@@ -39,4 +39,30 @@ export function formatGithubMessage(summary: string): string {
   return message;
 }
 
+export function formatSleepMessage(tip: string): string {
+  let message = `🌙 **深夜睡眠提醒** (${new Date().toLocaleDateString('zh-CN')})\n\n`;
+  message += `现在已经是凌晨 **00:10** 啦！你是全宇宙最努力的打工人，但现在身体需要充电了。🔋\n\n`;
+  message += `💡 **今日生活小常识：**\n${tip}\n\n`;
+  message += `请立刻放下手机，闭上眼睛，做一个甜甜的梦。晚安！😴💤`;
+  return message;
+}
+
+export function formatWakeupMessage(weather: WeatherData | null, quote: string): string {
+  let message = `☀️ **早安，小明！** (${new Date().toLocaleDateString('zh-CN')})\n\n`;
+  message += `${quote}\n\n`;
+
+  if (weather) {
+    message += `🌤️ **当前天气状态：**\n`;
+    message += `${weather.text} | ${weather.temp}°C\n\n`;
+
+    if (weather.text.includes('雨')) {
+      message += `⚠️ **注意：今天有雨，出门记得带伞哦！** ☔\n\n`;
+    }
+  }
+
+  message += `💪 加油，又是充满机遇的一天！别忘了打卡哦～`;
+  return message;
+}
+
+
 

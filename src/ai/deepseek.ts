@@ -98,4 +98,55 @@ ${repos.map((n, i) => `${i + 1}. ${n.title}: ${n.description}`).join('\n')}
   }
 }
 
+export async function generateLifeTipWithAI(): Promise<string> {
+  if (!config.deepseekApiKey) {
+    return '生活小贴士：多喝热水，早点睡觉。';
+  }
+
+  const openai = new OpenAI({
+    baseURL: 'https://api.deepseek.com',
+    apiKey: config.deepseekApiKey
+  });
+
+  const prompt = '请随机生成一条非常简短、实用、有趣的“生活小常识”或“健康小贴士”。要求：字数控制在 50 字以内，带上 1-2 个 Emoji，适合深夜阅读。';
+
+  try {
+    const completion = await openai.chat.completions.create({
+      messages: [{ role: 'user', content: prompt }],
+      model: 'deepseek-v4-flash',
+    });
+
+    return completion.choices[0].message.content || '生活小贴士：好梦！';
+  } catch (error) {
+    console.error('Failed to generate life tip with DeepSeek:', error);
+    return '生活小贴士：放下手机，立刻闭眼。';
+  }
+}
+
+export async function generateMorningQuoteWithAI(): Promise<string> {
+  if (!config.deepseekApiKey) {
+    return '早安！新的一天，加油！☀️';
+  }
+
+  const openai = new OpenAI({
+    baseURL: 'https://api.deepseek.com',
+    apiKey: config.deepseekApiKey
+  });
+
+  const prompt = '请生成一段简短、充满力量、能让人瞬间清醒并感到温暖的晨间励志语录。要求：适合程序员阅读，带上 1-2 个积极的 Emoji，字数 40 字以内。';
+
+  try {
+    const completion = await openai.chat.completions.create({
+      messages: [{ role: 'user', content: prompt }],
+      model: 'deepseek-v4-flash',
+    });
+
+    return completion.choices[0].message.content || '加油，你是最棒的！☀️';
+  } catch (error) {
+    console.error('Failed to generate morning quote with DeepSeek:', error);
+    return '早安！今天又是充满可能的一天。🚀';
+  }
+}
+
+
 
