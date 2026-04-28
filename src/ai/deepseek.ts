@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import { config } from '../config';
 import { GameNews } from '../fetchers/games';
+import { WeiboHot } from '../fetchers/weibo';
 
 export async function summarizeNewsWithAI(newsList: GameNews[]): Promise<GameNews[]> {
   if (!config.deepseekApiKey) {
@@ -34,15 +35,15 @@ ${newsList.map((n, i) => `[${i}] ${n.title}`).join('\n')}
   try {
     const completion = await openai.chat.completions.create({
       messages: [{ role: 'user', content: prompt }],
-      model: 'deepseek-chat',
+      model: 'deepseek-v4-flash',
     });
 
     const aiContent = completion.choices[0].message.content || '';
-    
+
     // 解析 AI 的输出，并覆盖到原数组中
     const lines = aiContent.split('\n');
     const summarizedNews = [...newsList];
-    
+
     lines.forEach(line => {
       const match = line.match(/^\[(\d+)\]\s*(.*)/);
       if (match) {
@@ -60,3 +61,40 @@ ${newsList.map((n, i) => `[${i}] ${n.title}`).join('\n')}
     return newsList; // 发生错误时回退到原始新闻
   }
 }
+
+export async function summarizeWeiboWithAI(hotList: WeiboHot[]): Promise<string> {
+  if (!config.deepseekApiKey || hotList.length === 0) {
+    return '暂无热搜摘要。';
+  }
+
+  const openai = new OpenAI({
+    baseURL: 'https://api.deepseek.com',
+    apiKey: config.deepseekApiKey
+  });
+
+  const prompt = `
+请作为一名客观、敏锐的社会观察者，对以下微博热搜进行梳理和精炼。
+要求：
+1. 过滤掉无聊的营销号广告和过度娱乐的八卦。
+2. 将剩下的内容按类别（如：社会热点、科技民生、娱乐影视）进行归类。
+3. 每个类别下用简洁的语言描述现在的核心关注点。
+4. 语言要干练，使用适当的 Emoji。
+5. 返回格式为 Telegram Markdown。
+
+热搜列表：
+${hotList.map((n, i) => `${i + 1}. ${n.title}`).join('\n')}
+  `;
+
+  try {
+    const completion = await openai.chat.completions.create({
+      messages: [{ role: 'user', content: prompt }],
+      model: 'deepseek-v4-flash',
+    });
+
+    return completion.choices[0].message.content || 'AI 总结失败。';
+  } catch (error) {
+    console.error('Failed to summarize Weibo with DeepSeek:', error);
+    return '微博热搜 AI 总结暂时不可用。';
+  }
+}
+

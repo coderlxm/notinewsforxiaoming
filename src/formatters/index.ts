@@ -31,3 +31,11 @@ export function formatTelegramMessage(weather: WeatherData | null, news: GameNew
 
   return message;
 }
+
+export function formatWeiboMessage(summary: string): string {
+  let message = `🔥 **微博午后热点速递** (${new Date().toLocaleDateString('zh-CN')})\n\n`;
+  message += summary;
+  message += `\n\n[点击查看实时热搜榜](https://s.weibo.com/top/summary)`;
+  return message;
+}
+
