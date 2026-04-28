@@ -1,4 +1,4 @@
-import Parser from 'rss-parser';
+import axios from 'axios';
 
 export interface GithubRepo {
   title: string;
@@ -6,25 +6,34 @@ export interface GithubRepo {
   description: string;
 }
 
-const parser = new Parser({
-  headers: {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-  }
-});
-
 export async function fetchGithubTrending(): Promise<GithubRepo[]> {
-  // 使用 GitHub Trending Daily RSS
-  const RSS_URL = 'https://rsshub.app/github/trending/daily/any';
+  // 计算 7 天前的日期，模拟 Trending 效果
+  const date = new Date();
+  date.setDate(date.getDate() - 7);
+  const dateString = date.toISOString().split('T')[0];
+
+  // 使用 GitHub 官方 Search API：搜索过去 7 天创建、Star 数最高的项目
+  const API_URL = `https://api.github.com/search/repositories?q=created:>${dateString}&sort=stars&order=desc&per_page=5`;
   
   try {
-    const parsed = await parser.parseURL(RSS_URL);
-    return parsed.items.slice(0, 5).map(item => ({
-      title: item.title || 'Unknown Repo',
-      link: item.link || '',
-      description: item.contentSnippet || ''
-    }));
+    const response = await axios.get(API_URL, {
+      headers: {
+        'Accept': 'application/vnd.github.v3+json',
+        'User-Agent': 'NotiNewsBot'
+      }
+    });
+
+    if (response.data && response.data.items) {
+      return response.data.items.map((item: any) => ({
+        title: item.full_name,
+        link: item.html_url,
+        description: item.description || 'No description'
+      }));
+    }
+    return [];
   } catch (error) {
-    console.error('Failed to fetch Github Trending:', error);
+    console.error('Failed to fetch Github Trending from official API:', error);
     return [];
   }
 }
+
