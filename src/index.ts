@@ -1,8 +1,8 @@
 import { fetchWeather } from './fetchers/weather';
 import { fetchGameNews } from './fetchers/games';
-import { fetchWeiboHot } from './fetchers/weibo';
-import { summarizeNewsWithAI, summarizeWeiboWithAI } from './ai/deepseek';
-import { formatTelegramMessage, formatWeiboMessage } from './formatters';
+import { fetchGithubTrending } from './fetchers/github';
+import { summarizeNewsWithAI, summarizeGithubWithAI } from './ai/deepseek';
+import { formatTelegramMessage, formatGithubMessage } from './formatters';
 import { sendTelegramMessage } from './publishers/telegram';
 
 async function main() {
@@ -21,12 +21,12 @@ async function main() {
     const message = formatTelegramMessage(weather, aiProcessedNews);
     await sendTelegramMessage(message);
   } 
-  // 北京时间 13:00 - 24:00 (UTC 05:00 - 16:00) 运行微博热搜逻辑
+  // 北京时间 13:00 - 24:00 (UTC 05:00 - 16:00) 运行 GitHub Trending 逻辑
   else {
-    console.log('Running afternoon Weibo task...');
-    const hotList = await fetchWeiboHot();
-    const summary = await summarizeWeiboWithAI(hotList);
-    const message = formatWeiboMessage(summary);
+    console.log('Running afternoon Github task...');
+    const repos = await fetchGithubTrending();
+    const summary = await summarizeGithubWithAI(repos);
+    const message = formatGithubMessage(summary);
     await sendTelegramMessage(message);
   }
   

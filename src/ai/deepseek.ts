@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 import { config } from '../config';
 import { GameNews } from '../fetchers/games';
-import { WeiboHot } from '../fetchers/weibo';
+import { GithubRepo } from '../fetchers/github';
 
 export async function summarizeNewsWithAI(newsList: GameNews[]): Promise<GameNews[]> {
   if (!config.deepseekApiKey) {
@@ -62,9 +62,9 @@ ${newsList.map((n, i) => `[${i}] ${n.title}`).join('\n')}
   }
 }
 
-export async function summarizeWeiboWithAI(hotList: WeiboHot[]): Promise<string> {
-  if (!config.deepseekApiKey || hotList.length === 0) {
-    return '暂无热搜摘要。';
+export async function summarizeGithubWithAI(repos: GithubRepo[]): Promise<string> {
+  if (!config.deepseekApiKey || repos.length === 0) {
+    return '暂无今日 GitHub 趋势。';
   }
 
   const openai = new OpenAI({
@@ -73,16 +73,16 @@ export async function summarizeWeiboWithAI(hotList: WeiboHot[]): Promise<string>
   });
 
   const prompt = `
-请作为一名客观、敏锐的社会观察者，对以下微博热搜进行梳理和精炼。
+请作为一名资深的 Full Stack 工程师和技术博主，对以下 GitHub 今日热门项目进行解析。
 要求：
-1. 过滤掉无聊的营销号广告和过度娱乐的八卦。
-2. 将剩下的内容按类别（如：社会热点、科技民生、娱乐影视）进行归类。
-3. 每个类别下用简洁的语言描述现在的核心关注点。
-4. 语言要干练，使用适当的 Emoji。
-5. 返回格式为 Telegram Markdown。
+1. 将项目名称和描述翻译成地道的中文。
+2. 用一句话精准描述这个项目“解决了什么痛点”或“为什么值得关注”。
+3. 保持专业且极客的语气。
+4. 使用适当的技术类 Emoji。
+5. 返回格式为 Telegram Markdown，包含链接。
 
-热搜列表：
-${hotList.map((n, i) => `${i + 1}. ${n.title}`).join('\n')}
+项目列表：
+${repos.map((n, i) => `${i + 1}. ${n.title}: ${n.description}`).join('\n')}
   `;
 
   try {
@@ -93,8 +93,9 @@ ${hotList.map((n, i) => `${i + 1}. ${n.title}`).join('\n')}
 
     return completion.choices[0].message.content || 'AI 总结失败。';
   } catch (error) {
-    console.error('Failed to summarize Weibo with DeepSeek:', error);
-    return '微博热搜 AI 总结暂时不可用。';
+    console.error('Failed to summarize Github with DeepSeek:', error);
+    return 'GitHub 趋势 AI 总结暂时不可用。';
   }
 }
+
 
