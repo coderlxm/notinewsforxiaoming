@@ -1,15 +1,6 @@
 name: Daily News Push
 
 on:
-  schedule:
-    # 每天北京时间早上 9:55 运行 (UTC 01:55)
-    - cron: '55 1 * * *'
-    # 每天北京时间下午 15:00 运行 (UTC 07:00)
-    - cron: '0 7 * * *'
-    # 每天北京时间凌晨 00:10 运行 (UTC 16:10)
-    - cron: '10 16 * * *'
-    # 每周一至周五北京时间早上 08:30 运行 (UTC 00:30)
-    - cron: '30 0 * * 1-5'
   workflow_dispatch: # 允许手动触发
 
 jobs:
