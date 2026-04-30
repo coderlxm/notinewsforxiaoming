@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 import { config } from '../config';
 import { GameNews } from '../fetchers/games';
-import { EnglishContent } from '../fetchers/english';
+import type { EnglishContent } from '../fetchers/english';
 
 export async function summarizeNewsWithAI(newsList: GameNews[]): Promise<GameNews[]> {
   if (!config.deepseekApiKey) {
@@ -272,5 +272,4 @@ export async function generateEnglishFallbackWithAI(): Promise<string> {
     ].join('\n');
   }
 }
-
 
