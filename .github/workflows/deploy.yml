@@ -1,0 +1,82 @@
+name: Deploy To Server
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SERVER_HOST: ${{ secrets.SERVER_HOST }}
+      SERVER_PORT: ${{ secrets.SERVER_PORT }}
+      SERVER_USER: ${{ secrets.SERVER_USER }}
+      SERVER_PROJECT_DIR: ${{ secrets.SERVER_PROJECT_DIR }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate secrets
+        run: |
+          test -n "$SERVER_HOST"
+          test -n "$SERVER_USER"
+          test -n "$SERVER_PROJECT_DIR"
+
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SERVER_SSH_KEY }}
+
+      - name: Add server to known_hosts
+        run: |
+          PORT="${SERVER_PORT:-22}"
+          mkdir -p ~/.ssh
+          ssh-keyscan -p "$PORT" -H "$SERVER_HOST" >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Ensure project directory exists
+        run: |
+          PORT="${SERVER_PORT:-22}"
+          ssh -p "$PORT" "$SERVER_USER@$SERVER_HOST" "mkdir -p '$SERVER_PROJECT_DIR'"
+
+      - name: Sync tracked files
+        run: |
+          PORT="${SERVER_PORT:-22}"
+          ssh -p "$PORT" "$SERVER_USER@$SERVER_HOST" "cd '$SERVER_PROJECT_DIR' && \
+            find . -mindepth 1 -maxdepth 1 ! -name '.env' -exec rm -rf {} +"
+          git archive --format=tar HEAD | \
+            ssh -p "$PORT" "$SERVER_USER@$SERVER_HOST" "tar -xf - -C '$SERVER_PROJECT_DIR'"
+
+      - name: Install dependencies on server
+        run: |
+          PORT="${SERVER_PORT:-22}"
+          ssh -p "$PORT" "$SERVER_USER@$SERVER_HOST" "
+            set -e
+            cd '$SERVER_PROJECT_DIR'
+            if ! command -v node >/dev/null 2>&1; then
+              echo 'Node.js is missing on server' >&2
+              exit 1
+            fi
+            if ! command -v pnpm >/dev/null 2>&1; then
+              timeout 180 npm install -g pnpm@10.33.2 --registry=https://registry.npmmirror.com --fetch-retries=1 --fetch-timeout=30000 --loglevel warn
+            fi
+            pnpm install --frozen-lockfile
+          "
+
+      - name: Reload timer units
+        run: |
+          PORT="${SERVER_PORT:-22}"
+          ssh -p "$PORT" "$SERVER_USER@$SERVER_HOST" "
+            set -e
+            systemctl daemon-reload
+            systemctl restart notinews.timer
+            systemctl status notinews.timer --no-pager -l | sed -n '1,40p'
+          "
