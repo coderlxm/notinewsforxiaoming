@@ -1,5 +1,5 @@
-import { WeatherData } from '../fetchers/weather';
-import { GameNews } from '../fetchers/games';
+import type { WeatherData } from '../fetchers/weather';
+import type { GameNews } from '../fetchers/games';
 import { isChinaWorkday } from '../calendar/chinaWorkday';
 
 export function formatTelegramMessage(weather: WeatherData | null, news: GameNews[]): string {
@@ -69,5 +69,4 @@ export function formatEnglishMessage(summary: string): string {
   message += `\n\n#英语学习 #CET6 #碎片化`;
   return message;
 }
-
 

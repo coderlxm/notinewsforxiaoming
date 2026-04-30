@@ -1,6 +1,6 @@
 import OpenAI from 'openai';
 import { config } from '../config';
-import { GameNews } from '../fetchers/games';
+import type { GameNews } from '../fetchers/games';
 import type { EnglishContent } from '../fetchers/english';
 
 export async function summarizeNewsWithAI(newsList: GameNews[]): Promise<GameNews[]> {
@@ -272,4 +272,3 @@ export async function generateEnglishFallbackWithAI(): Promise<string> {
     ].join('\n');
   }
 }
-
