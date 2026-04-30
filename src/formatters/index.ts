@@ -52,14 +52,15 @@ export function formatWakeupMessage(weather: WeatherData | null, quote: string):
     message += `🌤️ **当前天气状态：**\n`;
     message += `${weather.text} | ${weather.temp}°C\n\n`;
 
-    if (weather.text.includes('雨') || weather.text.includes('阴')) {
+    if (weather.text.includes('雨')) {
       message += `⚠️ **注意：今天有雨，出门记得带伞哦！** ☔\n\n`;
+    } else if (weather.text.includes('阴')) {
+      message += `🌥️ **注意：今天阴天，可能有雨，建议带伞以防万一。** ☂️\n\n`;
     }
   }
 
   message += `💪 加油，又是充满机遇的一天！别忘了打卡哦～`;
   return message;
 }
-
 
 
