@@ -7,13 +7,13 @@ export interface WeatherData {
   feelsLike: string;
   windDir: string;
 }
-
+// test
 export async function fetchWeather(): Promise<WeatherData | null> {
   if (!config.qweatherApiKey || !config.qweatherCityId) {
     console.warn('Weather API Key or City ID is not set. Skipping weather fetch.');
     return null;
   }
-  
+
   try {
     const url = `https://p66apy3ykq.re.qweatherapi.com/v7/weather/now?location=${config.qweatherCityId}&key=${config.qweatherApiKey}`;
     const response = await axios.get(url);
