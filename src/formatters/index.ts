@@ -55,7 +55,7 @@ export function formatWakeupMessage(weather: WeatherData | null, quote: string):
     message += `🌤️ **当前天气状态：**\n`;
     message += `${weather.text} | ${weather.temp}°C\n\n`;
 
-    if (weather.text.includes('雨')) {
+    if (weather.text.includes('雨') || weather.text.includes('阴')) {
       message += `⚠️ **注意：今天有雨，出门记得带伞哦！** ☔\n\n`;
     }
   }
