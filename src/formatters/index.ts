@@ -1,5 +1,6 @@
 import { WeatherData } from '../fetchers/weather';
 import { GameNews } from '../fetchers/games';
+import { isChinaWorkday } from '../calendar/chinaWorkday';
 
 export function formatTelegramMessage(weather: WeatherData | null, news: GameNews[]): string {
   let message = `📅 **每日简报** (${new Date().toLocaleDateString('zh-CN')})\n\n`;
@@ -19,11 +20,7 @@ export function formatTelegramMessage(weather: WeatherData | null, news: GameNew
     });
   }
 
-  const dayOfWeek = new Date().getDay();
-  // getDay(): 0 为周日，1-5 为工作日，6 为周六
-  const isWeekday = dayOfWeek >= 1 && dayOfWeek <= 5;
-
-  if (isWeekday) {
+  if (isChinaWorkday(new Date())) {
     message += `\n🚨 **打工人日常提醒** 🚨\n`;
     message += `💧 **多喝水！** 身体是革命的本钱，立刻去接一杯水！\n`;
     message += `⏱️ **记得打卡！** 上下班千万别忘了打卡，保卫工资！\n`;
