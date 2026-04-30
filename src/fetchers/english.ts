@@ -1,0 +1,141 @@
+import Parser from 'rss-parser';
+
+export interface EnglishContent {
+  source: string;
+  title: string;
+  content: string;
+  link: string;
+}
+
+const parser = new Parser({
+  headers: {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  }
+});
+
+type EnglishSource = {
+  name: string;
+  urls: string[];
+};
+
+const SOURCES = [
+  {
+    name: 'IGN',
+    urls: ['https://rsshub.icu/ign/news', 'https://feeds.feedburner.com/ign/all']
+  },
+  {
+    name: 'TechCrunch',
+    urls: ['https://techcrunch.com/feed/', 'https://rsshub.icu/techcrunch/home']
+  },
+  {
+    name: 'The Verge',
+    urls: ['https://www.theverge.com/rss/index.xml']
+  },
+  {
+    name: 'BBC News',
+    urls: ['https://feeds.bbci.co.uk/news/rss.xml', 'https://rsshub.icu/bbc/news']
+  },
+  {
+    name: 'Reuters',
+    urls: ['https://feeds.reuters.com/reuters/worldNews', 'https://rsshub.icu/reuters/world']
+  },
+  {
+    name: 'ESPN',
+    urls: ['https://www.espn.com/espn/rss/news']
+  }
+];
+
+function stripHtml(input: string): string {
+  return input.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function countWords(input: string): number {
+  return input.split(/\s+/).filter(Boolean).length;
+}
+
+function shuffle<T>(items: T[]): T[] {
+  const result = [...items];
+  for (let i = result.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const temp = result[i]!;
+    result[i] = result[j]!;
+    result[j] = temp;
+  }
+  return result;
+}
+
+async function parseWithTimeout(url: string, timeoutMs: number): Promise<Parser.Output<unknown>> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`Timeout after ${timeoutMs}ms: ${url}`)), timeoutMs);
+    parser.parseURL(url)
+      .then((parsed) => {
+        clearTimeout(timer);
+        resolve(parsed);
+      })
+      .catch((error) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+  });
+}
+
+function pickCandidate(
+  items: Parser.Item[],
+  sourceName: string
+): EnglishContent | null {
+  const normalized = items.map((item) => {
+    const raw = item.contentSnippet || item.content || '';
+    const content = stripHtml(raw);
+    return {
+      title: item.title || 'No Title',
+      link: item.link || '',
+      content,
+      words: countWords(content)
+    };
+  }).filter((item) => item.content.length > 0);
+
+  if (normalized.length === 0) return null;
+
+  const preferred = normalized.filter((item) => item.words >= 100 && item.words <= 300);
+  const pool = preferred.length > 0 ? preferred : normalized;
+  const selected = pool[Math.floor(Math.random() * pool.length)]!;
+
+  return {
+    source: sourceName,
+    title: selected.title,
+    content: selected.content,
+    link: selected.link
+  };
+}
+
+async function fetchFromSource(source: EnglishSource): Promise<EnglishContent | null> {
+  for (const url of source.urls) {
+    try {
+      const parsed = await parseWithTimeout(url, 10000);
+      const sample = shuffle(parsed.items).slice(0, 12);
+      const picked = pickCandidate(sample, source.name);
+      if (picked) return picked;
+    } catch (error) {
+      console.error(`Failed to fetch English content from ${source.name} (${url}):`, error);
+    }
+  }
+  return null;
+}
+
+export async function fetchEnglishContent(): Promise<EnglishContent | null> {
+  const shuffled = shuffle(SOURCES);
+  const requests = shuffled.map(async (source) => {
+    const result = await fetchFromSource(source);
+    if (!result) {
+      throw new Error(`No valid content from ${source.name}`);
+    }
+    return result;
+  });
+
+  try {
+    return await Promise.any(requests);
+  } catch (error) {
+    console.error('Failed to fetch English content from all sources:', error);
+    return null;
+  }
+}

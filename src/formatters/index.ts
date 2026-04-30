@@ -63,4 +63,11 @@ export function formatWakeupMessage(weather: WeatherData | null, quote: string):
   return message;
 }
 
+export function formatEnglishMessage(summary: string): string {
+  let message = `🎓 **名师每日英语** (${new Date().toLocaleDateString('zh-CN')})\n\n`;
+  message += summary;
+  message += `\n\n#英语学习 #CET6 #碎片化`;
+  return message;
+}
+
 
