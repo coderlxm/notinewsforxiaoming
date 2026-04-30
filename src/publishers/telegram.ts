@@ -1,11 +1,24 @@
 import { Telegraf } from 'telegraf';
 import { config } from '../config';
 
-function isMarkdownParseError(error: unknown): boolean {
+function isEntityParseError(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
   const response = (error as { response?: { description?: unknown } }).response;
   if (!response || typeof response.description !== 'string') return false;
   return response.description.includes("can't parse entities");
+}
+
+function toPlainText(message: string): string {
+  return message
+    .replace(/<a\s+href="([^"]+)"[^>]*>(.*?)<\/a>/gi, '$2 ($1)')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/?(b|strong|i|em|code|u|s)>/gi, '')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&');
 }
 
 export async function sendTelegramMessage(message: string): Promise<void> {
@@ -20,15 +33,15 @@ export async function sendTelegramMessage(message: string): Promise<void> {
   const bot = new Telegraf(config.tgToken);
   try {
     await bot.telegram.sendMessage(config.tgChatId, message, {
-      parse_mode: 'Markdown',
+      parse_mode: 'HTML',
       link_preview_options: { is_disabled: true }
     });
     console.log('Successfully sent message to Telegram.');
   } catch (error) {
-    if (isMarkdownParseError(error)) {
-      console.warn('Markdown parse failed. Retrying as plain text...');
+    if (isEntityParseError(error)) {
+      console.warn('Parse failed. Retrying as plain text...');
       try {
-        await bot.telegram.sendMessage(config.tgChatId, message, {
+        await bot.telegram.sendMessage(config.tgChatId, toPlainText(message), {
           link_preview_options: { is_disabled: true }
         });
         console.log('Successfully sent message to Telegram (plain text fallback).');
