@@ -80,3 +80,24 @@ jobs:
             systemctl restart notinews.timer
             systemctl status notinews.timer --no-pager -l | sed -n '1,40p'
           "
+
+      - name: Notify deploy success to Telegram
+        run: |
+          PORT="${SERVER_PORT:-22}"
+          SHORT_SHA="${GITHUB_SHA::7}"
+          ssh -p "$PORT" "$SERVER_USER@$SERVER_HOST" "
+            set -e
+            cd '$SERVER_PROJECT_DIR'
+            set -a
+            . ./.env
+            set +a
+            if [ -z \"\$TG_TOKEN\" ] || [ -z \"\$TG_CHAT_ID\" ]; then
+              echo 'TG_TOKEN or TG_CHAT_ID is missing in .env' >&2
+              exit 1
+            fi
+            RELEASE_TIME=\$(date '+%Y-%m-%d %H:%M:%S %Z')
+            MSG=\$(printf '✅ NotiNews Bot 已更新\n发布时间: %s\nCommit: %s' \"\${RELEASE_TIME}\" \"${SHORT_SHA}\")
+            curl -sS -X POST \"https://api.telegram.org/bot\${TG_TOKEN}/sendMessage\" \
+              --data-urlencode \"chat_id=\${TG_CHAT_ID}\" \
+              --data-urlencode \"text=\${MSG}\" >/dev/null
+          "
