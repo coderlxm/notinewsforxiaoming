@@ -111,6 +111,7 @@ jobs:
               '10:30') NEXT_MODE='Daily English Teacher' ;;
               '15:00') NEXT_MODE='Afternoon Github Trending' ;;
               '16:00') NEXT_MODE='Daily English Teacher' ;;
+              '21:00') NEXT_MODE='Daily English Teacher' ;;
               *) NEXT_MODE='Daily English Teacher' ;;
             esac
             MSG=\$(printf '✅ NotiNews Bot 已更新\n发布时间: %s\nCommit: %s\n下次执行: %s\n下次模式: %s' \"\${RELEASE_TIME}\" \"${SHORT_SHA}\" \"\${NEXT_RUN_TIME}\" \"\${NEXT_MODE}\")
