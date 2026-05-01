@@ -1,6 +1,7 @@
 import type { WeatherData } from '../fetchers/weather';
 import type { GameNews } from '../fetchers/games';
 import { isChinaWorkday } from '../calendar/chinaWorkday';
+import { getCountdownInfo } from '../calendar/countdown';
 
 function escapeHtml(text: string): string {
   return text
@@ -88,7 +89,6 @@ export function formatSleepMessage(tip: string): string {
 
 export function formatWakeupMessage(weather: WeatherData | null, quote: string): string {
   let message = `☀️ <b>早安，小明！</b> (${new Date().toLocaleDateString('zh-CN')})\n\n`;
-  message += `${renderMarkdownLikeAsHtml(quote)}\n\n`;
 
   if (weather) {
     message += '🌤️ <b>当前天气状态：</b>\n';
@@ -101,10 +101,31 @@ export function formatWakeupMessage(weather: WeatherData | null, quote: string):
     }
   }
 
-  if (isChinaWorkday(new Date())) {
-    message += '💪 加油，又是充满机遇的一天！别忘了打卡哦～';
+  const countdown = getCountdownInfo();
+  message += '\n⏳ <b>期待值回血中</b>\n';
+  message += '---\n';
+  if (countdown.isHolidayToday && countdown.currentHolidayName) {
+    message += `🏝️ 正在享受<b>【${countdown.currentHolidayName}】</b>假期中！\n`;
+  }
+  if (countdown.holiday) {
+    message += `🏝️ 距离<b>【${countdown.holiday.name}】</b>还有 <b>${countdown.holiday.days}</b> 天\n`;
+  }
+  if (countdown.gta6.days >= 0) {
+    const gtaEmoji = countdown.gta6.isSoon ? '🔥' : '🎮';
+    message += `${gtaEmoji} 距离<b>【GTA 6 发售】</b>还有 <b>${countdown.gta6.days}</b> 天\n`;
+    if (countdown.gta6.isSoon) {
+      message += '🚨 <b>冲刺阶段：</b>进入最后 30 天倒计时，准备开冲！\n';
+    }
   } else {
-    message += '💪 加油，又是充满机遇的一天！好好享受假期吧～';
+    message += '🎮 <b>GTA 6 已发售，准备开玩！</b>\n';
+  }
+
+  message += `\n📝 <b>今日励志语录</b>\n${renderMarkdownLikeAsHtml(quote)}\n`;
+
+  if (isChinaWorkday(new Date())) {
+    message += '\n💪 加油，又是充满机遇的一天！别忘了打卡哦～';
+  } else {
+    message += '\n💪 加油，又是充满机遇的一天！好好享受假期吧～';
   }
   return message;
 }
