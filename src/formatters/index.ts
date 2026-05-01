@@ -101,7 +101,11 @@ export function formatWakeupMessage(weather: WeatherData | null, quote: string):
     }
   }
 
-  message += '💪 加油，又是充满机遇的一天！别忘了打卡哦～';
+  if (isChinaWorkday(new Date())) {
+    message += '💪 加油，又是充满机遇的一天！别忘了打卡哦～';
+  } else {
+    message += '💪 加油，又是充满机遇的一天！好好享受假期吧～';
+  }
   return message;
 }
 
