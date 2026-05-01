@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import { config } from '../config';
 import type { GameNews } from '../fetchers/games';
 import type { EnglishContent } from '../fetchers/english';
+import type { V2exTopic } from '../fetchers/v2ex';
 
 export async function summarizeNewsWithAI(newsList: GameNews[]): Promise<GameNews[]> {
   if (!config.deepseekApiKey) {
@@ -270,5 +271,52 @@ export async function generateEnglishFallbackWithAI(): Promise<string> {
       '🎓 **课后私语**:',
       '* One more page today is a better you tomorrow.（今天多学一页，明天就更强一点。）'
     ].join('\n');
+  }
+}
+
+export async function summarizeV2exWithAI(topics: V2exTopic[]): Promise<string> {
+  if (!config.deepseekApiKey || topics.length === 0) {
+    return '今日 V2EX 暂无热点讨论。';
+  }
+
+  const openai = new OpenAI({
+    baseURL: 'https://api.deepseek.com',
+    apiKey: config.deepseekApiKey
+  });
+
+  const prompt = `
+Role: 你是一位深谙 V2EX 社区文化、既能硬核聊技术又能深度剖析情感的人间清醒观察者。
+Input: 下面是今日 V2EX 的热帖列表：
+${topics.map(t => `- [${t.node}] ${t.title} (回复: ${t.replies})\n  内容摘要: ${t.content.slice(0, 300)}`).join('\n\n')}
+
+Task:
+请为用户生成一份“V2EX 今日热议脱水总结”。要求：
+
+1. **情感类话题特写 (Highest Priority)**：
+   - 识别涉及 [缘分天空]、[酷爱]、[结婚]、[奇思妙想] 等情感、人际关系或生活感悟的帖子。
+   - 对这类帖子进行深度拆解：原帖的纠结点在哪？评论区的核心矛盾是什么（如：全员劝分、三观碰撞）？有没有什么一针见血的神评论？
+   - 内容允许详细，保持同理心但要清醒。
+
+2. **其他热门分类**：
+   - 将剩下的帖子按 [硬核技术]、[职场/搞钱]、[生活琐事] 等进行归类总结。
+   - 保持精炼，一句话点出看点。
+
+3. **输出要求**：
+   - 使用 HTML 格式（支持 <b>, <i>, <a>, <code> 标签）。
+   - 整体风格要犀利且有趣，像是在和老友深夜聊天。
+
+注意：内容中如果包含链接，请使用 <a href="链接">标题</a> 格式。
+  `;
+
+  try {
+    const completion = await openai.chat.completions.create({
+      messages: [{ role: 'user', content: prompt }],
+      model: 'deepseek-v4-flash',
+    });
+
+    return completion.choices[0].message.content || 'AI 总结失败。';
+  } catch (error) {
+    console.error('Failed to summarize V2EX with DeepSeek:', error);
+    return 'V2EX 今日总结暂时不可用。';
   }
 }

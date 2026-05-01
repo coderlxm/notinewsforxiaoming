@@ -115,3 +115,10 @@ export function formatEnglishMessage(summary: string): string {
   message += '\n\n#英语学习 #CET6 #碎片化';
   return message;
 }
+
+export function formatV2exMessage(summary: string): string {
+  let message = `🚀 <b>V2EX 今日热议脱水总结</b> (${new Date().toLocaleDateString('zh-CN')})\n\n`;
+  message += summary; // AI 已经输出了 HTML
+  message += '\n\n#V2EX #社区热点 #深夜剧场';
+  return message;
+}

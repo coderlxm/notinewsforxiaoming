@@ -2,8 +2,9 @@ import { fetchWeather } from './fetchers/weather';
 import { fetchGameNews } from './fetchers/games';
 import { fetchGithubTrending } from './fetchers/github';
 import { fetchEnglishContent } from './fetchers/english';
-import { summarizeNewsWithAI, summarizeGithubWithAI, generateLifeTipWithAI, generateMorningQuoteWithAI, teachEnglishWithAI, generateEnglishFallbackWithAI } from './ai/deepseek';
-import { formatTelegramMessage, formatGithubMessage, formatSleepMessage, formatWakeupMessage, formatEnglishMessage } from './formatters';
+import { fetchV2exHot } from './fetchers/v2ex';
+import { summarizeNewsWithAI, summarizeGithubWithAI, generateLifeTipWithAI, generateMorningQuoteWithAI, teachEnglishWithAI, generateEnglishFallbackWithAI, summarizeV2exWithAI } from './ai/deepseek';
+import { formatTelegramMessage, formatGithubMessage, formatSleepMessage, formatWakeupMessage, formatEnglishMessage, formatV2exMessage } from './formatters';
 import { sendTelegramMessage } from './publishers/telegram';
 
 const MINUTES_PER_DAY = 24 * 60;
@@ -13,7 +14,8 @@ const SPECIAL_SCHEDULE = {
   sleep: 10,           // 00:10
   wakeup: 8 * 60 + 30, // 08:30
   news: 9 * 60 + 55,   // 09:55
-  github: 15 * 60      // 15:00
+  github: 15 * 60,     // 15:00
+  v2ex: 20 * 60        // 20:00
 };
 
 function minuteDistance(a: number, b: number): number {
@@ -69,6 +71,13 @@ async function main() {
     const message = formatGithubMessage(summary);
     await sendTelegramMessage(message);
   }
+  else if (isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.v2ex)) {
+    console.log('Mode: Evening V2EX Hot Topics');
+    const topics = await fetchV2exHot();
+    const summary = await summarizeV2exWithAI(topics);
+    const message = formatV2exMessage(summary);
+    await sendTelegramMessage(message);
+  }
   // --- 2. 其他所有时段：英语学习模式（含手动执行） ---
   else {
     console.log('Mode: Daily English Teacher');
@@ -79,6 +88,7 @@ async function main() {
     const message = formatEnglishMessage(summary);
     await sendTelegramMessage(message);
   }
+
   
   console.log('Task finished.');
 }

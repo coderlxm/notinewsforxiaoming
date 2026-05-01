@@ -111,6 +111,7 @@ jobs:
               '10:30') NEXT_MODE='Daily English Teacher' ;;
               '15:00') NEXT_MODE='Afternoon Github Trending' ;;
               '16:00') NEXT_MODE='Daily English Teacher' ;;
+              '20:00') NEXT_MODE='Evening V2EX Hot Topics' ;;
               '21:00') NEXT_MODE='Daily English Teacher' ;;
               *) NEXT_MODE='Daily English Teacher' ;;
             esac
