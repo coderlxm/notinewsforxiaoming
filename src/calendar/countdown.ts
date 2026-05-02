@@ -16,8 +16,8 @@ interface HolidayPeriod {
 
 const HOLIDAY_NAME_BY_START_DATE: Record<string, string> = {
   '2026-01-01': '元旦',
-  '2026-02-16': '春节',
-  '2026-04-06': '清明节',
+  '2026-02-15': '春节',
+  '2026-04-04': '清明节',
   '2026-05-01': '劳动节',
   '2026-06-19': '端午节',
   '2026-09-25': '中秋节',
@@ -59,6 +59,22 @@ function nextDate(date: string): string {
   return `${ny}-${nm}-${nd}`;
 }
 
+function prevDate(date: string): string {
+  const [y, m, d] = date.split('-').map(Number);
+  const dt = new Date(Date.UTC(y!, (m ?? 1) - 1, d!));
+  dt.setUTCDate(dt.getUTCDate() - 1);
+  const ny = dt.getUTCFullYear();
+  const nm = String(dt.getUTCMonth() + 1).padStart(2, '0');
+  const nd = String(dt.getUTCDate()).padStart(2, '0');
+  return `${ny}-${nm}-${nd}`;
+}
+
+function isWeekend(date: string): boolean {
+  const [y, m, d] = date.split('-').map(Number);
+  const dow = new Date(Date.UTC(y!, (m ?? 1) - 1, d!)).getUTCDay();
+  return dow === 0 || dow === 6;
+}
+
 function loadHolidayCalendar(year: number): HolidayCalendar | null {
   try {
     const path = resolve(process.cwd(), `data/china-holiday-${year}.json`);
@@ -68,36 +84,49 @@ function loadHolidayCalendar(year: number): HolidayCalendar | null {
   }
 }
 
-function buildHolidayPeriods(holidayDates: string[]): HolidayPeriod[] {
+function buildHolidayPeriods(holidayDates: string[], workdayOverrides: string[]): HolidayPeriod[] {
   if (holidayDates.length === 0) return [];
-  const sorted = [...holidayDates].sort();
+  const holidaySet = new Set(holidayDates);
+  const workdaySet = new Set(workdayOverrides);
+  const visitedOverride = new Set<string>();
   const periods: HolidayPeriod[] = [];
+  const sortedOverrides = [...holidayDates].sort();
 
-  let start = sorted[0]!;
-  let end = sorted[0]!;
+  const isNonWorkday = (date: string): boolean => {
+    if (workdaySet.has(date)) return false;
+    if (holidaySet.has(date)) return true;
+    return isWeekend(date);
+  };
 
-  for (let i = 1; i < sorted.length; i += 1) {
-    const current = sorted[i]!;
-    if (current === nextDate(end)) {
-      end = current;
-    } else {
-      periods.push({
-        name: HOLIDAY_NAME_BY_START_DATE[start] ?? '节假日',
-        start,
-        end
-      });
-      start = current;
-      end = current;
+  for (const anchor of sortedOverrides) {
+    if (visitedOverride.has(anchor)) continue;
+
+    let start = anchor;
+    let end = anchor;
+
+    while (isNonWorkday(prevDate(start))) {
+      start = prevDate(start);
     }
+    while (isNonWorkday(nextDate(end))) {
+      end = nextDate(end);
+    }
+
+    let cursor = start;
+    while (cursor <= end) {
+      if (holidaySet.has(cursor)) {
+        visitedOverride.add(cursor);
+      }
+      cursor = nextDate(cursor);
+    }
+
+    periods.push({
+      name: HOLIDAY_NAME_BY_START_DATE[start] ?? HOLIDAY_NAME_BY_START_DATE[anchor] ?? '节假日',
+      start,
+      end
+    });
   }
 
-  periods.push({
-    name: HOLIDAY_NAME_BY_START_DATE[start] ?? '节假日',
-    start,
-    end
-  });
-
-  return periods;
+  return periods.sort((a, b) => a.start.localeCompare(b.start));
 }
 
 export interface CountdownInfo {
@@ -111,7 +140,7 @@ export function getCountdownInfo(): CountdownInfo {
   const today = chinaToday();
   const currentYear = parseInt(today.slice(0, 4), 10);
   const calendar = loadHolidayCalendar(currentYear);
-  const holidayPeriods = buildHolidayPeriods(calendar?.holiday_overrides ?? []);
+  const holidayPeriods = buildHolidayPeriods(calendar?.holiday_overrides ?? [], calendar?.workday_overrides ?? []);
 
   let currentHoliday: HolidayPeriod | null = null;
   for (const h of holidayPeriods) {

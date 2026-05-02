@@ -89,15 +89,18 @@ export function formatSleepMessage(tip: string): string {
 
 export function formatWakeupMessage(weather: WeatherData | null, quote: string): string {
   let message = `☀️ <b>早安，小明！</b> (${new Date().toLocaleDateString('zh-CN')})\n\n`;
+  const isWorkday = isChinaWorkday(new Date());
 
   if (weather) {
     message += '🌤️ <b>当前天气状态：</b>\n';
     message += `${escapeHtml(weather.text)} | ${escapeHtml(String(weather.temp))}°C\n\n`;
 
-    if (weather.text.includes('雨')) {
-      message += '⚠️ <b>注意：今天有雨，出门记得带伞哦！</b> ☔\n\n';
-    } else if (weather.text.includes('阴')) {
-      message += '🌥️ <b>注意：今天阴天，可能有雨，建议带伞以防万一。</b> ☂️\n\n';
+    if (isWorkday) {
+      if (weather.text.includes('雨')) {
+        message += '⚠️ <b>注意：今天有雨，出门记得带伞哦！</b> ☔\n\n';
+      } else if (weather.text.includes('阴')) {
+        message += '🌥️ <b>注意：今天阴天，可能有雨，建议带伞以防万一。</b> ☂️\n\n';
+      }
     }
   }
 
@@ -122,7 +125,7 @@ export function formatWakeupMessage(weather: WeatherData | null, quote: string):
 
   message += `\n📝 <b>今日励志语录</b>\n${renderMarkdownLikeAsHtml(quote)}\n`;
 
-  if (isChinaWorkday(new Date())) {
+  if (isWorkday) {
     message += '\n💪 加油，又是充满机遇的一天！别忘了打卡哦～';
   } else {
     message += '\n💪 加油，又是充满机遇的一天！好好享受假期吧～';
