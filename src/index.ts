@@ -9,6 +9,8 @@ import { sendTelegramMessage } from './publishers/telegram';
 
 const MINUTES_PER_DAY = 24 * 60;
 const TOLERANCE_MINUTES = 10;
+const TEST_MODE_ENABLED = process.env.TEST_MODE_ENABLED === '1';
+const TEST_FORCE_MODE = (process.env.TEST_FORCE_MODE || '').trim().toLowerCase();
 
 const SPECIAL_SCHEDULE = {
   sleep: 10,           // 00:10
@@ -29,6 +31,90 @@ function isNearSchedule(currentMinuteOfDay: number, targetMinuteOfDay: number): 
   return minuteDistance(currentMinuteOfDay, targetMinuteOfDay) <= TOLERANCE_MINUTES;
 }
 
+type PushMode = 'sleep' | 'wakeup' | 'news' | 'github' | 'v2ex' | 'fitness' | 'english';
+
+function parseForcedMode(rawMode: string): PushMode | null {
+  const modeMap: Record<string, PushMode> = {
+    sleep: 'sleep',
+    wakeup: 'wakeup',
+    news: 'news',
+    github: 'github',
+    v2ex: 'v2ex',
+    fitness: 'fitness',
+    english: 'english'
+  };
+  return modeMap[rawMode] ?? null;
+}
+
+async function runMode(mode: PushMode, chinaDayOfWeek: number): Promise<void> {
+  if (mode === 'sleep') {
+    console.log('Mode: Midnight Sleep Reminder');
+    const tip = await generateLifeTipWithAI();
+    const message = formatSleepMessage(tip);
+    await sendTelegramMessage(message);
+    return;
+  }
+
+  if (mode === 'wakeup') {
+    console.log('Mode: Morning Wake-up');
+    const [weather, quote] = await Promise.all([
+      fetchWeather(),
+      generateMorningQuoteWithAI()
+    ]);
+    const message = formatWakeupMessage(weather, quote);
+    await sendTelegramMessage(message);
+    return;
+  }
+
+  if (mode === 'news') {
+    console.log('Mode: Morning News');
+    const [weather, rawNews] = await Promise.all([
+      fetchWeather(),
+      fetchGameNews()
+    ]);
+    const aiProcessedNews = await summarizeNewsWithAI(rawNews);
+    const message = formatTelegramMessage(weather, aiProcessedNews);
+    await sendTelegramMessage(message);
+    return;
+  }
+
+  if (mode === 'github') {
+    console.log('Mode: Afternoon Github Trending');
+    const repos = await fetchGithubTrending();
+    const summary = await summarizeGithubWithAI(repos);
+    const message = formatGithubMessage(summary);
+    await sendTelegramMessage(message);
+    return;
+  }
+
+  if (mode === 'v2ex') {
+    console.log('Mode: Evening V2EX Hot Topics');
+    const topics = await fetchV2exHot();
+    const summary = await summarizeV2exWithAI(topics);
+    const message = formatV2exMessage(summary);
+    await sendTelegramMessage(message);
+    return;
+  }
+
+  if (mode === 'fitness') {
+    console.log('Mode: Fitness Coach');
+    const weather = await fetchWeather();
+    const weatherText = weather ? weather.text : '未知天气';
+    const plan = await generateFitnessPlanWithAI(chinaDayOfWeek, weatherText);
+    const message = formatFitnessMessage(plan);
+    await sendTelegramMessage(message);
+    return;
+  }
+
+  console.log('Mode: Daily English Teacher');
+  const article = await fetchEnglishContent();
+  const summary = article
+    ? await teachEnglishWithAI(article)
+    : await generateEnglishFallbackWithAI();
+  const message = formatEnglishMessage(summary);
+  await sendTelegramMessage(message);
+}
+
 async function main() {
   const now = new Date();
   // 统一按北京时间计算周几，避免服务器本地时区导致误判。
@@ -42,71 +128,35 @@ async function main() {
   console.log(`Current UTC Time: ${String(currentUTCHour).padStart(2, '0')}:${String(currentUTCMinute).padStart(2, '0')}`);
   console.log(`Current China Time: ${chinaTime} (Day of Week: ${chinaDayOfWeek})`);
 
-  // --- 1. 固定触发点模式（10 分钟容差） ---
-  if (isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.sleep)) {
-    console.log('Mode: Midnight Sleep Reminder');
-    const tip = await generateLifeTipWithAI();
-    const message = formatSleepMessage(tip);
-    await sendTelegramMessage(message);
+  if (TEST_MODE_ENABLED) {
+    const forcedMode = parseForcedMode(TEST_FORCE_MODE);
+    if (!forcedMode) {
+      throw new Error(`Invalid TEST_FORCE_MODE: "${TEST_FORCE_MODE}". Allowed: sleep,wakeup,news,github,v2ex,fitness,english`);
+    }
+    console.log(`Test mode enabled. Bypass schedule and force mode: ${forcedMode}`);
+    await runMode(forcedMode, chinaDayOfWeek);
   }
-  else if (isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.wakeup)) {
-    console.log('Mode: Morning Wake-up');
-    const [weather, quote] = await Promise.all([
-      fetchWeather(),
-      generateMorningQuoteWithAI()
-    ]);
-    const message = formatWakeupMessage(weather, quote);
-    await sendTelegramMessage(message);
-  }
-  else if (isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.news)) {
-    console.log('Mode: Morning News');
-    const [weather, rawNews] = await Promise.all([
-      fetchWeather(),
-      fetchGameNews()
-    ]);
-    const aiProcessedNews = await summarizeNewsWithAI(rawNews);
-    const message = formatTelegramMessage(weather, aiProcessedNews);
-    await sendTelegramMessage(message);
-  }
-  else if (isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.github)) {
-    console.log('Mode: Afternoon Github Trending');
-    const repos = await fetchGithubTrending();
-    const summary = await summarizeGithubWithAI(repos);
-    const message = formatGithubMessage(summary);
-    await sendTelegramMessage(message);
-  }
-  else if (isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.v2ex)) {
-    console.log('Mode: Evening V2EX Hot Topics');
-    const topics = await fetchV2exHot();
-    const summary = await summarizeV2exWithAI(topics);
-    const message = formatV2exMessage(summary);
-    await sendTelegramMessage(message);
-  }
-  // --- 健身规划模块 (周一, 周三 20:30 | 周六 14:00) ---
-  else if (
-    ((chinaDayOfWeek === 1 || chinaDayOfWeek === 3) && isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.fitness_weekday)) ||
-    (chinaDayOfWeek === 6 && isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.fitness_weekend))
-  ) {
-    console.log('Mode: Fitness Coach');
-    const weather = await fetchWeather();
-    const weatherText = weather ? weather.text : '未知天气';
-    const plan = await generateFitnessPlanWithAI(chinaDayOfWeek, weatherText);
-    const message = formatFitnessMessage(plan);
-    await sendTelegramMessage(message);
-  }
-  // --- 2. 其他所有时段：英语学习模式（含手动执行） ---
   else {
-    console.log('Mode: Daily English Teacher');
-    const article = await fetchEnglishContent();
-    const summary = article
-      ? await teachEnglishWithAI(article)
-      : await generateEnglishFallbackWithAI();
-    const message = formatEnglishMessage(summary);
-    await sendTelegramMessage(message);
+    let selectedMode: PushMode = 'english';
+    if (isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.sleep)) {
+      selectedMode = 'sleep';
+    } else if (isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.wakeup)) {
+      selectedMode = 'wakeup';
+    } else if (isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.news)) {
+      selectedMode = 'news';
+    } else if (isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.github)) {
+      selectedMode = 'github';
+    } else if (isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.v2ex)) {
+      selectedMode = 'v2ex';
+    } else if (
+      ((chinaDayOfWeek === 1 || chinaDayOfWeek === 3) && isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.fitness_weekday)) ||
+      (chinaDayOfWeek === 6 && isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.fitness_weekend))
+    ) {
+      selectedMode = 'fitness';
+    }
+    await runMode(selectedMode, chinaDayOfWeek);
   }
 
-
-  
   console.log('Task finished.');
 }
 
