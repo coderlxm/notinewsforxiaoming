@@ -6,6 +6,7 @@ import { fetchV2exHot } from './fetchers/v2ex';
 import { summarizeNewsWithAI, summarizeGithubWithAI, generateLifeTipWithAI, generateMorningQuoteWithAI, teachEnglishWithAI, generateEnglishFallbackWithAI, summarizeV2exWithAI, generateFitnessPlanWithAI } from './ai/deepseek';
 import { formatTelegramMessage, formatGithubMessage, formatSleepMessage, formatWakeupMessage, formatEnglishMessage, formatV2exMessage, formatFitnessMessage } from './formatters';
 import { sendTelegramMessage } from './publishers/telegram';
+import { getFitnessContext, markFitnessWorkoutGenerated } from './services/fitness';
 
 const MINUTES_PER_DAY = 24 * 60;
 const TOLERANCE_MINUTES = 10;
@@ -100,9 +101,14 @@ async function runMode(mode: PushMode, chinaDayOfWeek: number): Promise<void> {
     console.log('Mode: Fitness Coach');
     const weather = await fetchWeather();
     const weatherText = weather ? weather.text : '未知天气';
-    const plan = await generateFitnessPlanWithAI(chinaDayOfWeek, weatherText);
+    const fitnessContext = getFitnessContext(chinaDayOfWeek);
+    const plan = await generateFitnessPlanWithAI(chinaDayOfWeek, weatherText, fitnessContext);
     const message = formatFitnessMessage(plan);
-    await sendTelegramMessage(message);
+    const sent = await sendTelegramMessage(message);
+    if (sent) {
+      const nextStatus = markFitnessWorkoutGenerated(fitnessContext.status, fitnessContext.focusArea);
+      console.log(`Fitness status updated. Level: ${nextStatus.training_state.current_level}, Total: ${nextStatus.training_state.total_completed}`);
+    }
     return;
   }
 

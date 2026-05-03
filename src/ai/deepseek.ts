@@ -3,6 +3,7 @@ import { config } from '../config';
 import type { GameNews } from '../fetchers/games';
 import type { EnglishContent } from '../fetchers/english';
 import type { V2exTopic } from '../fetchers/v2ex';
+import type { FitnessContext } from '../services/fitness';
 
 export async function summarizeNewsWithAI(newsList: GameNews[]): Promise<GameNews[]> {
   if (!config.deepseekApiKey) {
@@ -326,7 +327,7 @@ Task:
   }
 }
 
-export async function generateFitnessPlanWithAI(dayOfWeek: number, weatherText: string): Promise<string> {
+export async function generateFitnessPlanWithAI(dayOfWeek: number, weatherText: string, fitnessContext: FitnessContext): Promise<string> {
   if (!config.deepseekApiKey) {
     return '教练今天没带表，请稍后再试。';
   }
@@ -339,20 +340,21 @@ export async function generateFitnessPlanWithAI(dayOfWeek: number, weatherText: 
   const isRainy = weatherText.includes('雨');
   const dayLabels = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
   const dayLabel = dayLabels[dayOfWeek] || '未知日期';
-  
-  // 根据周几设定不同的侧重点
-  let focus = '全身燃脂';
-  if (dayOfWeek === 1) focus = '上肢力量 + 腹部核心';
-  if (dayOfWeek === 3) focus = '下肢稳固 + 身体协调';
-  if (dayOfWeek === 6) focus = '全身爆发力大循环 (Weekend Special)';
+  const { status, focusArea, bgmStyle, bgmKeyword } = fitnessContext;
 
   const prompt = `
 Role: 你是一位非常有亲和力、极其注重动作安全性、擅长减脂训练的资深健身教练。
-User: 小明（身高 172cm, 体重 68kg，上班族，CET-6水平，希望动作简单安全，强度适中）。
+User: 小明（32岁，男性，身高 172cm, 体重 68kg，上班族，CET-6水平，希望动作简单安全，强度适中）。
 Context: 
 - 今天是: ${dayLabel}
-- 训练侧重: ${focus}
+- 当前训练等级: Level ${status.training_state.current_level}（1-100，等级越高可略微增加组数或缩短休息，但仍保持安全适中）
+- 累计训练次数: ${status.training_state.total_completed}
+- 上次训练日期: ${status.training_state.last_workout_date ?? '暂无记录'}
+- 上次训练侧重: ${status.training_state.last_focus_area ?? '暂无记录'}
+- 本次训练侧重: ${focusArea}
 - 当前天气: ${weatherText} ${isRainy ? '(检测到恶劣天气，请优先制定【纯居家自重方案】)' : '(天气良好，可以前往健身房或户外)'}
+- BGM 推荐风格: ${bgmStyle}
+- BGM 搜索关键词: ${bgmKeyword}
 
 Task:
 请为小明制定一份 60 分钟的训练计划，严格按以下格式输出（使用 HTML 标签）：
@@ -363,10 +365,14 @@ Task:
    - 动作需简单、安全。
    - 每个动作标注：动作名、组数 x 次数、休息时间。
    - **注意：每个动作必须附带一句话的简要做法说明（严禁长篇大论，限 30 字以内）。**
-4. 🥦 <b>教练饮食贴士</b>: (限 20 字以内)
-5. 📢 <b>今日教练寄语</b>: (限 30 字以内)
+4. 🎵 <b>教练推荐 BGM 风格</b>: ${bgmStyle}，关键词：<code>${bgmKeyword}</code>
+5. 🥦 <b>教练饮食贴士</b>: (限 20 字以内)
+6. 📢 <b>今日教练寄语</b>: (限 30 字以内)
 
-注意：**总输出长度严禁超过 600 个汉字**。排版清晰，Emoji 适度，确保 Telegram 消息不会因过长而发送失败。
+注意：
+- 本次必须避开上次训练侧重里已训练过的主要肌群，优先保证恢复。
+- 根据 Level ${status.training_state.current_level} 小幅调整强度，不要突然加量。
+- **总输出长度严禁超过 600 个汉字**。排版清晰，Emoji 适度，确保 Telegram 消息不会因过长而发送失败。
   `;
 
   try {

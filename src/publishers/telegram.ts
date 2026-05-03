@@ -21,13 +21,13 @@ function toPlainText(message: string): string {
     .replace(/&amp;/g, '&');
 }
 
-export async function sendTelegramMessage(message: string): Promise<void> {
+export async function sendTelegramMessage(message: string): Promise<boolean> {
   if (!config.tgToken || !config.tgChatId) {
     console.warn('Telegram Token or Chat ID is not set. Skipping message push.');
     console.log('=== Console Fallback Output ===');
     console.log(message);
     console.log('===============================');
-    return;
+    return true;
   }
 
   const bot = new Telegraf(config.tgToken);
@@ -37,6 +37,7 @@ export async function sendTelegramMessage(message: string): Promise<void> {
       link_preview_options: { is_disabled: true }
     });
     console.log('Successfully sent message to Telegram.');
+    return true;
   } catch (error) {
     if (isEntityParseError(error)) {
       console.warn('Parse failed. Retrying as plain text...');
@@ -45,12 +46,13 @@ export async function sendTelegramMessage(message: string): Promise<void> {
           link_preview_options: { is_disabled: true }
         });
         console.log('Successfully sent message to Telegram (plain text fallback).');
-        return;
+        return true;
       } catch (fallbackError) {
         console.error('Failed to send message to Telegram (fallback):', fallbackError);
-        return;
+        return false;
       }
     }
     console.error('Failed to send message to Telegram:', error);
+    return false;
   }
 }

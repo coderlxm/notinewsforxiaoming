@@ -51,7 +51,7 @@ jobs:
         run: |
           PORT="${SERVER_PORT:-22}"
           ssh -p "$PORT" "$SERVER_USER@$SERVER_HOST" "cd '$SERVER_PROJECT_DIR' && \
-            find . -mindepth 1 -maxdepth 1 ! -name '.env' -exec rm -rf {} +"
+            find . -mindepth 1 -maxdepth 1 ! -name '.env' ! -name 'data' -exec rm -rf {} +"
           git archive --format=tar HEAD | \
             ssh -p "$PORT" "$SERVER_USER@$SERVER_HOST" "tar -xf - -C '$SERVER_PROJECT_DIR'"
 

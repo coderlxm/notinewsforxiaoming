@@ -11,6 +11,9 @@ lerna-debug.log*
 node_modules/
 .pnpm-store/
 
+# Runtime state
+data/fitness_status.json
+
 # Mac OS
 .DS_Store
 
