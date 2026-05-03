@@ -3,6 +3,15 @@ import type { GameNews } from '../fetchers/games';
 import { isChinaWorkday } from '../calendar/chinaWorkday';
 import { getCountdownInfo } from '../calendar/countdown';
 
+function chinaDateLabel(): string {
+  return new Intl.DateTimeFormat('zh-CN', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric'
+  }).format(new Date());
+}
+
 function escapeHtml(text: string): string {
   return text
     .replace(/&/g, '&amp;')
@@ -44,7 +53,7 @@ function renderMarkdownLikeAsHtml(input: string): string {
 }
 
 export function formatTelegramMessage(weather: WeatherData | null, news: GameNews[]): string {
-  let message = `📅 <b>每日简报</b> (${new Date().toLocaleDateString('zh-CN')})\n\n`;
+  let message = `📅 <b>每日简报</b> (${chinaDateLabel()})\n\n`;
 
   if (weather) {
     message += '🌤️ <b>今日天气</b>\n';
@@ -73,14 +82,14 @@ export function formatTelegramMessage(weather: WeatherData | null, news: GameNew
 }
 
 export function formatGithubMessage(summary: string): string {
-  let message = `🚀 <b>GitHub 今日趋势精选</b> (${new Date().toLocaleDateString('zh-CN')})\n\n`;
+  let message = `🚀 <b>GitHub 今日趋势精选</b> (${chinaDateLabel()})\n\n`;
   message += renderMarkdownLikeAsHtml(summary);
   message += '\n\n<a href="https://github.com/trending">查看更多热门项目</a>';
   return message;
 }
 
 export function formatSleepMessage(tip: string): string {
-  let message = `🌙 <b>深夜睡眠提醒</b> (${new Date().toLocaleDateString('zh-CN')})\n\n`;
+  let message = `🌙 <b>深夜睡眠提醒</b> (${chinaDateLabel()})\n\n`;
   message += '现在已经是凌晨 <b>00:10</b> 啦！你是全宇宙最努力的打工人，但现在身体需要充电了。🔋\n\n';
   message += `💡 <b>今日生活小常识：</b>\n${renderMarkdownLikeAsHtml(tip)}\n\n`;
   message += '请立刻放下手机，闭上眼睛，做一个甜甜的梦。晚安！😴💤';
@@ -88,7 +97,7 @@ export function formatSleepMessage(tip: string): string {
 }
 
 export function formatWakeupMessage(weather: WeatherData | null, quote: string): string {
-  let message = `☀️ <b>早安，小明！</b> (${new Date().toLocaleDateString('zh-CN')})\n\n`;
+  let message = `☀️ <b>早安，小明！</b> (${chinaDateLabel()})\n\n`;
   const isWorkday = isChinaWorkday(new Date());
 
   if (weather) {
@@ -134,14 +143,14 @@ export function formatWakeupMessage(weather: WeatherData | null, quote: string):
 }
 
 export function formatEnglishMessage(summary: string): string {
-  let message = `🎓 <b>名师每日英语</b> (${new Date().toLocaleDateString('zh-CN')})\n\n`;
+  let message = `🎓 <b>名师每日英语</b> (${chinaDateLabel()})\n\n`;
   message += renderMarkdownLikeAsHtml(summary);
   message += '\n\n#英语学习 #CET6 #碎片化';
   return message;
 }
 
 export function formatV2exMessage(summary: string): string {
-  let message = `🚀 <b>V2EX 今日热议脱水总结</b> (${new Date().toLocaleDateString('zh-CN')})\n\n`;
+  let message = `🚀 <b>V2EX 今日热议脱水总结</b> (${chinaDateLabel()})\n\n`;
   message += summary; // AI 已经输出了 HTML
   message += '\n\n#V2EX #社区热点 #深夜剧场';
   return message;
