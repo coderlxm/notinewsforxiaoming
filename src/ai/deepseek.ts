@@ -325,3 +325,60 @@ Task:
     return 'V2EX 今日总结暂时不可用。';
   }
 }
+
+export async function generateFitnessPlanWithAI(dayOfWeek: number, weatherText: string): Promise<string> {
+  if (!config.deepseekApiKey) {
+    return '教练今天没带表，请稍后再试。';
+  }
+
+  const openai = new OpenAI({
+    baseURL: 'https://api.deepseek.com',
+    apiKey: config.deepseekApiKey
+  });
+
+  const isRainy = weatherText.includes('雨');
+  const dayLabels = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+  const dayLabel = dayLabels[dayOfWeek] || '未知日期';
+  
+  // 根据周几设定不同的侧重点
+  let focus = '全身燃脂';
+  if (dayOfWeek === 1) focus = '上肢力量 + 腹部核心';
+  if (dayOfWeek === 3) focus = '下肢稳固 + 身体协调';
+  if (dayOfWeek === 6) focus = '全身爆发力大循环 (Weekend Special)';
+
+  const prompt = `
+Role: 你是一位非常有亲和力、极其注重动作安全性、擅长减脂训练的资深健身教练。
+User: 小明（上班族，CET-6水平，希望动作简单安全，强度适中）。
+Context: 
+- 今天是: ${dayLabel}
+- 训练侧重: ${focus}
+- 当前天气: ${weatherText} ${isRainy ? '(检测到恶劣天气，请优先制定【纯居家自重方案】)' : '(天气良好，可以前往健身房或户外)'}
+
+Task:
+请为小明制定一份 40 分钟的训练计划，严格按以下格式输出（使用 HTML 标签）：
+
+1. 🔥 <b>今日目标</b>: (一句话概括，如：暴汗燃脂 / 雕刻线条)
+2. 🏃 <b>第一阶段：动态热身</b> (5-8分钟): (列举 3 个简单动作)
+3. 💪 <b>第二阶段：正式训练</b> (25-30分钟): 
+   - 列举 4-5 个动作。
+   - 动作需简单、安全、少用复杂器械（或只用哑铃/常见固定器械）。
+   - 每个动作标注：动作名、组数 x 次数、休息时间。
+4. 🧘 <b>第三阶段：静态拉伸</b> (5-8分钟): (针对今日训练部位的 3 个拉伸动作)
+5. 🥦 <b>教练饮食贴士</b>: (给出一项简单的练后补充建议，如：补充优质蛋白质)
+6. 📢 <b>今日教练寄语</b>: (一句鼓励性的中英双语话语)
+
+注意：排版清晰，Emoji 丰富，语气鼓励且专业。
+  `;
+
+  try {
+    const completion = await openai.chat.completions.create({
+      messages: [{ role: 'user', content: prompt }],
+      model: 'deepseek-v4-flash',
+    });
+
+    return completion.choices[0].message.content || '教练正在忙，请稍后刷新。';
+  } catch (error) {
+    console.error('Failed to generate fitness plan with DeepSeek:', error);
+    return '健身计划生成暂时不可用。';
+  }
+}

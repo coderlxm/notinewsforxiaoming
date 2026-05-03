@@ -12,6 +12,14 @@ function chinaDateLabel(): string {
   }).format(new Date());
 }
 
+function chinaWeekdayLabel(): string {
+  const weekday = new Intl.DateTimeFormat('zh-CN', {
+    timeZone: 'Asia/Shanghai',
+    weekday: 'short'
+  }).format(new Date());
+  return weekday;
+}
+
 function escapeHtml(text: string): string {
   return text
     .replace(/&/g, '&amp;')
@@ -153,5 +161,12 @@ export function formatV2exMessage(summary: string): string {
   let message = `🚀 <b>V2EX 今日热议脱水总结</b> (${chinaDateLabel()})\n\n`;
   message += summary; // AI 已经输出了 HTML
   message += '\n\n#V2EX #社区热点 #深夜剧场';
+  return message;
+}
+
+export function formatFitnessMessage(summary: string): string {
+  let message = `🏋️‍♂️ <b>今日健身私教课</b> (${chinaDateLabel()} ${chinaWeekdayLabel()})\n\n`;
+  message += summary;
+  message += `\n\n#健身 #减脂 #健康生活`;
   return message;
 }
