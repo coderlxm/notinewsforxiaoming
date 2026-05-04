@@ -170,3 +170,11 @@ export function formatFitnessMessage(summary: string): string {
   message += `\n\n#健身 #减脂 #健康生活`;
   return message;
 }
+
+export function formatVitaminMessage(): string {
+  let message = `💊 <b>饭点维生素提醒</b> (${chinaDateLabel()} ${chinaWeekdayLabel()})\n\n`;
+  message += '现在是饭点，记得把维生素一起吃掉。\n';
+  message += '最好随餐服用，顺手喝点水，别让身体的后勤系统断供。';
+  message += '\n\n#维生素 #健康提醒';
+  return message;
+}
