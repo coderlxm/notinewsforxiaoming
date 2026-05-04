@@ -4,9 +4,10 @@ import { fetchGithubTrending } from './fetchers/github';
 import { fetchEnglishContent } from './fetchers/english';
 import { fetchV2exHot } from './fetchers/v2ex';
 import { summarizeNewsWithAI, summarizeGithubWithAI, generateLifeTipWithAI, generateMorningQuoteWithAI, teachEnglishWithAI, generateEnglishFallbackWithAI, summarizeV2exWithAI, generateFitnessPlanWithAI } from './ai/deepseek';
-import { formatTelegramMessage, formatGithubMessage, formatSleepMessage, formatWakeupMessage, formatEnglishMessage, formatV2exMessage, formatFitnessMessage, formatVitaminMessage } from './formatters';
+import { formatTelegramMessage, formatGithubMessage, formatSleepMessage, formatWakeupMessage, formatEnglishMessage, formatV2exMessage, formatFitnessMessage, formatVitaminMessage, formatServerHealthMessage } from './formatters';
 import { sendTelegramMessage } from './publishers/telegram';
 import { getFitnessContext, markFitnessWorkoutGenerated } from './services/fitness';
+import { checkServerHealth } from './services/serverHealth';
 
 const MINUTES_PER_DAY = 24 * 60;
 const TOLERANCE_MINUTES = 10;
@@ -16,6 +17,7 @@ const TEST_FORCE_MODE = (process.env.TEST_FORCE_MODE || '').trim().toLowerCase()
 const SPECIAL_SCHEDULE = {
   sleep: 10,           // 00:10
   wakeup: 8 * 60 + 30, // 08:30
+  server_health: 9 * 60 + 10, // 09:10
   news: 9 * 60 + 55,   // 09:55
   vitamin_lunch: 12 * 60 + 30, // 12:30
   github: 15 * 60,     // 15:00
@@ -34,12 +36,13 @@ function isNearSchedule(currentMinuteOfDay: number, targetMinuteOfDay: number): 
   return minuteDistance(currentMinuteOfDay, targetMinuteOfDay) <= TOLERANCE_MINUTES;
 }
 
-type PushMode = 'sleep' | 'wakeup' | 'news' | 'github' | 'v2ex' | 'fitness' | 'vitamin' | 'english';
+type PushMode = 'sleep' | 'wakeup' | 'server_health' | 'news' | 'github' | 'v2ex' | 'fitness' | 'vitamin' | 'english';
 
 function parseForcedMode(rawMode: string): PushMode | null {
   const modeMap: Record<string, PushMode> = {
     sleep: 'sleep',
     wakeup: 'wakeup',
+    server_health: 'server_health',
     news: 'news',
     github: 'github',
     v2ex: 'v2ex',
@@ -78,6 +81,14 @@ async function runMode(mode: PushMode, chinaDayOfWeek: number): Promise<void> {
     ]);
     const aiProcessedNews = await summarizeNewsWithAI(rawNews);
     const message = formatTelegramMessage(weather, aiProcessedNews);
+    await sendTelegramMessage(message);
+    return;
+  }
+
+  if (mode === 'server_health') {
+    console.log('Mode: Server Health Check');
+    const results = await checkServerHealth();
+    const message = formatServerHealthMessage(results);
     await sendTelegramMessage(message);
     return;
   }
@@ -147,7 +158,7 @@ async function main() {
   if (TEST_MODE_ENABLED) {
     const forcedMode = parseForcedMode(TEST_FORCE_MODE);
     if (!forcedMode) {
-      throw new Error(`Invalid TEST_FORCE_MODE: "${TEST_FORCE_MODE}". Allowed: sleep,wakeup,news,github,v2ex,fitness,vitamin,english`);
+      throw new Error(`Invalid TEST_FORCE_MODE: "${TEST_FORCE_MODE}". Allowed: sleep,wakeup,server_health,news,github,v2ex,fitness,vitamin,english`);
     }
     console.log(`Test mode enabled. Bypass schedule and force mode: ${forcedMode}`);
     await runMode(forcedMode, chinaDayOfWeek);
@@ -158,6 +169,8 @@ async function main() {
       selectedMode = 'sleep';
     } else if (isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.wakeup)) {
       selectedMode = 'wakeup';
+    } else if (isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.server_health)) {
+      selectedMode = 'server_health';
     } else if (isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.news)) {
       selectedMode = 'news';
     } else if (isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.vitamin_lunch)) {

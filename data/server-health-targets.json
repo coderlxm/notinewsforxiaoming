@@ -1,0 +1,22 @@
+[
+  {
+    "alias": "bwgdc01",
+    "name": "主机",
+    "role": "NotiNews 当前主部署机"
+  },
+  {
+    "alias": "bwgdc6",
+    "name": "备机",
+    "role": "备用服务器"
+  },
+  {
+    "alias": "rndc02",
+    "name": "rndc02",
+    "role": "服务器"
+  },
+  {
+    "alias": "jp888",
+    "name": "jp888",
+    "role": "服务器"
+  }
+]

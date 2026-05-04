@@ -1,5 +1,6 @@
 import type { WeatherData } from '../fetchers/weather';
 import type { GameNews } from '../fetchers/games';
+import type { ServerHealthResult } from '../services/serverHealth';
 import { isChinaWorkday } from '../calendar/chinaWorkday';
 import { getCountdownInfo } from '../calendar/countdown';
 
@@ -176,5 +177,37 @@ export function formatVitaminMessage(): string {
   message += '现在是饭点，记得把维生素一起吃掉。\n';
   message += '最好随餐服用，顺手喝点水，别让身体的后勤系统断供。';
   message += '\n\n#维生素 #健康提醒';
+  return message;
+}
+
+export function formatServerHealthMessage(results: ServerHealthResult[]): string {
+  const hasAbnormal = results.some(result => !result.online);
+  let message = hasAbnormal
+    ? `🔴 <b>服务器巡检发现异常</b> (${chinaDateLabel()} ${chinaWeekdayLabel()})\n\n`
+    : `🟢 <b>服务器巡检正常</b> (${chinaDateLabel()} ${chinaWeekdayLabel()})\n\n`;
+
+  results.forEach(result => {
+    const target = result.target;
+    const title = `${target.alias} - ${target.name}`;
+
+    if (result.online) {
+      message += `✅ <b>${escapeHtml(title)}</b>\n`;
+      message += `用途: ${escapeHtml(target.role)}\n`;
+      if (target.provider) message += `服务商: ${escapeHtml(target.provider)}\n`;
+      if (target.note) message += `备注: ${escapeHtml(target.note)}\n`;
+      message += `状态: 在线\n`;
+      message += `主机名: ${escapeHtml(result.hostname ?? target.alias)}\n`;
+      message += `运行: ${escapeHtml(result.uptime ?? '未知')}\n\n`;
+      return;
+    }
+
+    message += `❌ <b>${escapeHtml(title)}</b>\n`;
+    message += `用途: ${escapeHtml(target.role)}\n`;
+    if (target.provider) message += `服务商: ${escapeHtml(target.provider)}\n`;
+    if (target.note) message += `备注: ${escapeHtml(target.note)}\n`;
+    message += `异常: ${escapeHtml(result.error ?? 'SSH 探测失败')}\n\n`;
+  });
+
+  message += '#服务器巡检 #健康检查';
   return message;
 }
