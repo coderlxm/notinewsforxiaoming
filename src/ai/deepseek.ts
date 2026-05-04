@@ -288,7 +288,7 @@ export async function summarizeV2exWithAI(topics: V2exTopic[]): Promise<string> 
   const prompt = `
 Role: 你是一位深谙 V2EX 社区文化、既能硬核聊技术又能深度剖析情感的人间清醒观察者。
 Input: 下面是今日 V2EX 的热帖列表：
-${topics.map(t => `- [${t.node}] ${t.title} (回复: ${t.replies})\n  内容摘要: ${t.content.slice(0, 300)}`).join('\n\n')}
+${topics.map(t => `- [${t.node}] ${t.title} (回复: ${t.replies})\n  链接: ${t.link}\n  内容摘要: ${t.content.slice(0, 300)}`).join('\n\n')}
 
 Task:
 请为用户生成一份“V2EX 今日热议脱水总结”。要求：
@@ -308,10 +308,13 @@ Task:
    - 保持精炼，一句话点出看点。
 
 4. **输出要求**：
-   - 使用 HTML 格式（支持 <b>, <i>, <a>, <code> 标签）。
+   - 使用 Telegram HTML 格式。
+   - 只允许使用这些标签：<b>, <i>, <a>, <code>。
+   - 禁止输出任何其他 HTML 标签，包括但不限于 <h1>, <h2>, <h3>, <p>, <ul>, <ol>, <li>, <br>, <blockquote>。
+   - 分段和列表请只使用换行、序号、短横线和 emoji，不要使用标题标签或列表标签。
    - 整体风格要犀利且有趣，像是在和老友深夜聊天。
 
-注意：内容中如果包含链接，请使用 <a href="链接">标题</a> 格式。
+注意：引用帖子时，请使用输入中提供的完整链接，格式为 <a href="完整链接">标题</a>。禁止省略、截断或改写链接。
   `;
 
   try {
