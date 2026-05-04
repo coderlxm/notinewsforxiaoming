@@ -1,6 +1,6 @@
 # 服务器触发规则（Source of Truth）
 
-最后更新：2026-05-02（Asia/Shanghai）
+最后更新：2026-05-03（Asia/Shanghai）
 
 ## 1. 线上实际调度（systemd timer）
 
@@ -8,17 +8,22 @@
 
 ```ini
 OnCalendar=*-*-* 08:30:00 Asia/Shanghai
+OnCalendar=*-*-* 09:10:00 Asia/Shanghai
 OnCalendar=*-*-* 09:55:00 Asia/Shanghai
 OnCalendar=*-*-* 10:30:00 Asia/Shanghai
+OnCalendar=*-*-* 12:30:00 Asia/Shanghai
+OnCalendar=Sat *-*-* 14:00:00 Asia/Shanghai
 OnCalendar=*-*-* 15:00:00 Asia/Shanghai
 OnCalendar=*-*-* 16:00:00 Asia/Shanghai
+OnCalendar=*-*-* 18:30:00 Asia/Shanghai
 OnCalendar=*-*-* 20:00:00 Asia/Shanghai
+OnCalendar=Mon,Wed *-*-* 20:30:00 Asia/Shanghai
 OnCalendar=*-*-* 21:00:00 Asia/Shanghai
 OnCalendar=*-*-* 00:10:00 Asia/Shanghai
 ```
 
 说明：
-- 所有时点均为每天触发。
+- 除 `Sat 14:00` 与 `Mon,Wed 20:30` 外，其余时点每天触发。
 
 ## 2. 时点对应业务模式（代码）
 
@@ -26,9 +31,14 @@ OnCalendar=*-*-* 00:10:00 Asia/Shanghai
 
 - `00:10` -> `Midnight Sleep Reminder`
 - `08:30` -> `Morning Wake-up`
+- `09:10` -> `Server Health Check`
 - `09:55` -> `Morning News`
+- `12:30` -> `Vitamin Reminder`
+- `14:00`（仅周六）-> `Fitness Coach`
 - `15:00` -> `Afternoon Github Trending`
+- `18:30` -> `Vitamin Reminder`
 - `20:00` -> `Evening V2EX Hot Topics`
+- `20:30`（仅周一、周三）-> `Fitness Coach`
 - 其他触发时点（如 `10:30` / `16:00` / `21:00`）-> `Daily English Teacher`
 
 补充（非工作日 wake-up 展示规则）：
