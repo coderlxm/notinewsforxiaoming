@@ -1,4 +1,4 @@
-import { execFile } from 'child_process';
+import { spawnSync } from 'child_process';
 import { existsSync, readFileSync } from 'fs';
 import { resolve } from 'path';
 
@@ -50,45 +50,71 @@ function normalizeSshError(error: unknown): string {
   return String(error);
 }
 
-function probeServer(target: ServerHealthTarget): Promise<ServerHealthResult> {
-  return new Promise(resolve => {
-    execFile(
-      'ssh',
-      [
-        '-o', 'BatchMode=yes',
-        '-o', `ConnectTimeout=${Math.floor(SSH_TIMEOUT_MS / 1000)}`,
-        target.alias,
-        'hostname && uptime -p'
-      ],
-      { timeout: SSH_TIMEOUT_MS },
-      (error, stdout) => {
-        if (error) {
-          resolve({
-            target,
-            online: false,
-            error: normalizeSshError(error)
-          });
-          return;
-        }
+function probeServer(target: ServerHealthTarget): ServerHealthResult {
+  const result = spawnSync(
+    'ssh',
+    [
+      '-o', 'BatchMode=yes',
+      '-o', 'PreferredAuthentications=publickey',
+      '-o', 'GSSAPIAuthentication=no',
+      '-o', 'ConnectionAttempts=1',
+      '-o', `ConnectTimeout=${Math.floor(SSH_TIMEOUT_MS / 1000)}`,
+      '-o', 'ServerAliveInterval=3',
+      '-o', 'ServerAliveCountMax=1',
+      '-o', 'LogLevel=ERROR',
+      target.alias,
+      'hostname && uptime -p'
+    ],
+    {
+      encoding: 'utf-8',
+      timeout: SSH_TIMEOUT_MS,
+      killSignal: 'SIGKILL'
+    }
+  );
 
-        const lines = stdout.trim().split('\n').map(line => line.trim()).filter(Boolean);
-        resolve({
-          target,
-          online: true,
-          hostname: lines[0] ?? target.alias,
-          uptime: lines[1] ?? '未知'
-        });
-      }
-    );
-  });
+  if (result.status === 0) {
+    const lines = result.stdout
+      .trim()
+      .split('\n')
+      .map(line => line.trim())
+      .filter(Boolean);
+    return {
+      target,
+      online: true,
+      hostname: lines[0] ?? target.alias,
+      uptime: lines[1] ?? '未知'
+    };
+  }
+
+  if (result.error) {
+    return {
+      target,
+      online: false,
+      error: normalizeSshError(result.error)
+    };
+  }
+
+  if (result.signal === 'SIGKILL' || result.status === null) {
+    return {
+      target,
+      online: false,
+      error: 'SSH 连接超时'
+    };
+  }
+
+  return {
+    target,
+    online: false,
+    error: result.stderr.trim().split('\n').slice(-1)[0] || `SSH 探测失败，退出码 ${result.status}`
+  };
 }
 
 async function probeServerWithRetry(target: ServerHealthTarget): Promise<ServerHealthResult> {
-  const firstResult = await probeServer(target);
+  const firstResult = probeServer(target);
   if (firstResult.online) return firstResult;
 
   await sleep(RETRY_DELAY_MS);
-  const secondResult = await probeServer(target);
+  const secondResult = probeServer(target);
   if (secondResult.online) return secondResult;
 
   return secondResult;
