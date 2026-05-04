@@ -20,12 +20,20 @@ type EnglishSource = {
 
 const SOURCES = [
   {
-    name: 'IGN',
-    urls: ['https://rsshub.icu/ign/news', 'https://feeds.feedburner.com/ign/all']
+    name: 'VOA Learning English - Everyday Grammar',
+    urls: ['https://learningenglish.voanews.com/api/zmg_pl-vomx-tpeymtm']
+  },
+  {
+    name: 'VOA Learning English - Words and Their Stories',
+    urls: ['https://learningenglish.voanews.com/api/zmypyl-vomx-tpeyry_']
+  },
+  {
+    name: 'VOA Learning English - As It Is',
+    urls: ['https://learningenglish.voanews.com/api/zkm-ql-vomx-tpej-rqi']
   },
   {
     name: 'TechCrunch',
-    urls: ['https://techcrunch.com/feed/', 'https://rsshub.icu/techcrunch/home']
+    urls: ['https://techcrunch.com/feed/']
   },
   {
     name: 'The Verge',
@@ -33,15 +41,27 @@ const SOURCES = [
   },
   {
     name: 'BBC News',
-    urls: ['https://feeds.bbci.co.uk/news/rss.xml', 'https://rsshub.icu/bbc/news']
+    urls: ['https://feeds.bbci.co.uk/news/rss.xml']
   },
   {
-    name: 'Reuters',
-    urls: ['https://feeds.reuters.com/reuters/worldNews', 'https://rsshub.icu/reuters/world']
+    name: 'BBC World',
+    urls: ['https://feeds.bbci.co.uk/news/world/rss.xml']
   },
   {
-    name: 'ESPN',
-    urls: ['https://www.espn.com/espn/rss/news']
+    name: 'The Guardian International',
+    urls: ['https://www.theguardian.com/international/rss']
+  },
+  {
+    name: 'The Guardian Technology',
+    urls: ['https://www.theguardian.com/technology/rss']
+  },
+  {
+    name: 'NPR News',
+    urls: ['https://feeds.npr.org/1001/rss.xml']
+  },
+  {
+    name: 'NPR Technology',
+    urls: ['https://feeds.npr.org/1019/rss.xml']
   }
 ];
 
