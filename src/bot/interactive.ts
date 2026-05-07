@@ -47,7 +47,7 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     scheduleReminder(bot, reminder);
 
     ctx.reply(
-      formatReminderCreated(reminder),
+      formatReminderCreated(reminder, result.source),
       { parse_mode: 'HTML', ...buildCancelButton(reminder.id) }
     );
   });
@@ -75,7 +75,7 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     scheduleReminder(bot, reminder);
 
     ctx.reply(
-      formatReminderCreated(reminder),
+      formatReminderCreated(reminder, result.source),
       { parse_mode: 'HTML', ...buildCancelButton(reminder.id) }
     );
   });

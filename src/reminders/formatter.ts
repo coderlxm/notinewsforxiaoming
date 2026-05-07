@@ -43,9 +43,10 @@ export function formatHelpMessage(): string {
   ].join('\n');
 }
 
-export function formatReminderCreated(reminder: Reminder): string {
+export function formatReminderCreated(reminder: Reminder, source?: 'deterministic' | 'ai'): string {
+  const sourceTag = source === 'ai' ? ' [AI]' : source === 'deterministic' ? ' [固定]' : '';
   return [
-    '<b>已创建提醒</b>',
+    `<b>已创建提醒</b>${sourceTag}`,
     '',
     `时间：${formatTime(reminder.trigger_at)}`,
     `内容：${escapeHtml(reminder.text)}`,

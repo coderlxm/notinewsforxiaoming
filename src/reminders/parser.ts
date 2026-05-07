@@ -4,6 +4,7 @@ import { config } from '../config/index';
 export interface ParsedReminder {
   triggerAt: Date;
   text: string;
+  source: 'deterministic' | 'ai';
 }
 
 export interface ParseError {
@@ -60,7 +61,7 @@ export function parseReminderCommand(input: string, now: Date): ParsedReminder |
     if (!text?.trim()) {
       return { error: '提醒内容不能为空。' };
     }
-    return { triggerAt, text: text.trim() };
+    return { triggerAt, text: text.trim(), source: 'deterministic' };
   }
 
   const relativeMatch = args.match(/^(\d+)\s*(m|h)\s+(.+)/);
@@ -71,7 +72,7 @@ export function parseReminderCommand(input: string, now: Date): ParsedReminder |
     if (!text?.trim()) {
       return { error: '提醒内容不能为空。' };
     }
-    return { triggerAt, text: text.trim() };
+    return { triggerAt, text: text.trim(), source: 'deterministic' };
   }
 
   return { error: helpText };
@@ -88,7 +89,7 @@ function parseChineseRelative(text: string, now: Date): ParsedReminder | null {
     if (reminderText && num > 0) {
       const multipliers: Record<string, number> = { 秒: 1000, 秒钟: 1000, 分钟: 60000, 小时: 3600000 };
       const ms = num * (multipliers[unit] || 60000);
-      return { triggerAt: new Date(now.getTime() + ms), text: reminderText };
+      return { triggerAt: new Date(now.getTime() + ms), text: reminderText, source: 'deterministic' };
     }
   }
 
@@ -99,6 +100,7 @@ function parseChineseRelative(text: string, now: Date): ParsedReminder | null {
     return {
       triggerAt: new Date(now.getTime() + 30 * 60 * 1000),
       text: halfHourMatch[1]!.trim(),
+      source: 'deterministic' as const,
     };
   }
 
@@ -108,7 +110,7 @@ function parseChineseRelative(text: string, now: Date): ParsedReminder | null {
     const num = parseInt(remindBeforeMatch[2]!, 10);
     const reminderText = remindBeforeMatch[1]!.trim();
     if (reminderText && num > 0) {
-      return { triggerAt: new Date(now.getTime() + num * 60000), text: reminderText };
+      return { triggerAt: new Date(now.getTime() + num * 60000), text: reminderText, source: 'deterministic' };
     }
   }
 
@@ -185,7 +187,7 @@ export async function parseNaturalReminder(
       return { error: '没有识别到有效提醒时间。' };
     }
 
-    return { triggerAt, text: reminderText };
+    return { triggerAt, text: reminderText, source: 'ai' };
   } catch (error) {
     console.error('Failed to parse natural reminder with DeepSeek:', error);
     return { error: '没有识别到有效提醒时间。' };
