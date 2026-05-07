@@ -13,12 +13,14 @@ export interface ParseError {
 const helpText = '格式不正确。示例：\n/remind 2026-05-08 15:30 开会\n/remind 10m 收衣服\n/remind 2h 看日志';
 
 function formatBeijingTime(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const hour = String(date.getHours()).padStart(2, '0');
-  const minute = String(date.getMinutes()).padStart(2, '0');
-  const second = String(date.getSeconds()).padStart(2, '0');
+  const offsetMs = 8 * 60 * 60 * 1000;
+  const beijing = new Date(date.getTime() + offsetMs);
+  const year = beijing.getUTCFullYear();
+  const month = String(beijing.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(beijing.getUTCDate()).padStart(2, '0');
+  const hour = String(beijing.getUTCHours()).padStart(2, '0');
+  const minute = String(beijing.getUTCMinutes()).padStart(2, '0');
+  const second = String(beijing.getUTCSeconds()).padStart(2, '0');
   return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
 }
 
