@@ -13,6 +13,7 @@ node_modules/
 
 # Runtime state
 data/fitness_status.json
+data/notinews.sqlite
 
 # Mac OS
 .DS_Store
