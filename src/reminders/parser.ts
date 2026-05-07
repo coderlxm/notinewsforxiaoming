@@ -77,10 +77,52 @@ export function parseReminderCommand(input: string, now: Date): ParsedReminder |
   return { error: helpText };
 }
 
+function parseChineseRelative(text: string, now: Date): ParsedReminder | null {
+  const patterns = [
+    /(\d+)\s*分钟[之以]?后[提醒]?我?\s*(.+)/,
+    /(\d+)\s*小时[之以]?后[提醒]?我?\s*(.+)/,
+    /半\s*小时[之以]?后[提醒]?我?\s*(.+)/,
+    /(\d+)\s*秒[钟之以]?后[提醒]?我?\s*(.+)/,
+    /提醒\s*我\s*(.+?)\s*在\s*(\d+)\s*分钟[之以]?后/,
+    /(.+?)\s*在\s*(\d+)\s*分钟[之以]?后/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (!match) continue;
+
+    let ms = 0;
+    let reminderText = '';
+
+    if (pattern.source.includes('半小时')) {
+      ms = 30 * 60 * 1000;
+      reminderText = match[1]!.trim();
+    } else if (pattern.source.includes('提醒')) {
+      // Pattern: 提醒我XXX在N分钟后 → text=group1, num=group2
+      const [numStr, txt] = [match[2], match[1]];
+      ms = parseInt(numStr!, 10) * 60 * 1000;
+      reminderText = txt!.trim();
+    } else {
+      const numStr = match[1]!;
+      const unit = pattern.source.includes('小时') ? 3600000 : pattern.source.includes('秒') ? 1000 : 60000;
+      ms = parseInt(numStr, 10) * unit;
+      reminderText = match[2]!.trim();
+    }
+
+    if (!reminderText || ms <= 0) continue;
+    return { triggerAt: new Date(now.getTime() + ms), text: reminderText };
+  }
+
+  return null;
+}
+
 export async function parseNaturalReminder(
   text: string,
   now: Date
 ): Promise<ParsedReminder | ParseError> {
+  const deterministic = parseChineseRelative(text, now);
+  if (deterministic) return deterministic;
+
   if (!config.deepseekApiKey) {
     return { error: 'AI 解析未配置，请使用 /remind 命令格式创建提醒。' };
   }
@@ -108,9 +150,11 @@ export async function parseNaturalReminder(
     const completion = await openai.chat.completions.create({
       messages: [{ role: 'user', content: prompt }],
       model: 'deepseek-v4-flash',
+      response_format: { type: 'json_object' },
     });
 
     const raw = completion.choices[0]?.message?.content || '';
+    console.log('[parseNaturalReminder] raw AI:', raw);
     const parsed = extractJson(raw);
 
     if (
