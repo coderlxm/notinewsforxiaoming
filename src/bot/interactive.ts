@@ -1,4 +1,5 @@
 import type { Telegraf } from 'telegraf';
+import { message } from 'telegraf/filters';
 import { isAuthorized } from './auth';
 import { parseReminderCommand, parseNaturalReminder } from '../reminders/parser';
 import * as repo from '../reminders/repository';
@@ -51,7 +52,7 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     );
   });
 
-  bot.on('text', async (ctx) => {
+  bot.on(message('text'), async (ctx) => {
     if (!isAuthorized(ctx)) return;
 
     const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
