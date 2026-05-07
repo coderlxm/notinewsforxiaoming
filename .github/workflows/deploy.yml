@@ -51,7 +51,7 @@ jobs:
         run: |
           PORT="${SERVER_PORT:-22}"
           ssh -p "$PORT" "$SERVER_USER@$SERVER_HOST" "cd '$SERVER_PROJECT_DIR' && \
-            find . -mindepth 1 -maxdepth 1 ! -name '.env' ! -name 'data' -exec rm -rf {} +"
+            find . -mindepth 1 -maxdepth 1 ! -name '.env' ! -name '.npmrc' ! -name 'data' -exec rm -rf {} +"
           git archive --format=tar HEAD | \
             ssh -p "$PORT" "$SERVER_USER@$SERVER_HOST" "tar -xf - -C '$SERVER_PROJECT_DIR'"
 
@@ -68,6 +68,7 @@ jobs:
             if ! command -v pnpm >/dev/null 2>&1; then
               timeout 180 npm install -g pnpm@10.33.2 --registry=https://registry.npmmirror.com --fetch-retries=1 --fetch-timeout=30000 --loglevel warn
             fi
+            export npm_config_disturl=https://npmmirror.com/mirrors/node
             pnpm install --frozen-lockfile
           "
 
