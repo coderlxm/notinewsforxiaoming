@@ -1,6 +1,6 @@
 import type { Telegraf } from 'telegraf';
 import { isAuthorized } from './auth';
-import { parseReminderCommand } from '../reminders/parser';
+import { parseReminderCommand, parseNaturalReminder } from '../reminders/parser';
 import * as repo from '../reminders/repository';
 import { scheduleReminder, cancelScheduledReminder } from '../reminders/scheduler';
 import {
@@ -30,6 +30,34 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
 
     const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
     const result = parseReminderCommand(text, new Date());
+
+    if ('error' in result) {
+      ctx.reply(result.error, { parse_mode: 'HTML' });
+      return;
+    }
+
+    const reminder = repo.createReminder({
+      chat_id: String(ctx.chat!.id),
+      text: result.text,
+      trigger_at: result.triggerAt,
+      source_message_id: ctx.message?.message_id
+    });
+
+    scheduleReminder(bot, reminder);
+
+    ctx.reply(
+      formatReminderCreated(reminder),
+      { parse_mode: 'HTML', ...buildCancelButton(reminder.id) }
+    );
+  });
+
+  bot.on('text', async (ctx) => {
+    if (!isAuthorized(ctx)) return;
+
+    const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
+    if (!text || text.startsWith('/')) return;
+
+    const result = await parseNaturalReminder(text, new Date());
 
     if ('error' in result) {
       ctx.reply(result.error, { parse_mode: 'HTML' });

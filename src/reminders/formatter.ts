@@ -30,10 +30,14 @@ export function formatHelpMessage(): string {
     '/help - 查看帮助',
     '/remind - 创建提醒',
     '',
-    '<b>提醒格式：</b>',
+    '<b>命令格式：</b>',
     '<code>/remind 2026-05-08 15:30 开会</code>',
     '<code>/remind 10m 收衣服</code>',
     '<code>/remind 2h 看日志</code>',
+    '',
+    '<b>自然语言（直接输入即可）：</b>',
+    '<code>10 分钟后提醒我收衣服</code>',
+    '<code>明天下午 3 点提醒我开会</code>',
   ].join('\n');
 }
 
