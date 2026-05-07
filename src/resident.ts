@@ -1,11 +1,13 @@
 import { createBot } from './bot/createBot';
 import { registerInteractiveHandlers } from './bot/interactive';
 import { schedulePendingReminders } from './reminders/scheduler';
+import { registerFixedJobs } from './scheduled/jobs';
 
 async function main() {
   const bot = createBot();
   registerInteractiveHandlers(bot);
   schedulePendingReminders(bot);
+  registerFixedJobs();
 
   bot.launch({
     allowedUpdates: ['message', 'callback_query'],
