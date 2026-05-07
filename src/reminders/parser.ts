@@ -78,39 +78,38 @@ export function parseReminderCommand(input: string, now: Date): ParsedReminder |
 }
 
 function parseChineseRelative(text: string, now: Date): ParsedReminder | null {
-  const patterns = [
-    /(\d+)\s*分钟[之以]?后[提醒]?我?\s*(.+)/,
-    /(\d+)\s*小时[之以]?后[提醒]?我?\s*(.+)/,
-    /半\s*小时[之以]?后[提醒]?我?\s*(.+)/,
-    /(\d+)\s*秒[钟之以]?后[提醒]?我?\s*(.+)/,
-    /提醒\s*我\s*(.+?)\s*在\s*(\d+)\s*分钟[之以]?后/,
-    /(.+?)\s*在\s*(\d+)\s*分钟[之以]?后/,
-  ];
-
-  for (const pattern of patterns) {
-    const match = text.match(pattern);
-    if (!match) continue;
-
-    let ms = 0;
-    let reminderText = '';
-
-    if (pattern.source.includes('半小时')) {
-      ms = 30 * 60 * 1000;
-      reminderText = match[1]!.trim();
-    } else if (pattern.source.includes('提醒')) {
-      // Pattern: 提醒我XXX在N分钟后 → text=group1, num=group2
-      const [numStr, txt] = [match[2], match[1]];
-      ms = parseInt(numStr!, 10) * 60 * 1000;
-      reminderText = txt!.trim();
-    } else {
-      const numStr = match[1]!;
-      const unit = pattern.source.includes('小时') ? 3600000 : pattern.source.includes('秒') ? 1000 : 60000;
-      ms = parseInt(numStr, 10) * unit;
-      reminderText = match[2]!.trim();
+  // Pattern 1: "N分/小时后提醒我XXX" or "N分/小时后XXX"
+  // Group 1 = number, Group 2 = reminder text
+  const primaryMatch = text.match(/(\d+)\s*(分钟|小时|秒钟?)?[之以]?后(?:提醒我?)?\s*(.+)/);
+  if (primaryMatch) {
+    const num = parseInt(primaryMatch[1]!, 10);
+    const unit = (primaryMatch[2] || '分钟') as string;
+    const reminderText = primaryMatch[3]!.trim();
+    if (reminderText && num > 0) {
+      const multipliers: Record<string, number> = { 秒: 1000, 秒钟: 1000, 分钟: 60000, 小时: 3600000 };
+      const ms = num * (multipliers[unit] || 60000);
+      return { triggerAt: new Date(now.getTime() + ms), text: reminderText };
     }
+  }
 
-    if (!reminderText || ms <= 0) continue;
-    return { triggerAt: new Date(now.getTime() + ms), text: reminderText };
+  // Pattern 2: "半小时后提醒我XXX" or "半小时后XXX"
+  // Group 1 = reminder text
+  const halfHourMatch = text.match(/半小时[之以]?后(?:提醒我?)?\s*(.+)/);
+  if (halfHourMatch && halfHourMatch[1]!.trim()) {
+    return {
+      triggerAt: new Date(now.getTime() + 30 * 60 * 1000),
+      text: halfHourMatch[1]!.trim(),
+    };
+  }
+
+  // Pattern 3: "提醒我XXX在N分钟后"  — Group 1 = text, Group 2 = number
+  const remindBeforeMatch = text.match(/提醒\s*我\s*(.+?)\s*在\s*(\d+)\s*分钟[之以]?后/);
+  if (remindBeforeMatch) {
+    const num = parseInt(remindBeforeMatch[2]!, 10);
+    const reminderText = remindBeforeMatch[1]!.trim();
+    if (reminderText && num > 0) {
+      return { triggerAt: new Date(now.getTime() + num * 60000), text: reminderText };
+    }
   }
 
   return null;
