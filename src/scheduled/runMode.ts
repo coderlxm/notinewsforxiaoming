@@ -1,3 +1,4 @@
+import type { Telegraf } from 'telegraf';
 import { fetchWeather } from '../fetchers/weather';
 import { fetchGameNews } from '../fetchers/games';
 import { fetchGithubTrending } from '../fetchers/github';
@@ -45,12 +46,12 @@ export function parseForcedMode(rawMode: string): PushMode | null {
   return modeMap[rawMode] ?? null;
 }
 
-export async function runMode(mode: PushMode, chinaDayOfWeek: number): Promise<void> {
+export async function runMode(mode: PushMode, chinaDayOfWeek: number, bot?: Telegraf): Promise<void> {
   if (mode === 'sleep') {
     console.log('Mode: Midnight Sleep Reminder');
     const tip = await generateLifeTipWithAI();
     const message = formatSleepMessage(tip);
-    await sendTelegramMessage(message);
+    await sendTelegramMessage(message, bot);
     return;
   }
 
@@ -61,7 +62,7 @@ export async function runMode(mode: PushMode, chinaDayOfWeek: number): Promise<v
       generateMorningQuoteWithAI()
     ]);
     const message = formatWakeupMessage(weather, quote);
-    await sendTelegramMessage(message);
+    await sendTelegramMessage(message, bot);
     return;
   }
 
@@ -73,7 +74,7 @@ export async function runMode(mode: PushMode, chinaDayOfWeek: number): Promise<v
     ]);
     const aiProcessedNews = await summarizeNewsWithAI(rawNews);
     const message = formatTelegramMessage(weather, aiProcessedNews);
-    await sendTelegramMessage(message);
+    await sendTelegramMessage(message, bot);
     return;
   }
 
@@ -81,7 +82,7 @@ export async function runMode(mode: PushMode, chinaDayOfWeek: number): Promise<v
     console.log('Mode: Server Health Check');
     const results = await checkServerHealth();
     const message = formatServerHealthMessage(results);
-    await sendTelegramMessage(message);
+    await sendTelegramMessage(message, bot);
     return;
   }
 
@@ -90,7 +91,7 @@ export async function runMode(mode: PushMode, chinaDayOfWeek: number): Promise<v
     const repos = await fetchGithubTrending();
     const summary = await summarizeGithubWithAI(repos);
     const message = formatGithubMessage(summary);
-    await sendTelegramMessage(message);
+    await sendTelegramMessage(message, bot);
     return;
   }
 
@@ -99,7 +100,7 @@ export async function runMode(mode: PushMode, chinaDayOfWeek: number): Promise<v
     const topics = await fetchV2exHot();
     const summary = await summarizeV2exWithAI(topics);
     const message = formatV2exMessage(summary);
-    await sendTelegramMessage(message);
+    await sendTelegramMessage(message, bot);
     return;
   }
 
@@ -110,7 +111,7 @@ export async function runMode(mode: PushMode, chinaDayOfWeek: number): Promise<v
     const fitnessContext = getFitnessContext(chinaDayOfWeek);
     const plan = await generateFitnessPlanWithAI(chinaDayOfWeek, weatherText, fitnessContext);
     const message = formatFitnessMessage(plan);
-    const sent = await sendTelegramMessage(message);
+    const sent = await sendTelegramMessage(message, bot);
     if (sent) {
       const nextStatus = markFitnessWorkoutGenerated(fitnessContext.status, fitnessContext.focusArea);
       console.log(`Fitness status updated. Level: ${nextStatus.training_state.current_level}, Total: ${nextStatus.training_state.total_completed}`);
@@ -121,7 +122,7 @@ export async function runMode(mode: PushMode, chinaDayOfWeek: number): Promise<v
   if (mode === 'vitamin') {
     console.log('Mode: Vitamin Reminder');
     const message = formatVitaminMessage();
-    await sendTelegramMessage(message);
+    await sendTelegramMessage(message, bot);
     return;
   }
 
@@ -131,5 +132,5 @@ export async function runMode(mode: PushMode, chinaDayOfWeek: number): Promise<v
     ? await teachEnglishWithAI(article)
     : await generateEnglishFallbackWithAI();
   const message = formatEnglishMessage(summary);
-  await sendTelegramMessage(message);
+  await sendTelegramMessage(message, bot);
 }

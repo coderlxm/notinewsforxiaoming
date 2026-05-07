@@ -7,7 +7,7 @@ async function main() {
   const bot = createBot();
   registerInteractiveHandlers(bot);
   schedulePendingReminders(bot);
-  registerFixedJobs();
+  registerFixedJobs(bot);
 
   bot.launch({
     allowedUpdates: ['message', 'callback_query'],
