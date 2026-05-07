@@ -48,10 +48,11 @@ export function schedulePendingReminders(bot: Telegraf): void {
   for (const reminder of reminders) {
     const triggerAt = new Date(reminder.trigger_at);
     if (triggerAt <= now) {
-      throw new Error(
-        `Found expired pending reminder id=${reminder.id} trigger_at=${reminder.trigger_at}. ` +
-        `Process may have been down. Please investigate.`
+      console.warn(
+        `Expired pending reminder id=${reminder.id} trigger_at=${reminder.trigger_at}. Cancelling.`
       );
+      repo.cancelReminder(reminder.id);
+      continue;
     }
     scheduleReminder(bot, reminder);
   }

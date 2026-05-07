@@ -10,11 +10,13 @@ function escapeHtml(text: string): string {
 
 function formatTime(iso: string): string {
   const d = new Date(iso);
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  const hour = String(d.getHours()).padStart(2, '0');
-  const minute = String(d.getMinutes()).padStart(2, '0');
+  const offsetMs = 8 * 60 * 60 * 1000;
+  const beijing = new Date(d.getTime() + offsetMs);
+  const year = beijing.getUTCFullYear();
+  const month = String(beijing.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(beijing.getUTCDate()).padStart(2, '0');
+  const hour = String(beijing.getUTCHours()).padStart(2, '0');
+  const minute = String(beijing.getUTCMinutes()).padStart(2, '0');
   return `${year}-${month}-${day} ${hour}:${minute}`;
 }
 

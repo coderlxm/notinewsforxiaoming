@@ -150,7 +150,6 @@ export async function parseNaturalReminder(
     const completion = await openai.chat.completions.create({
       messages: [{ role: 'user', content: prompt }],
       model: 'deepseek-v4-flash',
-      response_format: { type: 'json_object' },
     });
 
     const raw = completion.choices[0]?.message?.content || '';
