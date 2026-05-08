@@ -61,7 +61,7 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
       const recurringResult = parseRecurringCommand(args, now);
       if (recurringResult && !('error' in recurringResult)) {
         const rruleText = buildRRuleText(recurringResult.spec);
-        const nextTrigger = getNextTrigger(rruleText);
+        const nextTrigger = getNextTrigger(rruleText, now, true);
         const rule = repo.createRecurringRule({
           chat_id: String(ctx.chat!.id),
           text: recurringResult.text,
@@ -119,7 +119,8 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
     if (!text || text.startsWith('/')) return;
 
-    const result = await parseNaturalReminder(text, new Date());
+    const receivedAt = new Date();
+    const result = await parseNaturalReminder(text, receivedAt);
 
     if ('error' in result) {
       ctx.reply(result.error, { parse_mode: 'HTML' });
@@ -128,7 +129,7 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
 
     if ('spec' in result) {
       const rruleText = buildRRuleText(result.spec);
-      const nextTrigger = getNextTrigger(rruleText);
+      const nextTrigger = getNextTrigger(rruleText, receivedAt, true);
       const rule = repo.createRecurringRule({
         chat_id: String(ctx.chat!.id),
         text: result.text,
