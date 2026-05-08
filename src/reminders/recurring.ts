@@ -78,6 +78,13 @@ function getRRuleTimezone(rruleText: string): string {
   return TZ;
 }
 
+function normalizeRRuleText(rruleText: string): string {
+  return rruleText.replace(
+    /^DTSTART;TZID=[^:]+:(\d{8}T\d{6})/m,
+    'DTSTART:$1Z',
+  );
+}
+
 function toPseudoUtc(date: Date, tzid: string): Date {
   const wallClock = dayjs(date).tz(tzid).format('YYYY-MM-DD HH:mm:ss');
   return dayjs.utc(wallClock).toDate();
@@ -94,11 +101,12 @@ export function getNextTrigger(
   after: Date = new Date(),
   inclusive = true,
 ): Date {
-  const rule = rrulestr(rruleText);
+  const normalizedText = normalizeRRuleText(rruleText);
+  const rule = rrulestr(normalizedText);
   const tzid = timezoneName || getRRuleTimezone(rruleText);
   const pseudoAfter = toPseudoUtc(after, tzid);
   const next = rule.after(pseudoAfter, inclusive);
-  if (!next) throw new Error(`No next trigger for rrule: ${rruleText}`);
+  if (!next) throw new Error(`No next trigger for rrule: ${normalizedText}`);
   return fromPseudoUtc(next, tzid);
 }
 
