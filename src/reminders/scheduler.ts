@@ -89,7 +89,7 @@ function scheduleRecurringRule(bot: Telegraf, rule: RecurringRule): void {
       repo.setRecurringRunSentMessageId(run.id, msg.message_id);
 
       const currentTriggerAt = new Date(current.next_trigger_at);
-      const nextTrigger = getNextTrigger(current.rrule_text);
+      const nextTrigger = getNextTrigger(current.rrule_text, currentTriggerAt, false);
       repo.updateRecurringNextTrigger(rule.id, nextTrigger, currentTriggerAt);
       scheduleRecurringRule(bot, { ...current, next_trigger_at: nextTrigger.toISOString() });
     } catch (err) {
@@ -114,11 +114,6 @@ export function schedulePendingRecurringRules(bot: Telegraf): void {
 
   for (const rule of rules) {
     try {
-      const calculated = getNextTrigger(rule.rrule_text);
-      if (calculated.toISOString() !== rule.next_trigger_at) {
-        repo.updateRecurringNextTrigger(rule.id, calculated);
-        rule.next_trigger_at = calculated.toISOString();
-      }
       scheduleRecurringRule(bot, rule);
     } catch (err) {
       console.error(`Failed to schedule recurring rule id=${rule.id}:`, err);
