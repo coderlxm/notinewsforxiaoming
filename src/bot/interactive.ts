@@ -29,7 +29,7 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     ctx.reply(formatHelpMessage(), { parse_mode: 'HTML' });
   });
 
-  bot.command('remind', (ctx) => {
+  bot.command('remind', async (ctx) => {
     if (!isAuthorized(ctx)) return;
 
     const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
@@ -38,10 +38,10 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     if (!args) {
       const reminders = repo.findPendingByChatId(String(ctx.chat!.id));
       if (reminders.length === 0) {
-        ctx.reply(formatEmptyReminderList(), { parse_mode: 'HTML' });
+        await ctx.reply(formatEmptyReminderList(), { parse_mode: 'HTML' });
         return;
       }
-      ctx.reply(
+      await ctx.reply(
         formatReminderList(reminders),
         { parse_mode: 'HTML', ...buildReminderListButtons(reminders) }
       );
@@ -51,23 +51,23 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     const result = parseReminderCommand(text, new Date());
 
     if ('error' in result) {
-      ctx.reply(result.error, { parse_mode: 'HTML' });
+      await ctx.reply(result.error, { parse_mode: 'HTML' });
       return;
     }
 
     const reminder = repo.createReminder({
       chat_id: String(ctx.chat!.id),
       text: result.text,
-      trigger_at: result.triggerAt,
-      source_message_id: ctx.message?.message_id
+      trigger_at: result.triggerAt
     });
 
     scheduleReminder(bot, reminder);
 
-    ctx.reply(
+    const createdMessage = await ctx.reply(
       formatReminderCreated(reminder, result.source),
       { parse_mode: 'HTML', ...buildCancelButton(reminder.id) }
     );
+    repo.setSourceMessageId(reminder.id, createdMessage.message_id);
   });
 
   bot.on(message('text'), async (ctx) => {
@@ -86,28 +86,26 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     const reminder = repo.createReminder({
       chat_id: String(ctx.chat!.id),
       text: result.text,
-      trigger_at: result.triggerAt,
-      source_message_id: ctx.message?.message_id
+      trigger_at: result.triggerAt
     });
 
     scheduleReminder(bot, reminder);
 
-    ctx.reply(
+    const createdMessage = await ctx.reply(
       formatReminderCreated(reminder, result.source),
       { parse_mode: 'HTML', ...buildCancelButton(reminder.id) }
     );
+    repo.setSourceMessageId(reminder.id, createdMessage.message_id);
   });
 
   async function clearSourceButtons(reminder: repo.Reminder): Promise<void> {
     if (!reminder.source_message_id) return;
-    try {
-      await bot.telegram.editMessageReplyMarkup(
-        reminder.chat_id,
-        reminder.source_message_id
-      );
-    } catch {
-      // message may have been deleted or is too old
-    }
+    await bot.telegram.editMessageReplyMarkup(
+      reminder.chat_id,
+      reminder.source_message_id,
+      undefined,
+      { inline_keyboard: [] }
+    );
   }
 
   bot.on('callback_query', async (ctx) => {

@@ -1,4 +1,4 @@
-# clearSourceButtons 无法移除创建消息上的取消按钮
+# clearSourceButtons 无法移除创建消息上的取消按钮（已修复）
 
 ## 现象
 
@@ -8,21 +8,70 @@
 
 点击「已完成」或「取消」后，创建消息上的内联按钮应立即消失。
 
-## 尝试的修复
+## 根因
 
-调用 `bot.telegram.editMessageReplyMarkup(chatId, messageId)` 清除创建消息（`source_message_id`）上的 inline keyboard。代码在 `src/bot/interactive.ts` 的 `clearSourceButtons` 中。
+根因是 `source_message_id` 写错了。
 
-两种方式都已尝试失败：
+创建提醒时，代码把 `source_message_id` 存成了“用户输入消息”的 `message_id`，而不是“机器人回复的创建确认消息（带取消按钮）”的 `message_id`。  
+因此 `clearSourceButtons` 实际在编辑错误目标消息，导致取消按钮一直存在。
 
-1. `editMessageReplyMarkup(chatId, msgId, undefined, { reply_markup: undefined })`
-2. `editMessageReplyMarkup(chatId, msgId)` — 不传 extra 参数
+另外，`editMessageReplyMarkup` 未显式传空 `inline_keyboard`，即使目标正确也不稳定。
 
-## 可能原因
+## 修复方法
 
-- **Telegram API 行为不确定**：不传 `reply_markup` 时，Telegram 可能保留当前按钮而非移除。需要显式传 `{ reply_markup: { inline_keyboard: [] } }` 来清空。但 Telegraf 类型可能不支持这种用法
-- **`source_message_id` 不准确**：如果 `source_message_id` 与实际有按钮的消息 ID 不匹配，调用的消息本身就没有按钮，看起来没变化，但实际是调错目标
-- **Telegraf 封装差异**：Telegraf 内部可能出于类型安全不允许传入空 inline keyboard，导致无法发出移除请求
+### 1) 修正 `source_message_id` 的写入时机和来源
+
+文件：`src/bot/interactive.ts`
+
+- 创建提醒后先 `await ctx.reply(...)`
+- 使用返回的 `createdMessage.message_id` 回写数据库
+- 不再把 `ctx.message?.message_id`（用户消息）写入 `source_message_id`
+
+对应新增仓储方法：
+
+文件：`src/reminders/repository.ts`
+
+- 新增 `setSourceMessageId(id, messageId)`
+
+### 2) 显式清空 inline keyboard
+
+文件：`src/bot/interactive.ts`
+
+`clearSourceButtons` 改为：
+
+```ts
+await bot.telegram.editMessageReplyMarkup(
+  reminder.chat_id,
+  reminder.source_message_id,
+  undefined,
+  { inline_keyboard: [] }
+);
+```
+
+## 变更摘要
+
+- `src/bot/interactive.ts`
+  - `/remind` handler 改为 `async`
+  - 两条创建链路（命令创建 / 自然语言创建）统一记录机器人创建消息 ID
+  - `clearSourceButtons` 使用显式空按钮数组清理
+- `src/reminders/repository.ts`
+  - 新增 `setSourceMessageId`
+
+## 验证方法
+
+1. 启动常驻 bot：`pnpm start:bot`
+2. 发送 `/remind 2m 测试清按钮`
+3. 观察机器人回复的创建消息包含「取消提醒」
+4. 等提醒触发后点击「已完成」
+5. 预期：创建消息上的「取消提醒」按钮立即消失
+
+同样地，点击「取消提醒」后也应立即清除该创建消息上的按钮。
+
+## 备注
+
+此修复对“修复后新建的提醒”生效。  
+历史数据里已写错的 `source_message_id` 不会自动纠正，必要时可取消并重建提醒。
 
 ## 状态
 
-未解决。
+已解决（2026-05-08）。

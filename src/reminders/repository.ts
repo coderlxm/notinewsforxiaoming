@@ -97,3 +97,9 @@ export function setSentMessageId(id: number, messageId: number): void {
   const stmt = db.prepare('UPDATE reminders SET sent_message_id = ? WHERE id = ?');
   stmt.run(messageId, id);
 }
+
+export function setSourceMessageId(id: number, messageId: number): void {
+  const db = getDb();
+  const stmt = db.prepare('UPDATE reminders SET source_message_id = ? WHERE id = ?');
+  stmt.run(messageId, id);
+}
