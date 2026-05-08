@@ -4,9 +4,10 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 
-const { RRule, rrulestr } = rrulePkg as {
+const { RRule, rrulestr, datetime } = rrulePkg as {
   RRule: typeof import('rrule')['RRule'];
   rrulestr: typeof import('rrule')['rrulestr'];
+  datetime: typeof import('rrule')['datetime'];
 };
 
 dayjs.extend(utc);
@@ -49,6 +50,8 @@ export function buildRRuleText(spec: RecurrenceSpec): string {
     : null;
 
   const [hourStr, minuteStr] = spec.time.split(':');
+  const tzid = spec.timezone || TZ;
+  const nowTz = dayjs().tz(tzid);
   const rule = new RRule({
     freq,
     byweekday,
@@ -56,16 +59,24 @@ export function buildRRuleText(spec: RecurrenceSpec): string {
     byhour: parseInt(hourStr!, 10),
     byminute: parseInt(minuteStr!, 10),
     bysecond: 0,
-    dtstart: new Date(),
-    tzid: TZ,
+    dtstart: datetime(
+      nowTz.year(),
+      nowTz.month() + 1,
+      nowTz.date(),
+      nowTz.hour(),
+      nowTz.minute(),
+      nowTz.second(),
+    ),
+    tzid,
   });
 
   return rule.toString();
 }
 
-function normalizePseudoUtcToRealUtc(pseudoUtc: Date, tzid: string): Date {
+function normalizePseudoUtcToRealUtc(pseudoUtc: Date): Date {
+  const localTz = dayjs.tz.guess();
   const wallClock = dayjs.utc(pseudoUtc).format('YYYY-MM-DD HH:mm:ss');
-  return dayjs.tz(wallClock, tzid).utc().toDate();
+  return dayjs.tz(wallClock, localTz).utc().toDate();
 }
 
 export function getNextTrigger(
@@ -74,11 +85,9 @@ export function getNextTrigger(
   inclusive = true,
 ): Date {
   const rule = rrulestr(rruleText);
-  const options = (rule as unknown as { options?: Record<string, unknown> }).options ?? {};
-  const tzid = String(options.tzid || TZ);
   const next = rule.after(after, inclusive);
   if (!next) throw new Error(`No next trigger for rrule: ${rruleText}`);
-  return normalizePseudoUtcToRealUtc(next, tzid);
+  return normalizePseudoUtcToRealUtc(next);
 }
 
 export function describeRecurrence(spec: RecurrenceSpec): string {
