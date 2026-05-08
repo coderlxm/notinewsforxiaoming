@@ -3,6 +3,7 @@ import type { Weekday } from 'rrule';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
+import schedule from 'node-schedule';
 
 const { RRule, rrulestr, datetime } = rrulePkg as {
   RRule: typeof import('rrule')['RRule'];
@@ -20,6 +21,8 @@ export interface RecurrenceSpec {
   time: string;
   timezone: string;
 }
+
+const TZ = 'Asia/Shanghai';
 
 function freqToRRule(freq: string): number {
   if (freq === 'DAILY') return RRule.DAILY;
@@ -48,8 +51,7 @@ export function buildRRuleText(spec: RecurrenceSpec, baseAt: Date = new Date()):
     : null;
 
   const [hourStr, minuteStr] = spec.time.split(':');
-  const tzid = spec.timezone;
-  if (!tzid) throw new Error('Missing recurrence timezone');
+  const tzid = spec.timezone || TZ;
   const baseTz = dayjs(baseAt).tz(tzid);
   const rule = new RRule({
     freq,
@@ -72,20 +74,62 @@ export function buildRRuleText(spec: RecurrenceSpec, baseAt: Date = new Date()):
   return rule.toString();
 }
 
-function toPseudoUtc(date: Date, tzid: string): Date {
-  const wallClock = dayjs(date).tz(tzid).format('YYYY-MM-DD HH:mm:ss');
-  return dayjs.utc(wallClock).toDate();
+function toScheduleDayOfWeek(rruleWeekday: number): number {
+  // rrule: 0=MO..6=SU, node-schedule: 0=SU..6=SA
+  return (rruleWeekday + 1) % 7;
 }
 
-function fromPseudoUtc(date: Date, tzid: string): Date {
-  const wallClock = dayjs.utc(date).format('YYYY-MM-DD HH:mm:ss');
-  return dayjs.tz(wallClock, tzid).utc().toDate();
+function firstNumber(values: unknown, field: string): number {
+  if (!Array.isArray(values) || values.length === 0) {
+    throw new Error(`Missing ${field} in recurring rule`);
+  }
+  const n = Number(values[0]);
+  if (!Number.isInteger(n)) {
+    throw new Error(`Invalid ${field} in recurring rule`);
+  }
+  return n;
 }
 
-function getRRuleTimezone(rruleText: string): string {
-  const match = rruleText.match(/^DTSTART;TZID=([^:]+):/m);
-  if (!match?.[1]) throw new Error(`Missing timezone in rrule: ${rruleText}`);
-  return match[1];
+function numberArray(values: unknown, field: string): number[] {
+  if (!Array.isArray(values) || values.length === 0) {
+    throw new Error(`Missing ${field} in recurring rule`);
+  }
+  const arr = values.map(v => Number(v)).filter(v => Number.isInteger(v));
+  if (arr.length === 0) {
+    throw new Error(`Invalid ${field} in recurring rule`);
+  }
+  return arr;
+}
+
+function buildScheduleRule(options: Record<string, unknown>): schedule.RecurrenceRule {
+  const tzid = String(options.tzid || TZ);
+  const freq = Number(options.freq);
+  const hour = firstNumber(options.byhour, 'byhour');
+  const minute = firstNumber(options.byminute, 'byminute');
+  const second = firstNumber(options.bysecond, 'bysecond');
+
+  const rule = new schedule.RecurrenceRule();
+  rule.tz = tzid;
+  rule.hour = hour;
+  rule.minute = minute;
+  rule.second = second;
+
+  if (freq === RRule.DAILY) {
+    return rule;
+  }
+
+  if (freq === RRule.WEEKLY) {
+    const byweekday = numberArray(options.byweekday, 'byweekday');
+    rule.dayOfWeek = byweekday.map(toScheduleDayOfWeek);
+    return rule;
+  }
+
+  if (freq === RRule.MONTHLY) {
+    rule.date = numberArray(options.bymonthday, 'bymonthday');
+    return rule;
+  }
+
+  throw new Error(`Unsupported recurring freq: ${freq}`);
 }
 
 export function getNextTrigger(
@@ -94,10 +138,12 @@ export function getNextTrigger(
   inclusive = true,
 ): Date {
   const rule = rrulestr(rruleText);
-  const tzid = getRRuleTimezone(rruleText);
-  const next = rule.after(toPseudoUtc(after, tzid), inclusive);
+  const options = (rule as unknown as { options?: Record<string, unknown> }).options ?? {};
+  const recurrence = buildScheduleRule(options);
+  const base = inclusive ? new Date(after.getTime() - 1000) : after;
+  const next = recurrence.nextInvocationDate(base);
   if (!next) throw new Error(`No next trigger for rrule: ${rruleText}`);
-  return fromPseudoUtc(next, tzid);
+  return next;
 }
 
 export function describeRecurrence(spec: RecurrenceSpec): string {
