@@ -1,14 +1,8 @@
-import rrulePkg from 'rrule';
+import { RRule, rrulestr, datetime } from 'rrule';
 import type { Weekday } from 'rrule';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
-
-const { RRule, rrulestr, datetime } = rrulePkg as {
-  RRule: typeof import('rrule')['RRule'];
-  rrulestr: typeof import('rrule')['rrulestr'];
-  datetime: typeof import('rrule')['datetime'];
-};
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -20,8 +14,6 @@ export interface RecurrenceSpec {
   time: string;
   timezone: string;
 }
-
-const TZ = 'Asia/Shanghai';
 
 function freqToRRule(freq: string): number {
   if (freq === 'DAILY') return RRule.DAILY;
@@ -50,7 +42,8 @@ export function buildRRuleText(spec: RecurrenceSpec, baseAt: Date = new Date()):
     : null;
 
   const [hourStr, minuteStr] = spec.time.split(':');
-  const tzid = spec.timezone || TZ;
+  const tzid = spec.timezone;
+  if (!tzid) throw new Error('Missing recurrence timezone');
   const baseTz = dayjs(baseAt).tz(tzid);
   const rule = new RRule({
     freq,
@@ -83,13 +76,19 @@ function fromPseudoUtc(date: Date, tzid: string): Date {
   return dayjs.tz(wallClock, tzid).utc().toDate();
 }
 
+function getRRuleTimezone(rruleText: string): string {
+  const match = rruleText.match(/^DTSTART;TZID=([^:]+):/m);
+  if (!match?.[1]) throw new Error(`Missing timezone in rrule: ${rruleText}`);
+  return match[1];
+}
+
 export function getNextTrigger(
   rruleText: string,
   after: Date = new Date(),
   inclusive = true,
 ): Date {
   const rule = rrulestr(rruleText);
-  const tzid = (rule as unknown as { options?: { tzid?: string } }).options?.tzid || TZ;
+  const tzid = getRRuleTimezone(rruleText);
   const next = rule.after(toPseudoUtc(after, tzid), inclusive);
   if (!next) throw new Error(`No next trigger for rrule: ${rruleText}`);
   return fromPseudoUtc(next, tzid);
