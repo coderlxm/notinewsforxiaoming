@@ -47,6 +47,16 @@ export function findPendingReminders(): Reminder[] {
   return stmt.all() as Reminder[];
 }
 
+export function findPendingByChatId(chatId: string): Reminder[] {
+  const db = getDb();
+  const stmt = db.prepare(`
+    SELECT * FROM reminders
+    WHERE chat_id = ? AND status = 'pending'
+    ORDER BY trigger_at ASC
+  `);
+  return stmt.all(chatId) as Reminder[];
+}
+
 export function findReminderById(id: number): Reminder | null {
   const db = getDb();
   const stmt = db.prepare('SELECT * FROM reminders WHERE id = ?');

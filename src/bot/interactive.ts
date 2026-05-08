@@ -8,10 +8,13 @@ import {
   formatStartMessage,
   formatHelpMessage,
   formatReminderCreated,
+  formatEmptyReminderList,
+  formatReminderList,
   formatReminderDone,
   formatReminderSnoozed,
   formatReminderCancelled,
   buildCancelButton,
+  buildReminderListButtons,
 } from '../reminders/formatter';
 import { parseCallbackData } from './callbacks';
 
@@ -30,6 +33,21 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     if (!isAuthorized(ctx)) return;
 
     const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
+    const args = text.replace(/^\/remind\s*/, '').trim();
+
+    if (!args) {
+      const reminders = repo.findPendingByChatId(String(ctx.chat!.id));
+      if (reminders.length === 0) {
+        ctx.reply(formatEmptyReminderList(), { parse_mode: 'HTML' });
+        return;
+      }
+      ctx.reply(
+        formatReminderList(reminders),
+        { parse_mode: 'HTML', ...buildReminderListButtons(reminders) }
+      );
+      return;
+    }
+
     const result = parseReminderCommand(text, new Date());
 
     if ('error' in result) {

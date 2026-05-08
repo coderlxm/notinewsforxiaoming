@@ -8,16 +8,36 @@ function escapeHtml(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function formatTime(iso: string): string {
+function beijingDate(iso: string): Date {
   const d = new Date(iso);
-  const offsetMs = 8 * 60 * 60 * 1000;
-  const beijing = new Date(d.getTime() + offsetMs);
-  const year = beijing.getUTCFullYear();
-  const month = String(beijing.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(beijing.getUTCDate()).padStart(2, '0');
-  const hour = String(beijing.getUTCHours()).padStart(2, '0');
-  const minute = String(beijing.getUTCMinutes()).padStart(2, '0');
+  return new Date(d.getTime() + 8 * 60 * 60 * 1000);
+}
+
+function formatTime(iso: string): string {
+  const bj = beijingDate(iso);
+  const year = bj.getUTCFullYear();
+  const month = String(bj.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(bj.getUTCDate()).padStart(2, '0');
+  const hour = String(bj.getUTCHours()).padStart(2, '0');
+  const minute = String(bj.getUTCMinutes()).padStart(2, '0');
   return `${year}-${month}-${day} ${hour}:${minute}`;
+}
+
+function formatShortTime(iso: string): string {
+  const bj = beijingDate(iso);
+  const now = beijingDate(new Date().toISOString());
+  const hour = String(bj.getUTCHours()).padStart(2, '0');
+  const minute = String(bj.getUTCMinutes()).padStart(2, '0');
+
+  if (bj.getUTCFullYear() === now.getUTCFullYear() &&
+      bj.getUTCMonth() === now.getUTCMonth() &&
+      bj.getUTCDate() === now.getUTCDate()) {
+    return `${hour}:${minute}`;
+  }
+
+  const month = String(bj.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(bj.getUTCDate()).padStart(2, '0');
+  return `${month}-${day} ${hour}:${minute}`;
 }
 
 export function formatStartMessage(): string {
@@ -30,7 +50,8 @@ export function formatHelpMessage(): string {
     '',
     '/start - 开始使用',
     '/help - 查看帮助',
-    '/remind - 创建提醒',
+    '/remind - 查看提醒列表',
+    '/remind <时间> <内容> - 创建提醒',
     '',
     '<b>命令格式：</b>',
     '<code>/remind 2026-05-08 15:30 开会</code>',
@@ -51,6 +72,31 @@ export function formatReminderCreated(reminder: Reminder, source?: 'deterministi
     `时间：${formatTime(reminder.trigger_at)}`,
     `内容：${escapeHtml(reminder.text)}`,
   ].join('\n');
+}
+
+export function formatEmptyReminderList(): string {
+  return '暂无提醒。\n\n使用 /remind 或直接输入自然语言创建提醒。';
+}
+
+export function formatReminderList(reminders: Reminder[]): string {
+  const count = reminders.length;
+  const lines = [`<b>待处理提醒 (${count})</b>`, ''];
+
+  reminders.forEach((r, i) => {
+    const time = formatShortTime(r.trigger_at);
+    lines.push(`${i + 1}. ${time} ${escapeHtml(r.text)}`);
+  });
+
+  return lines.join('\n');
+}
+
+export function buildReminderListButtons(reminders: Reminder[]): { reply_markup: InlineKeyboardMarkup } {
+  const rows = reminders.map((r, i) => [{
+    text: `取消 ${i + 1}`,
+    callback_data: `reminder:cancel:${r.id}`
+  }]);
+
+  return { reply_markup: { inline_keyboard: rows } };
 }
 
 export function formatReminderMessage(reminder: Reminder): string {
