@@ -161,6 +161,54 @@ function parseChineseRelative(text: string, now: Date): ParsedReminder | null {
   return null;
 }
 
+function normalizeHourByPeriod(period: string | undefined, hour: number): number {
+  if (!period) return hour;
+  if (period === '下午' || period === '晚上') {
+    if (hour < 12) return hour + 12;
+    return hour;
+  }
+  if (period === '凌晨') {
+    if (hour === 12) return 0;
+    return hour;
+  }
+  if (period === '中午') {
+    if (hour >= 1 && hour <= 10) return hour + 12;
+    return hour;
+  }
+  return hour;
+}
+
+function parseChineseDailyRecurring(text: string): ParsedRecurringReminder | null {
+  const normalized = text.replace(/\s+/g, '');
+  const match = normalized.match(/^每(?:天|日)(?:早上|上午|中午|下午|晚上|凌晨)?\d{1,2}(?:点|:|：)\d{1,2}分?(?:提醒我?)?.+$/);
+  if (!match) return null;
+
+  const detailMatch = normalized.match(/^每(?:天|日)(早上|上午|中午|下午|晚上|凌晨)?(\d{1,2})(?:点|:|：)(\d{1,2})分?(?:提醒我?)?(.+)$/);
+  if (!detailMatch) return null;
+
+  const [, period, hourRaw, minuteRaw, reminderTextRaw] = detailMatch;
+  const minute = parseInt(minuteRaw!, 10);
+  const hourBase = parseInt(hourRaw!, 10);
+  const hour = normalizeHourByPeriod(period, hourBase);
+  const reminderText = reminderTextRaw?.trim() || '';
+
+  if (!reminderText) return null;
+  if (hour < 0 || hour > 23) return null;
+  if (minute < 0 || minute > 59) return null;
+
+  return {
+    spec: {
+      freq: 'DAILY',
+      byweekday: [],
+      bymonthday: [],
+      time: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`,
+      timezone: 'Asia/Shanghai',
+    },
+    text: reminderText,
+    source: 'deterministic',
+  };
+}
+
 const recurrenceSchema = z.object({
   intent: z.literal('create_recurring_reminder'),
   recurrence: z.object({
@@ -179,6 +227,8 @@ export async function parseNaturalReminder(
 ): Promise<ParsedReminder | ParsedRecurringReminder | ParseError> {
   const deterministic = parseChineseRelative(text, now);
   if (deterministic) return deterministic;
+  const recurringDeterministic = parseChineseDailyRecurring(text);
+  if (recurringDeterministic) return recurringDeterministic;
 
   if (!config.deepseekApiKey) {
     return { error: 'AI 解析未配置，请使用 /remind 命令格式创建提醒。' };
