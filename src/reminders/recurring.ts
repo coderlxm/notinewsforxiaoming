@@ -1,4 +1,10 @@
-import { RRule, rrulestr, Weekday } from 'rrule';
+import rrulePkg from 'rrule';
+import type { Weekday } from 'rrule';
+
+const { RRule, rrulestr } = rrulePkg as {
+  RRule: typeof import('rrule')['RRule'];
+  rrulestr: typeof import('rrule')['rrulestr'];
+};
 
 export interface RecurrenceSpec {
   freq: 'DAILY' | 'WEEKLY' | 'MONTHLY';
