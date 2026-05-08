@@ -168,7 +168,7 @@ const recurrenceSchema = z.object({
     byweekday: z.array(z.string()),
     bymonthday: z.array(z.number()),
     time: z.string().regex(/^\d{2}:\d{2}$/),
-    timezone: z.string().optional(),
+    timezone: z.string(),
   }),
   text: z.string().min(1),
 });
@@ -246,7 +246,7 @@ export async function parseNaturalReminder(
           byweekday: recurrence.byweekday,
           bymonthday: recurrence.bymonthday,
           time: recurrence.time,
-          timezone: 'Asia/Shanghai',
+          timezone: recurrence.timezone,
         },
         text: reminderText,
         source: 'ai',
