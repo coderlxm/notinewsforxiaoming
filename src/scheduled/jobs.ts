@@ -28,9 +28,19 @@ export function registerFixedJobs(bot: Telegraf): void {
     await runMode('news', getChinaDayOfWeek(), bot);
   });
 
+  // english: 10:30
+  schedule.scheduleJob({ hour: 10, minute: 30, tz: 'Asia/Shanghai' }, async () => {
+    await runMode('english', getChinaDayOfWeek(), bot);
+  });
+
   // vitamin: 12:30
   schedule.scheduleJob({ hour: 12, minute: 30, tz: 'Asia/Shanghai' }, async () => {
     await runMode('vitamin', getChinaDayOfWeek(), bot);
+  });
+
+  // english: 13:30
+  schedule.scheduleJob({ hour: 13, minute: 30, tz: 'Asia/Shanghai' }, async () => {
+    await runMode('english', getChinaDayOfWeek(), bot);
   });
 
   // github: 15:00
@@ -46,6 +56,11 @@ export function registerFixedJobs(bot: Telegraf): void {
   // v2ex: 20:00
   schedule.scheduleJob({ hour: 20, minute: 0, tz: 'Asia/Shanghai' }, async () => {
     await runMode('v2ex', getChinaDayOfWeek(), bot);
+  });
+
+  // english: 21:30
+  schedule.scheduleJob({ hour: 21, minute: 30, tz: 'Asia/Shanghai' }, async () => {
+    await runMode('english', getChinaDayOfWeek(), bot);
   });
 
   // fitness: Mon(1) / Wed(3) 20:30
