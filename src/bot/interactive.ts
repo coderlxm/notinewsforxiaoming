@@ -98,6 +98,18 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     );
   });
 
+  async function clearSourceButtons(reminder: repo.Reminder): Promise<void> {
+    if (!reminder.source_message_id) return;
+    try {
+      await bot.telegram.editMessageReplyMarkup(
+        reminder.chat_id,
+        reminder.source_message_id
+      );
+    } catch {
+      // message may have been deleted or is too old
+    }
+  }
+
   bot.on('callback_query', async (ctx) => {
     if (!isAuthorized(ctx)) return;
 
@@ -115,6 +127,7 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
       case 'cancel': {
         repo.cancelReminder(data.id);
         cancelScheduledReminder(data.id);
+        await clearSourceButtons(reminder);
         try {
           await ctx.editMessageText(formatReminderCancelled(reminder), { parse_mode: 'HTML' });
         } catch {
@@ -125,6 +138,7 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
       case 'done': {
         repo.markReminderDone(data.id);
         cancelScheduledReminder(data.id);
+        await clearSourceButtons(reminder);
         try {
           await ctx.editMessageText(formatReminderDone(reminder), { parse_mode: 'HTML' });
         } catch {
@@ -141,6 +155,8 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
         if (updated) {
           scheduleReminder(bot, updated);
         }
+
+        await clearSourceButtons(reminder);
 
         const replyText = updated
           ? formatReminderSnoozed(updated)
