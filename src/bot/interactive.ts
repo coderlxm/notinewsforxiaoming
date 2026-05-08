@@ -119,52 +119,47 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
     if (!text || text.startsWith('/')) return;
 
-    try {
-      const result = await parseNaturalReminder(text, new Date());
+    const result = await parseNaturalReminder(text, new Date());
 
-      if ('error' in result) {
-        await ctx.reply(result.error, { parse_mode: 'HTML' });
-        return;
-      }
+    if ('error' in result) {
+      ctx.reply(result.error, { parse_mode: 'HTML' });
+      return;
+    }
 
-      if ('spec' in result) {
-        const rruleText = buildRRuleText(result.spec);
-        const nextTrigger = getNextTrigger(rruleText);
-        const rule = repo.createRecurringRule({
-          chat_id: String(ctx.chat!.id),
-          text: result.text,
-          timezone: result.spec.timezone,
-          rrule_text: rruleText,
-          next_trigger_at: nextTrigger,
-          source: result.source,
-        });
-        scheduleRecurringRule(bot, rule);
-        const description = describeRecurrence(result.spec);
-        const createdMessage = await ctx.reply(
-          formatRecurringCreated(rule, description),
-          { parse_mode: 'HTML', ...buildRecurringRuleButtons(rule.id) }
-        );
-        repo.setRecurringSourceMessageId(rule.id, createdMessage.message_id);
-        return;
-      }
-
-      const reminder = repo.createReminder({
+    if ('spec' in result) {
+      const rruleText = buildRRuleText(result.spec);
+      const nextTrigger = getNextTrigger(rruleText);
+      const rule = repo.createRecurringRule({
         chat_id: String(ctx.chat!.id),
         text: result.text,
-        trigger_at: result.triggerAt
+        timezone: result.spec.timezone,
+        rrule_text: rruleText,
+        next_trigger_at: nextTrigger,
+        source: result.source,
       });
-
-      scheduleReminder(bot, reminder);
-
+      scheduleRecurringRule(bot, rule);
+      const description = describeRecurrence(result.spec);
       const createdMessage = await ctx.reply(
-        formatReminderCreated(reminder, result.source),
-        { parse_mode: 'HTML', ...buildCancelButton(reminder.id) }
+        formatRecurringCreated(rule, description),
+        { parse_mode: 'HTML', ...buildRecurringRuleButtons(rule.id) }
       );
-      repo.setSourceMessageId(reminder.id, createdMessage.message_id);
-    } catch (error) {
-      console.error('Natural reminder handling failed:', error);
-      await ctx.reply('提醒解析失败，请重试或使用 /remind 命令格式。', { parse_mode: 'HTML' });
+      repo.setRecurringSourceMessageId(rule.id, createdMessage.message_id);
+      return;
     }
+
+    const reminder = repo.createReminder({
+      chat_id: String(ctx.chat!.id),
+      text: result.text,
+      trigger_at: result.triggerAt
+    });
+
+    scheduleReminder(bot, reminder);
+
+    const createdMessage = await ctx.reply(
+      formatReminderCreated(reminder, result.source),
+      { parse_mode: 'HTML', ...buildCancelButton(reminder.id) }
+    );
+    repo.setSourceMessageId(reminder.id, createdMessage.message_id);
   });
 
   async function clearSourceButtons(reminder: repo.Reminder): Promise<void> {
