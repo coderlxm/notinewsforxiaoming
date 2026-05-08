@@ -1,4 +1,5 @@
 import type { Reminder } from './repository';
+import { bjFormat, formatShortDisplay } from '../utils/time';
 
 interface InlineKeyboardMarkup {
   inline_keyboard: Array<Array<{ text: string; callback_data: string }>>;
@@ -6,38 +7,6 @@ interface InlineKeyboardMarkup {
 
 function escapeHtml(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
-function beijingDate(iso: string): Date {
-  const d = new Date(iso);
-  return new Date(d.getTime() + 8 * 60 * 60 * 1000);
-}
-
-function formatTime(iso: string): string {
-  const bj = beijingDate(iso);
-  const year = bj.getUTCFullYear();
-  const month = String(bj.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(bj.getUTCDate()).padStart(2, '0');
-  const hour = String(bj.getUTCHours()).padStart(2, '0');
-  const minute = String(bj.getUTCMinutes()).padStart(2, '0');
-  return `${year}-${month}-${day} ${hour}:${minute}`;
-}
-
-function formatShortTime(iso: string): string {
-  const bj = beijingDate(iso);
-  const now = beijingDate(new Date().toISOString());
-  const hour = String(bj.getUTCHours()).padStart(2, '0');
-  const minute = String(bj.getUTCMinutes()).padStart(2, '0');
-
-  if (bj.getUTCFullYear() === now.getUTCFullYear() &&
-      bj.getUTCMonth() === now.getUTCMonth() &&
-      bj.getUTCDate() === now.getUTCDate()) {
-    return `${hour}:${minute}`;
-  }
-
-  const month = String(bj.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(bj.getUTCDate()).padStart(2, '0');
-  return `${month}-${day} ${hour}:${minute}`;
 }
 
 export function formatStartMessage(): string {
@@ -69,7 +38,7 @@ export function formatReminderCreated(reminder: Reminder, source?: 'deterministi
   return [
     `<b>已创建提醒</b>${sourceTag}`,
     '',
-    `时间：${formatTime(reminder.trigger_at)}`,
+    `时间：${bjFormat(reminder.trigger_at)}`,
     `内容：${escapeHtml(reminder.text)}`,
   ].join('\n');
 }
@@ -83,7 +52,7 @@ export function formatReminderList(reminders: Reminder[]): string {
   const lines = [`<b>待处理提醒 (${count})</b>`, ''];
 
   reminders.forEach((r, i) => {
-    const time = formatShortTime(r.trigger_at);
+    const time = formatShortDisplay(r.trigger_at);
     lines.push(`${i + 1}. ${time} ${escapeHtml(r.text)}`);
   });
 
@@ -112,7 +81,7 @@ export function formatReminderDone(reminder: Reminder): string {
 }
 
 export function formatReminderSnoozed(reminder: Reminder): string {
-  return `提醒已推迟 5 分钟，新的提醒时间：${formatTime(reminder.trigger_at)}`;
+  return `提醒已推迟 5 分钟，新的提醒时间：${bjFormat(reminder.trigger_at)}`;
 }
 
 export function formatReminderCancelled(reminder: Reminder): string {

@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { config } from '../config/index';
+import { bjFormat } from '../utils/time';
 
 export interface ParsedReminder {
   triggerAt: Date;
@@ -12,18 +13,6 @@ export interface ParseError {
 }
 
 const helpText = '格式不正确。示例：\n/remind 2026-05-08 15:30 开会\n/remind 10m 收衣服\n/remind 2h 看日志';
-
-function formatBeijingTime(date: Date): string {
-  const offsetMs = 8 * 60 * 60 * 1000;
-  const beijing = new Date(date.getTime() + offsetMs);
-  const year = beijing.getUTCFullYear();
-  const month = String(beijing.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(beijing.getUTCDate()).padStart(2, '0');
-  const hour = String(beijing.getUTCHours()).padStart(2, '0');
-  const minute = String(beijing.getUTCMinutes()).padStart(2, '0');
-  const second = String(beijing.getUTCSeconds()).padStart(2, '0');
-  return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
-}
 
 function extractJson(raw: string): unknown | null {
   try {
@@ -133,7 +122,7 @@ export async function parseNaturalReminder(
     apiKey: config.deepseekApiKey
   });
 
-  const beijingTime = formatBeijingTime(now);
+  const beijingTime = bjFormat(now, 'YYYY-MM-DD HH:mm:ss');
 
   const prompt = `你是提醒解析器。当前北京时间：${beijingTime}。
 只输出 JSON，不输出解释。

@@ -1,11 +1,7 @@
 import schedule from 'node-schedule';
 import type { Telegraf } from 'telegraf';
 import { runMode } from './runMode';
-
-function getChinaDayOfWeek(): number {
-  const now = Date.now();
-  return new Date(now + 8 * 60 * 60 * 1000).getUTCDay();
-}
+import { getChinaDayOfWeek } from '../utils/time';
 
 export function registerFixedJobs(bot: Telegraf): void {
   // sleep: 00:10 Beijing time
