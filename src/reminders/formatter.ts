@@ -1,5 +1,6 @@
-import type { Reminder } from './repository';
+import type { Reminder, RecurringRule } from './repository';
 import { bjFormat, formatShortDisplay } from '../utils/time';
+import { describeRecurrence } from './recurring';
 
 interface InlineKeyboardMarkup {
   inline_keyboard: Array<Array<{ text: string; callback_data: string }>>;
@@ -107,4 +108,64 @@ export function buildReminderButtons(reminderId: number): { reply_markup: Inline
       ]]
     }
   };
+}
+
+export function formatRecurringCreated(rule: RecurringRule, description: string): string {
+  const nextTime = bjFormat(rule.next_trigger_at);
+  const sourceTag = rule.source === 'ai' ? ' [AI]' : ' [固定]';
+  return [
+    `<b>已创建循环提醒</b>${sourceTag}`,
+    '',
+    `规则：${escapeHtml(description)}`,
+    `内容：${escapeHtml(rule.text)}`,
+    `下次：${nextTime}`,
+  ].join('\n');
+}
+
+export function formatRecurringReminderMessage(rule: RecurringRule): string {
+  return [
+    '<b>循环提醒时间到</b>',
+    '',
+    escapeHtml(rule.text),
+  ].join('\n');
+}
+
+export function buildRecurringRuleButtons(ruleId: number): { reply_markup: InlineKeyboardMarkup } {
+  return {
+    reply_markup: {
+      inline_keyboard: [[
+        { text: '暂停循环', callback_data: `recur:pause:${ruleId}` },
+        { text: '取消循环', callback_data: `recur:cancel:${ruleId}` },
+      ]]
+    }
+  };
+}
+
+export function buildRecurringReminderButtons(ruleId: number, runId: number): { reply_markup: InlineKeyboardMarkup } {
+  return {
+    reply_markup: {
+      inline_keyboard: [[
+        { text: '已完成', callback_data: `recur:done:${ruleId}:${runId}` },
+        { text: '跳过本次', callback_data: `recur:skip:${ruleId}:${runId}` },
+      ], [
+        { text: '停止循环', callback_data: `recur:cancel:${ruleId}:0` },
+      ]]
+    }
+  };
+}
+
+export function formatRecurringCancelled(rule: RecurringRule): string {
+  return `循环提醒「${escapeHtml(rule.text)}」已取消。`;
+}
+
+export function formatRecurringPaused(rule: RecurringRule): string {
+  return `循环提醒「${escapeHtml(rule.text)}」已暂停。`;
+}
+
+export function formatRecurringRunDone(): string {
+  return '已完成本次循环提醒。';
+}
+
+export function formatRecurringRunSkipped(): string {
+  return '已跳过本次循环提醒。';
 }

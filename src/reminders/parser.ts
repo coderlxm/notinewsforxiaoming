@@ -1,9 +1,17 @@
 import OpenAI from 'openai';
+import { z } from 'zod';
 import { config } from '../config/index';
 import { bjFormat } from '../utils/time';
+import type { RecurrenceSpec } from './recurring';
 
 export interface ParsedReminder {
   triggerAt: Date;
+  text: string;
+  source: 'deterministic' | 'ai';
+}
+
+export interface ParsedRecurringReminder {
+  spec: RecurrenceSpec;
   text: string;
   source: 'deterministic' | 'ai';
 }
@@ -12,7 +20,7 @@ export interface ParseError {
   error: string;
 }
 
-const helpText = '格式不正确。示例：\n/remind 2026-05-08 15:30 开会\n/remind 10m 收衣服\n/remind 2h 看日志';
+const helpText = '格式不正确。示例：\n/remind 2026-05-08 15:30 开会\n/remind 10m 收衣服\n/remind 2h 看日志\n/remind every day 22:00 做俯卧撑';
 
 function extractJson(raw: string): unknown | null {
   try {
@@ -28,6 +36,58 @@ function extractJson(raw: string): unknown | null {
     }
     return null;
   }
+}
+
+const DAY_MAP: Record<string, string> = {
+  mon: 'MO', tue: 'TU', wed: 'WE', thu: 'TH', fri: 'FR', sat: 'SA', sun: 'SU',
+  monday: 'MO', tuesday: 'TU', wednesday: 'WE', thursday: 'TH', friday: 'FR', saturday: 'SA', sunday: 'SU',
+};
+
+export function parseRecurringCommand(args: string, _now: Date): ParsedRecurringReminder | ParseError | null {
+  if (!args) return null;
+
+  const everyDayMatch = args.match(/^every\s+day\s+(\d{2}:\d{2})\s+(.+)/);
+  if (everyDayMatch) {
+    const [, time, text] = everyDayMatch;
+    if (!text?.trim()) return { error: '提醒内容不能为空。' };
+    return {
+      spec: { freq: 'DAILY', byweekday: [], bymonthday: [], time: time!, timezone: 'Asia/Shanghai' },
+      text: text.trim(),
+      source: 'deterministic',
+    };
+  }
+
+  const everyWeekMatch = args.match(/^every\s+week\s+([a-zA-Z,\s]+?)\s+(\d{2}:\d{2})\s+(.+)/);
+  if (everyWeekMatch) {
+    const [, daysStr, time, text] = everyWeekMatch;
+    const byweekday = daysStr!.split(/[,，\s]+/).filter(Boolean).map(d => {
+      const mapped = DAY_MAP[d.toLowerCase().trim()];
+      if (!mapped) throw new Error(`Invalid weekday: ${d}`);
+      return mapped;
+    });
+    if (byweekday.length === 0) return { error: '请指定至少一个星期几。如: mon,wed,fri' };
+    if (!text?.trim()) return { error: '提醒内容不能为空。' };
+    return {
+      spec: { freq: 'WEEKLY', byweekday, bymonthday: [], time: time!, timezone: 'Asia/Shanghai' },
+      text: text.trim(),
+      source: 'deterministic',
+    };
+  }
+
+  const everyMonthMatch = args.match(/^every\s+month\s+(\d{1,2})\s+(\d{2}:\d{2})\s+(.+)/);
+  if (everyMonthMatch) {
+    const [, day, time, text] = everyMonthMatch;
+    const dayNum = parseInt(day!, 10);
+    if (dayNum < 1 || dayNum > 31) return { error: '日期必须在 1-31 之间。' };
+    if (!text?.trim()) return { error: '提醒内容不能为空。' };
+    return {
+      spec: { freq: 'MONTHLY', byweekday: [], bymonthday: [dayNum], time: time!, timezone: 'Asia/Shanghai' },
+      text: text.trim(),
+      source: 'deterministic',
+    };
+  }
+
+  return null;
 }
 
 export function parseReminderCommand(input: string, now: Date): ParsedReminder | ParseError {
@@ -68,8 +128,6 @@ export function parseReminderCommand(input: string, now: Date): ParsedReminder |
 }
 
 function parseChineseRelative(text: string, now: Date): ParsedReminder | null {
-  // Pattern 1: "N分/小时后提醒我XXX" or "N分/小时后XXX"
-  // Group 1 = number, Group 2 = reminder text
   const primaryMatch = text.match(/(\d+)\s*(分钟|小时|秒钟?)?[之以]?后(?:提醒我?)?\s*(.+)/);
   if (primaryMatch) {
     const num = parseInt(primaryMatch[1]!, 10);
@@ -82,8 +140,6 @@ function parseChineseRelative(text: string, now: Date): ParsedReminder | null {
     }
   }
 
-  // Pattern 2: "半小时后提醒我XXX" or "半小时后XXX"
-  // Group 1 = reminder text
   const halfHourMatch = text.match(/半小时[之以]?后(?:提醒我?)?\s*(.+)/);
   if (halfHourMatch && halfHourMatch[1]!.trim()) {
     return {
@@ -93,7 +149,6 @@ function parseChineseRelative(text: string, now: Date): ParsedReminder | null {
     };
   }
 
-  // Pattern 3: "提醒我XXX在N分钟后"  — Group 1 = text, Group 2 = number
   const remindBeforeMatch = text.match(/提醒\s*我\s*(.+?)\s*在\s*(\d+)\s*分钟[之以]?后/);
   if (remindBeforeMatch) {
     const num = parseInt(remindBeforeMatch[2]!, 10);
@@ -106,10 +161,22 @@ function parseChineseRelative(text: string, now: Date): ParsedReminder | null {
   return null;
 }
 
+const recurrenceSchema = z.object({
+  intent: z.literal('create_recurring_reminder'),
+  recurrence: z.object({
+    freq: z.enum(['DAILY', 'WEEKLY', 'MONTHLY']),
+    byweekday: z.array(z.string()),
+    bymonthday: z.array(z.number()),
+    time: z.string().regex(/^\d{2}:\d{2}$/),
+    timezone: z.string(),
+  }),
+  text: z.string().min(1),
+});
+
 export async function parseNaturalReminder(
   text: string,
   now: Date
-): Promise<ParsedReminder | ParseError> {
+): Promise<ParsedReminder | ParsedRecurringReminder | ParseError> {
   const deterministic = parseChineseRelative(text, now);
   if (deterministic) return deterministic;
 
@@ -129,7 +196,20 @@ export async function parseNaturalReminder(
 
 输入：${text}
 
-输出格式：
+如果用户想要创建循环/重复提醒（如每天、每周、每月），输出：
+{
+  "intent": "create_recurring_reminder",
+  "recurrence": {
+    "freq": "DAILY",
+    "byweekday": [],
+    "bymonthday": [],
+    "time": "22:00",
+    "timezone": "Asia/Shanghai"
+  },
+  "text": "做俯卧撑"
+}
+
+如果用户想要一次性提醒，输出：
 {
   "intent": "create_reminder",
   "trigger_at": "2026-05-07T21:20:00+08:00",
@@ -147,19 +227,37 @@ export async function parseNaturalReminder(
     console.log('[parseNaturalReminder] raw AI:', raw);
     const parsed = extractJson(raw);
 
-    if (
-      typeof parsed !== 'object' ||
-      parsed === null ||
-      !('intent' in parsed) ||
-      !('trigger_at' in parsed) ||
-      !('text' in parsed)
-    ) {
+    if (typeof parsed !== 'object' || parsed === null || !('intent' in parsed)) {
       return { error: '没有识别到有效提醒时间。' };
     }
 
     const obj = parsed as Record<string, unknown>;
 
+    if (obj.intent === 'create_recurring_reminder') {
+      const result = recurrenceSchema.safeParse(parsed);
+      if (!result.success) {
+        console.log('[parseNaturalReminder] zod validation failed:', result.error.issues);
+        return { error: '没有识别到有效的循环提醒格式。' };
+      }
+      const { recurrence, text: reminderText } = result.data;
+      return {
+        spec: {
+          freq: recurrence.freq,
+          byweekday: recurrence.byweekday,
+          bymonthday: recurrence.bymonthday,
+          time: recurrence.time,
+          timezone: recurrence.timezone,
+        },
+        text: reminderText,
+        source: 'ai',
+      };
+    }
+
     if (obj.intent !== 'create_reminder') {
+      return { error: '没有识别到有效提醒时间。' };
+    }
+
+    if (!('trigger_at' in obj) || !('text' in obj)) {
       return { error: '没有识别到有效提醒时间。' };
     }
 

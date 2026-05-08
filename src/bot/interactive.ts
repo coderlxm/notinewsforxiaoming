@@ -1,9 +1,10 @@
 import type { Telegraf } from 'telegraf';
 import { message } from 'telegraf/filters';
 import { isAuthorized } from './auth';
-import { parseReminderCommand, parseNaturalReminder } from '../reminders/parser';
+import { parseReminderCommand, parseNaturalReminder, parseRecurringCommand } from '../reminders/parser';
 import * as repo from '../reminders/repository';
-import { scheduleReminder, cancelScheduledReminder } from '../reminders/scheduler';
+import { scheduleReminder, cancelScheduledReminder, scheduleRecurringRule, cancelRecurringJob } from '../reminders/scheduler';
+import { buildRRuleText, getNextTrigger, describeRecurrence } from '../reminders/recurring';
 import {
   formatStartMessage,
   formatHelpMessage,
@@ -15,8 +16,14 @@ import {
   formatReminderCancelled,
   buildCancelButton,
   buildReminderListButtons,
+  formatRecurringCreated,
+  formatRecurringCancelled,
+  formatRecurringPaused,
+  formatRecurringRunDone,
+  formatRecurringRunSkipped,
+  buildRecurringRuleButtons,
 } from '../reminders/formatter';
-import { parseCallbackData } from './callbacks';
+import { parseCallbackData, parseRecurringCallbackData } from './callbacks';
 
 export function registerInteractiveHandlers(bot: Telegraf): void {
   bot.command('start', (ctx) => {
@@ -48,7 +55,43 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
       return;
     }
 
-    const result = parseReminderCommand(text, new Date());
+    const now = new Date();
+
+    try {
+      const recurringResult = parseRecurringCommand(args, now);
+      if (recurringResult && !('error' in recurringResult)) {
+        const rruleText = buildRRuleText(recurringResult.spec);
+        const nextTrigger = getNextTrigger(rruleText);
+        const rule = repo.createRecurringRule({
+          chat_id: String(ctx.chat!.id),
+          text: recurringResult.text,
+          timezone: recurringResult.spec.timezone,
+          rrule_text: rruleText,
+          next_trigger_at: nextTrigger,
+          source: recurringResult.source,
+        });
+        scheduleRecurringRule(bot, rule);
+        const description = describeRecurrence(recurringResult.spec);
+        const createdMessage = await ctx.reply(
+          formatRecurringCreated(rule, description),
+          { parse_mode: 'HTML', ...buildRecurringRuleButtons(rule.id) }
+        );
+        repo.setRecurringSourceMessageId(rule.id, createdMessage.message_id);
+        return;
+      }
+      if (recurringResult && 'error' in recurringResult) {
+        await ctx.reply(recurringResult.error, { parse_mode: 'HTML' });
+        return;
+      }
+    } catch (e) {
+      if (e instanceof Error) {
+        await ctx.reply(e.message, { parse_mode: 'HTML' });
+        return;
+      }
+      throw e;
+    }
+
+    const result = parseReminderCommand(text, now);
 
     if ('error' in result) {
       await ctx.reply(result.error, { parse_mode: 'HTML' });
@@ -83,6 +126,27 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
       return;
     }
 
+    if ('spec' in result) {
+      const rruleText = buildRRuleText(result.spec);
+      const nextTrigger = getNextTrigger(rruleText);
+      const rule = repo.createRecurringRule({
+        chat_id: String(ctx.chat!.id),
+        text: result.text,
+        timezone: result.spec.timezone,
+        rrule_text: rruleText,
+        next_trigger_at: nextTrigger,
+        source: result.source,
+      });
+      scheduleRecurringRule(bot, rule);
+      const description = describeRecurrence(result.spec);
+      const createdMessage = await ctx.reply(
+        formatRecurringCreated(rule, description),
+        { parse_mode: 'HTML', ...buildRecurringRuleButtons(rule.id) }
+      );
+      repo.setRecurringSourceMessageId(rule.id, createdMessage.message_id);
+      return;
+    }
+
     const reminder = repo.createReminder({
       chat_id: String(ctx.chat!.id),
       text: result.text,
@@ -108,12 +172,78 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     );
   }
 
+  async function clearRecurringSourceButtons(rule: repo.RecurringRule): Promise<void> {
+    if (!rule.source_message_id) return;
+    await bot.telegram.editMessageReplyMarkup(
+      rule.chat_id,
+      rule.source_message_id,
+      undefined,
+      { inline_keyboard: [] }
+    );
+  }
+
   bot.on('callback_query', async (ctx) => {
     if (!isAuthorized(ctx)) return;
 
-    const data = parseCallbackData(
-      ctx.callbackQuery && 'data' in ctx.callbackQuery ? ctx.callbackQuery.data : undefined
-    );
+    const cbData = ctx.callbackQuery && 'data' in ctx.callbackQuery ? ctx.callbackQuery.data : undefined;
+
+    const recurringData = parseRecurringCallbackData(cbData);
+    if (recurringData) {
+      await ctx.answerCbQuery();
+
+      const rule = repo.findRecurringRuleById(recurringData.ruleId);
+      if (!rule) return;
+
+      switch (recurringData.type) {
+        case 'pause': {
+          repo.updateRecurringStatus(recurringData.ruleId, 'paused');
+          cancelRecurringJob(recurringData.ruleId);
+          await clearRecurringSourceButtons(rule);
+          try {
+            await ctx.editMessageText(formatRecurringPaused(rule), { parse_mode: 'HTML' });
+          } catch {
+            await ctx.reply(formatRecurringPaused(rule), { parse_mode: 'HTML' });
+          }
+          break;
+        }
+        case 'cancel': {
+          repo.updateRecurringStatus(recurringData.ruleId, 'cancelled');
+          cancelRecurringJob(recurringData.ruleId);
+          await clearRecurringSourceButtons(rule);
+          try {
+            await ctx.editMessageText(formatRecurringCancelled(rule), { parse_mode: 'HTML' });
+          } catch {
+            await ctx.reply(formatRecurringCancelled(rule), { parse_mode: 'HTML' });
+          }
+          break;
+        }
+        case 'done': {
+          if (recurringData.runId) {
+            repo.updateRecurringRunAction(recurringData.runId, 'done');
+          }
+          try {
+            await ctx.editMessageText(formatRecurringRunDone(), { parse_mode: 'HTML' });
+          } catch {
+            await ctx.reply(formatRecurringRunDone(), { parse_mode: 'HTML' });
+          }
+          break;
+        }
+        case 'skip': {
+          if (recurringData.runId) {
+            repo.updateRecurringRunAction(recurringData.runId, 'skip');
+          }
+          try {
+            await ctx.editMessageText(formatRecurringRunSkipped(), { parse_mode: 'HTML' });
+          } catch {
+            await ctx.reply(formatRecurringRunSkipped(), { parse_mode: 'HTML' });
+          }
+          break;
+        }
+      }
+      return;
+    }
+
+    const data = parseCallbackData(cbData);
     if (!data) return;
 
     await ctx.answerCbQuery();

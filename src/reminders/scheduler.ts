@@ -1,10 +1,12 @@
 import schedule from 'node-schedule';
 import type { Telegraf } from 'telegraf';
-import type { Reminder } from './repository';
+import type { Reminder, RecurringRule } from './repository';
 import * as repo from './repository';
-import { formatReminderMessage, buildReminderButtons } from './formatter';
+import { formatReminderMessage, buildReminderButtons, formatRecurringReminderMessage, buildRecurringReminderButtons } from './formatter';
+import { getNextTrigger } from './recurring';
 
 const jobs = new Map<number, schedule.Job>();
+const recurJobs = new Map<number, schedule.Job>();
 
 export function scheduleReminder(bot: Telegraf, reminder: Reminder): void {
   const triggerAt = new Date(reminder.trigger_at);
@@ -61,3 +63,72 @@ export function schedulePendingReminders(bot: Telegraf): void {
     console.log(`Scheduled ${reminders.length} pending reminder(s).`);
   }
 }
+
+function scheduleRecurringRule(bot: Telegraf, rule: RecurringRule): void {
+  const triggerAt = new Date(rule.next_trigger_at);
+
+  const job = schedule.scheduleJob(triggerAt, async () => {
+    const current = repo.findRecurringRuleById(rule.id);
+    if (!current || current.status !== 'active') return;
+
+    try {
+      const run = repo.createRecurringRun({
+        rule_id: rule.id,
+        trigger_at: new Date(current.next_trigger_at),
+      });
+
+      const msg = await bot.telegram.sendMessage(
+        rule.chat_id,
+        formatRecurringReminderMessage(current),
+        {
+          parse_mode: 'HTML',
+          link_preview_options: { is_disabled: true },
+          ...buildRecurringReminderButtons(current.id, run.id),
+        }
+      );
+      repo.setRecurringRunSentMessageId(run.id, msg.message_id);
+
+      const currentTriggerAt = new Date(current.next_trigger_at);
+      const nextTrigger = getNextTrigger(current.rrule_text);
+      repo.updateRecurringNextTrigger(rule.id, nextTrigger, currentTriggerAt);
+      scheduleRecurringRule(bot, { ...current, next_trigger_at: nextTrigger.toISOString() });
+    } catch (err) {
+      console.error(`Failed to send recurring reminder rule_id=${rule.id}:`, err);
+      throw err;
+    }
+  });
+
+  recurJobs.set(rule.id, job);
+}
+
+export function cancelRecurringJob(id: number): void {
+  const job = recurJobs.get(id);
+  if (job) {
+    job.cancel();
+    recurJobs.delete(id);
+  }
+}
+
+export function schedulePendingRecurringRules(bot: Telegraf): void {
+  const rules = repo.findActiveRecurringRules();
+
+  for (const rule of rules) {
+    try {
+      const calculated = getNextTrigger(rule.rrule_text);
+      if (calculated.toISOString() !== rule.next_trigger_at) {
+        repo.updateRecurringNextTrigger(rule.id, calculated);
+        rule.next_trigger_at = calculated.toISOString();
+      }
+      scheduleRecurringRule(bot, rule);
+    } catch (err) {
+      console.error(`Failed to schedule recurring rule id=${rule.id}:`, err);
+      throw err;
+    }
+  }
+
+  if (rules.length > 0) {
+    console.log(`Scheduled ${rules.length} recurring rule(s).`);
+  }
+}
+
+export { scheduleRecurringRule };

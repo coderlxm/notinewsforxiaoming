@@ -32,7 +32,9 @@
     "dotenv": "^17.4.2",
     "node-schedule": "^2.1.1",
     "openai": "^6.35.0",
+    "rrule": "^2.8.1",
     "rss-parser": "^3.13.0",
-    "telegraf": "^4.16.3"
+    "telegraf": "^4.16.3",
+    "zod": "^4.4.3"
   }
 }

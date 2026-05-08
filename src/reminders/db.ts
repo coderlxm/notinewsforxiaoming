@@ -27,6 +27,36 @@ export function getDb(): Database.Database {
       );
       CREATE INDEX IF NOT EXISTS idx_reminders_pending_trigger_at
       ON reminders(status, trigger_at);
+
+      CREATE TABLE IF NOT EXISTS recurring_reminder_rules (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        chat_id TEXT NOT NULL,
+        text TEXT NOT NULL,
+        timezone TEXT NOT NULL,
+        rrule_text TEXT NOT NULL,
+        next_trigger_at TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('active', 'paused', 'cancelled')),
+        source TEXT NOT NULL CHECK (source IN ('deterministic', 'ai')),
+        source_message_id INTEGER,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        last_triggered_at TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_recur_active_next
+      ON recurring_reminder_rules(status, next_trigger_at);
+
+      CREATE TABLE IF NOT EXISTS recurring_reminder_runs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        rule_id INTEGER NOT NULL,
+        trigger_at TEXT NOT NULL,
+        sent_message_id INTEGER,
+        action TEXT CHECK (action IN ('done', 'skip', 'none')),
+        acted_at TEXT,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY(rule_id) REFERENCES recurring_reminder_rules(id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_recur_runs_rule
+      ON recurring_reminder_runs(rule_id, trigger_at);
     `);
   }
   return db;
