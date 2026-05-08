@@ -3,6 +3,7 @@ import type { Weekday } from 'rrule';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
+import schedule from 'node-schedule';
 
 const { RRule, rrulestr, datetime } = rrulePkg as {
   RRule: typeof import('rrule')['RRule'];
@@ -40,7 +41,7 @@ function weekdayToRRule(wd: string): Weekday {
   return v;
 }
 
-export function buildRRuleText(spec: RecurrenceSpec): string {
+export function buildRRuleText(spec: RecurrenceSpec, baseAt: Date = new Date()): string {
   const freq = freqToRRule(spec.freq);
   const byweekday = spec.byweekday.length > 0
     ? spec.byweekday.map(weekdayToRRule)
@@ -51,7 +52,7 @@ export function buildRRuleText(spec: RecurrenceSpec): string {
 
   const [hourStr, minuteStr] = spec.time.split(':');
   const tzid = spec.timezone || TZ;
-  const nowTz = dayjs().tz(tzid);
+  const baseTz = dayjs(baseAt).tz(tzid);
   const rule = new RRule({
     freq,
     byweekday,
@@ -60,12 +61,12 @@ export function buildRRuleText(spec: RecurrenceSpec): string {
     byminute: parseInt(minuteStr!, 10),
     bysecond: 0,
     dtstart: datetime(
-      nowTz.year(),
-      nowTz.month() + 1,
-      nowTz.date(),
-      nowTz.hour(),
-      nowTz.minute(),
-      nowTz.second(),
+      baseTz.year(),
+      baseTz.month() + 1,
+      baseTz.date(),
+      baseTz.hour(),
+      baseTz.minute(),
+      baseTz.second(),
     ),
     tzid,
   });
@@ -73,10 +74,62 @@ export function buildRRuleText(spec: RecurrenceSpec): string {
   return rule.toString();
 }
 
-function normalizePseudoUtcToRealUtc(pseudoUtc: Date): Date {
-  const localTz = dayjs.tz.guess();
-  const wallClock = dayjs.utc(pseudoUtc).format('YYYY-MM-DD HH:mm:ss');
-  return dayjs.tz(wallClock, localTz).utc().toDate();
+function toScheduleDayOfWeek(rruleWeekday: number): number {
+  // rrule: 0=MO..6=SU, node-schedule: 0=SU..6=SA
+  return (rruleWeekday + 1) % 7;
+}
+
+function firstNumber(values: unknown, field: string): number {
+  if (!Array.isArray(values) || values.length === 0) {
+    throw new Error(`Missing ${field} in recurring rule`);
+  }
+  const n = Number(values[0]);
+  if (!Number.isInteger(n)) {
+    throw new Error(`Invalid ${field} in recurring rule`);
+  }
+  return n;
+}
+
+function numberArray(values: unknown, field: string): number[] {
+  if (!Array.isArray(values) || values.length === 0) {
+    throw new Error(`Missing ${field} in recurring rule`);
+  }
+  const arr = values.map(v => Number(v)).filter(v => Number.isInteger(v));
+  if (arr.length === 0) {
+    throw new Error(`Invalid ${field} in recurring rule`);
+  }
+  return arr;
+}
+
+function buildScheduleRule(options: Record<string, unknown>): schedule.RecurrenceRule {
+  const tzid = String(options.tzid || TZ);
+  const freq = Number(options.freq);
+  const hour = firstNumber(options.byhour, 'byhour');
+  const minute = firstNumber(options.byminute, 'byminute');
+  const second = firstNumber(options.bysecond, 'bysecond');
+
+  const rule = new schedule.RecurrenceRule();
+  rule.tz = tzid;
+  rule.hour = hour;
+  rule.minute = minute;
+  rule.second = second;
+
+  if (freq === RRule.DAILY) {
+    return rule;
+  }
+
+  if (freq === RRule.WEEKLY) {
+    const byweekday = numberArray(options.byweekday, 'byweekday');
+    rule.dayOfWeek = byweekday.map(toScheduleDayOfWeek);
+    return rule;
+  }
+
+  if (freq === RRule.MONTHLY) {
+    rule.date = numberArray(options.bymonthday, 'bymonthday');
+    return rule;
+  }
+
+  throw new Error(`Unsupported recurring freq: ${freq}`);
 }
 
 export function getNextTrigger(
@@ -85,9 +138,12 @@ export function getNextTrigger(
   inclusive = true,
 ): Date {
   const rule = rrulestr(rruleText);
-  const next = rule.after(after, inclusive);
+  const options = (rule as unknown as { options?: Record<string, unknown> }).options ?? {};
+  const recurrence = buildScheduleRule(options);
+  const base = inclusive ? new Date(after.getTime() - 1000) : after;
+  const next = recurrence.nextInvocationDate(base);
   if (!next) throw new Error(`No next trigger for rrule: ${rruleText}`);
-  return normalizePseudoUtcToRealUtc(next);
+  return next;
 }
 
 export function describeRecurrence(spec: RecurrenceSpec): string {
