@@ -1,10 +1,16 @@
 import rrulePkg from 'rrule';
 import type { Weekday } from 'rrule';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
 
 const { RRule, rrulestr } = rrulePkg as {
   RRule: typeof import('rrule')['RRule'];
   rrulestr: typeof import('rrule')['rrulestr'];
 };
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 export interface RecurrenceSpec {
   freq: 'DAILY' | 'WEEKLY' | 'MONTHLY';
@@ -62,7 +68,13 @@ export function getNextTrigger(rruleText: string): Date {
   const now = new Date();
   const next = rule.after(now, true);
   if (!next) throw new Error(`No next trigger for rrule: ${rruleText}`);
-  return next;
+
+  // rrule returns pseudo-UTC dates; normalize to true UTC before persistence.
+  // See rrule "Important: Use UTC dates" timezone note.
+  const localTz = dayjs.tz.guess();
+  const wallClock = dayjs.utc(next).format('YYYY-MM-DD HH:mm:ss');
+  const normalized = dayjs.tz(wallClock, localTz).utc();
+  return normalized.toDate();
 }
 
 export function describeRecurrence(spec: RecurrenceSpec): string {
