@@ -11,51 +11,60 @@ function escapeHtml(text: string): string {
 }
 
 export function formatStartMessage(): string {
-  return '你好！我是 NotiNews Bot。\n\n使用 /help 查看可用命令。';
+  return '👋 你好！我是 <b>NotiNews Bot</b>。\n\n我是一个智能个人助手，可以帮你记录提醒、汇总新闻和管理日常。\n\n使用 /help 查看可用命令。';
 }
 
 export function formatHelpMessage(): string {
   return [
-    '<b>可用命令：</b>',
+    '🛠️ <b>可用命令指南</b>',
+    '──────────────────',
+    '🔔 <b>提醒相关：</b>',
+    '/remind - 查看清单',
+    '/remind <code>[时间] [内容]</code> - 创建提醒',
     '',
-    '/start - 开始使用',
-    '/help - 查看帮助',
-    '/remind - 查看提醒列表',
-    '/remind <时间> <内容> - 创建提醒',
+    '💡 <b>命令示例：</b>',
+    '• <code>/remind 15:30 开会</code>',
+    '• <code>/remind 10m 拿快递</code>',
+    '• <code>/remind 明天 10:00 健身</code>',
     '',
-    '<b>命令格式：</b>',
-    '<code>/remind 2026-05-08 15:30 开会</code>',
-    '<code>/remind 10m 收衣服</code>',
-    '<code>/remind 2h 看日志</code>',
-    '',
-    '<b>自然语言（直接输入即可）：</b>',
-    '<code>10 分钟后提醒我收衣服</code>',
-    '<code>明天下午 3 点提醒我开会</code>',
+    '🤖 <b>自然语言对话：</b>',
+    '直接发送 <code>10 分钟后提醒我下楼</code> 即可。',
+    '──────────────────',
+    '#帮助 #NotiNews',
   ].join('\n');
 }
 
 export function formatReminderCreated(reminder: Reminder, source?: 'deterministic' | 'ai'): string {
-  const sourceTag = source === 'ai' ? ' [AI]' : source === 'deterministic' ? ' [固定]' : '';
+  const sourceTag = source === 'ai' ? ' [AI]' : source === 'deterministic' ? ' [指令]' : '';
   return [
-    `<b>已创建提醒</b>${sourceTag}`,
-    '',
-    `时间：${bjFormat(reminder.trigger_at)}`,
-    `内容：${escapeHtml(reminder.text)}`,
+    `✅ <b>提醒设置成功</b>${sourceTag}`,
+    '──────────────────',
+    `📅 <b>时间</b>：${bjFormat(reminder.trigger_at)}`,
+    `📝 <b>内容</b>：${escapeHtml(reminder.text)}`,
+    '──────────────────',
+    '<i>我会在准时叫醒你。</i>',
   ].join('\n');
 }
 
 export function formatEmptyReminderList(): string {
-  return '暂无提醒。\n\n使用 /remind 或直接输入自然语言创建提醒。';
+  return '✨ <b>当前清单空空如也</b>\n\n使用 /remind 或直接发送语音/文字来创建一个提醒吧。';
 }
 
 export function formatReminderList(reminders: Reminder[]): string {
   const count = reminders.length;
-  const lines = [`<b>待处理提醒 (${count})</b>`, ''];
+  const lines = [`📋 <b>待处理提醒清单 (${count})</b>`, '──────────────────'];
 
+  const emojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
   reminders.forEach((r, i) => {
     const time = formatShortDisplay(r.trigger_at);
-    lines.push(`${i + 1}. ${time} ${escapeHtml(r.text)}`);
+    const prefix = i < 10 ? emojis[i] : `${i + 1}.`;
+    lines.push(`${prefix} <code>${time}</code> ${escapeHtml(r.text)}`);
   });
+
+  if (count > 0) {
+    lines.push('──────────────────');
+    lines.push('<i>点击下方按钮可快速操作。</i>');
+  }
 
   return lines.join('\n');
 }
@@ -71,22 +80,28 @@ export function buildReminderListButtons(reminders: Reminder[]): { reply_markup:
 
 export function formatReminderMessage(reminder: Reminder): string {
   return [
-    '<b>提醒时间到</b>',
-    '',
+    '⏰ <b>提醒时间到</b>',
+    '──────────────────',
     escapeHtml(reminder.text),
+    '──────────────────',
+    '#提醒 #任务',
   ].join('\n');
 }
 
 export function formatReminderDone(reminder: Reminder): string {
-  return `提醒「${escapeHtml(reminder.text)}」已标记为完成。`;
+  return `✅ 提醒「<b>${escapeHtml(reminder.text)}</b>」已标记为完成。`;
 }
 
 export function formatReminderSnoozed(reminder: Reminder): string {
-  return `提醒已推迟 5 分钟，新的提醒时间：${bjFormat(reminder.trigger_at)}`;
+  return [
+    '💤 <b>提醒已推迟</b>',
+    '──────────────────',
+    `新时间：<code>${bjFormat(reminder.trigger_at)}</code>`,
+  ].join('\n');
 }
 
 export function formatReminderCancelled(reminder: Reminder): string {
-  return `提醒「${escapeHtml(reminder.text)}」已取消。`;
+  return `🗑️ 提醒「<b>${escapeHtml(reminder.text)}</b>」已从清单中移除。`;
 }
 
 export function buildCancelButton(reminderId: number): { reply_markup: InlineKeyboardMarkup } {
@@ -103,8 +118,8 @@ export function buildReminderButtons(reminderId: number): { reply_markup: Inline
   return {
     reply_markup: {
       inline_keyboard: [[
-        { text: '已完成', callback_data: `reminder:done:${reminderId}` },
-        { text: '推迟 5 分钟', callback_data: `reminder:snooze5:${reminderId}` }
+        { text: '✅ 已完成', callback_data: `reminder:done:${reminderId}` },
+        { text: '💤 晚点再说', callback_data: `reminder:snooze5:${reminderId}` }
       ]]
     }
   };
@@ -112,21 +127,25 @@ export function buildReminderButtons(reminderId: number): { reply_markup: Inline
 
 export function formatRecurringCreated(rule: RecurringRule, description: string): string {
   const nextTime = bjFormat(rule.next_trigger_at);
-  const sourceTag = rule.source === 'ai' ? ' [AI]' : ' [固定]';
+  const sourceTag = rule.source === 'ai' ? ' [AI]' : ' [指令]';
   return [
-    `<b>已创建循环提醒</b>${sourceTag}`,
-    '',
-    `规则：${escapeHtml(description)}`,
-    `内容：${escapeHtml(rule.text)}`,
-    `下次：${nextTime}`,
+    `🔄 <b>循环提醒已就绪</b>${sourceTag}`,
+    '──────────────────',
+    `🗓️ <b>规则</b>：${escapeHtml(description)}`,
+    `📝 <b>内容</b>：${escapeHtml(rule.text)}`,
+    `⏳ <b>下次</b>：${nextTime}`,
+    '──────────────────',
+    '<i>规则已生效，将持续为您保驾护航。</i>',
   ].join('\n');
 }
 
 export function formatRecurringReminderMessage(rule: RecurringRule): string {
   return [
-    '<b>循环提醒时间到</b>',
-    '',
+    '🔄 <b>循环提醒时间到</b>',
+    '──────────────────',
     escapeHtml(rule.text),
+    '──────────────────',
+    '#循环提醒 #例行',
   ].join('\n');
 }
 
@@ -134,8 +153,8 @@ export function buildRecurringRuleButtons(ruleId: number): { reply_markup: Inlin
   return {
     reply_markup: {
       inline_keyboard: [[
-        { text: '暂停循环', callback_data: `recur:pause:${ruleId}` },
-        { text: '取消循环', callback_data: `recur:cancel:${ruleId}` },
+        { text: '⏸️ 暂停循环', callback_data: `recur:pause:${ruleId}` },
+        { text: '🗑️ 取消规则', callback_data: `recur:cancel:${ruleId}` },
       ]]
     }
   };
@@ -145,27 +164,28 @@ export function buildRecurringReminderButtons(ruleId: number, runId: number): { 
   return {
     reply_markup: {
       inline_keyboard: [[
-        { text: '已完成', callback_data: `recur:done:${ruleId}:${runId}` },
-        { text: '跳过本次', callback_data: `recur:skip:${ruleId}:${runId}` },
+        { text: '✅ 已完成', callback_data: `recur:done:${ruleId}:${runId}` },
+        { text: '⏭️ 跳过本次', callback_data: `recur:skip:${ruleId}:${runId}` },
       ], [
-        { text: '停止循环', callback_data: `recur:cancel:${ruleId}:0` },
+        { text: '🛑 停止循环', callback_data: `recur:cancel:${ruleId}:0` },
       ]]
     }
   };
 }
 
 export function formatRecurringCancelled(rule: RecurringRule): string {
-  return `循环提醒「${escapeHtml(rule.text)}」已取消。`;
+  return `🗑️ 循环提醒规则「<b>${escapeHtml(rule.text)}</b>」已取消。`;
 }
 
 export function formatRecurringPaused(rule: RecurringRule): string {
-  return `循环提醒「${escapeHtml(rule.text)}」已暂停。`;
+  return `⏸️ 循环提醒「<b>${escapeHtml(rule.text)}</b>」已暂停。`;
 }
 
 export function formatRecurringRunDone(): string {
-  return '已完成本次循环提醒。';
+  return '✅ 已完成本次循环任务。';
 }
 
 export function formatRecurringRunSkipped(): string {
-  return '已跳过本次循环提醒。';
+  return '⏭️ 已跳过本次循环任务。';
 }
+

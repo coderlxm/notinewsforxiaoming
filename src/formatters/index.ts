@@ -98,55 +98,54 @@ export function formatGithubMessage(summary: string): string {
 }
 
 export function formatSleepMessage(tip: string): string {
-  let message = `🌙 <b>深夜睡眠提醒</b> (${chinaDateLabel()})\n\n`;
+  let message = `🌙 <b>深夜睡眠提醒</b> (${chinaDateLabel()})\n`;
+  message += '──────────────────\n';
   message += '现在已经是凌晨 <b>00:10</b> 啦！你是全宇宙最努力的打工人，但现在身体需要充电了。🔋\n\n';
-  message += `💡 <b>今日生活小常识：</b>\n${renderMarkdownLikeAsHtml(tip)}\n\n`;
+  message += `💡 <b>今日生活小常识：</b>\n${renderMarkdownLikeAsHtml(tip)}\n`;
+  message += '──────────────────\n';
   message += '请立刻放下手机，闭上眼睛，做一个甜甜的梦。晚安！😴💤';
   return message;
 }
 
 export function formatWakeupMessage(weather: WeatherData | null, quote: string): string {
-  let message = `☀️ <b>早安，小明！</b> (${chinaDateLabel()})\n\n`;
+  let message = `☀️ <b>早安，小明！</b> (${chinaDateLabel()})\n`;
+  message += '──────────────────\n';
   const isWorkday = isChinaWorkday(new Date());
 
   if (weather) {
-    message += '🌤️ <b>当前天气状态：</b>\n';
-    message += `${escapeHtml(weather.text)} | ${escapeHtml(String(weather.temp))}°C\n\n`;
+    message += `🌤️ <b>当前天气：</b>${escapeHtml(weather.text)} | ${escapeHtml(String(weather.temp))}°C\n\n`;
 
     if (isWorkday) {
       if (weather.text.includes('雨')) {
         message += '⚠️ <b>注意：今天有雨，出门记得带伞哦！</b> ☔\n\n';
       } else if (weather.text.includes('阴')) {
-        message += '🌥️ <b>注意：今天阴天，可能有雨，建议带伞以防万一。</b> ☂️\n\n';
+        message += '🌥️ <b>注意：今天阴天，建议带伞以防万一。</b> ☂️\n\n';
       }
     }
   }
 
   const countdown = getCountdownInfo();
-  message += '\n⏳ <b>期待值回血中</b>\n';
-  message += '---\n';
+  message += '⏳ <b>期待值回血中</b>\n';
   if (countdown.isHolidayToday && countdown.currentHolidayName) {
     message += `🏝️ 正在享受<b>【${countdown.currentHolidayName}】</b>假期中！\n`;
   }
   if (countdown.holiday) {
-    message += `🏝️ 距离<b>【${countdown.holiday.name}】</b>还有 <b>${countdown.holiday.days}</b> 天\n`;
+    message += `📅 距离<b>【${countdown.holiday.name}】</b>还有 <b>${countdown.holiday.days}</b> 天\n`;
   }
   if (countdown.gta6.days >= 0) {
     const gtaEmoji = countdown.gta6.isSoon ? '🔥' : '🎮';
     message += `${gtaEmoji} 距离<b>【GTA 6 发售】</b>还有 <b>${countdown.gta6.days}</b> 天\n`;
-    if (countdown.gta6.isSoon) {
-      message += '🚨 <b>冲刺阶段：</b>进入最后 30 天倒计时，准备开冲！\n';
-    }
   } else {
     message += '🎮 <b>GTA 6 已发售，准备开玩！</b>\n';
   }
 
   message += `\n📝 <b>今日励志语录</b>\n${renderMarkdownLikeAsHtml(quote)}\n`;
+  message += '──────────────────\n';
 
   if (isWorkday) {
-    message += '\n💪 加油，又是充满机遇的一天！别忘了打卡哦～';
+    message += '💪 加油，又是充满机遇的一天！别忘了打卡哦～';
   } else {
-    message += '\n💪 加油，又是充满机遇的一天！好好享受假期吧～';
+    message += '💪 加油，又是充满机遇的一天！好好享受假期吧～';
   }
   return message;
 }
@@ -173,10 +172,12 @@ export function formatFitnessMessage(summary: string): string {
 }
 
 export function formatVitaminMessage(): string {
-  let message = `💊 <b>饭点维生素提醒</b> (${chinaDateLabel()} ${chinaWeekdayLabel()})\n\n`;
-  message += '现在是饭点，记得把维生素一起吃掉。\n';
-  message += '最好随餐服用，顺手喝点水，别让身体的后勤系统断供。';
-  message += '\n\n#维生素 #健康提醒';
+  let message = `💊 <b>饭点维生素提醒</b> (${chinaDateLabel()})\n`;
+  message += '──────────────────\n';
+  message += '现在是饭点时间，记得随餐服用维生素。\n\n';
+  message += '💧 顺手喝点水，别让身体的后勤系统断供。\n';
+  message += '──────────────────\n';
+  message += '#维生素 #健康提醒';
   return message;
 }
 
