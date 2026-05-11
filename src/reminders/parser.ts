@@ -16,6 +16,21 @@ export interface ParsedRecurringReminder {
   source: 'deterministic' | 'ai';
 }
 
+export interface ParsedListReminders {
+  intent: 'list_reminders';
+  rangeStart: Date;
+  rangeEnd: Date;
+  title: string;
+  source: 'ai';
+}
+
+export interface ParsedCancelReminder {
+  intent: 'cancel_reminder';
+  query: string;
+  target: 'once' | 'recurring' | 'any';
+  source: 'ai';
+}
+
 export interface ParseError {
   error: string;
 }
@@ -173,10 +188,23 @@ const recurrenceSchema = z.object({
   text: z.string().min(1),
 });
 
+const listRemindersSchema = z.object({
+  intent: z.literal('list_reminders'),
+  range_start: z.string().datetime({ offset: true }),
+  range_end: z.string().datetime({ offset: true }),
+  title: z.string().optional(),
+});
+
+const cancelReminderSchema = z.object({
+  intent: z.literal('cancel_reminder'),
+  query: z.string().min(1),
+  target: z.enum(['once', 'recurring', 'any']).default('any'),
+});
+
 export async function parseNaturalReminder(
   text: string,
   now: Date
-): Promise<ParsedReminder | ParsedRecurringReminder | ParseError> {
+): Promise<ParsedReminder | ParsedRecurringReminder | ParsedListReminders | ParsedCancelReminder | ParseError> {
   const deterministic = parseChineseRelative(text, now);
   if (deterministic) return deterministic;
 
@@ -214,7 +242,24 @@ export async function parseNaturalReminder(
   "intent": "create_reminder",
   "trigger_at": "2026-05-07T21:20:00+08:00",
   "text": "收衣服"
-}`;
+}
+
+如果用户想要查询提醒（如"明天有什么提醒""下周有哪些安排""今天下午要做什么"），输出：
+{
+  "intent": "list_reminders",
+  "range_start": "2026-05-12T00:00:00+08:00",
+  "range_end": "2026-05-12T23:59:59+08:00",
+  "title": "明天"
+}
+时间必须用 ISO 8601 带 +08:00，范围必须是闭区间，最长 31 天。
+
+如果用户想要取消提醒（如"取消开会""帮我把俯卧撑取消掉""取消做俯卧撑的循环提醒"），输出：
+{
+  "intent": "cancel_reminder",
+  "query": "开会",
+  "target": "any"
+}
+target 枚举：once（一次性）、recurring（循环）、any（两者都查）。只输出关键词，不输出数据库 id。`;
 
   try {
     const completion = await openai.chat.completions.create({
@@ -250,6 +295,52 @@ export async function parseNaturalReminder(
         },
         text: reminderText,
         source: 'ai',
+      };
+    }
+
+    if (obj.intent === 'list_reminders') {
+      const result = listRemindersSchema.safeParse(parsed);
+      if (!result.success) {
+        console.log('[parseNaturalReminder] list_reminders validation failed:', result.error.issues);
+        return { error: '查询时间范围格式不正确，请使用更具体的说法。' };
+      }
+      const { range_start, range_end, title } = result.data;
+      const rangeStart = new Date(range_start);
+      const rangeEnd = new Date(range_end);
+      if (isNaN(rangeStart.getTime()) || isNaN(rangeEnd.getTime())) {
+        return { error: '查询时间范围格式不正确，请使用更具体的说法。' };
+      }
+      if (rangeStart >= rangeEnd) {
+        return { error: '查询开始时间必须早于结束时间。' };
+      }
+      const diffMs = rangeEnd.getTime() - rangeStart.getTime();
+      if (diffMs > 31 * 24 * 3600 * 1000) {
+        return { error: '查询范围最长 31 天，请缩小查询范围。' };
+      }
+      return {
+        intent: 'list_reminders' as const,
+        rangeStart,
+        rangeEnd,
+        title: title || '',
+        source: 'ai' as const,
+      };
+    }
+
+    if (obj.intent === 'cancel_reminder') {
+      const result = cancelReminderSchema.safeParse(parsed);
+      if (!result.success) {
+        console.log('[parseNaturalReminder] cancel_reminder validation failed:', result.error.issues);
+        return { error: '没有找到要取消的提醒，请提供提醒内容的关键词。' };
+      }
+      const { query, target } = result.data;
+      if (!query.trim()) {
+        return { error: '请提供要取消的提醒关键词。' };
+      }
+      return {
+        intent: 'cancel_reminder' as const,
+        query: query.trim(),
+        target,
+        source: 'ai' as const,
       };
     }
 

@@ -1,10 +1,16 @@
-import type { Telegraf } from 'telegraf';
+import type { Telegraf, Context } from 'telegraf';
 import { message } from 'telegraf/filters';
 import { isAuthorized } from './auth';
-import { parseReminderCommand, parseNaturalReminder, parseRecurringCommand } from '../reminders/parser';
+import {
+  parseReminderCommand,
+  parseNaturalReminder,
+  parseRecurringCommand,
+  type ParsedListReminders,
+  type ParsedCancelReminder,
+} from '../reminders/parser';
 import * as repo from '../reminders/repository';
 import { scheduleReminder, cancelScheduledReminder, scheduleRecurringRule, cancelRecurringJob } from '../reminders/scheduler';
-import { buildRRuleText, getNextTrigger, describeRecurrence } from '../reminders/recurring';
+import { buildRRuleText, getNextTrigger, describeRecurrence, getOccurrencesInRange } from '../reminders/recurring';
 import {
   formatStartMessage,
   formatHelpMessage,
@@ -22,8 +28,13 @@ import {
   formatRecurringRunDone,
   formatRecurringRunSkipped,
   buildRecurringRuleButtons,
+  formatReminderRangeList,
+  formatCancelCandidates,
+  buildCancelCandidateButtons,
+  type ReminderListItem,
+  type CancelCandidate,
 } from '../reminders/formatter';
-import { parseCallbackData, parseRecurringCallbackData } from './callbacks';
+import { parseCallbackData, parseRecurringCallbackData, parseNaturalCancelCallbackData } from './callbacks';
 
 export function registerInteractiveHandlers(bot: Telegraf): void {
   bot.command('start', (ctx) => {
@@ -127,6 +138,16 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
       return;
     }
 
+    if ('intent' in result && result.intent === 'list_reminders') {
+      await handleListIntent(ctx, result);
+      return;
+    }
+
+    if ('intent' in result && result.intent === 'cancel_reminder') {
+      await handleCancelIntent(ctx, result);
+      return;
+    }
+
     if ('spec' in result) {
       const rruleText = buildRRuleText(result.spec, receivedAt);
       const nextTrigger = getNextTrigger(rruleText, result.spec.timezone, receivedAt, true);
@@ -187,6 +208,52 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     if (!isAuthorized(ctx)) return;
 
     const cbData = ctx.callbackQuery && 'data' in ctx.callbackQuery ? ctx.callbackQuery.data : undefined;
+
+    const nlCancelData = parseNaturalCancelCallbackData(cbData);
+    if (nlCancelData) {
+      await ctx.answerCbQuery();
+      const chatId = String(ctx.chat!.id);
+
+      if (nlCancelData.kind === 'once') {
+        const reminder = repo.findReminderById(nlCancelData.id);
+        if (!reminder || reminder.status !== 'pending' || reminder.chat_id !== chatId) {
+          try {
+            await ctx.editMessageText('该提醒已不存在或已处理。', { parse_mode: 'HTML' });
+          } catch {
+            await ctx.reply('该提醒已不存在或已处理。', { parse_mode: 'HTML' });
+          }
+          return;
+        }
+        repo.cancelReminder(nlCancelData.id);
+        cancelScheduledReminder(nlCancelData.id);
+        await clearSourceButtons(reminder);
+        try {
+          await ctx.editMessageText(`已取消一次性提醒「<b>${reminder.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</b>」。`, { parse_mode: 'HTML' });
+        } catch {
+          await ctx.reply(`已取消一次性提醒「<b>${reminder.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</b>」。`, { parse_mode: 'HTML' });
+        }
+        return;
+      }
+
+      const rule = repo.findRecurringRuleById(nlCancelData.id);
+      if (!rule || rule.status !== 'active' || rule.chat_id !== chatId) {
+        try {
+          await ctx.editMessageText('该提醒已不存在或已处理。', { parse_mode: 'HTML' });
+        } catch {
+          await ctx.reply('该提醒已不存在或已处理。', { parse_mode: 'HTML' });
+        }
+        return;
+      }
+      repo.updateRecurringStatus(nlCancelData.id, 'cancelled');
+      cancelRecurringJob(nlCancelData.id);
+      await clearRecurringSourceButtons(rule);
+      try {
+        await ctx.editMessageText(`已取消循环提醒「<b>${rule.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</b>」。`, { parse_mode: 'HTML' });
+      } catch {
+        await ctx.reply(`已取消循环提醒「<b>${rule.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</b>」。`, { parse_mode: 'HTML' });
+      }
+      return;
+    }
 
     const recurringData = parseRecurringCallbackData(cbData);
     if (recurringData) {
@@ -299,4 +366,112 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
       }
     }
   });
+
+  async function handleListIntent(
+    ctx: Context,
+    intent: ParsedListReminders,
+  ): Promise<void> {
+    const chatId = String(ctx.chat!.id);
+    const onceReminders = repo.findPendingRemindersInRange(chatId, intent.rangeStart, intent.rangeEnd);
+    const activeRules = repo.findActiveRecurringByChatId(chatId);
+
+    const items: ReminderListItem[] = [...onceReminders.map((r: repo.Reminder) => ({
+      kind: 'once' as const,
+      text: r.text,
+      triggerAt: new Date(r.trigger_at),
+    }))];
+
+    for (const rule of activeRules) {
+      try {
+        const occurrences = getOccurrencesInRange(rule, intent.rangeStart, intent.rangeEnd);
+        for (const occ of occurrences) {
+          items.push({
+            kind: 'recurring' as const,
+            text: rule.text,
+            triggerAt: occ.triggerAt,
+          });
+        }
+      } catch (e) {
+        await ctx.reply(
+          e instanceof Error ? e.message : '循环提醒展开失败，请缩小查询范围。',
+          { parse_mode: 'HTML' },
+        );
+        return;
+      }
+    }
+
+    items.sort((a, b) => a.triggerAt.getTime() - b.triggerAt.getTime());
+
+    await ctx.reply(
+      formatReminderRangeList(intent.title, items),
+      { parse_mode: 'HTML' },
+    );
+  }
+
+  async function handleCancelIntent(
+    ctx: Context,
+    intent: ParsedCancelReminder,
+  ): Promise<void> {
+    const chatId = String(ctx.chat!.id);
+    const candidates: CancelCandidate[] = [];
+
+    if (intent.target === 'once' || intent.target === 'any') {
+      const onceResults = repo.searchPendingReminders(chatId, intent.query);
+      for (const r of onceResults) {
+        candidates.push({
+          kind: 'once',
+          id: r.id,
+          text: r.text,
+          triggerAt: new Date(r.trigger_at),
+        });
+      }
+    }
+
+    if (intent.target === 'recurring' || intent.target === 'any') {
+      const recurringResults = repo.searchActiveRecurringRules(chatId, intent.query);
+      for (const rule of recurringResults) {
+        candidates.push({
+          kind: 'recurring',
+          id: rule.id,
+          text: rule.text,
+          triggerAt: new Date(rule.next_trigger_at),
+        });
+      }
+    }
+
+    candidates.sort((a, b) => a.triggerAt.getTime() - b.triggerAt.getTime());
+
+    if (candidates.length === 0) {
+      await ctx.reply(
+        formatCancelCandidates(intent.query, []),
+        { parse_mode: 'HTML' },
+      );
+      return;
+    }
+
+    if (candidates.length === 1) {
+      const c = candidates[0]!;
+      if (c.kind === 'once') {
+        const reminder = repo.findReminderById(c.id)!;
+        repo.cancelReminder(c.id);
+        cancelScheduledReminder(c.id);
+        await clearSourceButtons(reminder);
+      } else {
+        const rule = repo.findRecurringRuleById(c.id)!;
+        repo.updateRecurringStatus(c.id, 'cancelled');
+        cancelRecurringJob(c.id);
+        await clearRecurringSourceButtons(rule);
+      }
+      await ctx.reply(
+        formatCancelCandidates(intent.query, candidates),
+        { parse_mode: 'HTML' },
+      );
+      return;
+    }
+
+    await ctx.reply(
+      formatCancelCandidates(intent.query, candidates),
+      { parse_mode: 'HTML', ...buildCancelCandidateButtons(candidates) },
+    );
+  }
 }

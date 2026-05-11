@@ -189,3 +189,74 @@ export function formatRecurringRunSkipped(): string {
   return '⏭️ 已跳过本次循环任务。';
 }
 
+export interface ReminderListItem {
+  kind: 'once' | 'recurring';
+  text: string;
+  triggerAt: Date;
+}
+
+export interface CancelCandidate {
+  kind: 'once' | 'recurring';
+  id: number;
+  text: string;
+  triggerAt: Date;
+}
+
+export function formatReminderRangeList(
+  title: string,
+  items: ReminderListItem[],
+): string {
+  const label = title || '查询结果';
+  if (items.length === 0) {
+    return `📭 <b>${escapeHtml(label)}</b>\n\n这个时间段没有提醒。`;
+  }
+  const lines = [
+    `📋 <b>${escapeHtml(label)} 提醒 (${items.length})</b>`,
+    '──────────────────',
+  ];
+  items.forEach((item, i) => {
+    const time = bjFormat(item.triggerAt);
+    const tag = item.kind === 'recurring' ? ' [循环]' : '';
+    const num = i + 1;
+    lines.push(`${num}. <code>${time}</code>${tag} ${escapeHtml(item.text)}`);
+  });
+  return lines.join('\n');
+}
+
+export function formatCancelCandidates(
+  query: string,
+  candidates: CancelCandidate[],
+): string {
+  if (candidates.length === 0) {
+    return `🔍 没有找到与「<b>${escapeHtml(query)}</b>」相关的提醒。`;
+  }
+  if (candidates.length === 1) {
+    const c = candidates[0]!;
+    const tag = c.kind === 'recurring' ? '循环' : '一次性';
+    return `已取消${tag}提醒「<b>${escapeHtml(c.text)}</b>」。`;
+  }
+  const lines = [
+    `🔍 找到 ${candidates.length} 个与「<b>${escapeHtml(query)}</b>」相关的提醒，请选择一个取消：`,
+    '──────────────────',
+  ];
+  candidates.forEach((c, i) => {
+    const time = bjFormat(c.triggerAt);
+    const tag = c.kind === 'recurring' ? ' [循环]' : '';
+    lines.push(`${i + 1}. <code>${time}</code>${tag} ${escapeHtml(c.text)}`);
+  });
+  return lines.join('\n');
+}
+
+export function buildCancelCandidateButtons(
+  candidates: CancelCandidate[],
+): { reply_markup: InlineKeyboardMarkup } {
+  const rows = candidates.map((c) => {
+    const prefix = c.kind === 'once' ? 'nlcancel:once' : 'nlcancel:recur';
+    return [{
+      text: `取消「${c.text.slice(0, 10)}${c.text.length > 10 ? '...' : ''}」`,
+      callback_data: `${prefix}:${c.id}`,
+    }];
+  });
+  return { reply_markup: { inline_keyboard: rows } };
+}
+

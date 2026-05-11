@@ -45,3 +45,19 @@ export function parseRecurringCallbackData(data: string | undefined): RecurringC
 
   return null;
 }
+
+export interface NaturalCancelCallbackData {
+  kind: 'once' | 'recurring';
+  id: number;
+}
+
+export function parseNaturalCancelCallbackData(data: string | undefined): NaturalCancelCallbackData | null {
+  if (!data) return null;
+  const parts = data.split(':');
+  if (parts.length !== 3 || parts[0] !== 'nlcancel') return null;
+  const [, kind, idStr] = parts;
+  if (kind !== 'once' && kind !== 'recur') return null;
+  const id = parseInt(idStr!, 10);
+  if (isNaN(id)) return null;
+  return { kind: kind === 'once' ? 'once' : 'recurring', id };
+}

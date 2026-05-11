@@ -1,14 +1,8 @@
-import rrulePkg from 'rrule';
-import type { Weekday } from 'rrule';
+import { RRule, rrulestr, datetime, type Weekday } from 'rrule/dist/esm/index.js';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
-
-const { RRule, rrulestr, datetime } = rrulePkg as {
-  RRule: typeof import('rrule')['RRule'];
-  rrulestr: typeof import('rrule')['rrulestr'];
-  datetime: typeof import('rrule')['datetime'];
-};
+import type { RecurringRule } from './repository';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -128,4 +122,34 @@ export function describeRecurrence(spec: RecurrenceSpec): string {
   }
 
   return '未知规则';
+}
+
+export interface RecurringOccurrence {
+  rule: RecurringRule;
+  triggerAt: Date;
+}
+
+export function getOccurrencesInRange(
+  rule: RecurringRule,
+  start: Date,
+  end: Date,
+): RecurringOccurrence[] {
+  const results: RecurringOccurrence[] = [];
+  const MAX_OCCURRENCES = 100;
+
+  let inclusive = true;
+  let cursor = start;
+
+  while (results.length <= MAX_OCCURRENCES) {
+    const next = getNextTrigger(rule.rrule_text, rule.timezone, cursor, inclusive);
+    if (next > end) break;
+    if (results.length === MAX_OCCURRENCES) {
+      throw new Error(`循环提醒「${rule.text}」在范围内展开超过 ${MAX_OCCURRENCES} 次，请缩小查询范围。`);
+    }
+    results.push({ rule, triggerAt: next });
+    cursor = next;
+    inclusive = false;
+  }
+
+  return results;
 }

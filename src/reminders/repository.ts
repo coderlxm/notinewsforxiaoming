@@ -241,3 +241,54 @@ export function setRecurringRunSentMessageId(id: number, messageId: number): voi
   const stmt = db.prepare('UPDATE recurring_reminder_runs SET sent_message_id = ? WHERE id = ?');
   stmt.run(messageId, id);
 }
+
+export function findPendingRemindersInRange(
+  chatId: string,
+  start: Date,
+  end: Date
+): Reminder[] {
+  const db = getDb();
+  const stmt = db.prepare(`
+    SELECT * FROM reminders
+    WHERE chat_id = ?
+      AND status = 'pending'
+      AND trigger_at >= ?
+      AND trigger_at <= ?
+    ORDER BY trigger_at ASC
+  `);
+  return stmt.all(chatId, start.toISOString(), end.toISOString()) as Reminder[];
+}
+
+export function searchPendingReminders(
+  chatId: string,
+  query: string
+): Reminder[] {
+  const db = getDb();
+  const stmt = db.prepare(`
+    SELECT * FROM reminders
+    WHERE chat_id = ?
+      AND status = 'pending'
+      AND text LIKE ? ESCAPE '\\'
+    ORDER BY trigger_at ASC
+  `);
+  return stmt.all(chatId, `%${escapeLikePattern(query)}%`) as Reminder[];
+}
+
+export function searchActiveRecurringRules(
+  chatId: string,
+  query: string
+): RecurringRule[] {
+  const db = getDb();
+  const stmt = db.prepare(`
+    SELECT * FROM recurring_reminder_rules
+    WHERE chat_id = ?
+      AND status = 'active'
+      AND text LIKE ? ESCAPE '\\'
+    ORDER BY next_trigger_at ASC
+  `);
+  return stmt.all(chatId, `%${escapeLikePattern(query)}%`) as RecurringRule[];
+}
+
+function escapeLikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, '\\$&');
+}
