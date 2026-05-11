@@ -1,4 +1,4 @@
-import { RRule, rrulestr, datetime, type Weekday } from 'rrule/dist/esm/index.js';
+import { RRule, rrulestr, datetime, type Weekday } from 'rrule';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
