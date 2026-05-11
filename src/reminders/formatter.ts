@@ -42,7 +42,7 @@ export function formatReminderCreated(reminder: Reminder, source?: 'deterministi
     `📅 <b>时间</b>：${bjFormat(reminder.trigger_at)}`,
     `📝 <b>内容</b>：${escapeHtml(reminder.text)}`,
     '──────────────────',
-    '<i>我会在准时叫醒你。</i>',
+    '<i>任务已记录，我会准时提醒你。</i>',
   ].join('\n');
 }
 
