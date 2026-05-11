@@ -1,8 +1,15 @@
-import { RRule, rrulestr, datetime, type Weekday } from 'rrule';
+import rrulePkg from 'rrule';
+import type { Weekday } from 'rrule';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import type { RecurringRule } from './repository';
+
+const { RRule, rrulestr, datetime } = rrulePkg as {
+  RRule: typeof import('rrule')['RRule'];
+  rrulestr: typeof import('rrule')['rrulestr'];
+  datetime: typeof import('rrule')['datetime'];
+};
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
