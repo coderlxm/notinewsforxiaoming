@@ -49,17 +49,24 @@ function pickItemGuid(item: FeedItemLike): string | null {
 function extractCoverUrl(description?: string): string | null {
   if (!description) return null;
 
-  const escapedImgSrc = description.match(/<img[^>]*src=&quot;(https?:\/\/[^"&]+)&quot;/i);
-  if (escapedImgSrc?.[1] && /\.(jpg|jpeg|png|webp)(\?|$)/i.test(escapedImgSrc[1])) return escapedImgSrc[1];
+  // Unescape common HTML entities that might break regex
+  const unescaped = description
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
 
-  const imgSrc = description.match(/<img[^>]*src=["'](https?:\/\/[^"']+)["']/i);
-  if (imgSrc?.[1] && /\.(jpg|jpeg|png|webp)(\?|$)/i.test(imgSrc[1])) return imgSrc[1];
+  // 1. Try to find the "bigImage" link first (it usually contains the high-quality cover)
+  // Matching something like: <a ... class="bigImage" ... href="URL" ...> or <a ... href="URL" ... class="bigImage" ...>
+  const bigImageMatch = unescaped.match(/<a[^>]+class=["'][^"']*bigImage[^"']*["'][^>]+href=["'](https?:\/\/[^"']+\.(?:jpg|jpeg|png|webp)[^"']*)["']/i) 
+    || unescaped.match(/<a[^>]+href=["'](https?:\/\/[^"']+\.(?:jpg|jpeg|png|webp)[^"']*)["'][^>]+class=["'][^"']*bigImage[^"']*["']/i);
+  
+  if (bigImageMatch?.[1]) return bigImageMatch[1];
 
-  const escapedBigImageHref = description.match(/class=&quot;bigImage&quot;[^>]*href=&quot;(https?:\/\/[^"&]+)&quot;/i);
-  if (escapedBigImageHref?.[1] && /\.(jpg|jpeg|png|webp)(\?|$)/i.test(escapedBigImageHref[1])) return escapedBigImageHref[1];
-
-  const bigImageHref = description.match(/class=["']bigImage["'][^>]*href=["'](https?:\/\/[^"']+)["']/i);
-  if (bigImageHref?.[1] && /\.(jpg|jpeg|png|webp)(\?|$)/i.test(bigImageHref[1])) return bigImageHref[1];
+  // 2. Fallback to the first available image src
+  const anyImgMatch = unescaped.match(/<img[^>]+src=["'](https?:\/\/[^"']+\.(?:jpg|jpeg|png|webp)[^"']*)["']/i);
+  if (anyImgMatch?.[1]) return anyImgMatch[1];
 
   return null;
 }
