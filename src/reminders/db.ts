@@ -73,12 +73,19 @@ export function getDb(): Database.Database {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         target_id INTEGER NOT NULL,
         item_guid TEXT NOT NULL,
+        cover_sent INTEGER NOT NULL DEFAULT 0,
         pushed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY(target_id) REFERENCES tracked_targets(id)
       );
       CREATE UNIQUE INDEX IF NOT EXISTS idx_push_history_target_guid
       ON push_history(target_id, item_guid);
     `);
+
+    const pushHistoryColumns = db.prepare(`PRAGMA table_info(push_history)`).all() as Array<{ name: string }>;
+    const hasCoverSent = pushHistoryColumns.some((column) => column.name === 'cover_sent');
+    if (!hasCoverSent) {
+      db.exec(`ALTER TABLE push_history ADD COLUMN cover_sent INTEGER NOT NULL DEFAULT 0;`);
+    }
   }
   return db;
 }

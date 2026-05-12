@@ -9,6 +9,14 @@ export interface TrackedTarget {
   updated_at: string;
 }
 
+export interface PushHistoryRow {
+  id: number;
+  target_id: number;
+  item_guid: string;
+  cover_sent: number;
+  pushed_at: string;
+}
+
 export function findTrackedTargets(): TrackedTarget[] {
   const db = getDb();
   const stmt = db.prepare(`
@@ -19,21 +27,31 @@ export function findTrackedTargets(): TrackedTarget[] {
   return stmt.all() as TrackedTarget[];
 }
 
-export function hasPushHistory(targetId: number, itemGuid: string): boolean {
+export function findPushHistory(targetId: number, itemGuid: string): PushHistoryRow | null {
   const db = getDb();
   const stmt = db.prepare(`
-    SELECT 1 FROM push_history
+    SELECT * FROM push_history
     WHERE target_id = ? AND item_guid = ?
     LIMIT 1
   `);
-  return Boolean(stmt.get(targetId, itemGuid));
+  return (stmt.get(targetId, itemGuid) as PushHistoryRow) ?? null;
 }
 
-export function createPushHistory(targetId: number, itemGuid: string): void {
+export function createPushHistory(targetId: number, itemGuid: string, coverSent: boolean): void {
   const db = getDb();
   const stmt = db.prepare(`
-    INSERT OR IGNORE INTO push_history (target_id, item_guid, pushed_at)
-    VALUES (?, ?, ?)
+    INSERT OR IGNORE INTO push_history (target_id, item_guid, cover_sent, pushed_at)
+    VALUES (?, ?, ?, ?)
   `);
-  stmt.run(targetId, itemGuid, new Date().toISOString());
+  stmt.run(targetId, itemGuid, coverSent ? 1 : 0, new Date().toISOString());
+}
+
+export function markCoverSent(pushHistoryId: number): void {
+  const db = getDb();
+  const stmt = db.prepare(`
+    UPDATE push_history
+    SET cover_sent = 1
+    WHERE id = ?
+  `);
+  stmt.run(pushHistoryId);
 }

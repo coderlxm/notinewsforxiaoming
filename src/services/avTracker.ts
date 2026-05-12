@@ -2,9 +2,15 @@ import OpenAI from 'openai';
 import Parser from 'rss-parser';
 import type { Telegraf } from 'telegraf';
 import { config } from '../config';
-import { sendTelegramMessage } from '../publishers/telegram';
 import { formatAvUpdateMessage } from '../formatters/avFormatter';
-import { createPushHistory, findTrackedTargets, hasPushHistory, type TrackedTarget } from './avRepository';
+import { sendAvUpdate } from '../publishers/avTelegram';
+import {
+  createPushHistory,
+  findPushHistory,
+  findTrackedTargets,
+  markCoverSent,
+  type TrackedTarget
+} from './avRepository';
 
 interface FeedItemLike {
   guid?: string;
@@ -12,6 +18,7 @@ interface FeedItemLike {
   link?: string;
   title?: string;
   pubDate?: string;
+  description?: string;
 }
 
 export interface AvFetchSummary {
@@ -33,6 +40,18 @@ function pickItemGuid(item: FeedItemLike): string | null {
   const guid = item.guid || item.id || item.link || item.title;
   if (!guid) return null;
   return String(guid).trim() || null;
+}
+
+function extractCoverUrl(description?: string): string | null {
+  if (!description) return null;
+
+  const bigImageHref = description.match(/class=["']bigImage["'][^>]*href=["'](https?:\/\/[^"']+)["']/i);
+  if (bigImageHref?.[1]) return bigImageHref[1];
+
+  const imgSrc = description.match(/<img[^>]*src=["'](https?:\/\/[^"']+)["']/i);
+  if (imgSrc?.[1]) return imgSrc[1];
+
+  return null;
 }
 
 async function translateAvTitle(title: string): Promise<string | null> {
@@ -79,8 +98,9 @@ export async function runAvFetchOnce(bot?: Telegraf): Promise<AvFetchSummary> {
         skipped += 1;
         continue;
       }
-
-      if (hasPushHistory(target.id, itemGuid)) {
+      const coverUrl = extractCoverUrl(item.description);
+      const history = findPushHistory(target.id, itemGuid);
+      if (history && history.cover_sent === 1) {
         skipped += 1;
         continue;
       }
@@ -96,8 +116,14 @@ export async function runAvFetchOnce(bot?: Telegraf): Promise<AvFetchSummary> {
         link: item.link?.trim() || null,
       });
 
-      await sendTelegramMessage(message, bot);
-      createPushHistory(target.id, itemGuid);
+      const coverSent = await sendAvUpdate({ message, coverUrl }, bot);
+
+      if (!history) {
+        createPushHistory(target.id, itemGuid, coverSent || !coverUrl);
+      } else if (coverSent || !coverUrl) {
+        markCoverSent(history.id);
+      }
+
       pushed += 1;
     }
   }
