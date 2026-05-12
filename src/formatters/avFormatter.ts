@@ -44,7 +44,7 @@ export function formatAvUpdateMessage(input: AvUpdateMessageInput): string {
     lines.push(`翻译：${escapeHtml(translated)}`);
   }
   if (input.pubDate) {
-    lines.push(`发布时间：${escapeHtml(input.pubDate)}`);
+    lines.push(`最新更新日期：${escapeHtml(input.pubDate)}`);
   }
 
   const safeUrl = normalizeUrl(input.link);

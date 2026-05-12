@@ -45,6 +45,12 @@ function pickItemGuid(item: FeedItemLike): string | null {
 function extractCoverUrl(description?: string): string | null {
   if (!description) return null;
 
+  const escapedBigImageHref = description.match(/class=&quot;bigImage&quot;[^>]*href=&quot;(https?:\/\/[^"&]+)&quot;/i);
+  if (escapedBigImageHref?.[1]) return escapedBigImageHref[1];
+
+  const escapedImgSrc = description.match(/<img[^>]*src=&quot;(https?:\/\/[^"&]+)&quot;/i);
+  if (escapedImgSrc?.[1]) return escapedImgSrc[1];
+
   const bigImageHref = description.match(/class=["']bigImage["'][^>]*href=["'](https?:\/\/[^"']+)["']/i);
   if (bigImageHref?.[1]) return bigImageHref[1];
 
@@ -90,7 +96,7 @@ export async function runAvFetchOnce(bot?: Telegraf): Promise<AvFetchSummary> {
   for (const target of targets) {
     const route = buildTargetRoute(target);
     const feed = await parser.parseURL(`http://localhost:1200/${route}`);
-    const recentItems = (feed.items || []).slice(0, 5) as FeedItemLike[];
+    const recentItems = (feed.items || []).slice(0, 1) as FeedItemLike[];
 
     for (const item of recentItems) {
       const itemGuid = pickItemGuid(item);
