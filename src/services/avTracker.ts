@@ -18,6 +18,7 @@ interface FeedItemLike {
   link?: string;
   title?: string;
   pubDate?: string;
+  content?: string;
   description?: string;
 }
 
@@ -46,11 +47,12 @@ function pickItemGuid(item: FeedItemLike): string | null {
   return String(guid).trim() || null;
 }
 
-function extractCoverUrl(description?: string): string | null {
-  if (!description) return null;
+function extractCoverUrl(content?: string, description?: string): string | null {
+  const raw = content || description;
+  if (!raw) return null;
 
   // Unescape common HTML entities that might break regex
-  const unescaped = description
+  const unescaped = raw
     .replace(/&quot;/g, '"')
     .replace(/&apos;/g, "'")
     .replace(/&lt;/g, '<')
@@ -119,7 +121,7 @@ export async function runAvFetchOnce(
         skipped += 1;
         continue;
       }
-      const coverUrl = extractCoverUrl(item.description);
+      const coverUrl = extractCoverUrl(item.content, item.description);
       const history = findPushHistory(target.id, itemGuid);
       if (!forceResend && history && history.cover_sent === 1) {
         skipped += 1;
