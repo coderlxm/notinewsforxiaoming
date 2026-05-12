@@ -35,6 +35,7 @@ import {
   type CancelCandidate,
 } from '../reminders/formatter';
 import { parseCallbackData, parseRecurringCallbackData, parseNaturalCancelCallbackData } from './callbacks';
+import { runAvFetchOnce } from '../services/avTracker';
 
 export function registerInteractiveHandlers(bot: Telegraf): void {
   bot.command('start', (ctx) => {
@@ -45,6 +46,25 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
   bot.command('help', (ctx) => {
     if (!isAuthorized(ctx)) return;
     ctx.reply(formatHelpMessage(), { parse_mode: 'HTML' });
+  });
+
+  bot.command('fetchav', async (ctx) => {
+    if (!isAuthorized(ctx)) return;
+    await ctx.reply('开始手动检查 AV 更新...', { parse_mode: 'HTML' });
+
+    try {
+      const summary = await runAvFetchOnce(bot);
+      await ctx.reply(
+        `检查完成：新增 ${summary.pushed} 条，已跳过 ${summary.skipped} 条。`,
+        { parse_mode: 'HTML' }
+      );
+    } catch (e) {
+      if (e instanceof Error) {
+        await ctx.reply(`AV 检查失败：${e.message}`, { parse_mode: 'HTML' });
+        return;
+      }
+      throw e;
+    }
   });
 
   bot.command('remind', async (ctx) => {

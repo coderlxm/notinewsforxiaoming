@@ -57,6 +57,27 @@ export function getDb(): Database.Database {
       );
       CREATE INDEX IF NOT EXISTS idx_recur_runs_rule
       ON recurring_reminder_runs(rule_id, trigger_at);
+
+      CREATE TABLE IF NOT EXISTS tracked_targets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        source TEXT NOT NULL DEFAULT 'javbus',
+        target_type TEXT NOT NULL CHECK (target_type IN ('star', 'label')),
+        target_id TEXT NOT NULL,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_tracked_targets_unique
+      ON tracked_targets(source, target_type, target_id);
+
+      CREATE TABLE IF NOT EXISTS push_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        target_id INTEGER NOT NULL,
+        item_guid TEXT NOT NULL,
+        pushed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(target_id) REFERENCES tracked_targets(id)
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_push_history_target_guid
+      ON push_history(target_id, item_guid);
     `);
   }
   return db;

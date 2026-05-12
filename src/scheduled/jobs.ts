@@ -54,6 +54,14 @@ export function registerFixedJobs(bot: Telegraf): void {
     await runMode('v2ex', getChinaDayOfWeek(), bot);
   });
 
+  // av_update: 13:00 / 21:00
+  schedule.scheduleJob({ hour: 13, minute: 0, tz: 'Asia/Shanghai' }, async () => {
+    await runMode('av_update', getChinaDayOfWeek(), bot);
+  });
+  schedule.scheduleJob({ hour: 21, minute: 0, tz: 'Asia/Shanghai' }, async () => {
+    await runMode('av_update', getChinaDayOfWeek(), bot);
+  });
+
   // english: 21:30
   schedule.scheduleJob({ hour: 21, minute: 30, tz: 'Asia/Shanghai' }, async () => {
     await runMode('english', getChinaDayOfWeek(), bot);

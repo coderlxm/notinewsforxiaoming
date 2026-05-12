@@ -26,6 +26,7 @@ export function formatHelpMessage(): string {
     '• <code>/remind 15:30 开会</code>',
     '• <code>/remind 10m 拿快递</code>',
     '• <code>/remind 明天 10:00 健身</code>',
+    '• <code>/fetchav</code> - 手动检查一次 AV 更新',
     '',
     '🤖 <b>自然语言对话：</b>',
     '直接发送 <code>10 分钟后提醒我下楼</code> 即可。',
@@ -259,4 +260,3 @@ export function buildCancelCandidateButtons(
   });
   return { reply_markup: { inline_keyboard: rows } };
 }
-

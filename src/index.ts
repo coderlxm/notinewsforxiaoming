@@ -12,9 +12,11 @@ const SPECIAL_SCHEDULE = {
   server_health: 9 * 60 + 10, // 09:10
   news: 9 * 60 + 55,   // 09:55
   vitamin_lunch: 12 * 60 + 30, // 12:30
+  av_update_midday: 13 * 60, // 13:00
   github: 15 * 60,     // 15:00
   vitamin_dinner: 18 * 60 + 30, // 18:30
   v2ex: 20 * 60,       // 20:00
+  av_update_night: 21 * 60, // 21:00
   fitness_weekday: 20 * 60 + 30, // 20:30 (周一, 周三)
   fitness_weekend: 14 * 60       // 14:00 (周六)
 };
@@ -43,7 +45,7 @@ async function main() {
   if (TEST_MODE_ENABLED) {
     const forcedMode = parseForcedMode(TEST_FORCE_MODE);
     if (!forcedMode) {
-      throw new Error(`Invalid TEST_FORCE_MODE: "${TEST_FORCE_MODE}". Allowed: sleep,wakeup,server_health,news,github,v2ex,fitness,vitamin,english`);
+      throw new Error(`Invalid TEST_FORCE_MODE: "${TEST_FORCE_MODE}". Allowed: sleep,wakeup,server_health,news,github,v2ex,fitness,vitamin,english,av_update`);
     }
     console.log(`Test mode enabled. Bypass schedule and force mode: ${forcedMode}`);
     await runMode(forcedMode, chinaDayOfWeek);
@@ -60,10 +62,14 @@ async function main() {
       selectedMode = 'news';
     } else if (isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.vitamin_lunch)) {
       selectedMode = 'vitamin';
+    } else if (isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.av_update_midday)) {
+      selectedMode = 'av_update';
     } else if (isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.github)) {
       selectedMode = 'github';
     } else if (isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.vitamin_dinner)) {
       selectedMode = 'vitamin';
+    } else if (isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.av_update_night)) {
+      selectedMode = 'av_update';
     } else if (isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.v2ex)) {
       selectedMode = 'v2ex';
     } else if (

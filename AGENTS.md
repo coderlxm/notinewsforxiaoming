@@ -67,36 +67,37 @@ const telegramAgent = new https.Agent({
 });
 ```
 
-这类问题应修正网络路径，而不是绕开 Telegraf 或增加任何兜底。
+## 验证命令硬约束
 
-## 服务器巡检教训
+除非用户明确要求，否则禁止主动运行、建议运行或写入任何测试、验证、检查、构建、启动、冒烟类命令。
 
-服务器巡检功能的目标是：每天北京时间 `09:10` 检查固定服务器在线状态，并把结果发到 Telegram。
+包括但不限于：
 
-已验证：
+- `pnpm ...`
+- `npm test`
+- `npm run ...`
+- `yarn ...`
+- `npx ...`
+- `TEST_MODE_ENABLED=1 TEST_FORCE_MODE=<mode> pnpm start`
+- `tsc --noEmit`
+- `./node_modules/.bin/tsc --noEmit`
+- `npx tsc --noEmit`
+- `vue-tsc`
+- `tsx -e ...`
+- `node -e ...`
+- `ts-node ...`
+- `vitest`
+- `jest`
+- `eslint`
+- `prettier --check`
+- `build`
+- `dev`
+- `start`
+- `smoke test`
+- `health check`
 
-- 生产主机上的 SSH alias 和专用巡检 key 可以访问 4 台机器
-- 单独执行 SSH 探测正常
-- 单独调用 `checkServerHealth()` 正常
-- 线上完整发送成功依赖 Telegram 发送链路走稳定 IPv4 路径
-
-不要因为某次线上卡住，就直接判断 SSH 巡检失败。应拆开验证：
-
-1. 主机到目标机器的 SSH 是否正常
-2. `checkServerHealth()` 是否正常返回
-3. Telegram 发送是否正常
-
-## 测试原则
-
-本项目已有测试直达模式：
-
-```bash
-TEST_MODE_ENABLED=1 TEST_FORCE_MODE=<mode> pnpm start
-```
-
-新增功能时优先通过这个入口验证真实业务效果。
-
-测试中可以临时加日志定位，但完成后应移除诊断噪声。
+不要把任何测试、验证、检查、构建、启动、冒烟类命令写进开发文档、验收文档、最终回复或建议步骤。  
+如果确实需要使用这些命令，必须先说明原因并得到用户明确确认。
 
 ## 代码风格
 
@@ -105,3 +106,11 @@ TEST_MODE_ENABLED=1 TEST_FORCE_MODE=<mode> pnpm start
 - 不引入与当前业务无关的抽象。
 - 不把一次排查中的临时方案沉淀为长期代码。
 - 默认严禁任何兜底、重试、fallback；如果确实需要，必须先得到用户明确同意。
+
+## 循环提醒导入硬约束
+
+`src/reminders/recurring.ts` 中 `rrule` 的导入写法属于线上稳定性敏感点。
+
+- 除非用户明确要求，否则禁止修改这行导入及其加载方式。
+- 不允许因为本地环境报错而单独切换该导入写法。
+- 如需调整，必须先说明依据和风险，再由用户明确确认后执行。

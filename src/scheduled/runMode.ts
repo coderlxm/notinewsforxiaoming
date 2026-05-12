@@ -28,8 +28,9 @@ import {
 import { sendTelegramMessage } from '../publishers/telegram';
 import { getFitnessContext, markFitnessWorkoutGenerated } from '../services/fitness';
 import { checkServerHealth } from '../services/serverHealth';
+import { runAvFetchOnce } from '../services/avTracker';
 
-export type PushMode = 'sleep' | 'wakeup' | 'server_health' | 'news' | 'github' | 'v2ex' | 'fitness' | 'vitamin' | 'english';
+export type PushMode = 'sleep' | 'wakeup' | 'server_health' | 'news' | 'github' | 'v2ex' | 'fitness' | 'vitamin' | 'english' | 'av_update';
 
 export function parseForcedMode(rawMode: string): PushMode | null {
   const modeMap: Record<string, PushMode> = {
@@ -41,7 +42,8 @@ export function parseForcedMode(rawMode: string): PushMode | null {
     v2ex: 'v2ex',
     fitness: 'fitness',
     vitamin: 'vitamin',
-    english: 'english'
+    english: 'english',
+    av_update: 'av_update'
   };
   return modeMap[rawMode] ?? null;
 }
@@ -123,6 +125,13 @@ export async function runMode(mode: PushMode, chinaDayOfWeek: number, bot?: Tele
     console.log('Mode: Vitamin Reminder');
     const message = formatVitaminMessage();
     await sendTelegramMessage(message, bot);
+    return;
+  }
+
+  if (mode === 'av_update') {
+    console.log('Mode: AV Update Tracker');
+    const summary = await runAvFetchOnce(bot);
+    console.log(`AV update finished. Checked: ${summary.checkedTargets}, New: ${summary.pushed}, Skipped: ${summary.skipped}`);
     return;
   }
 
