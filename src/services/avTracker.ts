@@ -49,17 +49,17 @@ function pickItemGuid(item: FeedItemLike): string | null {
 function extractCoverUrl(description?: string): string | null {
   if (!description) return null;
 
-  const escapedBigImageHref = description.match(/class=&quot;bigImage&quot;[^>]*href=&quot;(https?:\/\/[^"&]+)&quot;/i);
-  if (escapedBigImageHref?.[1]) return escapedBigImageHref[1];
-
   const escapedImgSrc = description.match(/<img[^>]*src=&quot;(https?:\/\/[^"&]+)&quot;/i);
-  if (escapedImgSrc?.[1]) return escapedImgSrc[1];
-
-  const bigImageHref = description.match(/class=["']bigImage["'][^>]*href=["'](https?:\/\/[^"']+)["']/i);
-  if (bigImageHref?.[1]) return bigImageHref[1];
+  if (escapedImgSrc?.[1] && /\.(jpg|jpeg|png|webp)(\?|$)/i.test(escapedImgSrc[1])) return escapedImgSrc[1];
 
   const imgSrc = description.match(/<img[^>]*src=["'](https?:\/\/[^"']+)["']/i);
-  if (imgSrc?.[1]) return imgSrc[1];
+  if (imgSrc?.[1] && /\.(jpg|jpeg|png|webp)(\?|$)/i.test(imgSrc[1])) return imgSrc[1];
+
+  const escapedBigImageHref = description.match(/class=&quot;bigImage&quot;[^>]*href=&quot;(https?:\/\/[^"&]+)&quot;/i);
+  if (escapedBigImageHref?.[1] && /\.(jpg|jpeg|png|webp)(\?|$)/i.test(escapedBigImageHref[1])) return escapedBigImageHref[1];
+
+  const bigImageHref = description.match(/class=["']bigImage["'][^>]*href=["'](https?:\/\/[^"']+)["']/i);
+  if (bigImageHref?.[1] && /\.(jpg|jpeg|png|webp)(\?|$)/i.test(bigImageHref[1])) return bigImageHref[1];
 
   return null;
 }
