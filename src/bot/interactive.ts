@@ -50,10 +50,15 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
 
   bot.command('fetchav', async (ctx) => {
     if (!isAuthorized(ctx)) return;
-    await ctx.reply('开始手动检查 AV 更新...', { parse_mode: 'HTML' });
+    const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
+    const forceResend = /\b(force|all)\b/i.test(text);
+    await ctx.reply(
+      forceResend ? '开始手动检查 AV 更新（强制重发模式）...' : '开始手动检查 AV 更新...',
+      { parse_mode: 'HTML' }
+    );
 
     try {
-      const summary = await runAvFetchOnce(bot);
+      const summary = await runAvFetchOnce(bot, { forceResend });
       await ctx.reply(
         `检查完成：新增 ${summary.pushed} 条，已跳过 ${summary.skipped} 条。`,
         { parse_mode: 'HTML' }

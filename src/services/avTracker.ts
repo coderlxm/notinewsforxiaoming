@@ -27,6 +27,10 @@ export interface AvFetchSummary {
   checkedTargets: number;
 }
 
+interface RunAvFetchOptions {
+  forceResend?: boolean;
+}
+
 const parser = new Parser();
 
 function buildTargetRoute(target: TrackedTarget): string {
@@ -88,10 +92,14 @@ async function translateAvTitle(title: string): Promise<string | null> {
   }
 }
 
-export async function runAvFetchOnce(bot?: Telegraf): Promise<AvFetchSummary> {
+export async function runAvFetchOnce(
+  bot?: Telegraf,
+  options: RunAvFetchOptions = {}
+): Promise<AvFetchSummary> {
   const targets = findTrackedTargets();
   let pushed = 0;
   let skipped = 0;
+  const forceResend = options.forceResend === true;
 
   for (const target of targets) {
     const route = buildTargetRoute(target);
@@ -106,7 +114,7 @@ export async function runAvFetchOnce(bot?: Telegraf): Promise<AvFetchSummary> {
       }
       const coverUrl = extractCoverUrl(item.description);
       const history = findPushHistory(target.id, itemGuid);
-      if (history && history.cover_sent === 1) {
+      if (!forceResend && history && history.cover_sent === 1) {
         skipped += 1;
         continue;
       }
