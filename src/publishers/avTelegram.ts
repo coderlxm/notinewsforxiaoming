@@ -1,4 +1,5 @@
 import type { Telegraf } from 'telegraf';
+import axios from 'axios';
 import { config } from '../config';
 import { sendTelegramMessage } from './telegram';
 import { createBot } from '../bot/createBot';
@@ -18,16 +19,19 @@ export async function sendAvUpdate(input: SendAvUpdateInput, bot?: Telegraf): Pr
     throw new Error('Telegram Token or Chat ID is not set.');
   }
 
-  try {
-    const sender = bot ?? createBot();
-    await sender.telegram.sendPhoto(config.tgChatId, input.coverUrl, {
+  const imageResponse = await axios.get<ArrayBuffer>(input.coverUrl, {
+    responseType: 'arraybuffer',
+    timeout: 15000,
+  });
+  const imageBuffer = Buffer.from(imageResponse.data);
+  const sender = bot ?? createBot();
+  await sender.telegram.sendPhoto(
+    config.tgChatId,
+    { source: imageBuffer, filename: 'cover.jpg' },
+    {
       caption: input.message,
       parse_mode: 'HTML',
-    });
-    return true;
-  } catch (error) {
-    console.error('Failed to send AV cover, fallback to text:', error);
-    await sendTelegramMessage(input.message, bot);
-    return false;
-  }
+    }
+  );
+  return true;
 }
