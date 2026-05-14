@@ -2,6 +2,16 @@ import schedule from 'node-schedule';
 import type { Telegraf } from 'telegraf';
 import { runMode } from './runMode';
 import { getChinaDayOfWeek } from '../utils/time';
+import { isChinaWorkday } from '../calendar/chinaWorkday';
+
+const VITAMIN_WORKDAY_RANDOM_WINDOW_MS = 15 * 60 * 1000;
+
+function scheduleWorkdayVitamin(bot: Telegraf): void {
+  const delay = Math.floor(Math.random() * VITAMIN_WORKDAY_RANDOM_WINDOW_MS);
+  setTimeout(async () => {
+    await runMode('vitamin', getChinaDayOfWeek(), bot);
+  }, delay);
+}
 
 export function registerFixedJobs(bot: Telegraf): void {
   // sleep: 00:10 Beijing time
@@ -29,8 +39,9 @@ export function registerFixedJobs(bot: Telegraf): void {
     await runMode('english', getChinaDayOfWeek(), bot);
   });
 
-  // vitamin: 12:30
+  // vitamin lunch: 12:30 on non-workdays
   schedule.scheduleJob({ hour: 12, minute: 30, tz: 'Asia/Shanghai' }, async () => {
+    if (isChinaWorkday(new Date())) return;
     await runMode('vitamin', getChinaDayOfWeek(), bot);
   });
 
@@ -44,9 +55,16 @@ export function registerFixedJobs(bot: Telegraf): void {
     await runMode('github', getChinaDayOfWeek(), bot);
   });
 
-  // vitamin: 18:30
+  // vitamin dinner: 18:30 on non-workdays
   schedule.scheduleJob({ hour: 18, minute: 30, tz: 'Asia/Shanghai' }, async () => {
+    if (isChinaWorkday(new Date())) return;
     await runMode('vitamin', getChinaDayOfWeek(), bot);
+  });
+
+  // vitamin dinner: random between 20:45 and 21:00 on China workdays
+  schedule.scheduleJob({ hour: 20, minute: 45, tz: 'Asia/Shanghai' }, () => {
+    if (!isChinaWorkday(new Date())) return;
+    scheduleWorkdayVitamin(bot);
   });
 
   // v2ex: 20:00
@@ -54,11 +72,8 @@ export function registerFixedJobs(bot: Telegraf): void {
     await runMode('v2ex', getChinaDayOfWeek(), bot);
   });
 
-  // av_update: 13:00 / 21:00
-  schedule.scheduleJob({ hour: 13, minute: 0, tz: 'Asia/Shanghai' }, async () => {
-    await runMode('av_update', getChinaDayOfWeek(), bot);
-  });
-  schedule.scheduleJob({ hour: 21, minute: 0, tz: 'Asia/Shanghai' }, async () => {
+  // av_update: 13:30
+  schedule.scheduleJob({ hour: 13, minute: 30, tz: 'Asia/Shanghai' }, async () => {
     await runMode('av_update', getChinaDayOfWeek(), bot);
   });
 

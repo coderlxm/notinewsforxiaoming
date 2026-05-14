@@ -132,6 +132,12 @@ export async function runMode(mode: PushMode, chinaDayOfWeek: number, bot?: Tele
     console.log('Mode: AV Update Tracker');
     const summary = await runAvFetchOnce(bot);
     console.log(`AV update finished. Checked: ${summary.checkedTargets}, New: ${summary.pushed}, Skipped: ${summary.skipped}`);
+    if (summary.pushed === 0) {
+      await sendTelegramMessage(
+        `AV 定时检查完成：本次无更新（检查目标 ${summary.checkedTargets}，已跳过 ${summary.skipped}）。`,
+        bot
+      );
+    }
     return;
   }
 

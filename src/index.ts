@@ -1,5 +1,6 @@
 import { runMode, parseForcedMode } from './scheduled/runMode';
 import type { PushMode } from './scheduled/runMode';
+import { isChinaWorkday } from './calendar/chinaWorkday';
 
 const MINUTES_PER_DAY = 24 * 60;
 const TOLERANCE_MINUTES = 10;
@@ -12,11 +13,10 @@ const SPECIAL_SCHEDULE = {
   server_health: 9 * 60 + 10, // 09:10
   news: 9 * 60 + 55,   // 09:55
   vitamin_lunch: 12 * 60 + 30, // 12:30
-  av_update_midday: 13 * 60, // 13:00
+  av_update: 13 * 60 + 30, // 13:30
   github: 15 * 60,     // 15:00
   vitamin_dinner: 18 * 60 + 30, // 18:30
   v2ex: 20 * 60,       // 20:00
-  av_update_night: 21 * 60, // 21:00
   fitness_weekday: 20 * 60 + 30, // 20:30 (周一, 周三)
   fitness_weekend: 14 * 60       // 14:00 (周六)
 };
@@ -51,7 +51,7 @@ async function main() {
     await runMode(forcedMode, chinaDayOfWeek);
   }
   else {
-    let selectedMode: PushMode = 'english';
+    let selectedMode: PushMode | null = 'english';
     if (isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.sleep)) {
       selectedMode = 'sleep';
     } else if (isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.wakeup)) {
@@ -61,15 +61,13 @@ async function main() {
     } else if (isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.news)) {
       selectedMode = 'news';
     } else if (isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.vitamin_lunch)) {
-      selectedMode = 'vitamin';
-    } else if (isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.av_update_midday)) {
+      selectedMode = isChinaWorkday(now) ? null : 'vitamin';
+    } else if (isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.av_update)) {
       selectedMode = 'av_update';
     } else if (isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.github)) {
       selectedMode = 'github';
     } else if (isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.vitamin_dinner)) {
       selectedMode = 'vitamin';
-    } else if (isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.av_update_night)) {
-      selectedMode = 'av_update';
     } else if (isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.v2ex)) {
       selectedMode = 'v2ex';
     } else if (
@@ -78,7 +76,9 @@ async function main() {
     ) {
       selectedMode = 'fitness';
     }
-    await runMode(selectedMode, chinaDayOfWeek);
+    if (selectedMode) {
+      await runMode(selectedMode, chinaDayOfWeek);
+    }
   }
 
   console.log('Task finished.');
