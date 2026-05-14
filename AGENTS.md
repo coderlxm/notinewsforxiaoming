@@ -45,59 +45,15 @@
 
 不要优先设计“失败后怎么办”。这个项目不需要为了理论完备性牺牲代码可读性。
 
-## Telegram 发送教训
-
-本项目 Telegram 发送应保持使用 `Telegraf`。
-
-不要把发送链路改成：
-
-- `curl`
-- Node `fetch`
-- 多通道发送
-- 重试发送
-- 发送超时兜底
-- HTML 失败后的复杂降级逻辑
-
-一次线上问题的根因是服务器上 Node/Telegraf 默认网络路径不稳定，最终正确修复是给 Telegraf 配置 IPv4 agent：
-
-```ts
-const telegramAgent = new https.Agent({
-  family: 4,
-  keepAlive: false
-});
-```
-
 ## 验证命令硬约束
 
-除非用户明确要求，否则禁止主动运行、建议运行或写入任何测试、验证、检查、构建、启动、冒烟类命令。
+除非用户在当前对话里明确要求，否则禁止主动运行、建议运行或写入任何测试、验证、检查、构建、启动、冒烟类命令。
 
-包括但不限于：
+禁止范围包括但不限于：`test`、`build`、`dev`、`start`、`tsc`、`vue-tsc`、`eslint`、`prettier`、`vitest`、`jest`、`node -e`、`tsx -e`、`ts-node`、`npx`、`pnpm`、`npm`、`yarn` 等。
 
-- `pnpm ...`
-- `npm test`
-- `npm run ...`
-- `yarn ...`
-- `npx ...`
-- `TEST_MODE_ENABLED=1 TEST_FORCE_MODE=<mode> pnpm start`
-- `tsc --noEmit`
-- `./node_modules/.bin/tsc --noEmit`
-- `npx tsc --noEmit`
-- `vue-tsc`
-- `tsx -e ...`
-- `node -e ...`
-- `ts-node ...`
-- `vitest`
-- `jest`
-- `eslint`
-- `prettier --check`
-- `build`
-- `dev`
-- `start`
-- `smoke test`
-- `health check`
+不要把任何测试、验证、检查、构建、启动、冒烟类命令写进开发文档、验收文档、最终回复或建议步骤。最终回复也不要提“未测试 / 未验证 / 未检查 / 未构建”等相关内容。
 
-不要把任何测试、验证、检查、构建、启动、冒烟类命令写进开发文档、验收文档、最终回复或建议步骤。  
-如果确实需要使用这些命令，必须先说明原因并得到用户明确确认。
+本项目优先业务主路径和真实使用效果，不用流程化验证替代理解需求。
 
 ## 代码风格
 
