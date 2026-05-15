@@ -14,9 +14,6 @@ import {
 import {
   parseAvContent,
   pickBestMagnet,
-  aiPickBestMagnet,
-  enhanceGenresWithAI,
-  type Magnet,
 } from './avContentParser';
 
 interface FeedItemLike {
@@ -33,6 +30,10 @@ export interface AvFetchSummary {
   pushed: number;
   skipped: number;
   checkedTargets: number;
+}
+interface TargetRunSummary {
+  pushed: number;
+  skipped: number;
 }
 
 interface RunAvFetchOptions {
@@ -87,13 +88,18 @@ export async function runAvFetchOnce(
   options: RunAvFetchOptions = {}
 ): Promise<AvFetchSummary> {
   const targets = findTrackedTargets();
-  let pushed = 0;
-  let skipped = 0;
   const forceResend = options.forceResend === true;
 
-  for (const target of targets) {
+  async function processTarget(target: TrackedTarget): Promise<TargetRunSummary> {
+    const startedAt = Date.now();
     const route = buildTargetRoute(target);
+    let pushed = 0;
+    let skipped = 0;
+
+    console.log(`[av_update] [${route}] start`);
+    const rssStartedAt = Date.now();
     const feed = await parser.parseURL(`http://localhost:1200/${route}`);
+    console.log(`[av_update] [${route}] rss=${Date.now() - rssStartedAt}ms`);
     const recentItems = (feed.items || []).slice(0, 1) as FeedItemLike[];
 
     for (const item of recentItems) {
@@ -110,26 +116,18 @@ export async function runAvFetchOnce(
       }
 
       // Parse HTML content with cheerio
+      const parseStartedAt = Date.now();
       const htmlContent = item.content || item.description || '';
       const parsed = parseAvContent(htmlContent);
+      console.log(`[av_update] [${route}] parse=${Date.now() - parseStartedAt}ms`);
 
       const title = item.title?.trim() || '未知标题';
+      const translateStartedAt = Date.now();
       const translatedTitle = await translateAvTitle(title);
+      console.log(`[av_update] [${route}] translate=${Date.now() - translateStartedAt}ms`);
 
-      // Magnet selection: try AI first, fall back to rule-based
-      let bestMagnet: Magnet | null = null;
-      if (parsed.magnets.length > 0) {
-        const aiPick = await aiPickBestMagnet(parsed.magnets);
-        if (aiPick) {
-          bestMagnet = parsed.magnets.find((m: Magnet) => m.name === aiPick) || null;
-        }
-        if (!bestMagnet) {
-          bestMagnet = pickBestMagnet(parsed.magnets);
-        }
-      }
-
-      // Genre enhancement via AI
-      const enhancedGenres = await enhanceGenresWithAI(parsed.metadata.genres);
+      // 仅保留规则选磁力，去掉额外 AI 调用
+      const bestMagnet = pickBestMagnet(parsed.magnets);
 
       const message = formatAvUpdateMessage({
         targetName: target.name,
@@ -141,15 +139,16 @@ export async function runAvFetchOnce(
         code: parsed.metadata.code,
         maker: parsed.metadata.maker,
         genres: parsed.metadata.genres,
-        enhancedGenres,
         bestMagnet,
       });
 
       const coverUrl = parsed.coverUrl;
+      const sendStartedAt = Date.now();
       const coverSent = await sendAvUpdateWithGallery(
         { message, coverUrl, sampleUrls: parsed.sampleImages },
         bot
       );
+      console.log(`[av_update] [${route}] send=${Date.now() - sendStartedAt}ms`);
 
       if (!history) {
         createPushHistory(target.id, itemGuid, coverSent || !coverUrl);
@@ -159,7 +158,17 @@ export async function runAvFetchOnce(
 
       pushed += 1;
     }
+
+    console.log(
+      `[av_update] [${route}] done total=${Date.now() - startedAt}ms pushed=${pushed} skipped=${skipped}`
+    );
+    return { pushed, skipped };
   }
+
+  // 并行处理各目标，缩短命令总耗时
+  const results = await Promise.all(targets.map((target) => processTarget(target)));
+  const pushed = results.reduce((sum, current) => sum + current.pushed, 0);
+  const skipped = results.reduce((sum, current) => sum + current.skipped, 0);
 
   return {
     pushed,

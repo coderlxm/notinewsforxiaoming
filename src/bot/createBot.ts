@@ -13,6 +13,7 @@ export function createBot(): Telegraf {
   }
 
   return new Telegraf(config.tgToken, {
+    handlerTimeout: Infinity,
     telegram: {
       agent: telegramAgent
     }
