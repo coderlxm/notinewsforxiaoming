@@ -39,8 +39,9 @@ export interface AvLabelSummaryMessageInput {
   targetName: string;
   latestDate: string;
   totalNewCount: number;
-  items: Array<{ title: string; code?: string | null }>;
+  items: Array<{ title: string; link: string | null }>;
   remainingCount: number;
+  targetLink: string | null;
 }
 
 export function formatAvUpdateMessage(input: AvUpdateMessageInput): string {
@@ -117,12 +118,21 @@ export function formatAvLabelSummaryMessage(input: AvLabelSummaryMessageInput): 
 
   input.items.forEach((item, index) => {
     const title = item.title.trim() || '未知标题';
-    const prefix = item.code ? `${escapeHtml(item.code)} ` : '';
-    lines.push(`${index + 1}) ${prefix}${escapeHtml(title)}`);
+    const safeUrl = normalizeUrl(item.link);
+    if (safeUrl !== '#') {
+      lines.push(`${index + 1}) <a href="${escapeHtml(safeUrl)}">${escapeHtml(title)}</a>`);
+    } else {
+      lines.push(`${index + 1}) ${escapeHtml(title)}`);
+    }
   });
 
   if (input.remainingCount > 0) {
-    lines.push(`… 还有 ${input.remainingCount} 部`);
+    const safeUrl = normalizeUrl(input.targetLink);
+    if (safeUrl !== '#') {
+      lines.push(`… <a href="${escapeHtml(safeUrl)}">还有 ${input.remainingCount} 部</a>`);
+    } else {
+      lines.push(`… 还有 ${input.remainingCount} 部`);
+    }
   }
 
   lines.push('');

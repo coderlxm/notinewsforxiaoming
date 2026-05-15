@@ -45,8 +45,8 @@ interface RunAvFetchOptions {
 }
 
 const parser = new Parser();
-const AV_LABEL_FETCH_LIMIT = 10;
-const AV_LABEL_SUMMARY_TOPK = 3;
+const AV_LABEL_FETCH_LIMIT = 30;
+const AV_LABEL_SUMMARY_TOPK = 10;
 
 function buildTargetRoute(target: TrackedTarget): string {
   if (target.target_type === 'label') {
@@ -100,6 +100,50 @@ async function translateAvTitle(title: string): Promise<string | null> {
     console.error('Failed to translate AV title with DeepSeek:', error);
     return null;
   }
+}
+
+async function translateLabelTitlesBatch(titles: string[]): Promise<string[]> {
+  if (titles.length === 0) return [];
+  if (!config.deepseekApiKey) {
+    throw new Error('DEEPSEEK_API_KEY is not set.');
+  }
+
+  const openai = new OpenAI({
+    baseURL: 'https://api.deepseek.com',
+    apiKey: config.deepseekApiKey
+  });
+
+  const numbered = titles.map((title, index) => `${index + 1}. ${title}`).join('\n');
+  const prompt = [
+    '请把下面这些 AV 作品标题翻译成简体中文。',
+    '要求：',
+    '1) 只返回 JSON 数组字符串',
+    '2) 数组长度必须和输入数量一致',
+    '3) 每个元素是对应序号标题的中文翻译',
+    '4) 不要输出任何解释',
+    '',
+    numbered,
+  ].join('\n');
+
+  const completion = await openai.chat.completions.create({
+    messages: [{ role: 'user', content: prompt }],
+    model: 'deepseek-v4-flash',
+  });
+  const output = completion.choices[0]?.message?.content?.trim();
+  if (!output) {
+    throw new Error('DeepSeek returned empty translation result for label titles.');
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(output);
+  } catch {
+    throw new Error(`Invalid JSON from DeepSeek label batch translation: ${output}`);
+  }
+  if (!Array.isArray(parsed) || parsed.length !== titles.length || parsed.some((item) => typeof item !== 'string')) {
+    throw new Error(`Unexpected translation array shape from DeepSeek: ${output}`);
+  }
+  return parsed as string[];
 }
 
 export async function runAvFetchOnce(
@@ -207,7 +251,7 @@ export async function runAvFetchOnce(
       return {
         guid,
         title,
-        code: parsed.metadata.code,
+        link: item.link?.trim() || null,
         batchDate,
       };
     }).filter((item) => item.guid);
@@ -243,9 +287,13 @@ export async function runAvFetchOnce(
       return { pushed, skipped };
     }
 
-    const summaryItems = latestBatchItems.slice(0, AV_LABEL_SUMMARY_TOPK).map((item) => ({
-      title: item.title,
-      code: item.code,
+    const visibleItems = latestBatchItems.slice(0, AV_LABEL_SUMMARY_TOPK);
+    const translateStartedAt = Date.now();
+    const translatedTitles = await translateLabelTitlesBatch(visibleItems.map((item) => item.title));
+    console.log(`[av_update] [${route}] translate=${Date.now() - translateStartedAt}ms`);
+    const summaryItems = visibleItems.map((item, index) => ({
+      title: translatedTitles[index] || '未知标题',
+      link: item.link,
     }));
     const summaryMessage = formatAvLabelSummaryMessage({
       targetName: target.name,
@@ -253,6 +301,7 @@ export async function runAvFetchOnce(
       totalNewCount: latestBatchItems.length,
       items: summaryItems,
       remainingCount: Math.max(0, latestBatchItems.length - summaryItems.length),
+      targetLink: `https://www.javbus.com/label/${target.target_id}`,
     });
 
     const sendStartedAt = Date.now();
