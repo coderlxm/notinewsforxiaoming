@@ -13,7 +13,9 @@ const SPECIAL_SCHEDULE = {
   server_health: 9 * 60 + 10, // 09:10
   news: 9 * 60 + 55,   // 09:55
   vitamin_lunch: 12 * 60 + 30, // 12:30
-  av_update: 13 * 60 + 30, // 13:30
+  av_update_morning: 7 * 60 + 30, // 07:30
+  av_update_afternoon: 15 * 60 + 30, // 15:30
+  av_update_night: 23 * 60 + 30, // 23:30
   github: 15 * 60,     // 15:00
   vitamin_dinner: 18 * 60 + 30, // 18:30
   v2ex: 20 * 60,       // 20:00
@@ -62,7 +64,11 @@ async function main() {
       selectedMode = 'news';
     } else if (isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.vitamin_lunch)) {
       selectedMode = isChinaWorkday(now) ? null : 'vitamin';
-    } else if (isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.av_update)) {
+    } else if (
+      isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.av_update_morning) ||
+      isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.av_update_afternoon) ||
+      isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.av_update_night)
+    ) {
       selectedMode = 'av_update';
     } else if (isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.github)) {
       selectedMode = 'github';
