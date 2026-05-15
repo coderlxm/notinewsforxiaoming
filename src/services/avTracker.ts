@@ -2,10 +2,13 @@ import OpenAI from 'openai';
 import Parser from 'rss-parser';
 import type { Telegraf } from 'telegraf';
 import { config } from '../config';
-import { formatAvUpdateMessage } from '../formatters/avFormatter';
+import { formatAvLabelSummaryMessage, formatAvUpdateMessage } from '../formatters/avFormatter';
 import { sendAvUpdateWithGallery } from '../publishers/avTelegram';
+import { sendTelegramMessage } from '../publishers/telegram';
 import {
+  createPushBatchHistory,
   createPushHistory,
+  findPushBatchHistory,
   findPushHistory,
   findTrackedTargets,
   markCoverSent,
@@ -31,6 +34,7 @@ export interface AvFetchSummary {
   skipped: number;
   checkedTargets: number;
 }
+
 interface TargetRunSummary {
   pushed: number;
   skipped: number;
@@ -41,6 +45,8 @@ interface RunAvFetchOptions {
 }
 
 const parser = new Parser();
+const AV_LABEL_FETCH_LIMIT = 10;
+const AV_LABEL_SUMMARY_TOPK = 3;
 
 function buildTargetRoute(target: TrackedTarget): string {
   if (target.target_type === 'label') {
@@ -53,6 +59,19 @@ function pickItemGuid(item: FeedItemLike): string | null {
   const guid = item.guid || item.id || item.link || item.title;
   if (!guid) return null;
   return String(guid).trim() || null;
+}
+
+function toBatchDate(item: FeedItemLike, releaseDate: string | null): string {
+  if (releaseDate && releaseDate.trim()) {
+    return releaseDate.trim();
+  }
+  if (item.pubDate) {
+    const date = new Date(item.pubDate);
+    if (!Number.isNaN(date.getTime())) {
+      return date.toISOString().slice(0, 10);
+    }
+  }
+  return new Date().toISOString().slice(0, 10);
 }
 
 async function translateAvTitle(title: string): Promise<string | null> {
@@ -90,7 +109,7 @@ export async function runAvFetchOnce(
   const targets = findTrackedTargets();
   const forceResend = options.forceResend === true;
 
-  async function processTarget(target: TrackedTarget): Promise<TargetRunSummary> {
+  async function processStarTarget(target: TrackedTarget): Promise<TargetRunSummary> {
     const startedAt = Date.now();
     const route = buildTargetRoute(target);
     let pushed = 0;
@@ -165,8 +184,102 @@ export async function runAvFetchOnce(
     return { pushed, skipped };
   }
 
+  async function processLabelTarget(target: TrackedTarget): Promise<TargetRunSummary> {
+    const startedAt = Date.now();
+    const route = buildTargetRoute(target);
+    let pushed = 0;
+    let skipped = 0;
+
+    console.log(`[av_update] [${route}] start`);
+    const rssStartedAt = Date.now();
+    const feed = await parser.parseURL(`http://localhost:1200/${route}`);
+    console.log(`[av_update] [${route}] rss=${Date.now() - rssStartedAt}ms`);
+    const recentItems = (feed.items || []).slice(0, AV_LABEL_FETCH_LIMIT) as FeedItemLike[];
+
+    const parsedItems = recentItems.map((item) => {
+      const parseStartedAt = Date.now();
+      const htmlContent = item.content || item.description || '';
+      const parsed = parseAvContent(htmlContent);
+      console.log(`[av_update] [${route}] parse=${Date.now() - parseStartedAt}ms`);
+      const guid = pickItemGuid(item);
+      const title = item.title?.trim() || '未知标题';
+      const batchDate = toBatchDate(item, parsed.metadata.releaseDate);
+      return {
+        guid,
+        title,
+        code: parsed.metadata.code,
+        batchDate,
+      };
+    }).filter((item) => item.guid);
+
+    if (parsedItems.length === 0) {
+      skipped += AV_LABEL_FETCH_LIMIT;
+      console.log(
+        `[av_update] [${route}] done total=${Date.now() - startedAt}ms pushed=${pushed} skipped=${skipped}`
+      );
+      return { pushed, skipped };
+    }
+
+    const effectiveItems = forceResend
+      ? parsedItems
+      : parsedItems.filter((item) => !findPushHistory(target.id, item.guid as string));
+    skipped += parsedItems.length - effectiveItems.length;
+
+    if (effectiveItems.length === 0) {
+      console.log(
+        `[av_update] [${route}] done total=${Date.now() - startedAt}ms pushed=${pushed} skipped=${skipped}`
+      );
+      return { pushed, skipped };
+    }
+
+    const latestBatchDate = effectiveItems[0].batchDate;
+    const latestBatchItems = effectiveItems.filter((item) => item.batchDate === latestBatchDate);
+    const dedupeKey = `javbus:label:${target.target_id}:${latestBatchDate}`;
+    if (!forceResend && findPushBatchHistory(dedupeKey)) {
+      skipped += latestBatchItems.length;
+      console.log(
+        `[av_update] [${route}] done total=${Date.now() - startedAt}ms pushed=${pushed} skipped=${skipped}`
+      );
+      return { pushed, skipped };
+    }
+
+    const summaryItems = latestBatchItems.slice(0, AV_LABEL_SUMMARY_TOPK).map((item) => ({
+      title: item.title,
+      code: item.code,
+    }));
+    const summaryMessage = formatAvLabelSummaryMessage({
+      targetName: target.name,
+      latestDate: latestBatchDate,
+      totalNewCount: latestBatchItems.length,
+      items: summaryItems,
+      remainingCount: Math.max(0, latestBatchItems.length - summaryItems.length),
+    });
+
+    const sendStartedAt = Date.now();
+    await sendTelegramMessage(summaryMessage, bot);
+    console.log(`[av_update] [${route}] send=${Date.now() - sendStartedAt}ms`);
+
+    latestBatchItems.forEach((item) => {
+      const history = findPushHistory(target.id, item.guid as string);
+      if (!history) {
+        createPushHistory(target.id, item.guid as string, true);
+      } else {
+        markCoverSent(history.id);
+      }
+    });
+    createPushBatchHistory(dedupeKey);
+
+    pushed += latestBatchItems.length;
+    console.log(
+      `[av_update] [${route}] done total=${Date.now() - startedAt}ms pushed=${pushed} skipped=${skipped}`
+    );
+    return { pushed, skipped };
+  }
+
   // 并行处理各目标，缩短命令总耗时
-  const results = await Promise.all(targets.map((target) => processTarget(target)));
+  const results = await Promise.all(
+    targets.map((target) => (target.target_type === 'label' ? processLabelTarget(target) : processStarTarget(target)))
+  );
   const pushed = results.reduce((sum, current) => sum + current.pushed, 0);
   const skipped = results.reduce((sum, current) => sum + current.skipped, 0);
 

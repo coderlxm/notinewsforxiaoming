@@ -35,6 +35,14 @@ export interface AvUpdateMessageInput {
   bestMagnet?: { name: string; link: string; size: string; shareDate: string } | null;
 }
 
+export interface AvLabelSummaryMessageInput {
+  targetName: string;
+  latestDate: string;
+  totalNewCount: number;
+  items: Array<{ title: string; code?: string | null }>;
+  remainingCount: number;
+}
+
 export function formatAvUpdateMessage(input: AvUpdateMessageInput): string {
   const translated = input.translatedTitle && input.translatedTitle.trim()
     ? input.translatedTitle.trim()
@@ -95,6 +103,30 @@ export function formatAvUpdateMessage(input: AvUpdateMessageInput): string {
   }
   lines.push('──────────────────');
   lines.push(footerTags.join(' '));
+
+  return lines.join('\n');
+}
+
+export function formatAvLabelSummaryMessage(input: AvLabelSummaryMessageInput): string {
+  const lines = [
+    `🏢 <b>片商更新</b>：${escapeHtml(input.targetName)}`,
+    `最新更新日期：${escapeHtml(input.latestDate)}`,
+    `本次新增：${input.totalNewCount} 部`,
+    '',
+  ];
+
+  input.items.forEach((item, index) => {
+    const title = item.title.trim() || '未知标题';
+    const prefix = item.code ? `${escapeHtml(item.code)} ` : '';
+    lines.push(`${index + 1}) ${prefix}${escapeHtml(title)}`);
+  });
+
+  if (input.remainingCount > 0) {
+    lines.push(`… 还有 ${input.remainingCount} 部`);
+  }
+
+  lines.push('');
+  lines.push('#片商更新 #批量摘要');
 
   return lines.join('\n');
 }

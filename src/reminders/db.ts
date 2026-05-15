@@ -79,6 +79,14 @@ export function getDb(): Database.Database {
       );
       CREATE UNIQUE INDEX IF NOT EXISTS idx_push_history_target_guid
       ON push_history(target_id, item_guid);
+
+      CREATE TABLE IF NOT EXISTS push_batch_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        dedupe_key TEXT NOT NULL,
+        pushed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_push_batch_history_dedupe
+      ON push_batch_history(dedupe_key);
     `);
 
     const pushHistoryColumns = db.prepare(`PRAGMA table_info(push_history)`).all() as Array<{ name: string }>;

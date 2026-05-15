@@ -17,6 +17,12 @@ export interface PushHistoryRow {
   pushed_at: string;
 }
 
+export interface PushBatchHistoryRow {
+  id: number;
+  dedupe_key: string;
+  pushed_at: string;
+}
+
 export function findTrackedTargets(): TrackedTarget[] {
   const db = getDb();
   const stmt = db.prepare(`
@@ -54,4 +60,23 @@ export function markCoverSent(pushHistoryId: number): void {
     WHERE id = ?
   `);
   stmt.run(pushHistoryId);
+}
+
+export function findPushBatchHistory(dedupeKey: string): PushBatchHistoryRow | null {
+  const db = getDb();
+  const stmt = db.prepare(`
+    SELECT * FROM push_batch_history
+    WHERE dedupe_key = ?
+    LIMIT 1
+  `);
+  return (stmt.get(dedupeKey) as PushBatchHistoryRow) ?? null;
+}
+
+export function createPushBatchHistory(dedupeKey: string): void {
+  const db = getDb();
+  const stmt = db.prepare(`
+    INSERT OR IGNORE INTO push_batch_history (dedupe_key, pushed_at)
+    VALUES (?, ?)
+  `);
+  stmt.run(dedupeKey, new Date().toISOString());
 }
