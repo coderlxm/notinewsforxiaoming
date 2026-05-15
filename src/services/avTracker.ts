@@ -3,7 +3,7 @@ import Parser from 'rss-parser';
 import type { Telegraf } from 'telegraf';
 import { config } from '../config';
 import { formatAvUpdateMessage } from '../formatters/avFormatter';
-import { sendAvUpdate } from '../publishers/avTelegram';
+import { sendAvUpdateWithGallery } from '../publishers/avTelegram';
 import {
   createPushHistory,
   findPushHistory,
@@ -11,6 +11,13 @@ import {
   markCoverSent,
   type TrackedTarget
 } from './avRepository';
+import {
+  parseAvContent,
+  pickBestMagnet,
+  aiPickBestMagnet,
+  enhanceGenresWithAI,
+  type Magnet,
+} from './avContentParser';
 
 interface FeedItemLike {
   guid?: string;
@@ -45,32 +52,6 @@ function pickItemGuid(item: FeedItemLike): string | null {
   const guid = item.guid || item.id || item.link || item.title;
   if (!guid) return null;
   return String(guid).trim() || null;
-}
-
-function extractCoverUrl(content?: string, description?: string): string | null {
-  const raw = content || description;
-  if (!raw) return null;
-
-  // Unescape common HTML entities that might break regex
-  const unescaped = raw
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&amp;/g, '&');
-
-  // 1. Try to find the "bigImage" link first (it usually contains the high-quality cover)
-  // Matching something like: <a ... class="bigImage" ... href="URL" ...> or <a ... href="URL" ... class="bigImage" ...>
-  const bigImageMatch = unescaped.match(/<a[^>]+class=["'][^"']*bigImage[^"']*["'][^>]+href=["'](https?:\/\/[^"']+\.(?:jpg|jpeg|png|webp)[^"']*)["']/i) 
-    || unescaped.match(/<a[^>]+href=["'](https?:\/\/[^"']+\.(?:jpg|jpeg|png|webp)[^"']*)["'][^>]+class=["'][^"']*bigImage[^"']*["']/i);
-  
-  if (bigImageMatch?.[1]) return bigImageMatch[1];
-
-  // 2. Fallback to the first available image src
-  const anyImgMatch = unescaped.match(/<img[^>]+src=["'](https?:\/\/[^"']+\.(?:jpg|jpeg|png|webp)[^"']*)["']/i);
-  if (anyImgMatch?.[1]) return anyImgMatch[1];
-
-  return null;
 }
 
 async function translateAvTitle(title: string): Promise<string | null> {
@@ -121,15 +102,35 @@ export async function runAvFetchOnce(
         skipped += 1;
         continue;
       }
-      const coverUrl = extractCoverUrl(item.content, item.description);
+
       const history = findPushHistory(target.id, itemGuid);
       if (!forceResend && history && history.cover_sent === 1) {
         skipped += 1;
         continue;
       }
 
+      // Parse HTML content with cheerio
+      const htmlContent = item.content || item.description || '';
+      const parsed = parseAvContent(htmlContent);
+
       const title = item.title?.trim() || '未知标题';
       const translatedTitle = await translateAvTitle(title);
+
+      // Magnet selection: try AI first, fall back to rule-based
+      let bestMagnet: Magnet | null = null;
+      if (parsed.magnets.length > 0) {
+        const aiPick = await aiPickBestMagnet(parsed.magnets);
+        if (aiPick) {
+          bestMagnet = parsed.magnets.find((m: Magnet) => m.name === aiPick) || null;
+        }
+        if (!bestMagnet) {
+          bestMagnet = pickBestMagnet(parsed.magnets);
+        }
+      }
+
+      // Genre enhancement via AI
+      const enhancedGenres = await enhanceGenresWithAI(parsed.metadata.genres);
+
       const message = formatAvUpdateMessage({
         targetName: target.name,
         targetType: target.target_type,
@@ -137,9 +138,18 @@ export async function runAvFetchOnce(
         translatedTitle,
         pubDate: item.pubDate?.trim() || null,
         link: item.link?.trim() || null,
+        code: parsed.metadata.code,
+        maker: parsed.metadata.maker,
+        genres: parsed.metadata.genres,
+        enhancedGenres,
+        bestMagnet,
       });
 
-      const coverSent = await sendAvUpdate({ message, coverUrl }, bot);
+      const coverUrl = parsed.coverUrl;
+      const coverSent = await sendAvUpdateWithGallery(
+        { message, coverUrl, sampleUrls: parsed.sampleImages },
+        bot
+      );
 
       if (!history) {
         createPushHistory(target.id, itemGuid, coverSent || !coverUrl);

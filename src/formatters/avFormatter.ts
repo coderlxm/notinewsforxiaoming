@@ -27,33 +27,74 @@ export interface AvUpdateMessageInput {
   translatedTitle: string | null;
   pubDate: string | null;
   link: string | null;
+  // New premium fields
+  code?: string | null;
+  maker?: string | null;
+  genres?: string[] | null;
+  enhancedGenres?: string | null;
+  bestMagnet?: { name: string; link: string; size: string; shareDate: string } | null;
 }
 
 export function formatAvUpdateMessage(input: AvUpdateMessageInput): string {
-  const targetTypeLabel = input.targetType === 'label' ? '片商' : '演员';
-  const translated = input.translatedTitle && input.translatedTitle.trim() ? input.translatedTitle.trim() : null;
-  const hasTranslated = translated && translated !== input.title;
+  const translated = input.translatedTitle && input.translatedTitle.trim()
+    ? input.translatedTitle.trim()
+    : null;
+  const displayTitle = translated || input.title;
+
   const lines = [
-    '<b>AV 新作更新</b>',
+    '🌟 <b>关注女优新作更新</b>',
     '──────────────────',
-    `${targetTypeLabel}：<b>${escapeHtml(input.targetName)}</b>`,
-    `标题：${escapeHtml(input.title)}`,
   ];
 
-  if (hasTranslated) {
-    lines.push(`翻译：${escapeHtml(translated)}`);
-  }
-  if (input.pubDate) {
-    lines.push(`最新更新日期：${escapeHtml(input.pubDate)}`);
+  lines.push(`👩 <b>演员</b>：${escapeHtml(input.targetName)}`);
+
+  if (input.code) {
+    lines.push(`🔢 <b>识别码</b>：${escapeHtml(input.code)}`);
   }
 
+  lines.push(`🎬 <b>标题</b>：${escapeHtml(displayTitle)}`);
+
+  if (input.maker) {
+    lines.push(`🏢 <b>制作商</b>：${escapeHtml(input.maker)}`);
+  }
+
+  // Genre display: prefer AI-enhanced format, fallback to plain hashtags
+  if (input.enhancedGenres) {
+    lines.push(`🏷️ <b>类别</b>：${input.enhancedGenres}`);
+  } else if (input.genres && input.genres.length > 0) {
+    const tags = input.genres.map((g) => `#${escapeHtml(g)}`).join(' ');
+    lines.push(`🏷️ <b>类别</b>：${tags}`);
+  }
+
+  // Magnet section
+  if (input.bestMagnet) {
+    const magnet = input.bestMagnet;
+    const hasCN = /字幕|中字|-C|CN|SUB/i.test(magnet.name);
+    lines.push('──────────────────');
+    lines.push(`🧲 <b>最优磁力${hasCN ? ' (含中字)' : ''}</b>`);
+    lines.push(`<code>${escapeHtml(magnet.link)}</code>`);
+    const details: string[] = [];
+    details.push(`📦 <b>大小</b>：${escapeHtml(magnet.size)}`);
+    if (magnet.shareDate) {
+      details.push(`📅 <b>分享日期</b>：${escapeHtml(magnet.shareDate)}`);
+    }
+    lines.push(details.join(' | '));
+  }
+
+  // Link to JavBus page
   const safeUrl = normalizeUrl(input.link);
   if (safeUrl !== '#') {
-    lines.push(`链接：<a href="${escapeHtml(safeUrl)}">查看作品</a>`);
+    lines.push('──────────────────');
+    lines.push(`🔗 <a href="${escapeHtml(safeUrl)}">查看作品详情</a>`);
   }
 
+  // Footer tags
+  const footerTags = ['#新作推送', '#磁力直达'];
+  if (input.targetType === 'star') {
+    footerTags.push(`#${input.targetName}`);
+  }
   lines.push('──────────────────');
-  lines.push('#AV更新 #JavBus');
+  lines.push(footerTags.join(' '));
 
   return lines.join('\n');
 }
