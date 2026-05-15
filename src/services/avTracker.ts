@@ -117,10 +117,11 @@ async function translateLabelTitlesBatch(titles: string[]): Promise<string[]> {
   const prompt = [
     '请把下面这些 AV 作品标题翻译成简体中文。',
     '要求：',
-    '1) 只返回 JSON 数组字符串',
-    '2) 数组长度必须和输入数量一致',
-    '3) 每个元素是对应序号标题的中文翻译',
-    '4) 不要输出任何解释',
+    '1) 只返回 json 对象',
+    '2) json 对象格式为 {"titles":["..."]}',
+    '3) titles 数组长度必须和输入数量一致',
+    '4) 每个元素是对应序号标题的中文翻译',
+    '5) 不要输出任何解释',
     '',
     numbered,
   ].join('\n');
@@ -128,6 +129,7 @@ async function translateLabelTitlesBatch(titles: string[]): Promise<string[]> {
   const completion = await openai.chat.completions.create({
     messages: [{ role: 'user', content: prompt }],
     model: 'deepseek-v4-flash',
+    response_format: { type: 'json_object' },
   });
   const output = completion.choices[0]?.message?.content?.trim();
   if (!output) {
@@ -140,10 +142,16 @@ async function translateLabelTitlesBatch(titles: string[]): Promise<string[]> {
   } catch {
     throw new Error(`Invalid JSON from DeepSeek label batch translation: ${output}`);
   }
-  if (!Array.isArray(parsed) || parsed.length !== titles.length || parsed.some((item) => typeof item !== 'string')) {
+  if (
+    !parsed ||
+    typeof parsed !== 'object' ||
+    !Array.isArray((parsed as { titles?: unknown }).titles) ||
+    (parsed as { titles: unknown[] }).titles.length !== titles.length ||
+    (parsed as { titles: unknown[] }).titles.some((item) => typeof item !== 'string')
+  ) {
     throw new Error(`Unexpected translation array shape from DeepSeek: ${output}`);
   }
-  return parsed as string[];
+  return (parsed as { titles: string[] }).titles;
 }
 
 export async function runAvFetchOnce(
