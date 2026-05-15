@@ -87,6 +87,17 @@ export function getDb(): Database.Database {
       );
       CREATE UNIQUE INDEX IF NOT EXISTS idx_push_batch_history_dedupe
       ON push_batch_history(dedupe_key);
+
+      CREATE TABLE IF NOT EXISTS av_source_health (
+        source_key TEXT PRIMARY KEY,
+        status TEXT NOT NULL CHECK (status IN ('up', 'down')),
+        last_error_type TEXT,
+        last_error_message TEXT,
+        last_error_at TEXT,
+        last_alert_at TEXT,
+        last_recovered_at TEXT,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
     `);
 
     const pushHistoryColumns = db.prepare(`PRAGMA table_info(push_history)`).all() as Array<{ name: string }>;

@@ -6,12 +6,16 @@ import { formatAvLabelSummaryMessage, formatAvUpdateMessage } from '../formatter
 import { sendAvUpdateWithGallery } from '../publishers/avTelegram';
 import { sendTelegramMessage } from '../publishers/telegram';
 import {
+  findAvSourceHealth,
   createPushBatchHistory,
   createPushHistory,
   findPushBatchHistory,
   findPushHistory,
   findTrackedTargets,
+  markAvSourceRecovered,
   markCoverSent,
+  updateAvSourceLastAlertAt,
+  upsertAvSourceDown,
   type TrackedTarget
 } from './avRepository';
 import {
@@ -47,6 +51,7 @@ interface RunAvFetchOptions {
 const parser = new Parser();
 const AV_LABEL_FETCH_LIMIT = 30;
 const AV_LABEL_SUMMARY_TOPK = 10;
+const AV_SOURCE_ALERT_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
 function buildTargetRoute(target: TrackedTarget): string {
   if (target.target_type === 'label') {
@@ -72,6 +77,20 @@ function toBatchDate(item: FeedItemLike, releaseDate: string | null): string {
     }
   }
   return new Date().toISOString().slice(0, 10);
+}
+
+function getErrorType(error: unknown): string {
+  if (!(error instanceof Error)) return 'UnknownError';
+  const message = error.message || '';
+  if (message.includes('Status code 503')) return 'HTTP_503';
+  if (message.includes('Status code 404')) return 'HTTP_404';
+  if (message.includes('timed out')) return 'Timeout';
+  return error.name || 'Error';
+}
+
+function getErrorMessage(error: unknown): string {
+  if (!(error instanceof Error)) return String(error);
+  return error.message || error.name || 'Unknown error';
 }
 
 async function translateAvTitle(title: string): Promise<string | null> {
@@ -333,10 +352,55 @@ export async function runAvFetchOnce(
     return { pushed, skipped };
   }
 
+  async function markSourceUpWithRecoveryNotify(sourceKey: string, route: string): Promise<void> {
+    const health = findAvSourceHealth(sourceKey);
+    if (health && health.status === 'down') {
+      await sendTelegramMessage(`AV 源站已恢复：${route}`, bot);
+    }
+    markAvSourceRecovered(sourceKey);
+  }
+
+  async function handleSourceDown(target: TrackedTarget, route: string, error: unknown): Promise<void> {
+    const sourceKey = `javbus:${target.target_type}:${target.target_id}`;
+    const errorType = getErrorType(error);
+    const errorMessage = getErrorMessage(error);
+    const health = findAvSourceHealth(sourceKey);
+    const now = Date.now();
+    const lastAlertAt = health?.last_alert_at ? new Date(health.last_alert_at).getTime() : 0;
+    const shouldAlert = !health || !health.last_alert_at || (now - lastAlertAt) >= AV_SOURCE_ALERT_INTERVAL_MS;
+
+    upsertAvSourceDown(sourceKey, errorType, errorMessage);
+
+    if (shouldAlert) {
+      const alert = [
+        'AV 源站异常',
+        `目标：${route}`,
+        `类型：${errorType}`,
+        `错误：${errorMessage}`,
+      ].join('\n');
+      await sendTelegramMessage(alert, bot);
+      updateAvSourceLastAlertAt(sourceKey);
+    }
+  }
+
+  async function processTargetWithHealth(target: TrackedTarget): Promise<TargetRunSummary> {
+    const route = buildTargetRoute(target);
+    const sourceKey = `javbus:${target.target_type}:${target.target_id}`;
+    try {
+      const result = target.target_type === 'label'
+        ? await processLabelTarget(target)
+        : await processStarTarget(target);
+      await markSourceUpWithRecoveryNotify(sourceKey, route);
+      return result;
+    } catch (error) {
+      console.error(`[av_update] [${route}] failed:`, error);
+      await handleSourceDown(target, route, error);
+      return { pushed: 0, skipped: 0 };
+    }
+  }
+
   // 并行处理各目标，缩短命令总耗时
-  const results = await Promise.all(
-    targets.map((target) => (target.target_type === 'label' ? processLabelTarget(target) : processStarTarget(target)))
-  );
+  const results = await Promise.all(targets.map((target) => processTargetWithHealth(target)));
   const pushed = results.reduce((sum, current) => sum + current.pushed, 0);
   const skipped = results.reduce((sum, current) => sum + current.skipped, 0);
 

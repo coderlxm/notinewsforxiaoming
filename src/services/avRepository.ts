@@ -23,6 +23,17 @@ export interface PushBatchHistoryRow {
   pushed_at: string;
 }
 
+export interface AvSourceHealthRow {
+  source_key: string;
+  status: 'up' | 'down';
+  last_error_type: string | null;
+  last_error_message: string | null;
+  last_error_at: string | null;
+  last_alert_at: string | null;
+  last_recovered_at: string | null;
+  updated_at: string;
+}
+
 export function findTrackedTargets(): TrackedTarget[] {
   const db = getDb();
   const stmt = db.prepare(`
@@ -79,4 +90,59 @@ export function createPushBatchHistory(dedupeKey: string): void {
     VALUES (?, ?)
   `);
   stmt.run(dedupeKey, new Date().toISOString());
+}
+
+export function findAvSourceHealth(sourceKey: string): AvSourceHealthRow | null {
+  const db = getDb();
+  const stmt = db.prepare(`
+    SELECT * FROM av_source_health
+    WHERE source_key = ?
+    LIMIT 1
+  `);
+  return (stmt.get(sourceKey) as AvSourceHealthRow) ?? null;
+}
+
+export function upsertAvSourceDown(sourceKey: string, errorType: string, errorMessage: string): void {
+  const db = getDb();
+  const now = new Date().toISOString();
+  const stmt = db.prepare(`
+    INSERT INTO av_source_health (
+      source_key, status, last_error_type, last_error_message, last_error_at, updated_at
+    )
+    VALUES (?, 'down', ?, ?, ?, ?)
+    ON CONFLICT(source_key) DO UPDATE SET
+      status = 'down',
+      last_error_type = excluded.last_error_type,
+      last_error_message = excluded.last_error_message,
+      last_error_at = excluded.last_error_at,
+      updated_at = excluded.updated_at
+  `);
+  stmt.run(sourceKey, errorType, errorMessage, now, now);
+}
+
+export function updateAvSourceLastAlertAt(sourceKey: string): void {
+  const db = getDb();
+  const now = new Date().toISOString();
+  const stmt = db.prepare(`
+    UPDATE av_source_health
+    SET last_alert_at = ?, updated_at = ?
+    WHERE source_key = ?
+  `);
+  stmt.run(now, now, sourceKey);
+}
+
+export function markAvSourceRecovered(sourceKey: string): void {
+  const db = getDb();
+  const now = new Date().toISOString();
+  const stmt = db.prepare(`
+    INSERT INTO av_source_health (
+      source_key, status, last_recovered_at, updated_at
+    )
+    VALUES (?, 'up', ?, ?)
+    ON CONFLICT(source_key) DO UPDATE SET
+      status = 'up',
+      last_recovered_at = excluded.last_recovered_at,
+      updated_at = excluded.updated_at
+  `);
+  stmt.run(sourceKey, now, now);
 }
