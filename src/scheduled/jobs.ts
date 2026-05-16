@@ -76,10 +76,6 @@ export function registerFixedJobs(bot: Telegraf): void {
   schedule.scheduleJob({ hour: 7, minute: 30, tz: 'Asia/Shanghai' }, async () => {
     await runMode('av_update', getChinaDayOfWeek(), bot);
   });
-  // temporary verification slot: 17:20
-  schedule.scheduleJob({ hour: 17, minute: 20, tz: 'Asia/Shanghai' }, async () => {
-    await runMode('av_update', getChinaDayOfWeek(), bot);
-  });
   schedule.scheduleJob({ hour: 15, minute: 30, tz: 'Asia/Shanghai' }, async () => {
     await runMode('av_update', getChinaDayOfWeek(), bot);
   });
