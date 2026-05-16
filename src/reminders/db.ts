@@ -98,6 +98,31 @@ export function getDb(): Database.Database {
         last_recovered_at TEXT,
         updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
+
+      CREATE TABLE IF NOT EXISTS v2ex_buffer_batches (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        batch_date TEXT NOT NULL,
+        source TEXT NOT NULL DEFAULT 'v2ex',
+        is_holiday INTEGER NOT NULL DEFAULT 1,
+        consumed INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_v2ex_batch_consumed
+      ON v2ex_buffer_batches(consumed, batch_date);
+
+      CREATE TABLE IF NOT EXISTS v2ex_buffer_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        batch_id INTEGER NOT NULL,
+        topic_id TEXT,
+        topic_url TEXT NOT NULL,
+        title TEXT NOT NULL,
+        author TEXT,
+        reply_count INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(batch_id) REFERENCES v2ex_buffer_batches(id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_v2ex_item_topic
+      ON v2ex_buffer_items(topic_id);
     `);
 
     const pushHistoryColumns = db.prepare(`PRAGMA table_info(push_history)`).all() as Array<{ name: string }>;

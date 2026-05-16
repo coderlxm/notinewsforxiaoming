@@ -4,6 +4,7 @@ import { fetchGameNews } from '../fetchers/games';
 import { fetchGithubTrending } from '../fetchers/github';
 import { fetchEnglishContent } from '../fetchers/english';
 import { fetchV2exHot } from '../fetchers/v2ex';
+import { isChinaWorkday } from '../calendar/chinaWorkday';
 import {
   summarizeNewsWithAI,
   summarizeGithubWithAI,
@@ -29,8 +30,9 @@ import { sendTelegramMessage } from '../publishers/telegram';
 import { getFitnessContext, markFitnessWorkoutGenerated } from '../services/fitness';
 import { checkServerHealth } from '../services/serverHealth';
 import { runAvFetchOnce } from '../services/avTracker';
+import { bufferHolidayV2exTopics, pushBufferedV2exIfNeeded } from '../services/v2exBufferedPush';
 
-export type PushMode = 'sleep' | 'wakeup' | 'server_health' | 'news' | 'github' | 'v2ex' | 'fitness' | 'vitamin' | 'english' | 'av_update';
+export type PushMode = 'sleep' | 'wakeup' | 'server_health' | 'news' | 'github' | 'v2ex' | 'v2ex_buffered_push' | 'fitness' | 'vitamin' | 'english' | 'av_update';
 
 export function parseForcedMode(rawMode: string): PushMode | null {
   const modeMap: Record<string, PushMode> = {
@@ -40,6 +42,7 @@ export function parseForcedMode(rawMode: string): PushMode | null {
     news: 'news',
     github: 'github',
     v2ex: 'v2ex',
+    v2ex_buffered_push: 'v2ex_buffered_push',
     fitness: 'fitness',
     vitamin: 'vitamin',
     english: 'english',
@@ -100,9 +103,25 @@ export async function runMode(mode: PushMode, chinaDayOfWeek: number, bot?: Tele
   if (mode === 'v2ex') {
     console.log('Mode: Evening V2EX Hot Topics');
     const topics = await fetchV2exHot();
-    const summary = await summarizeV2exWithAI(topics);
-    const message = formatV2exMessage(summary);
-    await sendTelegramMessage(message, bot);
+    if (isChinaWorkday(new Date())) {
+      const summary = await summarizeV2exWithAI(topics);
+      const message = formatV2exMessage(summary);
+      await sendTelegramMessage(message, bot);
+      return;
+    }
+    bufferHolidayV2exTopics(topics, new Date());
+    console.log(`V2EX holiday buffer stored. count=${topics.length}`);
+    return;
+  }
+
+  if (mode === 'v2ex_buffered_push') {
+    console.log('Mode: V2EX Buffered Push');
+    if (!isChinaWorkday(new Date())) {
+      console.log('Skip buffered V2EX push on non-workday.');
+      return;
+    }
+    const result = await pushBufferedV2exIfNeeded(bot);
+    console.log(`V2EX buffered push finished. pushed=${result.pushed} topics=${result.topicCount}`);
     return;
   }
 
