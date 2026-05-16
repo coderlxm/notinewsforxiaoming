@@ -46,12 +46,15 @@ interface TargetRunSummary {
 
 interface RunAvFetchOptions {
   forceResend?: boolean;
+  healthNotify?: boolean;
 }
 
 const parser = new Parser();
 const AV_LABEL_FETCH_LIMIT = 30;
 const AV_LABEL_SUMMARY_TOPK = 10;
 const AV_SOURCE_ALERT_INTERVAL_MS = 6 * 60 * 60 * 1000;
+const LABEL_DELAY_MIN_MS = 5000;
+const LABEL_DELAY_MAX_MS = 10000;
 
 function buildTargetRoute(target: TrackedTarget): string {
   if (target.target_type === 'label') {
@@ -91,6 +94,17 @@ function getErrorType(error: unknown): string {
 function getErrorMessage(error: unknown): string {
   if (!(error instanceof Error)) return String(error);
   return error.message || error.name || 'Unknown error';
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+interface TargetFailure {
+  target: TrackedTarget;
+  route: string;
+  errorType: string;
+  errorMessage: string;
 }
 
 async function translateAvTitle(title: string): Promise<string | null> {
@@ -179,6 +193,7 @@ export async function runAvFetchOnce(
 ): Promise<AvFetchSummary> {
   const targets = findTrackedTargets();
   const forceResend = options.forceResend === true;
+  const healthNotify = options.healthNotify !== false;
 
   async function processStarTarget(target: TrackedTarget): Promise<TargetRunSummary> {
     const startedAt = Date.now();
@@ -352,57 +367,81 @@ export async function runAvFetchOnce(
     return { pushed, skipped };
   }
 
-  async function markSourceUpWithRecoveryNotify(sourceKey: string, route: string): Promise<void> {
-    const health = findAvSourceHealth(sourceKey);
-    if (health && health.status === 'down') {
-      await sendTelegramMessage(`AV 源站已恢复：${route}`, bot);
-    }
+  function markSourceUp(sourceKey: string): void {
     markAvSourceRecovered(sourceKey);
   }
 
-  async function handleSourceDown(target: TrackedTarget, route: string, error: unknown): Promise<void> {
+  function markSourceDown(target: TrackedTarget, errorType: string, errorMessage: string): void {
     const sourceKey = `javbus:${target.target_type}:${target.target_id}`;
-    const errorType = getErrorType(error);
-    const errorMessage = getErrorMessage(error);
+    upsertAvSourceDown(sourceKey, errorType, errorMessage);
+  }
+
+  async function maybeSendGlobalFailureAlert(failures: TargetFailure[]): Promise<void> {
+    if (!healthNotify || failures.length < 2) return;
+    const sourceKey = 'javbus:global';
     const health = findAvSourceHealth(sourceKey);
     const now = Date.now();
     const lastAlertAt = health?.last_alert_at ? new Date(health.last_alert_at).getTime() : 0;
     const shouldAlert = !health || !health.last_alert_at || (now - lastAlertAt) >= AV_SOURCE_ALERT_INTERVAL_MS;
+    upsertAvSourceDown(
+      sourceKey,
+      'ALL_TARGETS_FAILED',
+      failures.map((item) => `${item.route}:${item.errorType}`).join(' | ')
+    );
+    if (!shouldAlert) return;
 
-    upsertAvSourceDown(sourceKey, errorType, errorMessage);
-
-    if (shouldAlert) {
-      const alert = [
-        'AV 源站异常',
-        `目标：${route}`,
-        `类型：${errorType}`,
-        `错误：${errorMessage}`,
-      ].join('\n');
-      await sendTelegramMessage(alert, bot);
-      updateAvSourceLastAlertAt(sourceKey);
-    }
+    const alert = [
+      'AV 源站异常（双路失败）',
+      ...failures.map((item) => `目标：${item.route} | 类型：${item.errorType} | 错误：${item.errorMessage}`),
+    ].join('\n');
+    await sendTelegramMessage(alert, bot);
+    updateAvSourceLastAlertAt(sourceKey);
   }
 
-  async function processTargetWithHealth(target: TrackedTarget): Promise<TargetRunSummary> {
+  async function processTargetWithHealth(
+    target: TrackedTarget
+  ): Promise<{ summary: TargetRunSummary; failure: TargetFailure | null }> {
     const route = buildTargetRoute(target);
     const sourceKey = `javbus:${target.target_type}:${target.target_id}`;
     try {
       const result = target.target_type === 'label'
         ? await processLabelTarget(target)
         : await processStarTarget(target);
-      await markSourceUpWithRecoveryNotify(sourceKey, route);
-      return result;
+      markSourceUp(sourceKey);
+      return { summary: result, failure: null };
     } catch (error) {
       console.error(`[av_update] [${route}] failed:`, error);
-      await handleSourceDown(target, route, error);
-      return { pushed: 0, skipped: 0 };
+      const errorType = getErrorType(error);
+      const errorMessage = getErrorMessage(error);
+      markSourceDown(target, errorType, errorMessage);
+      return {
+        summary: { pushed: 0, skipped: 0 },
+        failure: { target, route, errorType, errorMessage },
+      };
     }
   }
 
-  // 并行处理各目标，缩短命令总耗时
-  const results = await Promise.all(targets.map((target) => processTargetWithHealth(target)));
-  const pushed = results.reduce((sum, current) => sum + current.pushed, 0);
-  const skipped = results.reduce((sum, current) => sum + current.skipped, 0);
+  const starTargets = targets.filter((target) => target.target_type === 'star');
+  const labelTargets = targets.filter((target) => target.target_type === 'label');
+  const results: Array<{ summary: TargetRunSummary; failure: TargetFailure | null }> = [];
+
+  for (const target of starTargets) {
+    results.push(await processTargetWithHealth(target));
+  }
+  if (labelTargets.length > 0) {
+    const delay = LABEL_DELAY_MIN_MS + Math.floor(Math.random() * (LABEL_DELAY_MAX_MS - LABEL_DELAY_MIN_MS + 1));
+    console.log(`[av_update] delay before label targets: ${delay}ms`);
+    await sleep(delay);
+    for (const target of labelTargets) {
+      results.push(await processTargetWithHealth(target));
+    }
+  }
+
+  const failures = results.map((item) => item.failure).filter((item): item is TargetFailure => item !== null);
+  await maybeSendGlobalFailureAlert(failures);
+
+  const pushed = results.reduce((sum, current) => sum + current.summary.pushed, 0);
+  const skipped = results.reduce((sum, current) => sum + current.summary.skipped, 0);
 
   return {
     pushed,

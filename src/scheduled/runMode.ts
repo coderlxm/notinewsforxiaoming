@@ -130,7 +130,7 @@ export async function runMode(mode: PushMode, chinaDayOfWeek: number, bot?: Tele
 
   if (mode === 'av_update') {
     console.log('Mode: AV Update Tracker');
-    const summary = await runAvFetchOnce(bot);
+    const summary = await runAvFetchOnce(bot, { healthNotify: true });
     console.log(`AV update finished. Checked: ${summary.checkedTargets}, New: ${summary.pushed}, Skipped: ${summary.skipped}`);
     return;
   }

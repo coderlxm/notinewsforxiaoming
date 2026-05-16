@@ -58,7 +58,7 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     );
 
     try {
-      const summary = await runAvFetchOnce(bot, { forceResend });
+      const summary = await runAvFetchOnce(bot, { forceResend, healthNotify: false });
       await ctx.reply(
         `检查完成：新增 ${summary.pushed} 条，已跳过 ${summary.skipped} 条。`,
         { parse_mode: 'HTML' }
