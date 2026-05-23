@@ -37,7 +37,7 @@ import {
 } from '../reminders/formatter';
 import { parseCallbackData, parseRecurringCallbackData, parseNaturalCancelCallbackData, parseVitaminCallbackData } from './callbacks';
 import { runAvFetchOnce } from '../services/avTracker';
-import { getVitaminCountToday, scheduleVitaminSnooze } from '../services/vitaminReminder';
+import { markVitaminEatenToday, scheduleVitaminSnooze } from '../services/vitaminReminder';
 import { findPresetByText } from '../reminders/presets';
 
 export function registerInteractiveHandlers(bot: Telegraf): void {
@@ -263,6 +263,7 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
       await ctx.answerCbQuery();
 
       if (vitaminAction === 'eaten') {
+        markVitaminEatenToday();
         try {
           await ctx.deleteMessage();
         } catch {
@@ -272,16 +273,6 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
       }
 
       if (vitaminAction === 'snooze') {
-        const countToday = getVitaminCountToday();
-        if (countToday >= 3) {
-          try {
-            await ctx.editMessageText('💊 今天已达到最大提醒次数（3次），明天见！', { parse_mode: 'HTML' });
-          } catch {
-            await ctx.reply('💊 今天已达到最大提醒次数（3次），明天见！', { parse_mode: 'HTML' });
-          }
-          return;
-        }
-
         try {
           await ctx.editMessageText('💊 好的，30分钟后再提醒你。', { parse_mode: 'HTML' });
         } catch {

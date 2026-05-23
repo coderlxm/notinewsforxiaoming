@@ -2,6 +2,7 @@ import { createBot } from './bot/createBot';
 import { registerInteractiveHandlers } from './bot/interactive';
 import { schedulePendingReminders, schedulePendingRecurringRules } from './reminders/scheduler';
 import { registerFixedJobs } from './scheduled/jobs';
+import { restoreVitaminLoop } from './services/vitaminReminder';
 
 async function main() {
   const bot = createBot();
@@ -9,6 +10,7 @@ async function main() {
   schedulePendingReminders(bot);
   schedulePendingRecurringRules(bot);
   registerFixedJobs(bot);
+  restoreVitaminLoop(bot);
 
   bot.launch({
     allowedUpdates: ['message', 'callback_query'],
