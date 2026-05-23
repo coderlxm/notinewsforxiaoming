@@ -1,6 +1,7 @@
 import type { Reminder, RecurringRule } from './repository';
 import { bjFormat, formatShortDisplay } from '../utils/time';
 import { describeRecurrence } from './recurring';
+import { PRESET_REMINDERS } from './presets';
 
 interface InlineKeyboardMarkup {
   inline_keyboard: Array<Array<{ text: string; callback_data: string }>>;
@@ -35,8 +36,8 @@ export function formatHelpMessage(): string {
   ].join('\n');
 }
 
-export function formatReminderCreated(reminder: Reminder, source?: 'deterministic' | 'ai'): string {
-  const sourceTag = source === 'ai' ? ' [AI]' : source === 'deterministic' ? ' [指令]' : '';
+export function formatReminderCreated(reminder: Reminder, source?: 'deterministic' | 'ai' | 'preset'): string {
+  const sourceTag = source === 'ai' ? ' [AI]' : source === 'deterministic' ? ' [指令]' : source === 'preset' ? ' [快捷]' : '';
   return [
     `✅ <b>提醒设置成功</b>${sourceTag}`,
     '──────────────────',
@@ -259,4 +260,19 @@ export function buildCancelCandidateButtons(
     }];
   });
   return { reply_markup: { inline_keyboard: rows } };
+}
+
+export function buildPresetKeyboard(): { reply_markup: { keyboard: Array<Array<{ text: string }>>; resize_keyboard: boolean; one_time_keyboard: boolean } } {
+  const buttons = PRESET_REMINDERS.map(p => ({ text: `${p.emoji} ${p.label}` }));
+  const rows: Array<Array<{ text: string }>> = [];
+  for (let i = 0; i < buttons.length; i += 3) {
+    rows.push(buttons.slice(i, i + 3));
+  }
+  return {
+    reply_markup: {
+      keyboard: rows,
+      resize_keyboard: true,
+      one_time_keyboard: false,
+    }
+  };
 }

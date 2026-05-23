@@ -31,17 +31,22 @@ import {
   formatReminderRangeList,
   formatCancelCandidates,
   buildCancelCandidateButtons,
+  buildPresetKeyboard,
   type ReminderListItem,
   type CancelCandidate,
 } from '../reminders/formatter';
 import { parseCallbackData, parseRecurringCallbackData, parseNaturalCancelCallbackData, parseVitaminCallbackData } from './callbacks';
 import { runAvFetchOnce } from '../services/avTracker';
 import { getVitaminCountToday, scheduleVitaminSnooze } from '../services/vitaminReminder';
+import { findPresetByText } from '../reminders/presets';
 
 export function registerInteractiveHandlers(bot: Telegraf): void {
   bot.command('start', (ctx) => {
     if (!isAuthorized(ctx)) return;
-    ctx.reply(formatStartMessage(), { parse_mode: 'HTML' });
+    ctx.reply(formatStartMessage(), {
+      parse_mode: 'HTML',
+      ...buildPresetKeyboard(),
+    });
   });
 
   bot.command('help', (ctx) => {
@@ -155,6 +160,24 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
 
     const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
     if (!text || text.startsWith('/')) return;
+
+    const preset = findPresetByText(text);
+    if (preset) {
+      const receivedAt = new Date();
+      const triggerAt = new Date(receivedAt.getTime() + preset.minutes * 60 * 1000);
+      const reminder = repo.createReminder({
+        chat_id: String(ctx.chat!.id),
+        text: preset.reminderText,
+        trigger_at: triggerAt,
+      });
+      scheduleReminder(bot, reminder);
+      const createdMessage = await ctx.reply(
+        formatReminderCreated(reminder, 'preset'),
+        { parse_mode: 'HTML', ...buildCancelButton(reminder.id) }
+      );
+      repo.setSourceMessageId(reminder.id, createdMessage.message_id);
+      return;
+    }
 
     const receivedAt = new Date();
     const result = await parseNaturalReminder(text, receivedAt);
