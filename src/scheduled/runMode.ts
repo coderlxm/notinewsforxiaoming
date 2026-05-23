@@ -31,6 +31,7 @@ import { getFitnessContext, markFitnessWorkoutGenerated } from '../services/fitn
 import { checkServerHealth } from '../services/serverHealth';
 import { runAvFetchOnce } from '../services/avTracker';
 import { bufferHolidayV2exTopics, pushBufferedV2exIfNeeded } from '../services/v2exBufferedPush';
+import { canSendVitaminReminder, incrementVitaminCount, sendVitaminWithButtons } from '../services/vitaminReminder';
 
 export type PushMode = 'sleep' | 'wakeup' | 'server_health' | 'news' | 'github' | 'v2ex' | 'v2ex_buffered_push' | 'fitness' | 'vitamin' | 'english' | 'av_update';
 
@@ -142,8 +143,18 @@ export async function runMode(mode: PushMode, chinaDayOfWeek: number, bot?: Tele
 
   if (mode === 'vitamin') {
     console.log('Mode: Vitamin Reminder');
-    const message = formatVitaminMessage();
-    await sendTelegramMessage(message, bot);
+    if (!canSendVitaminReminder()) {
+      console.log('Vitamin reminder limit reached for today.');
+      return;
+    }
+    if (bot) {
+      await sendVitaminWithButtons(bot);
+      incrementVitaminCount();
+    } else {
+      const message = formatVitaminMessage();
+      await sendTelegramMessage(message);
+      incrementVitaminCount();
+    }
     return;
   }
 

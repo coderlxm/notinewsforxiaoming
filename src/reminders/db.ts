@@ -123,6 +123,11 @@ export function getDb(): Database.Database {
       );
       CREATE INDEX IF NOT EXISTS idx_v2ex_item_topic
       ON v2ex_buffer_items(topic_id);
+
+      CREATE TABLE IF NOT EXISTS vitamin_reminders (
+        date_key TEXT PRIMARY KEY,
+        count INTEGER NOT NULL DEFAULT 0
+      );
     `);
 
     const pushHistoryColumns = db.prepare(`PRAGMA table_info(push_history)`).all() as Array<{ name: string }>;

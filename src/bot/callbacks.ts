@@ -61,3 +61,12 @@ export function parseNaturalCancelCallbackData(data: string | undefined): Natura
   if (isNaN(id)) return null;
   return { kind: kind === 'once' ? 'once' : 'recurring', id };
 }
+
+export type VitaminAction = 'eaten' | 'snooze';
+
+export function parseVitaminCallbackData(data: string | undefined): VitaminAction | null {
+  if (!data) return null;
+  if (data === 'vitamin:eaten') return 'eaten';
+  if (data === 'vitamin:snooze') return 'snooze';
+  return null;
+}

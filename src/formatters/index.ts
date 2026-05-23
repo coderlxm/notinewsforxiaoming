@@ -181,6 +181,21 @@ export function formatVitaminMessage(): string {
   return message;
 }
 
+interface VitaminInlineKeyboardMarkup {
+  inline_keyboard: Array<Array<{ text: string; callback_data: string }>>;
+}
+
+export function buildVitaminButtons(): { reply_markup: VitaminInlineKeyboardMarkup } {
+  return {
+    reply_markup: {
+      inline_keyboard: [[
+        { text: '💊 已吃', callback_data: 'vitamin:eaten' },
+        { text: '⏰ 未吃，30分钟后再提醒', callback_data: 'vitamin:snooze' },
+      ]]
+    }
+  };
+}
+
 export function formatServerHealthMessage(results: ServerHealthResult[]): string {
   const hasAbnormal = results.some(result => !result.online);
   let message = hasAbnormal
