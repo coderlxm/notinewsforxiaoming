@@ -35,18 +35,69 @@ import {
   type ReminderListItem,
   type CancelCandidate,
 } from '../reminders/formatter';
-import { parseCallbackData, parseRecurringCallbackData, parseNaturalCancelCallbackData, parseVitaminCallbackData } from './callbacks';
+import {
+  parseCallbackData,
+  parseRecurringCallbackData,
+  parseNaturalCancelCallbackData,
+  parseVitaminCallbackData,
+  parseStartggWatchCallbackData,
+} from './callbacks';
 import { runAvFetchOnce } from '../services/avTracker';
 import { markVitaminEatenToday, scheduleVitaminSnooze } from '../services/vitaminReminder';
 import { findPresetByText } from '../reminders/presets';
-import { formatStartggWatchList } from '../formatters/startggFormatter';
-import { normalizeEventSlug, runStartggWatchOnce } from '../services/startggTracker';
+import {
+  buildStartggWatchCandidateButtons,
+  formatStartggGuide,
+  formatStartggWatchCandidates,
+  formatStartggWatchList,
+} from '../formatters/startggFormatter';
+import {
+  fetchEventMeta,
+  listEventEntrantPlayers,
+  normalizeEventSlug,
+  resolveUserToPlayer,
+  runStartggWatchOnce,
+} from '../services/startggTracker';
 import {
   createStartggWatchEvent,
   createStartggWatchPlayer,
+  findStartggWatchEventById,
+  findStartggWatchEventBySlug,
+  findStartggWatchPlayerByPlayerId,
   listStartggWatchEvents,
   listStartggWatchPlayers,
+  listStartggWatchStatusViews,
+  updateStartggWatchPlayerName,
 } from '../services/startggRepository';
+
+interface StartggWatchCandidate {
+  eventRowId: number;
+  eventName: string;
+  playerId: number;
+  playerName: string;
+}
+
+function isStartggUrl(raw: string): boolean {
+  return raw.startsWith('http://') || raw.startsWith('https://');
+}
+
+function isStartggUserReference(raw: string): boolean {
+  if (!isStartggUrl(raw)) {
+    return raw.startsWith('user/');
+  }
+  const url = new URL(raw);
+  const parts = url.pathname.split('/').filter(Boolean);
+  return parts.includes('user');
+}
+
+function isStartggEventReference(raw: string): boolean {
+  if (!isStartggUrl(raw)) {
+    return raw.startsWith('tournament/');
+  }
+  const url = new URL(raw);
+  const parts = url.pathname.split('/').filter(Boolean);
+  return parts.includes('tournament') && parts.includes('event');
+}
 
 export function registerInteractiveHandlers(bot: Telegraf): void {
   bot.command('start', (ctx) => {
@@ -98,6 +149,158 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     } catch (e) {
       if (e instanceof Error) {
         await ctx.reply(`start.gg 检查失败：${e.message}`, { parse_mode: 'HTML' });
+        return;
+      }
+      throw e;
+    }
+  });
+
+  bot.command('startgg', async (ctx) => {
+    if (!isAuthorized(ctx)) return;
+    const players = listStartggWatchPlayers().filter((row) => row.enabled === 1);
+    const events = listStartggWatchEvents().filter((row) => row.active === 1);
+    await ctx.reply(formatStartggGuide(players.length, events.length), { parse_mode: 'HTML' });
+  });
+
+  bot.command('watch', async (ctx) => {
+    if (!isAuthorized(ctx)) return;
+    const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
+    const raw = text.replace(/^\/watch\s*/, '').trim();
+    if (!raw) {
+      await ctx.reply(
+        '用法：/watch <选手名 | 用户链接 | 项目链接>\n示例：/watch Tokido',
+        { parse_mode: 'HTML' },
+      );
+      return;
+    }
+
+    try {
+      if (isStartggEventReference(raw)) {
+        const event = await fetchEventMeta(raw);
+        const existingEvent = findStartggWatchEventBySlug(event.slug);
+        if (existingEvent) {
+          await ctx.reply(`该项目已在监控列表中：${existingEvent.event_name} (${existingEvent.event_slug})`, { parse_mode: 'HTML' });
+          return;
+        }
+        createStartggWatchEvent(event.slug, event.name);
+        const enabledPlayers = listStartggWatchPlayers().filter((row) => row.enabled === 1).length;
+        const activeEvents = listStartggWatchEvents().filter((row) => row.active === 1).length;
+        const tournamentPrefix = event.tournamentName ? `${event.tournamentName} / ` : '';
+        const nextStep = enabledPlayers === 0
+          ? '下一步：发送 /watch <选手名> 或 /watch <user_url> 添加选手。'
+          : '下一步：发送 /watchlist 查看当前监控状态。';
+        await ctx.reply(
+          `已添加项目：${tournamentPrefix}${event.name}\n当前配置：${enabledPlayers} 位选手，${activeEvents} 个项目。\n${nextStep}`,
+          { parse_mode: 'HTML' },
+        );
+        return;
+      }
+
+      if (isStartggUserReference(raw)) {
+        const resolved = await resolveUserToPlayer(raw);
+        const existingPlayer = findStartggWatchPlayerByPlayerId(resolved.playerId);
+        if (existingPlayer) {
+          if (existingPlayer.player_name !== resolved.playerName) {
+            updateStartggWatchPlayerName(existingPlayer.id, resolved.playerName);
+          }
+          await ctx.reply(
+            `该选手已在监控中：${resolved.playerName} (player_id=${resolved.playerId})`,
+            { parse_mode: 'HTML' },
+          );
+          return;
+        }
+
+        createStartggWatchPlayer(resolved.playerId, resolved.playerName);
+        const activeEvents = listStartggWatchEvents().filter((row) => row.active === 1).length;
+        const nextStep = activeEvents === 0
+          ? '下一步：发送 /watch <event_url> 添加项目链接。'
+          : '下一步：发送 /watchlist 查看当前监控状态。';
+        await ctx.reply(
+          `已添加选手：${resolved.playerName} (player_id=${resolved.playerId})\n${nextStep}`,
+          { parse_mode: 'HTML' },
+        );
+        return;
+      }
+
+      const activeEvents = listStartggWatchEvents().filter((row) => row.active === 1);
+      if (activeEvents.length === 0) {
+        await ctx.reply(
+          '请先添加项目链接：/watch https://www.start.gg/tournament/xxx/event/yyy',
+          { parse_mode: 'HTML' },
+        );
+        return;
+      }
+
+      const nameQuery = raw.toLowerCase();
+      const candidateMap = new Map<number, StartggWatchCandidate>();
+      for (const eventRow of activeEvents) {
+        const entrants = await listEventEntrantPlayers(eventRow.event_slug);
+        for (const entrant of entrants) {
+          const playerName = entrant.playerName.toLowerCase();
+          const entrantName = entrant.entrantName.toLowerCase();
+          if (!playerName.includes(nameQuery) && !entrantName.includes(nameQuery)) continue;
+          if (candidateMap.has(entrant.playerId)) continue;
+          candidateMap.set(entrant.playerId, {
+            eventRowId: eventRow.id,
+            eventName: eventRow.event_name,
+            playerId: entrant.playerId,
+            playerName: entrant.playerName,
+          });
+        }
+      }
+
+      const candidates = Array.from(candidateMap.values());
+      if (candidates.length === 0) {
+        await ctx.reply(
+          `在已添加项目里未找到「${raw}」。\n建议改用选手用户链接：/watch https://www.start.gg/user/xxxx`,
+          { parse_mode: 'HTML' },
+        );
+        return;
+      }
+
+      if (candidates.length === 1) {
+        const candidate = candidates[0]!;
+        const existingPlayer = findStartggWatchPlayerByPlayerId(candidate.playerId);
+        if (existingPlayer) {
+          if (existingPlayer.player_name !== candidate.playerName) {
+            updateStartggWatchPlayerName(existingPlayer.id, candidate.playerName);
+          }
+          await ctx.reply(
+            `该选手已在监控中：${candidate.playerName} (player_id=${candidate.playerId})`,
+            { parse_mode: 'HTML' },
+          );
+          return;
+        }
+        createStartggWatchPlayer(candidate.playerId, candidate.playerName);
+        await ctx.reply(
+          `已添加选手：${candidate.playerName} (player_id=${candidate.playerId})\n来源项目：${candidate.eventName}`,
+          { parse_mode: 'HTML' },
+        );
+        return;
+      }
+
+      const topCandidates = candidates.slice(0, 10);
+      await ctx.reply(
+        formatStartggWatchCandidates(
+          raw,
+          topCandidates.map((item) => ({
+            playerName: item.playerName,
+            eventName: item.eventName,
+            playerId: item.playerId,
+          })),
+        ),
+        {
+          parse_mode: 'HTML',
+          ...buildStartggWatchCandidateButtons(topCandidates.map((item) => ({
+            eventRowId: item.eventRowId,
+            playerId: item.playerId,
+            playerName: item.playerName,
+          }))),
+        },
+      );
+    } catch (e) {
+      if (e instanceof Error) {
+        await ctx.reply(`添加监控失败：${e.message}`, { parse_mode: 'HTML' });
         return;
       }
       throw e;
@@ -161,7 +364,16 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     if (!isAuthorized(ctx)) return;
     const players = listStartggWatchPlayers();
     const events = listStartggWatchEvents();
-    await ctx.reply(formatStartggWatchList(players, events), { parse_mode: 'HTML' });
+    const statuses = listStartggWatchStatusViews();
+    await ctx.reply(formatStartggWatchList(players, events, statuses), { parse_mode: 'HTML' });
+  });
+
+  bot.command('watchlist', async (ctx) => {
+    if (!isAuthorized(ctx)) return;
+    const players = listStartggWatchPlayers();
+    const events = listStartggWatchEvents();
+    const statuses = listStartggWatchStatusViews();
+    await ctx.reply(formatStartggWatchList(players, events, statuses), { parse_mode: 'HTML' });
   });
 
   bot.command('remind', async (ctx) => {
@@ -343,6 +555,42 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     if (!isAuthorized(ctx)) return;
 
     const cbData = ctx.callbackQuery && 'data' in ctx.callbackQuery ? ctx.callbackQuery.data : undefined;
+
+    const startggWatchData = parseStartggWatchCallbackData(cbData);
+    if (startggWatchData) {
+      await ctx.answerCbQuery();
+      const eventRow = findStartggWatchEventById(startggWatchData.eventRowId);
+      if (!eventRow || eventRow.active !== 1) {
+        await ctx.reply('候选项已失效，请重新执行 /watch <选手名>。', { parse_mode: 'HTML' });
+        return;
+      }
+
+      const entrants = await listEventEntrantPlayers(eventRow.event_slug);
+      const selected = entrants.find((item) => item.playerId === startggWatchData.playerId);
+      if (!selected) {
+        await ctx.reply('未找到该候选选手，请重新执行 /watch <选手名>。', { parse_mode: 'HTML' });
+        return;
+      }
+
+      const existingPlayer = findStartggWatchPlayerByPlayerId(selected.playerId);
+      if (existingPlayer) {
+        if (existingPlayer.player_name !== selected.playerName) {
+          updateStartggWatchPlayerName(existingPlayer.id, selected.playerName);
+        }
+        await ctx.reply(
+          `该选手已在监控中：${selected.playerName} (player_id=${selected.playerId})`,
+          { parse_mode: 'HTML' },
+        );
+        return;
+      }
+
+      createStartggWatchPlayer(selected.playerId, selected.playerName);
+      await ctx.reply(
+        `已添加选手：${selected.playerName} (player_id=${selected.playerId})\n来源项目：${eventRow.event_name}`,
+        { parse_mode: 'HTML' },
+      );
+      return;
+    }
 
     const vitaminAction = parseVitaminCallbackData(cbData);
     if (vitaminAction) {

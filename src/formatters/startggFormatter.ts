@@ -32,6 +32,10 @@ function statusLabel(status: StartggWatchStatus): string {
   return '已淘汰';
 }
 
+interface InlineKeyboardMarkup {
+  inline_keyboard: Array<Array<{ text: string; callback_data: string }>>;
+}
+
 export interface StartggStatusChangedMessageInput {
   tournamentName: string;
   eventName: string;
@@ -77,7 +81,66 @@ export function formatStartggStatusChangedMessage(input: StartggStatusChangedMes
   return lines.join('\n');
 }
 
-export function formatStartggWatchList(players: Array<{ player_id: number; player_name: string; enabled: number }>, events: Array<{ event_slug: string; event_name: string; active: number }>): string {
+export function formatStartggGuide(playersCount: number, eventsCount: number): string {
+  const isEmpty = playersCount === 0 || eventsCount === 0;
+  const lines = [
+    '🥊 <b>start.gg 监控助手</b>',
+    '──────────────────',
+    `当前配置：${playersCount} 位选手，${eventsCount} 个项目`,
+    '',
+  ];
+
+  if (isEmpty) {
+    lines.push('建议按这两步完成首次配置：');
+    lines.push('1. <code>/watch Tokido</code> 或 <code>/watch https://www.start.gg/user/xxxx</code>');
+    lines.push('2. <code>/watch https://www.start.gg/tournament/xxx/event/yyy</code>');
+  } else {
+    lines.push('常用命令：');
+    lines.push('• <code>/watch &lt;选手名 | 用户链接 | 项目链接&gt;</code>');
+    lines.push('• <code>/watchlist</code> 查看监控对象和最近状态');
+    lines.push('• <code>/fetchstartgg</code> 手动触发一次检查');
+  }
+  return lines.join('\n');
+}
+
+export function formatStartggWatchCandidates(
+  query: string,
+  candidates: Array<{ playerName: string; eventName: string; playerId: number }>,
+): string {
+  const lines = [
+    `🔎 找到多个候选「<b>${escapeHtml(query)}</b>」，请选择：`,
+    '──────────────────',
+  ];
+  candidates.forEach((candidate, index) => {
+    lines.push(`${index + 1}. ${escapeHtml(candidate.playerName)}（${escapeHtml(candidate.eventName)}，player_id=${candidate.playerId}）`);
+  });
+  lines.push('──────────────────');
+  lines.push('点击下方按钮即可添加。');
+  return lines.join('\n');
+}
+
+export function buildStartggWatchCandidateButtons(
+  candidates: Array<{ eventRowId: number; playerId: number; playerName: string }>,
+): { reply_markup: InlineKeyboardMarkup } {
+  const rows = candidates.map((candidate, index) => [{
+    text: `${index + 1}. ${candidate.playerName}`,
+    callback_data: `sgwatch:add:${candidate.eventRowId}:${candidate.playerId}`,
+  }]);
+  return { reply_markup: { inline_keyboard: rows } };
+}
+
+export function formatStartggWatchList(
+  players: Array<{ player_id: number; player_name: string; enabled: number }>,
+  events: Array<{ event_slug: string; event_name: string; active: number }>,
+  statuses: Array<{
+    player_name: string;
+    event_name: string;
+    status: StartggWatchStatus;
+    placement: number | null;
+    last_set_round_label: string | null;
+    last_set_score_text: string | null;
+  }>,
+): string {
   const lines = ['🎯 <b>start.gg 监控列表</b>', ''];
   lines.push('<b>选手：</b>');
   if (players.length === 0) {
@@ -97,6 +160,23 @@ export function formatStartggWatchList(players: Array<{ player_id: number; playe
     events.forEach((event, index) => {
       const status = event.active === 1 ? '启用' : '停用';
       lines.push(`${index + 1}. ${escapeHtml(event.event_name)} (${escapeHtml(event.event_slug)}, ${status})`);
+    });
+  }
+
+  lines.push('');
+  lines.push('<b>最近状态：</b>');
+  if (statuses.length === 0) {
+    lines.push('（暂无快照，等待下一次检查）');
+  } else {
+    statuses.slice(0, 10).forEach((status, index) => {
+      const details: string[] = [];
+      if (status.placement) details.push(`名次 ${status.placement}`);
+      if (status.last_set_round_label) details.push(status.last_set_round_label);
+      if (status.last_set_score_text) details.push(`比分 ${status.last_set_score_text}`);
+      const suffix = details.length > 0 ? `，${escapeHtml(details.join('，'))}` : '';
+      lines.push(
+        `${index + 1}. ${escapeHtml(status.player_name)} @ ${escapeHtml(status.event_name)}：${escapeHtml(statusLabel(status.status))}${suffix}`
+      );
     });
   }
   return lines.join('\n');

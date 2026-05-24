@@ -1,4 +1,4 @@
-# start.gg 监控 MVP 使用说明
+# start.gg 监控使用说明（易用版）
 
 ## 1. 前置配置
 
@@ -6,30 +6,44 @@
 - `STARTGG_API_TOKEN`：start.gg 官方 GraphQL API token
 - `TG_TOKEN`、`TG_CHAT_ID`：Telegram 推送配置
 
-## 2. 监控对象管理（Telegram 命令）
+## 2. 快速开始（推荐路径）
 
-1. 添加选手
-- `/startggaddplayer <player_id> <player_name>`
-- 示例：`/startggaddplayer 123456 Tokido`
+1. 发送 `/startgg`  
+查看引导和当前配置数量。
 
-2. 添加赛事项目
-- `/startggaddevent <event_slug_or_url> [event_name]`
-- `event_slug` 格式：`tournament/<tournament_name>/event/<event_name>`
-- 示例：`/startggaddevent tournament/combo-breaker-2026/event/street-fighter-6 ComboBreaker SF6`
+2. 添加选手（3 选 1）
+- 按名字：`/watch Tokido`
+- 按用户链接：`/watch https://www.start.gg/user/xxxx`
+- 如果名字命中多个候选，机器人会返回按钮，点选即可添加。
 
-3. 查看当前监控列表
+3. 添加项目
+- `/watch https://www.start.gg/tournament/xxx/event/yyy`
+
+4. 查看列表
+- `/watchlist`
+
+## 3. `/watch` 输入规则
+
+`/watch <内容>` 支持三类输入：
+- 选手名：在已添加项目中匹配 entrant/player 名称
+- 用户页链接：自动解析为 `player_id`
+- 项目页链接：自动解析项目 slug 并入库
+
+不再要求手工输入 `player_id` 才能开始使用。
+
+## 4. 常用命令
+
+- `/startgg`：打开 start.gg 引导
+- `/watch <...>`：添加选手或项目
+- `/watchlist`：查看监控对象和最近状态
+- `/fetchstartgg`：手动触发一次检查
+
+兼容保留（不推荐新用户使用）：
+- `/startggaddplayer`
+- `/startggaddevent`
 - `/startggwatchlist`
 
-## 3. 监控执行方式
-
-1. 自动执行
-- Resident 固定任务每 20 分钟执行一次 `startgg_watch` 模式
-
-2. 手动执行
-- `/fetchstartgg`
-- 返回格式：项目数量、选手数量、本次状态变化条数
-
-## 4. 推送含义
+## 5. 状态说明
 
 状态字段：
 - `未在该项目出战`
@@ -38,18 +52,20 @@
 - `已淘汰`
 - `赛事已完赛`
 
-单条推送包含：
-- 赛事名、项目名、选手名
+`/watchlist` 的“最近状态”会展示：
+- 选手与项目
 - 当前状态
-- 当前名次（有则展示）
-- 最新轮次与比分（有则展示）
-- 项目页与最近对局链接
+- 名次（如有）
+- 最近轮次与比分（如有）
 
-## 5. 数据落库
+## 6. 执行机制
 
-MVP 相关表：
+- 自动执行：定时任务每 20 分钟运行一次 `startgg_watch`
+- 手动执行：`/fetchstartgg`
+
+## 7. 数据落库
+
+相关表：
 - `startgg_watch_players`
 - `startgg_watch_events`
 - `startgg_watch_snapshots`
-
-快照为“选手 x 项目”维度的最新状态，状态变化时触发 Telegram 推送。

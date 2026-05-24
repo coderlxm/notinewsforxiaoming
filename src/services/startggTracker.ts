@@ -85,6 +85,57 @@ query EventTracking(
 }
 `;
 
+const EVENT_BASIC_QUERY = `
+query EventBasic($slug: String!) {
+  event(slug: $slug) {
+    id
+    name
+    slug
+    tournament {
+      id
+      name
+    }
+  }
+}
+`;
+
+const EVENT_ENTRANTS_QUERY = `
+query EventEntrants($slug: String!, $entrantsPage: Int!, $entrantsPerPage: Int!) {
+  event(slug: $slug) {
+    id
+    name
+    slug
+    entrants(query: { page: $entrantsPage, perPage: $entrantsPerPage }) {
+      nodes {
+        id
+        name
+        participants {
+          player {
+            id
+            gamerTag
+            prefix
+          }
+        }
+      }
+    }
+  }
+}
+`;
+
+const USER_PLAYER_QUERY = `
+query UserPlayer($slug: String!) {
+  user(slug: $slug) {
+    slug
+    discriminator
+    player {
+      id
+      gamerTag
+      prefix
+    }
+  }
+}
+`;
+
 interface GraphqlResponse<T> {
   data?: T;
   errors?: Array<{ message: string }>;
@@ -145,6 +196,51 @@ interface EventTrackingResponse {
   } | null;
 }
 
+interface EventBasicResponse {
+  event: {
+    id: number;
+    name: string;
+    slug: string | null;
+    tournament: {
+      id: number;
+      name: string;
+    } | null;
+  } | null;
+}
+
+interface EventEntrantsResponse {
+  event: {
+    id: number;
+    name: string;
+    slug: string | null;
+    entrants: {
+      nodes: Array<{
+        id: number;
+        name: string;
+        participants: Array<{
+          player: {
+            id: number;
+            gamerTag: string | null;
+            prefix: string | null;
+          } | null;
+        }>;
+      }>;
+    };
+  } | null;
+}
+
+interface UserPlayerResponse {
+  user: {
+    slug: string | null;
+    discriminator: string | null;
+    player: {
+      id: number;
+      gamerTag: string | null;
+      prefix: string | null;
+    } | null;
+  } | null;
+}
+
 interface PlayerStatusSnapshot {
   status: StartggWatchStatus;
   placement: number | null;
@@ -160,6 +256,25 @@ export interface StartggWatchSummary {
   checkedPlayers: number;
   checkedEvents: number;
   changed: number;
+}
+
+export interface StartggEventMeta {
+  id: number;
+  name: string;
+  slug: string;
+  tournamentName: string | null;
+}
+
+export interface StartggEventEntrantPlayer {
+  playerId: number;
+  playerName: string;
+  entrantName: string;
+}
+
+export interface StartggUserResolvedPlayer {
+  playerId: number;
+  playerName: string;
+  userSlug: string;
 }
 
 export function normalizeEventSlug(raw: string): string {
@@ -185,7 +300,33 @@ export function normalizeEventSlug(raw: string): string {
   return trimmed.replace(/^\/+/, '');
 }
 
-async function queryStartgg<TData>(query: string, variables: Record<string, unknown>): Promise<TData> {
+export function normalizeUserSlug(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    throw new Error('start.gg user slug cannot be empty.');
+  }
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    const url = new URL(trimmed);
+    const parts = url.pathname.split('/').filter(Boolean);
+    const userIndex = parts.indexOf('user');
+    if (userIndex < 0 || !parts[userIndex + 1]) {
+      throw new Error(`Invalid start.gg user URL: ${raw}`);
+    }
+    return parts[userIndex + 1]!;
+  }
+  return trimmed.replace(/^\/+/, '').replace(/^user\//, '').split('/')[0] ?? trimmed;
+}
+
+function buildPlayerDisplayName(gamerTag: string | null, prefix: string | null): string {
+  const gamer = gamerTag?.trim() ?? '';
+  const org = prefix?.trim() ?? '';
+  if (org && gamer) {
+    return `${org} | ${gamer}`;
+  }
+  return gamer || org;
+}
+
+export async function queryStartgg<TData>(query: string, variables: Record<string, unknown>): Promise<TData> {
   if (!config.startggApiToken) {
     throw new Error('STARTGG_API_TOKEN is not set.');
   }
@@ -209,6 +350,72 @@ async function queryStartgg<TData>(query: string, variables: Record<string, unkn
     throw new Error('start.gg GraphQL returned empty data.');
   }
   return response.data.data;
+}
+
+export async function fetchEventMeta(rawEventSlugOrUrl: string): Promise<StartggEventMeta> {
+  const slug = normalizeEventSlug(rawEventSlugOrUrl);
+  const data = await queryStartgg<EventBasicResponse>(EVENT_BASIC_QUERY, { slug });
+  if (!data.event?.slug) {
+    throw new Error(`start.gg 项目不存在：${slug}`);
+  }
+  return {
+    id: data.event.id,
+    name: data.event.name,
+    slug: normalizeEventSlug(data.event.slug),
+    tournamentName: data.event.tournament?.name ?? null,
+  };
+}
+
+export async function listEventEntrantPlayers(rawEventSlugOrUrl: string): Promise<StartggEventEntrantPlayer[]> {
+  const slug = normalizeEventSlug(rawEventSlugOrUrl);
+  const data = await queryStartgg<EventEntrantsResponse>(EVENT_ENTRANTS_QUERY, {
+    slug,
+    entrantsPage: ENTRANTS_PAGE,
+    entrantsPerPage: ENTRANTS_PER_PAGE,
+  });
+  if (!data.event) {
+    throw new Error(`start.gg 项目不存在：${slug}`);
+  }
+
+  const unique = new Map<number, StartggEventEntrantPlayer>();
+  for (const entrant of data.event.entrants.nodes) {
+    for (const participant of entrant.participants) {
+      const player = participant.player;
+      if (!player) continue;
+      if (unique.has(player.id)) continue;
+      const playerName = buildPlayerDisplayName(player.gamerTag, player.prefix);
+      if (!playerName) continue;
+      unique.set(player.id, {
+        playerId: player.id,
+        playerName,
+        entrantName: entrant.name,
+      });
+    }
+  }
+
+  return Array.from(unique.values());
+}
+
+export async function resolveUserToPlayer(rawUserSlugOrUrl: string): Promise<StartggUserResolvedPlayer> {
+  const slug = normalizeUserSlug(rawUserSlugOrUrl);
+  const data = await queryStartgg<UserPlayerResponse>(USER_PLAYER_QUERY, { slug });
+  if (!data.user) {
+    throw new Error(`start.gg 用户不存在：${slug}`);
+  }
+  if (!data.user.player) {
+    throw new Error('该 start.gg 用户没有关联 player，无法用于赛事状态追踪。');
+  }
+
+  const playerName = buildPlayerDisplayName(data.user.player.gamerTag, data.user.player.prefix);
+  if (!playerName) {
+    throw new Error(`start.gg 用户 player 名称为空：${slug}`);
+  }
+
+  return {
+    playerId: data.user.player.id,
+    playerName,
+    userSlug: data.user.slug ?? slug,
+  };
 }
 
 function buildSetScoreText(slots: Array<{ standing: { stats: { score: { value: number | null } | null } | null } | null }>, displayScore: string | null): string | null {

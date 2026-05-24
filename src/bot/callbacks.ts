@@ -70,3 +70,18 @@ export function parseVitaminCallbackData(data: string | undefined): VitaminActio
   if (data === 'vitamin:snooze') return 'snooze';
   return null;
 }
+
+export interface StartggWatchCallbackData {
+  eventRowId: number;
+  playerId: number;
+}
+
+export function parseStartggWatchCallbackData(data: string | undefined): StartggWatchCallbackData | null {
+  if (!data) return null;
+  const parts = data.split(':');
+  if (parts.length !== 4 || parts[0] !== 'sgwatch' || parts[1] !== 'add') return null;
+  const eventRowId = parseInt(parts[2]!, 10);
+  const playerId = parseInt(parts[3]!, 10);
+  if (isNaN(eventRowId) || isNaN(playerId)) return null;
+  return { eventRowId, playerId };
+}
