@@ -32,7 +32,7 @@ import { checkServerHealth } from '../services/serverHealth';
 import { runAvFetchOnce } from '../services/avTracker';
 import { bufferHolidayV2exTopics, pushBufferedV2exIfNeeded } from '../services/v2exBufferedPush';
 import { isVitaminEatenToday, triggerVitaminReminder } from '../services/vitaminReminder';
-import { runStartggWatchOnce } from '../services/startggTracker';
+import { runStartggWatchByTournamentWindow } from '../services/startggPresetSync';
 
 export type PushMode = 'sleep' | 'wakeup' | 'server_health' | 'news' | 'github' | 'v2ex' | 'v2ex_buffered_push' | 'fitness' | 'vitamin' | 'english' | 'av_update' | 'startgg_watch';
 
@@ -167,7 +167,11 @@ export async function runMode(mode: PushMode, chinaDayOfWeek: number, bot?: Tele
 
   if (mode === 'startgg_watch') {
     console.log('Mode: start.gg Watch');
-    const summary = await runStartggWatchOnce(bot);
+    const summary = await runStartggWatchByTournamentWindow(bot);
+    if (!summary.inWindow) {
+      console.log('start.gg watch skipped: now is outside configured tournament windows.');
+      return;
+    }
     console.log(`start.gg watch finished. events=${summary.checkedEvents} players=${summary.checkedPlayers} changed=${summary.changed}`);
     return;
   }
