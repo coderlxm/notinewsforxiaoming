@@ -13,23 +13,13 @@ import {
 } from './startggRepository';
 
 const STARTGG_GRAPHQL_ENDPOINT = 'https://api.start.gg/gql/alpha';
-const SETS_PAGE = 1;
-const SETS_PER_PAGE = 250;
-const ENTRANTS_PAGE = 1;
-const ENTRANTS_PER_PAGE = 500;
-const STANDINGS_PAGE = 1;
-const STANDINGS_PER_PAGE = 500;
+const TRACKING_SETS_PER_PAGE = 80;
+const TRACKING_ENTRANTS_PER_PAGE = 150;
+const TRACKING_STANDINGS_PER_PAGE = 200;
+const ENTRANTS_PER_PAGE = 150;
 
-const EVENT_TRACKING_QUERY = `
-query EventTracking(
-  $slug: String!,
-  $setsPage: Int!,
-  $setsPerPage: Int!,
-  $entrantsPage: Int!,
-  $entrantsPerPage: Int!,
-  $standingsPage: Int!,
-  $standingsPerPage: Int!
-) {
+const EVENT_TRACKING_HEADER_QUERY = `
+query EventTrackingHeader($slug: String!) {
   event(slug: $slug) {
     id
     name
@@ -38,7 +28,17 @@ query EventTracking(
       id
       name
     }
-    sets(page: $setsPage, perPage: $setsPerPage, sortType: STANDARD) {
+  }
+}
+`;
+
+const EVENT_TRACKING_SETS_PAGE_QUERY = `
+query EventTrackingSetsPage($slug: String!, $page: Int!, $perPage: Int!) {
+  event(slug: $slug) {
+    sets(page: $page, perPage: $perPage, sortType: STANDARD) {
+      pageInfo {
+        totalPages
+      }
       nodes {
         id
         state
@@ -62,7 +62,17 @@ query EventTracking(
         }
       }
     }
-    entrants(query: { page: $entrantsPage, perPage: $entrantsPerPage }) {
+  }
+}
+`;
+
+const EVENT_TRACKING_ENTRANTS_PAGE_QUERY = `
+query EventTrackingEntrantsPage($slug: String!, $page: Int!, $perPage: Int!) {
+  event(slug: $slug) {
+    entrants(query: { page: $page, perPage: $perPage }) {
+      pageInfo {
+        totalPages
+      }
       nodes {
         id
         name
@@ -73,7 +83,17 @@ query EventTracking(
         }
       }
     }
-    standings(query: { page: $standingsPage, perPage: $standingsPerPage }) {
+  }
+}
+`;
+
+const EVENT_TRACKING_STANDINGS_PAGE_QUERY = `
+query EventTrackingStandingsPage($slug: String!, $page: Int!, $perPage: Int!) {
+  event(slug: $slug) {
+    standings(query: { page: $page, perPage: $perPage }) {
+      pageInfo {
+        totalPages
+      }
       nodes {
         placement
         entrant {
@@ -100,12 +120,15 @@ query EventBasic($slug: String!) {
 `;
 
 const EVENT_ENTRANTS_QUERY = `
-query EventEntrants($slug: String!, $entrantsPage: Int!, $entrantsPerPage: Int!) {
+query EventEntrants($slug: String!, $page: Int!, $perPage: Int!) {
   event(slug: $slug) {
     id
     name
     slug
-    entrants(query: { page: $entrantsPage, perPage: $entrantsPerPage }) {
+    entrants(query: { page: $page, perPage: $perPage }) {
+      pageInfo {
+        totalPages
+      }
       nodes {
         id
         name
@@ -196,6 +219,87 @@ interface EventTrackingResponse {
   } | null;
 }
 
+type EventTrackingEvent = NonNullable<EventTrackingResponse['event']>;
+
+interface EventTrackingHeaderResponse {
+  event: {
+    id: number;
+    name: string;
+    slug: string | null;
+    tournament: {
+      id: number;
+      name: string;
+    } | null;
+  } | null;
+}
+
+interface EventTrackingSetsPageResponse {
+  event: {
+    sets: {
+      pageInfo: {
+        totalPages: number | null;
+      } | null;
+      nodes: Array<{
+        id: number;
+        state: number | null;
+        round: number | null;
+        fullRoundText: string | null;
+        displayScore: string | null;
+        winnerId: number | null;
+        completedAt: number | null;
+        slots: Array<{
+          entrant: {
+            id: number;
+            name: string;
+          } | null;
+          standing: {
+            stats: {
+              score: {
+                value: number | null;
+              } | null;
+            } | null;
+          } | null;
+        }>;
+      }>;
+    };
+  } | null;
+}
+
+interface EventTrackingEntrantsPageResponse {
+  event: {
+    entrants: {
+      pageInfo: {
+        totalPages: number | null;
+      } | null;
+      nodes: Array<{
+        id: number;
+        name: string;
+        participants: Array<{
+          player: {
+            id: number;
+          } | null;
+        }>;
+      }>;
+    };
+  } | null;
+}
+
+interface EventTrackingStandingsPageResponse {
+  event: {
+    standings: {
+      pageInfo: {
+        totalPages: number | null;
+      } | null;
+      nodes: Array<{
+        placement: number;
+        entrant: {
+          id: number;
+        } | null;
+      }>;
+    };
+  } | null;
+}
+
 interface EventBasicResponse {
   event: {
     id: number;
@@ -214,6 +318,9 @@ interface EventEntrantsResponse {
     name: string;
     slug: string | null;
     entrants: {
+      pageInfo: {
+        totalPages: number | null;
+      } | null;
       nodes: Array<{
         id: number;
         name: string;
@@ -352,6 +459,83 @@ export async function queryStartgg<TData>(query: string, variables: Record<strin
   return response.data.data;
 }
 
+function normalizeTotalPages(totalPages: number | null | undefined): number {
+  if (!totalPages || totalPages < 1) return 1;
+  return totalPages;
+}
+
+async function fetchEventTrackingSnapshot(slug: string): Promise<EventTrackingEvent> {
+  const header = await queryStartgg<EventTrackingHeaderResponse>(EVENT_TRACKING_HEADER_QUERY, { slug });
+  if (!header.event) {
+    throw new Error(`start.gg event not found: ${slug}`);
+  }
+  if (!header.event.slug) {
+    throw new Error(`start.gg event missing slug: ${slug}`);
+  }
+
+  const sets: EventTrackingEvent['sets']['nodes'] = [];
+  const entrants: EventTrackingEvent['entrants']['nodes'] = [];
+  const standings: EventTrackingEvent['standings']['nodes'] = [];
+
+  let setsPage = 1;
+  let setsTotalPages = 1;
+  while (setsPage <= setsTotalPages) {
+    const pageData = await queryStartgg<EventTrackingSetsPageResponse>(EVENT_TRACKING_SETS_PAGE_QUERY, {
+      slug,
+      page: setsPage,
+      perPage: TRACKING_SETS_PER_PAGE,
+    });
+    if (!pageData.event) {
+      throw new Error(`start.gg event not found while reading sets: ${slug}`);
+    }
+    sets.push(...pageData.event.sets.nodes);
+    setsTotalPages = normalizeTotalPages(pageData.event.sets.pageInfo?.totalPages);
+    setsPage += 1;
+  }
+
+  let entrantsPage = 1;
+  let entrantsTotalPages = 1;
+  while (entrantsPage <= entrantsTotalPages) {
+    const pageData = await queryStartgg<EventTrackingEntrantsPageResponse>(EVENT_TRACKING_ENTRANTS_PAGE_QUERY, {
+      slug,
+      page: entrantsPage,
+      perPage: TRACKING_ENTRANTS_PER_PAGE,
+    });
+    if (!pageData.event) {
+      throw new Error(`start.gg event not found while reading entrants: ${slug}`);
+    }
+    entrants.push(...pageData.event.entrants.nodes);
+    entrantsTotalPages = normalizeTotalPages(pageData.event.entrants.pageInfo?.totalPages);
+    entrantsPage += 1;
+  }
+
+  let standingsPage = 1;
+  let standingsTotalPages = 1;
+  while (standingsPage <= standingsTotalPages) {
+    const pageData = await queryStartgg<EventTrackingStandingsPageResponse>(EVENT_TRACKING_STANDINGS_PAGE_QUERY, {
+      slug,
+      page: standingsPage,
+      perPage: TRACKING_STANDINGS_PER_PAGE,
+    });
+    if (!pageData.event) {
+      throw new Error(`start.gg event not found while reading standings: ${slug}`);
+    }
+    standings.push(...pageData.event.standings.nodes);
+    standingsTotalPages = normalizeTotalPages(pageData.event.standings.pageInfo?.totalPages);
+    standingsPage += 1;
+  }
+
+  return {
+    id: header.event.id,
+    name: header.event.name,
+    slug: header.event.slug,
+    tournament: header.event.tournament,
+    sets: { nodes: sets },
+    entrants: { nodes: entrants },
+    standings: { nodes: standings },
+  };
+}
+
 export async function fetchEventMeta(rawEventSlugOrUrl: string): Promise<StartggEventMeta> {
   const slug = normalizeEventSlug(rawEventSlugOrUrl);
   const data = await queryStartgg<EventBasicResponse>(EVENT_BASIC_QUERY, { slug });
@@ -368,29 +552,34 @@ export async function fetchEventMeta(rawEventSlugOrUrl: string): Promise<Startgg
 
 export async function listEventEntrantPlayers(rawEventSlugOrUrl: string): Promise<StartggEventEntrantPlayer[]> {
   const slug = normalizeEventSlug(rawEventSlugOrUrl);
-  const data = await queryStartgg<EventEntrantsResponse>(EVENT_ENTRANTS_QUERY, {
-    slug,
-    entrantsPage: ENTRANTS_PAGE,
-    entrantsPerPage: ENTRANTS_PER_PAGE,
-  });
-  if (!data.event) {
-    throw new Error(`start.gg 项目不存在：${slug}`);
-  }
-
   const unique = new Map<number, StartggEventEntrantPlayer>();
-  for (const entrant of data.event.entrants.nodes) {
-    for (const participant of entrant.participants) {
-      const player = participant.player;
-      if (!player) continue;
-      if (unique.has(player.id)) continue;
-      const playerName = buildPlayerDisplayName(player.gamerTag, player.prefix);
-      if (!playerName) continue;
-      unique.set(player.id, {
-        playerId: player.id,
-        playerName,
-        entrantName: entrant.name,
-      });
+  let page = 1;
+  let totalPages = 1;
+  while (page <= totalPages) {
+    const data = await queryStartgg<EventEntrantsResponse>(EVENT_ENTRANTS_QUERY, {
+      slug,
+      page,
+      perPage: ENTRANTS_PER_PAGE,
+    });
+    if (!data.event) {
+      throw new Error(`start.gg 项目不存在：${slug}`);
     }
+    for (const entrant of data.event.entrants.nodes) {
+      for (const participant of entrant.participants) {
+        const player = participant.player;
+        if (!player) continue;
+        if (unique.has(player.id)) continue;
+        const playerName = buildPlayerDisplayName(player.gamerTag, player.prefix);
+        if (!playerName) continue;
+        unique.set(player.id, {
+          playerId: player.id,
+          playerName,
+          entrantName: entrant.name,
+        });
+      }
+    }
+    totalPages = normalizeTotalPages(data.event.entrants.pageInfo?.totalPages);
+    page += 1;
   }
 
   return Array.from(unique.values());
@@ -444,12 +633,9 @@ function compareSetRecency(a: { completedAt: number | null; id: number }, b: { c
 
 function computePlayerSnapshot(
   eventSlug: string,
-  event: EventTrackingResponse['event'],
+  event: EventTrackingEvent,
   watchPlayerId: number
 ): PlayerStatusSnapshot {
-  if (!event) {
-    throw new Error(`Event not found for slug ${eventSlug}`);
-  }
   if (!event.slug) {
     throw new Error(`Event slug is empty: ${eventSlug}`);
   }
@@ -537,29 +723,18 @@ export async function runStartggWatchOnce(bot?: Telegraf): Promise<StartggWatchS
   let changed = 0;
   for (const eventRow of events) {
     const normalizedSlug = normalizeEventSlug(eventRow.event_slug);
-    const data = await queryStartgg<EventTrackingResponse>(EVENT_TRACKING_QUERY, {
-      slug: normalizedSlug,
-      setsPage: SETS_PAGE,
-      setsPerPage: SETS_PER_PAGE,
-      entrantsPage: ENTRANTS_PAGE,
-      entrantsPerPage: ENTRANTS_PER_PAGE,
-      standingsPage: STANDINGS_PAGE,
-      standingsPerPage: STANDINGS_PER_PAGE,
-    });
-    if (!data.event) {
-      throw new Error(`start.gg event not found: ${normalizedSlug}`);
-    }
-    if (!data.event.slug) {
+    const event = await fetchEventTrackingSnapshot(normalizedSlug);
+    if (!event.slug) {
       throw new Error(`start.gg event missing slug: ${normalizedSlug}`);
     }
-    if (!data.event.tournament?.name) {
+    if (!event.tournament?.name) {
       throw new Error(`start.gg event missing tournament name: ${normalizedSlug}`);
     }
 
-    updateStartggWatchEventResolved(eventRow.id, data.event.id, data.event.name);
+    updateStartggWatchEventResolved(eventRow.id, event.id, event.name);
 
     for (const player of players) {
-      const snapshot = computePlayerSnapshot(normalizedSlug, data.event, player.player_id);
+      const snapshot = computePlayerSnapshot(normalizedSlug, event, player.player_id);
       const previous = findStartggWatchSnapshot(player.id, eventRow.id);
       const changedNow = hasSnapshotChanged(snapshot, previous);
       upsertStartggWatchSnapshot({
@@ -579,9 +754,9 @@ export async function runStartggWatchOnce(bot?: Telegraf): Promise<StartggWatchS
 
       changed += 1;
       const message = formatStartggStatusChangedMessage({
-        tournamentName: data.event.tournament.name,
-        eventName: data.event.name,
-        eventSlug: data.event.slug,
+        tournamentName: event.tournament.name,
+        eventName: event.name,
+        eventSlug: event.slug,
         playerName: player.player_name,
         status: snapshot.status,
         placement: snapshot.placement,
