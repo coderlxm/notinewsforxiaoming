@@ -68,10 +68,9 @@ import {
   listStartggWatchStatusViews,
   updateStartggWatchPlayerName,
 } from '../services/startggRepository';
-import { runStartggWatchByTournamentWindow, syncStartggPresetPlayers } from '../services/startggPresetSync';
+import { runStartggWatchByApiWindow, syncStartggApiActiveEvents, syncStartggPresetPlayers } from '../services/startggPresetSync';
 import { addStartggTournamentWindow, listStartggTournamentWindows, removeStartggTournamentWindow } from '../services/startggWindowRepository';
 import { parseTournamentWindowFromNaturalLanguage } from '../services/startggWindowParser';
-import { getActiveTournamentWindows, loadStartggTournamentWindowsConfig } from '../services/startggPresetConfig';
 
 interface StartggWatchCandidate {
   eventRowId: number;
@@ -144,10 +143,13 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     if (!isAuthorized(ctx)) return;
     await ctx.reply('开始手动检查 start.gg 选手状态...', { parse_mode: 'HTML' });
     try {
-      const summary = await runStartggWatchByTournamentWindow(bot);
-      const windowTag = summary.windowNames.length > 0 ? `（当前赛事窗口：${summary.windowNames.join(', ')}）` : '';
+      const summary = await runStartggWatchByApiWindow(bot);
+      if (!summary.inWindow) {
+        await ctx.reply('检查完成：当前不在赛事活跃时段（按 start.gg tournament startAt/endAt 判定），已跳过抓取。', { parse_mode: 'HTML' });
+        return;
+      }
       await ctx.reply(
-        `检查完成${windowTag}：项目 ${summary.checkedEvents} 个，选手 ${summary.checkedPlayers} 个，状态变化 ${summary.changed} 条。`,
+        `检查完成：活跃项目 ${summary.activeEventCount} 个，本次检查项目 ${summary.checkedEvents} 个，选手 ${summary.checkedPlayers} 个，状态变化 ${summary.changed} 条。`,
         { parse_mode: 'HTML' }
       );
     } catch (e) {
@@ -162,15 +164,13 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
   bot.command('startgg', async (ctx) => {
     if (!isAuthorized(ctx)) return;
     try {
-      await syncStartggPresetPlayers();
+      const syncSummary = await syncStartggApiActiveEvents(new Date());
       const players = listStartggWatchPlayers().filter((row) => row.enabled === 1);
       const events = listStartggWatchEvents().filter((row) => row.active === 1);
-      const config = loadStartggTournamentWindowsConfig();
-      const activeWindows = getActiveTournamentWindows(config, new Date());
-      const windowText = activeWindows.length > 0
-        ? `可选窗口已命中：${activeWindows.map((window) => window.name).join(', ')}`
-        : '当前未命中可选窗口（不影响手动/定时监控）';
-      await ctx.reply(`${formatStartggGuide(players.length, events.length)}\n\n${windowText}`, { parse_mode: 'HTML' });
+      const activeText = syncSummary.activeEventCount > 0
+        ? `当前活跃项目：${syncSummary.activeEventCount} 个（按 start.gg tournament startAt/endAt 判定）`
+        : '当前活跃项目：0 个（按 start.gg tournament startAt/endAt 判定）';
+      await ctx.reply(`${formatStartggGuide(players.length, events.length)}\n\n${activeText}`, { parse_mode: 'HTML' });
     } catch (e) {
       if (e instanceof Error) {
         await ctx.reply(`start.gg 状态读取失败：${e.message}`, { parse_mode: 'HTML' });

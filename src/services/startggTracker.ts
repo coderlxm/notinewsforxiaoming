@@ -103,9 +103,12 @@ query EventBasic($slug: String!) {
     id
     name
     slug
+    startAt
     tournament {
       id
       name
+      startAt
+      endAt
     }
   }
 }
@@ -281,9 +284,12 @@ interface EventBasicResponse {
     id: number;
     name: string;
     slug: string | null;
+    startAt: number | null;
     tournament: {
       id: number;
       name: string;
+      startAt: number | null;
+      endAt: number | null;
     } | null;
   } | null;
 }
@@ -341,11 +347,18 @@ export interface StartggWatchSummary {
   changed: number;
 }
 
+export interface RunStartggWatchOptions {
+  eventSlugs?: string[];
+}
+
 export interface StartggEventMeta {
   id: number;
   name: string;
   slug: string;
   tournamentName: string | null;
+  eventStartAt: number | null;
+  tournamentStartAt: number | null;
+  tournamentEndAt: number | null;
 }
 
 export interface StartggEventEntrantPlayer {
@@ -523,6 +536,9 @@ export async function fetchEventMeta(rawEventSlugOrUrl: string): Promise<Startgg
     name: data.event.name,
     slug: normalizeEventSlug(data.event.slug),
     tournamentName: data.event.tournament?.name ?? null,
+    eventStartAt: data.event.startAt ?? null,
+    tournamentStartAt: data.event.tournament?.startAt ?? null,
+    tournamentEndAt: data.event.tournament?.endAt ?? null,
   };
 }
 
@@ -684,12 +700,18 @@ function hasSnapshotChanged(
     || current.lastSetScoreText !== previous.last_set_score_text;
 }
 
-export async function runStartggWatchOnce(bot?: Telegraf): Promise<StartggWatchSummary> {
+export async function runStartggWatchOnce(bot?: Telegraf, options?: RunStartggWatchOptions): Promise<StartggWatchSummary> {
   const players = listEnabledStartggWatchPlayers();
   const events = listActiveStartggWatchEvents();
+  const normalizedEventFilter = options?.eventSlugs
+    ? new Set(options.eventSlugs.map((slug) => normalizeEventSlug(slug)))
+    : null;
+  const targetEvents = normalizedEventFilter
+    ? events.filter((row) => normalizedEventFilter.has(normalizeEventSlug(row.event_slug)))
+    : events;
 
   let changed = 0;
-  for (const eventRow of events) {
+  for (const eventRow of targetEvents) {
     const normalizedSlug = normalizeEventSlug(eventRow.event_slug);
     const event = await fetchEventTrackingSnapshot(normalizedSlug);
     if (!event.slug) {
@@ -699,7 +721,8 @@ export async function runStartggWatchOnce(bot?: Telegraf): Promise<StartggWatchS
       throw new Error(`start.gg event missing tournament name: ${normalizedSlug}`);
     }
 
-    updateStartggWatchEventResolved(eventRow.id, event.id, event.name);
+    const resolvedEventName = event.tournament.name ? `${event.tournament.name} / ${event.name}` : event.name;
+    updateStartggWatchEventResolved(eventRow.id, event.id, resolvedEventName);
 
     for (const player of players) {
       const snapshot = computePlayerSnapshot(normalizedSlug, event, player.player_id);
@@ -738,7 +761,7 @@ export async function runStartggWatchOnce(bot?: Telegraf): Promise<StartggWatchS
 
   return {
     checkedPlayers: players.length,
-    checkedEvents: events.length,
+    checkedEvents: targetEvents.length,
     changed,
   };
 }
