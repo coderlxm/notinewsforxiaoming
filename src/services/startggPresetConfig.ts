@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 
@@ -76,6 +76,15 @@ function parseJsonFile(path: string): unknown {
 export function loadStartggPresetPlayersConfig(): StartggPresetPlayersConfig {
   const parsed = parseJsonFile(STARTGG_PRESET_PLAYERS_PATH);
   return presetPlayersConfigSchema.parse(parsed);
+}
+
+export function writeStartggPresetPlayersConfig(config: StartggPresetPlayersConfig): void {
+  const validated = presetPlayersConfigSchema.parse(config);
+  writeFileSync(
+    STARTGG_PRESET_PLAYERS_PATH,
+    `${JSON.stringify(validated, null, 2)}\n`,
+    'utf-8',
+  );
 }
 
 export function parseStartggTournamentWindowsConfig(input: unknown): StartggTournamentWindowsConfig {
