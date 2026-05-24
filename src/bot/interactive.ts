@@ -145,12 +145,9 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     await ctx.reply('开始手动检查 start.gg 选手状态...', { parse_mode: 'HTML' });
     try {
       const summary = await runStartggWatchByTournamentWindow(bot);
-      if (!summary.inWindow) {
-        await ctx.reply('当前不在任何赛事窗口内，已跳过抓取。', { parse_mode: 'HTML' });
-        return;
-      }
+      const windowTag = summary.windowNames.length > 0 ? `（当前赛事窗口：${summary.windowNames.join(', ')}）` : '';
       await ctx.reply(
-        `检查完成：窗口 ${summary.windowNames.join(', ')}；项目 ${summary.checkedEvents} 个，选手 ${summary.checkedPlayers} 个，状态变化 ${summary.changed} 条。`,
+        `检查完成${windowTag}：项目 ${summary.checkedEvents} 个，选手 ${summary.checkedPlayers} 个，状态变化 ${summary.changed} 条。`,
         { parse_mode: 'HTML' }
       );
     } catch (e) {
@@ -171,8 +168,8 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
       const config = loadStartggTournamentWindowsConfig();
       const activeWindows = getActiveTournamentWindows(config, new Date());
       const windowText = activeWindows.length > 0
-        ? `当前赛事窗口：${activeWindows.map((window) => window.name).join(', ')}`
-        : '当前不在任何赛事窗口';
+        ? `可选窗口已命中：${activeWindows.map((window) => window.name).join(', ')}`
+        : '当前未命中可选窗口（不影响手动/定时监控）';
       await ctx.reply(`${formatStartggGuide(players.length, events.length)}\n\n${windowText}`, { parse_mode: 'HTML' });
     } catch (e) {
       if (e instanceof Error) {

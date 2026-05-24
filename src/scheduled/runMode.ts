@@ -168,10 +168,6 @@ export async function runMode(mode: PushMode, chinaDayOfWeek: number, bot?: Tele
   if (mode === 'startgg_watch') {
     console.log('Mode: start.gg Watch');
     const summary = await runStartggWatchByTournamentWindow(bot);
-    if (!summary.inWindow) {
-      console.log('start.gg watch skipped: now is outside configured tournament windows.');
-      return;
-    }
     console.log(`start.gg watch finished. events=${summary.checkedEvents} players=${summary.checkedPlayers} changed=${summary.changed}`);
     return;
   }

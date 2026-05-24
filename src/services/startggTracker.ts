@@ -13,10 +13,10 @@ import {
 } from './startggRepository';
 
 const STARTGG_GRAPHQL_ENDPOINT = 'https://api.start.gg/gql/alpha';
-const TRACKING_SETS_PER_PAGE = 80;
-const TRACKING_ENTRANTS_PER_PAGE = 150;
-const TRACKING_STANDINGS_PER_PAGE = 200;
-const ENTRANTS_PER_PAGE = 150;
+const TRACKING_SETS_PER_PAGE = 120;
+const TRACKING_ENTRANTS_PER_PAGE = 300;
+const TRACKING_STANDINGS_PER_PAGE = 350;
+const ENTRANTS_PER_PAGE = 300;
 
 const EVENT_TRACKING_HEADER_QUERY = `
 query EventTrackingHeader($slug: String!) {
@@ -50,14 +50,6 @@ query EventTrackingSetsPage($slug: String!, $page: Int!, $perPage: Int!) {
         slots {
           entrant {
             id
-            name
-          }
-          standing {
-            stats {
-              score {
-                value
-              }
-            }
           }
         }
       }
@@ -185,14 +177,6 @@ interface EventTrackingResponse {
         slots: Array<{
           entrant: {
             id: number;
-            name: string;
-          } | null;
-          standing: {
-            stats: {
-              score: {
-                value: number | null;
-              } | null;
-            } | null;
           } | null;
         }>;
       }>;
@@ -250,14 +234,6 @@ interface EventTrackingSetsPageResponse {
         slots: Array<{
           entrant: {
             id: number;
-            name: string;
-          } | null;
-          standing: {
-            stats: {
-              score: {
-                value: number | null;
-              } | null;
-            } | null;
           } | null;
         }>;
       }>;
@@ -607,19 +583,11 @@ export async function resolveUserToPlayer(rawUserSlugOrUrl: string): Promise<Sta
   };
 }
 
-function buildSetScoreText(slots: Array<{ standing: { stats: { score: { value: number | null } | null } | null } | null }>, displayScore: string | null): string | null {
+function buildSetScoreText(displayScore: string | null): string | null {
   if (displayScore && displayScore.trim()) {
     return displayScore.trim();
   }
-  if (slots.length < 2) {
-    return null;
-  }
-  const left = slots[0]?.standing?.stats?.score?.value;
-  const right = slots[1]?.standing?.stats?.score?.value;
-  if (left === null || left === undefined || right === null || right === undefined) {
-    return null;
-  }
-  return `${left}-${right}`;
+  return null;
 }
 
 function compareSetRecency(a: { completedAt: number | null; id: number }, b: { completedAt: number | null; id: number }): number {
@@ -699,7 +667,7 @@ function computePlayerSnapshot(
     lastSetId: setId,
     lastSetRound: latestSet?.round ?? null,
     lastSetRoundLabel: latestSet?.fullRoundText ?? null,
-    lastSetScoreText: latestSet ? buildSetScoreText(latestSet.slots, latestSet.displayScore) : null,
+    lastSetScoreText: latestSet ? buildSetScoreText(latestSet.displayScore) : null,
     lastSetState: latestSet?.state ?? null,
     setPageUrl,
   };

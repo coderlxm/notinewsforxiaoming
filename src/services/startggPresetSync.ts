@@ -101,19 +101,9 @@ export async function runStartggWatchByTournamentWindow(bot?: Telegraf): Promise
 }> {
   const now = new Date();
   const syncSummary = await syncStartggActiveWindowEvents(now);
-  if (syncSummary.activeWindowCount === 0) {
-    return {
-      inWindow: false,
-      windowNames: [],
-      checkedPlayers: 0,
-      checkedEvents: 0,
-      changed: 0,
-    };
-  }
-
   const watchSummary = await runStartggWatchOnce(bot);
   return {
-    inWindow: true,
+    inWindow: syncSummary.activeWindowCount > 0,
     windowNames: syncSummary.activeWindows.map((window) => window.name),
     checkedPlayers: watchSummary.checkedPlayers,
     checkedEvents: watchSummary.checkedEvents,
