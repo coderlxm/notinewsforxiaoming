@@ -39,6 +39,14 @@ import { parseCallbackData, parseRecurringCallbackData, parseNaturalCancelCallba
 import { runAvFetchOnce } from '../services/avTracker';
 import { markVitaminEatenToday, scheduleVitaminSnooze } from '../services/vitaminReminder';
 import { findPresetByText } from '../reminders/presets';
+import { formatStartggWatchList } from '../formatters/startggFormatter';
+import { normalizeEventSlug, runStartggWatchOnce } from '../services/startggTracker';
+import {
+  createStartggWatchEvent,
+  createStartggWatchPlayer,
+  listStartggWatchEvents,
+  listStartggWatchPlayers,
+} from '../services/startggRepository';
 
 export function registerInteractiveHandlers(bot: Telegraf): void {
   bot.command('start', (ctx) => {
@@ -76,6 +84,84 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
       }
       throw e;
     }
+  });
+
+  bot.command('fetchstartgg', async (ctx) => {
+    if (!isAuthorized(ctx)) return;
+    await ctx.reply('开始手动检查 start.gg 选手状态...', { parse_mode: 'HTML' });
+    try {
+      const summary = await runStartggWatchOnce(bot);
+      await ctx.reply(
+        `检查完成：项目 ${summary.checkedEvents} 个，选手 ${summary.checkedPlayers} 个，状态变化 ${summary.changed} 条。`,
+        { parse_mode: 'HTML' }
+      );
+    } catch (e) {
+      if (e instanceof Error) {
+        await ctx.reply(`start.gg 检查失败：${e.message}`, { parse_mode: 'HTML' });
+        return;
+      }
+      throw e;
+    }
+  });
+
+  bot.command('startggaddplayer', async (ctx) => {
+    if (!isAuthorized(ctx)) return;
+    const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
+    const args = text.replace(/^\/startggaddplayer\s*/, '').trim();
+    const pieces = args.split(/\s+/);
+    if (pieces.length < 2) {
+      await ctx.reply('用法：/startggaddplayer <player_id> <player_name>', { parse_mode: 'HTML' });
+      return;
+    }
+
+    const rawPlayerId = pieces[0];
+    const playerName = pieces.slice(1).join(' ').trim();
+    const playerId = Number(rawPlayerId);
+    if (!Number.isInteger(playerId) || playerId <= 0) {
+      await ctx.reply('player_id 必须是正整数。', { parse_mode: 'HTML' });
+      return;
+    }
+    try {
+      createStartggWatchPlayer(playerId, playerName);
+      await ctx.reply(`已添加 start.gg 选手：${playerName} (player_id=${playerId})`, { parse_mode: 'HTML' });
+    } catch (e) {
+      if (e instanceof Error) {
+        await ctx.reply(`添加选手失败：${e.message}`, { parse_mode: 'HTML' });
+        return;
+      }
+      throw e;
+    }
+  });
+
+  bot.command('startggaddevent', async (ctx) => {
+    if (!isAuthorized(ctx)) return;
+    const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
+    const args = text.replace(/^\/startggaddevent\s*/, '').trim();
+    const pieces = args.split(/\s+/);
+    if (pieces.length < 1 || !pieces[0]) {
+      await ctx.reply('用法：/startggaddevent <event_slug_or_url> [event_name]', { parse_mode: 'HTML' });
+      return;
+    }
+
+    const eventSlug = normalizeEventSlug(pieces[0]);
+    const eventName = pieces.slice(1).join(' ').trim() || eventSlug;
+    try {
+      createStartggWatchEvent(eventSlug, eventName);
+      await ctx.reply(`已添加 start.gg 项目：${eventName} (${eventSlug})`, { parse_mode: 'HTML' });
+    } catch (e) {
+      if (e instanceof Error) {
+        await ctx.reply(`添加项目失败：${e.message}`, { parse_mode: 'HTML' });
+        return;
+      }
+      throw e;
+    }
+  });
+
+  bot.command('startggwatchlist', async (ctx) => {
+    if (!isAuthorized(ctx)) return;
+    const players = listStartggWatchPlayers();
+    const events = listStartggWatchEvents();
+    await ctx.reply(formatStartggWatchList(players, events), { parse_mode: 'HTML' });
   });
 
   bot.command('remind', async (ctx) => {

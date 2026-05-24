@@ -32,8 +32,9 @@ import { checkServerHealth } from '../services/serverHealth';
 import { runAvFetchOnce } from '../services/avTracker';
 import { bufferHolidayV2exTopics, pushBufferedV2exIfNeeded } from '../services/v2exBufferedPush';
 import { isVitaminEatenToday, triggerVitaminReminder } from '../services/vitaminReminder';
+import { runStartggWatchOnce } from '../services/startggTracker';
 
-export type PushMode = 'sleep' | 'wakeup' | 'server_health' | 'news' | 'github' | 'v2ex' | 'v2ex_buffered_push' | 'fitness' | 'vitamin' | 'english' | 'av_update';
+export type PushMode = 'sleep' | 'wakeup' | 'server_health' | 'news' | 'github' | 'v2ex' | 'v2ex_buffered_push' | 'fitness' | 'vitamin' | 'english' | 'av_update' | 'startgg_watch';
 
 export function parseForcedMode(rawMode: string): PushMode | null {
   const modeMap: Record<string, PushMode> = {
@@ -47,7 +48,8 @@ export function parseForcedMode(rawMode: string): PushMode | null {
     fitness: 'fitness',
     vitamin: 'vitamin',
     english: 'english',
-    av_update: 'av_update'
+    av_update: 'av_update',
+    startgg_watch: 'startgg_watch',
   };
   return modeMap[rawMode] ?? null;
 }
@@ -160,6 +162,13 @@ export async function runMode(mode: PushMode, chinaDayOfWeek: number, bot?: Tele
     console.log('Mode: AV Update Tracker');
     const summary = await runAvFetchOnce(bot, { healthNotify: true });
     console.log(`AV update finished. Checked: ${summary.checkedTargets}, New: ${summary.pushed}, Skipped: ${summary.skipped}`);
+    return;
+  }
+
+  if (mode === 'startgg_watch') {
+    console.log('Mode: start.gg Watch');
+    const summary = await runStartggWatchOnce(bot);
+    console.log(`start.gg watch finished. events=${summary.checkedEvents} players=${summary.checkedPlayers} changed=${summary.changed}`);
     return;
   }
 

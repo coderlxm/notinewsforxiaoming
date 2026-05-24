@@ -1,0 +1,162 @@
+import { getDb } from '../reminders/db';
+
+export type StartggWatchStatus = 'not_entered' | 'in_winners' | 'in_losers' | 'eliminated' | 'completed';
+
+export interface StartggWatchPlayer {
+  id: number;
+  player_id: number;
+  player_name: string;
+  enabled: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StartggWatchEvent {
+  id: number;
+  event_slug: string;
+  event_name: string;
+  event_id: number | null;
+  active: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StartggWatchSnapshot {
+  id: number;
+  watch_player_id: number;
+  watch_event_id: number;
+  status: StartggWatchStatus;
+  placement: number | null;
+  last_set_id: number | null;
+  last_set_round: number | null;
+  last_set_round_label: string | null;
+  last_set_score_text: string | null;
+  last_set_state: number | null;
+  captured_at: string;
+}
+
+export interface UpsertStartggSnapshotInput {
+  watch_player_id: number;
+  watch_event_id: number;
+  status: StartggWatchStatus;
+  placement: number | null;
+  last_set_id: number | null;
+  last_set_round: number | null;
+  last_set_round_label: string | null;
+  last_set_score_text: string | null;
+  last_set_state: number | null;
+  captured_at: string;
+}
+
+export function createStartggWatchPlayer(playerId: number, playerName: string): void {
+  const db = getDb();
+  db.prepare(`
+    INSERT INTO startgg_watch_players (player_id, player_name, enabled, created_at, updated_at)
+    VALUES (?, ?, 1, ?, ?)
+  `).run(playerId, playerName, new Date().toISOString(), new Date().toISOString());
+}
+
+export function createStartggWatchEvent(eventSlug: string, eventName: string): void {
+  const db = getDb();
+  db.prepare(`
+    INSERT INTO startgg_watch_events (event_slug, event_name, active, created_at, updated_at)
+    VALUES (?, ?, 1, ?, ?)
+  `).run(eventSlug, eventName, new Date().toISOString(), new Date().toISOString());
+}
+
+export function listStartggWatchPlayers(): StartggWatchPlayer[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT *
+    FROM startgg_watch_players
+    ORDER BY id ASC
+  `).all() as StartggWatchPlayer[];
+}
+
+export function listStartggWatchEvents(): StartggWatchEvent[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT *
+    FROM startgg_watch_events
+    ORDER BY id ASC
+  `).all() as StartggWatchEvent[];
+}
+
+export function listEnabledStartggWatchPlayers(): StartggWatchPlayer[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT *
+    FROM startgg_watch_players
+    WHERE enabled = 1
+    ORDER BY id ASC
+  `).all() as StartggWatchPlayer[];
+}
+
+export function listActiveStartggWatchEvents(): StartggWatchEvent[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT *
+    FROM startgg_watch_events
+    WHERE active = 1
+    ORDER BY id ASC
+  `).all() as StartggWatchEvent[];
+}
+
+export function findStartggWatchSnapshot(watchPlayerId: number, watchEventId: number): StartggWatchSnapshot | null {
+  const db = getDb();
+  const row = db.prepare(`
+    SELECT *
+    FROM startgg_watch_snapshots
+    WHERE watch_player_id = ? AND watch_event_id = ?
+    LIMIT 1
+  `).get(watchPlayerId, watchEventId);
+  return (row as StartggWatchSnapshot) ?? null;
+}
+
+export function upsertStartggWatchSnapshot(input: UpsertStartggSnapshotInput): void {
+  const db = getDb();
+  db.prepare(`
+    INSERT INTO startgg_watch_snapshots (
+      watch_player_id,
+      watch_event_id,
+      status,
+      placement,
+      last_set_id,
+      last_set_round,
+      last_set_round_label,
+      last_set_score_text,
+      last_set_state,
+      captured_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(watch_player_id, watch_event_id) DO UPDATE SET
+      status = excluded.status,
+      placement = excluded.placement,
+      last_set_id = excluded.last_set_id,
+      last_set_round = excluded.last_set_round,
+      last_set_round_label = excluded.last_set_round_label,
+      last_set_score_text = excluded.last_set_score_text,
+      last_set_state = excluded.last_set_state,
+      captured_at = excluded.captured_at
+  `).run(
+    input.watch_player_id,
+    input.watch_event_id,
+    input.status,
+    input.placement,
+    input.last_set_id,
+    input.last_set_round,
+    input.last_set_round_label,
+    input.last_set_score_text,
+    input.last_set_state,
+    input.captured_at
+  );
+}
+
+export function updateStartggWatchEventResolved(eventRowId: number, eventId: number, eventName: string): void {
+  const db = getDb();
+  db.prepare(`
+    UPDATE startgg_watch_events
+    SET event_id = ?, event_name = ?, updated_at = ?
+    WHERE id = ?
+  `).run(eventId, eventName, new Date().toISOString(), eventRowId);
+}

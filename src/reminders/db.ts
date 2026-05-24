@@ -128,6 +128,44 @@ export function getDb(): Database.Database {
         date_key TEXT PRIMARY KEY,
         count INTEGER NOT NULL DEFAULT 0
       );
+
+      CREATE TABLE IF NOT EXISTS startgg_watch_players (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        player_id INTEGER NOT NULL UNIQUE,
+        player_name TEXT NOT NULL,
+        enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS startgg_watch_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_slug TEXT NOT NULL UNIQUE,
+        event_name TEXT NOT NULL,
+        event_id INTEGER,
+        active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS startgg_watch_snapshots (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        watch_player_id INTEGER NOT NULL,
+        watch_event_id INTEGER NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('not_entered', 'in_winners', 'in_losers', 'eliminated', 'completed')),
+        placement INTEGER,
+        last_set_id INTEGER,
+        last_set_round INTEGER,
+        last_set_round_label TEXT,
+        last_set_score_text TEXT,
+        last_set_state INTEGER,
+        captured_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(watch_player_id) REFERENCES startgg_watch_players(id),
+        FOREIGN KEY(watch_event_id) REFERENCES startgg_watch_events(id),
+        UNIQUE(watch_player_id, watch_event_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_startgg_snapshot_player_event
+      ON startgg_watch_snapshots(watch_player_id, watch_event_id);
     `);
 
     const pushHistoryColumns = db.prepare(`PRAGMA table_info(push_history)`).all() as Array<{ name: string }>;

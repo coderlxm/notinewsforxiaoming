@@ -17,6 +17,8 @@ const SPECIAL_SCHEDULE = {
   av_update_morning: 7 * 60 + 30, // 07:30
   av_update_afternoon: 15 * 60 + 30, // 15:30
   av_update_night: 23 * 60 + 30, // 23:30
+  startgg_watch_day: 10 * 60 + 20, // 10:20
+  startgg_watch_night: 22 * 60 + 20, // 22:20
   github: 15 * 60,     // 15:00
   vitamin_dinner: 18 * 60 + 30, // 18:30
   v2ex: 20 * 60,       // 20:00
@@ -48,7 +50,7 @@ async function main() {
   if (TEST_MODE_ENABLED) {
     const forcedMode = parseForcedMode(TEST_FORCE_MODE);
     if (!forcedMode) {
-      throw new Error(`Invalid TEST_FORCE_MODE: "${TEST_FORCE_MODE}". Allowed: sleep,wakeup,server_health,news,github,v2ex,v2ex_buffered_push,fitness,vitamin,english,av_update`);
+      throw new Error(`Invalid TEST_FORCE_MODE: "${TEST_FORCE_MODE}". Allowed: sleep,wakeup,server_health,news,github,v2ex,v2ex_buffered_push,fitness,vitamin,english,av_update,startgg_watch`);
     }
     console.log(`Test mode enabled. Bypass schedule and force mode: ${forcedMode}`);
     await runMode(forcedMode, chinaDayOfWeek);
@@ -73,6 +75,11 @@ async function main() {
       isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.av_update_night)
     ) {
       selectedMode = 'av_update';
+    } else if (
+      isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.startgg_watch_day) ||
+      isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.startgg_watch_night)
+    ) {
+      selectedMode = 'startgg_watch';
     } else if (isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.github)) {
       selectedMode = 'github';
     } else if (isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.vitamin_dinner)) {

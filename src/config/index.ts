@@ -7,4 +7,5 @@ export const config = {
   qweatherApiKey: process.env.QWEATHER_API_KEY || '',
   qweatherCityId: process.env.QWEATHER_CITY_ID || '', // 默认为北京: 101010100
   deepseekApiKey: process.env.DEEPSEEK_API_KEY || '',
+  startggApiToken: process.env.STARTGG_API_TOKEN || '',
 };
