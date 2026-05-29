@@ -2,6 +2,7 @@ import type { Telegraf } from 'telegraf';
 import { summarizeV2exWithAI } from '../ai/deepseek';
 import type { V2exTopic } from '../fetchers/v2ex';
 import { sendTelegramMessage } from '../publishers/telegram';
+import { renderMarkdownLikeAsHtml } from '../formatters';
 import {
   createV2exHolidayBatch,
   findUnconsumedV2exHolidayBatches,
@@ -67,7 +68,7 @@ function formatV2exBufferedMessage(summary: string, rangeLabel: string): string 
     '🚀 <b>V2EX 节假日补充简报</b>',
     `📅 <b>覆盖日期</b>：${rangeLabel}`,
     '',
-    summary,
+    renderMarkdownLikeAsHtml(summary),
     '',
     '#V2EX #补充简报',
   ].join('\n');

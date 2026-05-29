@@ -50,7 +50,7 @@ function normalizeUrl(url: string): string {
   return '#';
 }
 
-function renderMarkdownLikeAsHtml(input: string): string {
+export function renderMarkdownLikeAsHtml(input: string): string {
   let html = escapeHtml(input);
   html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (_match, label: string, rawUrl: string) => {
     const safeUrl = escapeHtmlAttr(normalizeUrl(rawUrl));
@@ -159,7 +159,7 @@ export function formatEnglishMessage(summary: string): string {
 
 export function formatV2exMessage(summary: string): string {
   let message = `🚀 <b>V2EX 今日热议脱水总结</b> (${chinaDateLabel()})\n\n`;
-  message += summary; // AI 已经输出了 HTML
+  message += renderMarkdownLikeAsHtml(summary);
   message += '\n\n#V2EX #社区热点 #深夜剧场';
   return message;
 }
