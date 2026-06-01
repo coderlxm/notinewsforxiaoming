@@ -64,6 +64,20 @@ export function renderMarkdownLikeAsHtml(input: string): string {
 export function formatTelegramMessage(weather: WeatherData | null, news: GameNews[]): string {
   let message = `📅 <b>每日简报</b> (${chinaDateLabel()})\n\n`;
 
+  if (isChinaWorkday(new Date())) {
+    message += '┏━━━━━━━━━━━━━━━━━━━━━━━━┓\n';
+    message += '┃   🚨 <b>打工人日常提醒</b> 🚨   ┃\n';
+    message += '┣━━━━━━━━━━━━━━━━━━━━━━━━┫\n';
+    message += '┃  ⏱️ <b>记得打卡！</b>           ┃\n';
+    message += '┃  上下班千万别忘了打卡！    ┃\n';
+    message += '┃  保卫工资，从打卡开始！💰  ┃\n';
+    message += '┃                          ┃\n';
+    message += '┃  💧 <b>多喝水！</b>            ┃\n';
+    message += '┃  身体是革命的本钱，        ┃\n';
+    message += '┃  立刻去接一杯水！          ┃\n';
+    message += '┗━━━━━━━━━━━━━━━━━━━━━━━━┛\n\n';
+  }
+
   if (weather) {
     message += '🌤️ <b>今日天气</b>\n';
     message += `天气: ${escapeHtml(weather.text)} | 温度: ${escapeHtml(String(weather.temp))}°C (体感 ${escapeHtml(String(weather.feelsLike))}°C)\n`;
@@ -79,12 +93,6 @@ export function formatTelegramMessage(weather: WeatherData | null, news: GameNew
       const link = escapeHtmlAttr(normalizeUrl(item.link));
       message += `${index + 1}. <a href="${link}">${title}</a>\n`;
     });
-  }
-
-  if (isChinaWorkday(new Date())) {
-    message += '\n🚨 <b>打工人日常提醒</b> 🚨\n';
-    message += '💧 <b>多喝水！</b> 身体是革命的本钱，立刻去接一杯水！\n';
-    message += '⏱️ <b>记得打卡！</b> 上下班千万别忘了打卡，保卫工资！\n';
   }
 
   return message;
