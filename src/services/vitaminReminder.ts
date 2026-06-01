@@ -114,6 +114,11 @@ async function runVitaminLoopTick(bot: Telegraf): Promise<void> {
     return;
   }
 
+  if (state.loop_active !== 1) {
+    clearLoopTimer();
+    return;
+  }
+
   await sendVitaminWithButtons(bot);
   const nextTriggerAt = new Date(Date.now() + LOOP_INTERVAL_MS);
   setTodayLoop(nextTriggerAt);
