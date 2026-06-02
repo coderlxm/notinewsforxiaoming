@@ -1,6 +1,7 @@
 import { runMode, parseForcedMode } from './scheduled/runMode';
 import type { PushMode } from './scheduled/runMode';
 import { isChinaWorkday } from './calendar/chinaWorkday';
+import { bj } from './utils/time';
 
 const MINUTES_PER_DAY = 24 * 60;
 const TOLERANCE_MINUTES = 10;
@@ -37,14 +38,13 @@ function isNearSchedule(currentMinuteOfDay: number, targetMinuteOfDay: number): 
 
 async function main() {
   const now = new Date();
-  const chinaDayOfWeek = new Date(now.getTime() + 8 * 60 * 60 * 1000).getUTCDay();
-  const currentUTCHour = now.getUTCHours();
-  const currentUTCMinute = now.getUTCMinutes();
-  const chinaMinuteOfDay = ((currentUTCHour * 60 + currentUTCMinute) + 8 * 60) % (24 * 60);
-  const chinaHour = Math.floor(chinaMinuteOfDay / 60);
-  const chinaMinute = chinaMinuteOfDay % 60;
-  const chinaTime = `${String(chinaHour).padStart(2, '0')}:${String(chinaMinute).padStart(2, '0')}`;
-  console.log(`Current UTC Time: ${String(currentUTCHour).padStart(2, '0')}:${String(currentUTCMinute).padStart(2, '0')}`);
+  const bjNow = bj();
+  const chinaDayOfWeek = bjNow.day();
+  const chinaHour = bjNow.hour();
+  const chinaMinute = bjNow.minute();
+  const chinaMinuteOfDay = chinaHour * 60 + chinaMinute;
+  const chinaTime = bjNow.format('HH:mm');
+  console.log(`Current UTC Time: ${now.toISOString().slice(11, 16)}`);
   console.log(`Current China Time: ${chinaTime} (Day of Week: ${chinaDayOfWeek})`);
 
   if (TEST_MODE_ENABLED) {

@@ -1,5 +1,5 @@
-import OpenAI from 'openai';
 import { config } from '../config';
+import { getDeepSeekClient, DEEPSEEK_MODEL } from './client';
 import type { GameNews } from '../fetchers/games';
 import type { EnglishContent } from '../fetchers/english';
 import type { V2exTopic } from '../fetchers/v2ex';
@@ -13,10 +13,7 @@ export async function summarizeNewsWithAI(newsList: GameNews[]): Promise<GameNew
 
   if (newsList.length === 0) return newsList;
 
-  const openai = new OpenAI({
-    baseURL: 'https://api.deepseek.com',
-    apiKey: config.deepseekApiKey
-  });
+  const openai = getDeepSeekClient();
 
   const prompt = `
 请作为一名资深且幽默的游戏媒体编辑，对以下的新闻标题进行简要的中文润色和一句话看点提取。
@@ -37,7 +34,7 @@ ${newsList.map((n, i) => `[${i}] ${n.title}`).join('\n')}
   try {
     const completion = await openai.chat.completions.create({
       messages: [{ role: 'user', content: prompt }],
-      model: 'deepseek-v4-flash',
+      model: DEEPSEEK_MODEL,
     });
 
     const aiContent = completion.choices[0].message.content || '';
@@ -69,10 +66,7 @@ export async function summarizeGithubWithAI(repos: GithubRepo[]): Promise<string
     return '暂无今日 GitHub 趋势。';
   }
 
-  const openai = new OpenAI({
-    baseURL: 'https://api.deepseek.com',
-    apiKey: config.deepseekApiKey
-  });
+  const openai = getDeepSeekClient();
 
   const prompt = `
 请作为一名资深的 Full Stack 工程师和技术博主，对以下 GitHub 今日热门项目进行解析。
@@ -90,7 +84,7 @@ ${repos.map((n, i) => `${i + 1}. ${n.title}: ${n.description}`).join('\n')}
   try {
     const completion = await openai.chat.completions.create({
       messages: [{ role: 'user', content: prompt }],
-      model: 'deepseek-v4-flash',
+      model: DEEPSEEK_MODEL,
     });
 
     return completion.choices[0].message.content || 'AI 总结失败。';
@@ -105,17 +99,14 @@ export async function generateLifeTipWithAI(): Promise<string> {
     return '生活小贴士：多喝热水，早点睡觉。';
   }
 
-  const openai = new OpenAI({
-    baseURL: 'https://api.deepseek.com',
-    apiKey: config.deepseekApiKey
-  });
+  const openai = getDeepSeekClient();
 
   const prompt = '请随机生成一条非常简短、实用、有趣的“生活小常识”或“健康小贴士”。要求：字数控制在 50 字以内，带上 1-2 个 Emoji，适合深夜阅读。';
 
   try {
     const completion = await openai.chat.completions.create({
       messages: [{ role: 'user', content: prompt }],
-      model: 'deepseek-v4-flash',
+      model: DEEPSEEK_MODEL,
     });
 
     return completion.choices[0].message.content || '生活小贴士：好梦！';
@@ -130,17 +121,14 @@ export async function generateMorningQuoteWithAI(): Promise<string> {
     return '早安！新的一天，加油！☀️';
   }
 
-  const openai = new OpenAI({
-    baseURL: 'https://api.deepseek.com',
-    apiKey: config.deepseekApiKey
-  });
+  const openai = getDeepSeekClient();
 
   const prompt = '请生成一段简短、充满力量、能让人瞬间清醒并感到温暖的晨间励志语录。要求：适合程序员阅读，带上 1-2 个积极的 Emoji，字数 40 字以内。';
 
   try {
     const completion = await openai.chat.completions.create({
       messages: [{ role: 'user', content: prompt }],
-      model: 'deepseek-v4-flash',
+      model: DEEPSEEK_MODEL,
     });
 
     return completion.choices[0].message.content || '加油，你是最棒的！☀️';
@@ -155,10 +143,7 @@ export async function teachEnglishWithAI(article: EnglishContent): Promise<strin
     return '名师英语教学暂时掉线，请稍后再试。';
   }
 
-  const openai = new OpenAI({
-    baseURL: 'https://api.deepseek.com',
-    apiKey: config.deepseekApiKey
-  });
+  const openai = getDeepSeekClient();
 
   const prompt = `
 Role: 你是一位拥有 20 年经验的资深英语老师，擅长将原版新闻作为教材。
@@ -193,7 +178,7 @@ Task:
   try {
     const completion = await openai.chat.completions.create({
       messages: [{ role: 'user', content: prompt }],
-      model: 'deepseek-v4-flash',
+      model: DEEPSEEK_MODEL,
     });
 
     return completion.choices[0].message.content || '老师今天累了，请明天再来。';
@@ -227,10 +212,7 @@ export async function generateEnglishFallbackWithAI(): Promise<string> {
     ].join('\n');
   }
 
-  const openai = new OpenAI({
-    baseURL: 'https://api.deepseek.com',
-    apiKey: config.deepseekApiKey
-  });
+  const openai = getDeepSeekClient();
 
   const prompt = `
 你是一位资深英语老师。当前 RSS 抓取失败，请生成一份“替补版每日英语微课”，用于 CET-6 学习者的 5 分钟碎片学习。
@@ -246,7 +228,7 @@ export async function generateEnglishFallbackWithAI(): Promise<string> {
   try {
     const completion = await openai.chat.completions.create({
       messages: [{ role: 'user', content: prompt }],
-      model: 'deepseek-v4-flash',
+      model: DEEPSEEK_MODEL,
     });
 
     return completion.choices[0].message.content || '今日英语替补内容生成失败。';
@@ -280,10 +262,7 @@ export async function summarizeV2exWithAI(topics: V2exTopic[]): Promise<string> 
     return '今日 V2EX 暂无热点讨论。';
   }
 
-  const openai = new OpenAI({
-    baseURL: 'https://api.deepseek.com',
-    apiKey: config.deepseekApiKey
-  });
+  const openai = getDeepSeekClient();
 
   const prompt = `
 Role: 你是一位深谙 V2EX 社区文化、既能硬核聊技术又能深度剖析情感的人间清醒观察者。
@@ -319,7 +298,7 @@ Task:
   try {
     const completion = await openai.chat.completions.create({
       messages: [{ role: 'user', content: prompt }],
-      model: 'deepseek-v4-flash',
+      model: DEEPSEEK_MODEL,
     });
 
     return completion.choices[0].message.content || 'AI 总结失败。';
@@ -334,10 +313,7 @@ export async function generateFitnessPlanWithAI(dayOfWeek: number, weatherText: 
     return '教练今天没带表，请稍后再试。';
   }
 
-  const openai = new OpenAI({
-    baseURL: 'https://api.deepseek.com',
-    apiKey: config.deepseekApiKey
-  });
+  const openai = getDeepSeekClient();
 
   const isRainy = weatherText.includes('雨');
   const dayLabels = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
@@ -380,7 +356,7 @@ Task:
   try {
     const completion = await openai.chat.completions.create({
       messages: [{ role: 'user', content: prompt }],
-      model: 'deepseek-v4-flash',
+      model: DEEPSEEK_MODEL,
     });
 
     return completion.choices[0].message.content || '教练正在忙，请稍后刷新。';

@@ -3,6 +3,7 @@ import type { GameNews } from '../fetchers/games';
 import type { ServerHealthResult } from '../services/serverHealth';
 import { isChinaWorkday } from '../calendar/chinaWorkday';
 import { getCountdownInfo } from '../calendar/countdown';
+import { escapeHtml, escapeHtmlAttr } from '../utils/html';
 
 function chinaDateLabel(): string {
   return new Intl.DateTimeFormat('zh-CN', {
@@ -19,23 +20,6 @@ function chinaWeekdayLabel(): string {
     weekday: 'short'
   }).format(new Date());
   return weekday;
-}
-
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-function escapeHtmlAttr(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
 }
 
 function normalizeUrl(url: string): string {

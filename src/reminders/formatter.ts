@@ -2,13 +2,10 @@ import type { Reminder, RecurringRule } from './repository';
 import { bjFormat, formatShortDisplay } from '../utils/time';
 import { describeRecurrence } from './recurring';
 import { PRESET_REMINDERS } from './presets';
+import { escapeHtml } from '../utils/html';
 
 interface InlineKeyboardMarkup {
   inline_keyboard: Array<Array<{ text: string; callback_data: string }>>;
-}
-
-function escapeHtml(text: string): string {
-  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 export function formatStartMessage(): string {

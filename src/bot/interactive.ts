@@ -71,6 +71,7 @@ import {
 import { runStartggWatchByApiWindow, syncStartggApiActiveEvents, syncStartggPresetPlayers } from '../services/startggPresetSync';
 import { addStartggTournamentWindow, listStartggTournamentWindows, removeStartggTournamentWindow } from '../services/startggWindowRepository';
 import { parseTournamentWindowFromNaturalLanguage } from '../services/startggWindowParser';
+import { escapeHtml } from '../utils/html';
 
 interface StartggWatchCandidate {
   eventRowId: number;
@@ -448,7 +449,7 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     }
   });
 
-  bot.command('startggwatchlist', async (ctx) => {
+  async function handleWatchList(ctx: Context): Promise<void> {
     if (!isAuthorized(ctx)) return;
     try {
       await syncStartggPresetPlayers();
@@ -463,24 +464,10 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
       }
       throw e;
     }
-  });
+  }
 
-  bot.command('watchlist', async (ctx) => {
-    if (!isAuthorized(ctx)) return;
-    try {
-      await syncStartggPresetPlayers();
-      const players = listStartggWatchPlayers();
-      const events = listStartggWatchEvents();
-      const statuses = listStartggWatchStatusViews();
-      await ctx.reply(formatStartggWatchList(players, events, statuses), { parse_mode: 'HTML' });
-    } catch (e) {
-      if (e instanceof Error) {
-        await ctx.reply(`读取监控列表失败：${e.message}`, { parse_mode: 'HTML' });
-        return;
-      }
-      throw e;
-    }
-  });
+  bot.command('startggwatchlist', handleWatchList);
+  bot.command('watchlist', handleWatchList);
 
   bot.command('remind', async (ctx) => {
     if (!isAuthorized(ctx)) return;
@@ -742,9 +729,9 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
         cancelScheduledReminder(nlCancelData.id);
         await clearSourceButtons(reminder);
         try {
-          await ctx.editMessageText(`已取消一次性提醒「<b>${reminder.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</b>」。`, { parse_mode: 'HTML' });
+          await ctx.editMessageText(`已取消一次性提醒「<b>${escapeHtml(reminder.text)}</b>」。`, { parse_mode: 'HTML' });
         } catch {
-          await ctx.reply(`已取消一次性提醒「<b>${reminder.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</b>」。`, { parse_mode: 'HTML' });
+          await ctx.reply(`已取消一次性提醒「<b>${escapeHtml(reminder.text)}</b>」。`, { parse_mode: 'HTML' });
         }
         return;
       }
@@ -762,9 +749,9 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
       cancelRecurringJob(nlCancelData.id);
       await clearRecurringSourceButtons(rule);
       try {
-        await ctx.editMessageText(`已取消循环提醒「<b>${rule.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</b>」。`, { parse_mode: 'HTML' });
+        await ctx.editMessageText(`已取消循环提醒「<b>${escapeHtml(rule.text)}</b>」。`, { parse_mode: 'HTML' });
       } catch {
-        await ctx.reply(`已取消循环提醒「<b>${rule.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</b>」。`, { parse_mode: 'HTML' });
+        await ctx.reply(`已取消循环提醒「<b>${escapeHtml(rule.text)}</b>》。`, { parse_mode: 'HTML' });
       }
       return;
     }

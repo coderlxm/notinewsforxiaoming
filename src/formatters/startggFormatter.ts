@@ -1,13 +1,5 @@
 import type { StartggWatchStatus } from '../services/startggRepository';
-
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
+import { escapeHtml } from '../utils/html';
 
 function normalizeUrl(url: string | null): string {
   if (!url) {
