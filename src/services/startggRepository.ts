@@ -214,6 +214,58 @@ export function updateStartggWatchEventResolved(eventRowId: number, eventId: num
   `).run(eventId, eventName, new Date().toISOString(), eventRowId);
 }
 
+export interface StartggWatchEventEntrant {
+  id: number;
+  watch_player_id: number;
+  watch_event_id: number;
+  entrant_id: number | null;
+  entrant_name: string | null;
+}
+
+export function upsertStartggWatchEventEntrant(input: {
+  watch_player_id: number;
+  watch_event_id: number;
+  entrant_id: number | null;
+  entrant_name: string | null;
+}): void {
+  const db = getDb();
+  db.prepare(`
+    INSERT INTO startgg_watch_event_entrants (
+      watch_player_id, watch_event_id, entrant_id, entrant_name
+    )
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(watch_player_id, watch_event_id) DO UPDATE SET
+      entrant_id = excluded.entrant_id,
+      entrant_name = excluded.entrant_name
+  `).run(input.watch_player_id, input.watch_event_id, input.entrant_id, input.entrant_name);
+}
+
+export function findStartggWatchEventEntrant(
+  watchPlayerId: number,
+  watchEventId: number
+): StartggWatchEventEntrant | null {
+  const db = getDb();
+  const row = db.prepare(`
+    SELECT *
+    FROM startgg_watch_event_entrants
+    WHERE watch_player_id = ? AND watch_event_id = ?
+    LIMIT 1
+  `).get(watchPlayerId, watchEventId);
+  return (row as StartggWatchEventEntrant) ?? null;
+}
+
+export function listStartggWatchEventEntrantsByEvent(
+  watchEventId: number
+): StartggWatchEventEntrant[] {
+  const db = getDb();
+  return db.prepare(`
+    SELECT *
+    FROM startgg_watch_event_entrants
+    WHERE watch_event_id = ?
+    ORDER BY id ASC
+  `).all(watchEventId) as StartggWatchEventEntrant[];
+}
+
 export function listStartggWatchStatusViews(): StartggWatchStatusView[] {
   const db = getDb();
   return db.prepare(`

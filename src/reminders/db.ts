@@ -166,6 +166,17 @@ export function getDb(): Database.Database {
       );
       CREATE INDEX IF NOT EXISTS idx_startgg_snapshot_player_event
       ON startgg_watch_snapshots(watch_player_id, watch_event_id);
+
+      CREATE TABLE IF NOT EXISTS startgg_watch_event_entrants (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        watch_player_id INTEGER NOT NULL,
+        watch_event_id INTEGER NOT NULL,
+        entrant_id INTEGER,
+        entrant_name TEXT,
+        FOREIGN KEY(watch_player_id) REFERENCES startgg_watch_players(id),
+        FOREIGN KEY(watch_event_id) REFERENCES startgg_watch_events(id),
+        UNIQUE(watch_player_id, watch_event_id)
+      );
     `);
 
     const pushHistoryColumns = db.prepare(`PRAGMA table_info(push_history)`).all() as Array<{ name: string }>;
