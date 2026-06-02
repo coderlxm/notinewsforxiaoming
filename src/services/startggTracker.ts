@@ -13,6 +13,8 @@ import {
   upsertStartggWatchEventEntrant,
   findStartggWatchEventEntrant,
   type StartggWatchPlayer,
+  hasStartggPushedSet,
+  markStartggPushedSet,
 } from './startggRepository';
 
 const STARTGG_GRAPHQL_ENDPOINT = 'https://api.start.gg/gql/alpha';
@@ -838,6 +840,46 @@ function hasSnapshotChanged(
     || current.lastSetScoreText !== previous.last_set_score_text;
 }
 
+function compareSetChronology(a: { completedAt: number | null; id: number }, b: { completedAt: number | null; id: number }): number {
+  const aTime = a.completedAt ?? 0;
+  const bTime = b.completedAt ?? 0;
+  if (aTime !== bTime) {
+    return aTime - bTime;
+  }
+  return a.id - b.id;
+}
+
+function selectSetsToPush(
+  playerSets: TrackedSetNode[],
+  previous: ReturnType<typeof findStartggWatchSnapshot>,
+  watchPlayerId: number,
+  watchEventId: number
+): TrackedSetNode[] {
+  if (!previous) {
+    for (const set of playerSets) {
+      markStartggPushedSet(watchPlayerId, watchEventId, set.id);
+    }
+    return [];
+  }
+
+  const sortedSets = [...playerSets].sort(compareSetChronology);
+  if (previous.last_set_id !== null) {
+    const previousSetIndex = sortedSets.findIndex((set) => set.id === previous.last_set_id);
+    if (previousSetIndex < 0) {
+      throw new Error(`start.gg previous set missing from fetched sets: ${previous.last_set_id}`);
+    }
+    for (const set of sortedSets.slice(0, previousSetIndex + 1)) {
+      markStartggPushedSet(watchPlayerId, watchEventId, set.id);
+    }
+    return sortedSets
+      .slice(previousSetIndex + 1)
+      .filter((set) => !hasStartggPushedSet(watchPlayerId, watchEventId, set.id));
+  }
+
+  return sortedSets
+    .filter((set) => !hasStartggPushedSet(watchPlayerId, watchEventId, set.id));
+}
+
 export async function runStartggWatchOnce(bot?: Telegraf, options?: RunStartggWatchOptions): Promise<StartggWatchSummary> {
   const players = listEnabledStartggWatchPlayers();
   const events = listActiveStartggWatchEvents();
@@ -889,6 +931,7 @@ export async function runStartggWatchOnce(bot?: Telegraf, options?: RunStartggWa
       }
       const previous = findStartggWatchSnapshot(player.id, eventRow.id);
       const changedNow = hasSnapshotChanged(snapshot, previous);
+      const setsToPush = selectSetsToPush(playerSets, previous, player.id, eventRow.id);
       upsertStartggWatchSnapshot({
         watch_player_id: player.id,
         watch_event_id: eventRow.id,
@@ -902,21 +945,42 @@ export async function runStartggWatchOnce(bot?: Telegraf, options?: RunStartggWa
         captured_at: new Date().toISOString(),
       });
 
-      if (!changedNow) continue;
+      if (setsToPush.length === 0 && !changedNow) continue;
 
-      changed += 1;
-      const message = formatStartggStatusChangedMessage({
-        tournamentName: header.event.tournament.name,
-        eventName: header.event.name,
-        eventSlug: header.event.slug,
-        playerName: player.player_name,
-        status: snapshot.status,
-        placement: snapshot.placement,
-        roundLabel: snapshot.lastSetRoundLabel,
-        scoreText: snapshot.lastSetScoreText,
-        setPageUrl: snapshot.setPageUrl,
-      });
-      await sendTelegramMessage(message, bot);
+      if (setsToPush.length === 0) {
+        changed += 1;
+        const message = formatStartggStatusChangedMessage({
+          tournamentName: header.event.tournament.name,
+          eventName: header.event.name,
+          eventSlug: header.event.slug,
+          playerName: player.player_name,
+          status: snapshot.status,
+          placement: snapshot.placement,
+          roundLabel: snapshot.lastSetRoundLabel,
+          scoreText: snapshot.lastSetScoreText,
+          setPageUrl: snapshot.setPageUrl,
+        });
+        await sendTelegramMessage(message, bot);
+        continue;
+      }
+
+      for (const set of setsToPush) {
+        changed += 1;
+        const setPageUrl = `https://www.start.gg/${normalizedSlug}/set/${set.id}`;
+        const message = formatStartggStatusChangedMessage({
+          tournamentName: header.event.tournament.name,
+          eventName: header.event.name,
+          eventSlug: header.event.slug,
+          playerName: player.player_name,
+          status: snapshot.status,
+          placement: snapshot.placement,
+          roundLabel: set.fullRoundText,
+          scoreText: buildSetScoreText(set.displayScore),
+          setPageUrl,
+        });
+        await sendTelegramMessage(message, bot);
+        markStartggPushedSet(player.id, eventRow.id, set.id);
+      }
     }
   }
 

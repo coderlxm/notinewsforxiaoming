@@ -266,6 +266,25 @@ export function listStartggWatchEventEntrantsByEvent(
   `).all(watchEventId) as StartggWatchEventEntrant[];
 }
 
+export function hasStartggPushedSet(watchPlayerId: number, watchEventId: number, setId: number): boolean {
+  const db = getDb();
+  const row = db.prepare(`
+    SELECT 1
+    FROM startgg_pushed_sets
+    WHERE watch_player_id = ? AND watch_event_id = ? AND set_id = ?
+    LIMIT 1
+  `).get(watchPlayerId, watchEventId, setId);
+  return Boolean(row);
+}
+
+export function markStartggPushedSet(watchPlayerId: number, watchEventId: number, setId: number): void {
+  const db = getDb();
+  db.prepare(`
+    INSERT OR IGNORE INTO startgg_pushed_sets (watch_player_id, watch_event_id, set_id, pushed_at)
+    VALUES (?, ?, ?, ?)
+  `).run(watchPlayerId, watchEventId, setId, new Date().toISOString());
+}
+
 export function listStartggWatchStatusViews(): StartggWatchStatusView[] {
   const db = getDb();
   return db.prepare(`

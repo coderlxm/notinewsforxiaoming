@@ -177,6 +177,19 @@ export function getDb(): Database.Database {
         FOREIGN KEY(watch_event_id) REFERENCES startgg_watch_events(id),
         UNIQUE(watch_player_id, watch_event_id)
       );
+
+      CREATE TABLE IF NOT EXISTS startgg_pushed_sets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        watch_player_id INTEGER NOT NULL,
+        watch_event_id INTEGER NOT NULL,
+        set_id INTEGER NOT NULL,
+        pushed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(watch_player_id) REFERENCES startgg_watch_players(id),
+        FOREIGN KEY(watch_event_id) REFERENCES startgg_watch_events(id),
+        UNIQUE(watch_player_id, watch_event_id, set_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_startgg_pushed_sets_player_event
+      ON startgg_pushed_sets(watch_player_id, watch_event_id);
     `);
 
     const pushHistoryColumns = db.prepare(`PRAGMA table_info(push_history)`).all() as Array<{ name: string }>;
