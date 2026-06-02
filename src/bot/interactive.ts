@@ -72,6 +72,7 @@ import { runStartggWatchByApiWindow, syncStartggApiActiveEvents, syncStartggPres
 import { addStartggTournamentWindow, listStartggTournamentWindows, removeStartggTournamentWindow } from '../services/startggWindowRepository';
 import { parseTournamentWindowFromNaturalLanguage } from '../services/startggWindowParser';
 import { escapeHtml } from '../utils/html';
+import { updateStartggFastWatch } from '../scheduled/jobs';
 
 interface StartggWatchCandidate {
   eventRowId: number;
@@ -147,10 +148,12 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
       const summary = await runStartggWatchByApiWindow(bot);
       if (!summary.inWindow) {
         await ctx.reply('检查完成：当前不在赛事活跃时段（按 start.gg tournament startAt/endAt 判定），已跳过抓取。', { parse_mode: 'HTML' });
+        updateStartggFastWatch(bot, 0);
         return;
       }
+      updateStartggFastWatch(bot, summary.pendingSetCount);
       await ctx.reply(
-        `检查完成：活跃项目 ${summary.activeEventCount} 个，本次检查项目 ${summary.checkedEvents} 个，选手 ${summary.checkedPlayers} 个，状态变化 ${summary.changed} 条。`,
+        `检查完成：活跃项目 ${summary.activeEventCount} 个，本次检查项目 ${summary.checkedEvents} 个，选手 ${summary.checkedPlayers} 个，状态变化 ${summary.changed} 条，进行中 ${summary.pendingSetCount} 条。`,
         { parse_mode: 'HTML' }
       );
     } catch (e) {

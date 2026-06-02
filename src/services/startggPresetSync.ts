@@ -84,6 +84,7 @@ export async function runStartggWatchByApiWindow(bot?: Telegraf): Promise<{
   checkedPlayers: number;
   checkedEvents: number;
   changed: number;
+  pendingSetCount: number;
 }> {
   const now = new Date();
   const syncSummary = await syncStartggApiActiveEvents(now);
@@ -94,6 +95,7 @@ export async function runStartggWatchByApiWindow(bot?: Telegraf): Promise<{
       checkedPlayers: 0,
       checkedEvents: 0,
       changed: 0,
+      pendingSetCount: 0,
     };
   }
 
@@ -104,5 +106,6 @@ export async function runStartggWatchByApiWindow(bot?: Telegraf): Promise<{
     checkedPlayers: watchSummary.checkedPlayers,
     checkedEvents: watchSummary.checkedEvents,
     changed: watchSummary.changed,
+    pendingSetCount: watchSummary.pendingSetCount,
   };
 }

@@ -3,14 +3,45 @@ import type { Telegraf } from 'telegraf';
 import { runMode } from './runMode';
 import { getChinaDayOfWeek } from '../utils/time';
 import { isChinaWorkday } from '../calendar/chinaWorkday';
+import { runStartggWatchByApiWindow } from '../services/startggPresetSync';
 
 const VITAMIN_WORKDAY_RANDOM_WINDOW_MS = 15 * 60 * 1000;
+const STARTGG_FAST_WATCH_INTERVAL_MS = 2 * 60 * 1000;
+
+let startggFastWatchTimer: ReturnType<typeof setTimeout> | null = null;
 
 function scheduleWorkdayVitamin(bot: Telegraf): void {
   const delay = Math.floor(Math.random() * VITAMIN_WORKDAY_RANDOM_WINDOW_MS);
   setTimeout(async () => {
     await runMode('vitamin', getChinaDayOfWeek(), bot);
   }, delay);
+}
+
+function clearStartggFastWatch(): void {
+  if (!startggFastWatchTimer) return;
+  clearTimeout(startggFastWatchTimer);
+  startggFastWatchTimer = null;
+}
+
+export function updateStartggFastWatch(bot: Telegraf, pendingSetCount: number): void {
+  if (pendingSetCount === 0) {
+    clearStartggFastWatch();
+    return;
+  }
+
+  clearStartggFastWatch();
+  startggFastWatchTimer = setTimeout(async () => {
+    startggFastWatchTimer = null;
+    await runScheduledStartggWatch(bot);
+  }, STARTGG_FAST_WATCH_INTERVAL_MS);
+}
+
+async function runScheduledStartggWatch(bot: Telegraf): Promise<void> {
+  console.log('Mode: start.gg Watch');
+  const summary = await runStartggWatchByApiWindow(bot);
+  console.log(`start.gg watch finished. events=${summary.checkedEvents} players=${summary.checkedPlayers} changed=${summary.changed} pending=${summary.pendingSetCount}`);
+
+  updateStartggFastWatch(bot, summary.pendingSetCount);
 }
 
 export function registerFixedJobs(bot: Telegraf): void {
@@ -97,7 +128,7 @@ export function registerFixedJobs(bot: Telegraf): void {
 
   // startgg_watch: every 20 minutes
   schedule.scheduleJob({ minute: new schedule.Range(0, 59, 20), tz: 'Asia/Shanghai' }, async () => {
-    await runMode('startgg_watch', getChinaDayOfWeek(), bot);
+    await runScheduledStartggWatch(bot);
   });
 
   // english: 21:30

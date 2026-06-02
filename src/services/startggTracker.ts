@@ -395,12 +395,14 @@ interface PlayerStatusSnapshot {
   lastSetScoreText: string | null;
   lastSetState: number | null;
   setPageUrl: string | null;
+  pendingSetExists: boolean;
 }
 
 export interface StartggWatchSummary {
   checkedPlayers: number;
   checkedEvents: number;
   changed: number;
+  pendingSetCount: number;
 }
 
 export interface RunStartggWatchOptions {
@@ -775,6 +777,7 @@ function computePlayerSnapshot(
       lastSetScoreText: null,
       lastSetState: null,
       setPageUrl: null,
+      pendingSetExists: false,
     };
   }
 
@@ -820,6 +823,7 @@ function computePlayerSnapshot(
     lastSetScoreText: latestSet ? buildSetScoreText(latestSet.displayScore) : null,
     lastSetState: latestSet?.state ?? null,
     setPageUrl,
+    pendingSetExists,
   };
 }
 
@@ -845,6 +849,7 @@ export async function runStartggWatchOnce(bot?: Telegraf, options?: RunStartggWa
     : events;
 
   let changed = 0;
+  let pendingSetCount = 0;
   for (const eventRow of targetEvents) {
     const normalizedSlug = normalizeEventSlug(eventRow.event_slug);
     const header = await queryStartgg<EventTrackingHeaderResponse>(EVENT_TRACKING_HEADER_QUERY, { slug: normalizedSlug });
@@ -879,6 +884,9 @@ export async function runStartggWatchOnce(bot?: Telegraf, options?: RunStartggWa
       );
 
       const snapshot = computePlayerSnapshot(normalizedSlug, playerSets, entrantId, eventStandings);
+      if (snapshot.pendingSetExists) {
+        pendingSetCount += 1;
+      }
       const previous = findStartggWatchSnapshot(player.id, eventRow.id);
       const changedNow = hasSnapshotChanged(snapshot, previous);
       upsertStartggWatchSnapshot({
@@ -916,5 +924,6 @@ export async function runStartggWatchOnce(bot?: Telegraf, options?: RunStartggWa
     checkedPlayers: players.length,
     checkedEvents: targetEvents.length,
     changed,
+    pendingSetCount,
   };
 }
