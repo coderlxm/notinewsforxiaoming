@@ -173,6 +173,16 @@ export function formatVitaminMessage(): string {
   return message;
 }
 
+export function formatCoffeeMessage(): string {
+  let message = `☕ <b>早安咖啡时间</b> (${chinaDateLabel()})\n`;
+  message += '──────────────────\n';
+  message += '早上好！到公司别忘了点杯咖啡，开启元气满满的一天。\n\n';
+  message += '💡 一杯黑咖啡提神醒脑，比奶茶健康多了。\n';
+  message += '──────────────────\n';
+  message += '#咖啡 #早安';
+  return message;
+}
+
 interface VitaminInlineKeyboardMarkup {
   inline_keyboard: Array<Array<{ text: string; callback_data: string }>>;
 }

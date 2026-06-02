@@ -24,6 +24,12 @@ export function registerFixedJobs(bot: Telegraf): void {
     await runMode('wakeup', getChinaDayOfWeek(), bot);
   });
 
+  // coffee: 08:58 on China workdays
+  schedule.scheduleJob({ hour: 8, minute: 58, tz: 'Asia/Shanghai' }, async () => {
+    if (!isChinaWorkday(new Date())) return;
+    await runMode('coffee', getChinaDayOfWeek(), bot);
+  });
+
   // v2ex buffered push: 08:41 on workdays
   schedule.scheduleJob({ hour: 8, minute: 41, tz: 'Asia/Shanghai' }, async () => {
     if (!isChinaWorkday(new Date())) return;

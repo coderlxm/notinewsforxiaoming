@@ -25,6 +25,7 @@ import {
   formatFitnessMessage,
   formatVitaminMessage,
   formatServerHealthMessage,
+  formatCoffeeMessage,
 } from '../formatters/index';
 import { sendTelegramMessage } from '../publishers/telegram';
 import { getFitnessContext, markFitnessWorkoutGenerated } from '../services/fitness';
@@ -34,7 +35,7 @@ import { bufferHolidayV2exTopics, pushBufferedV2exIfNeeded } from '../services/v
 import { isVitaminEatenToday, triggerVitaminReminder } from '../services/vitaminReminder';
 import { runStartggWatchByApiWindow } from '../services/startggPresetSync';
 
-export type PushMode = 'sleep' | 'wakeup' | 'server_health' | 'news' | 'github' | 'v2ex' | 'v2ex_buffered_push' | 'fitness' | 'vitamin' | 'english' | 'av_update' | 'startgg_watch';
+export type PushMode = 'sleep' | 'wakeup' | 'server_health' | 'news' | 'github' | 'v2ex' | 'v2ex_buffered_push' | 'fitness' | 'vitamin' | 'english' | 'av_update' | 'startgg_watch' | 'coffee';
 
 export function parseForcedMode(rawMode: string): PushMode | null {
   const modeMap: Record<string, PushMode> = {
@@ -50,6 +51,7 @@ export function parseForcedMode(rawMode: string): PushMode | null {
     english: 'english',
     av_update: 'av_update',
     startgg_watch: 'startgg_watch',
+    coffee: 'coffee',
   };
   return modeMap[rawMode] ?? null;
 }
@@ -169,6 +171,13 @@ export async function runMode(mode: PushMode, chinaDayOfWeek: number, bot?: Tele
     console.log('Mode: start.gg Watch');
     const summary = await runStartggWatchByApiWindow(bot);
     console.log(`start.gg watch finished. events=${summary.checkedEvents} players=${summary.checkedPlayers} changed=${summary.changed}`);
+    return;
+  }
+
+  if (mode === 'coffee') {
+    console.log('Mode: Coffee Reminder');
+    const message = formatCoffeeMessage();
+    await sendTelegramMessage(message, bot);
     return;
   }
 

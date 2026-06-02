@@ -11,6 +11,7 @@ const TEST_FORCE_MODE = (process.env.TEST_FORCE_MODE || '').trim().toLowerCase()
 const SPECIAL_SCHEDULE = {
   sleep: 10,           // 00:10
   wakeup: 8 * 60 + 30, // 08:30
+  coffee: 8 * 60 + 58, // 08:58 (China workdays only)
   v2ex_buffered_push: 8 * 60 + 41, // 08:41
   server_health: 9 * 60 + 10, // 09:10
   news: 9 * 60 + 55,   // 09:55
@@ -50,7 +51,7 @@ async function main() {
   if (TEST_MODE_ENABLED) {
     const forcedMode = parseForcedMode(TEST_FORCE_MODE);
     if (!forcedMode) {
-      throw new Error(`Invalid TEST_FORCE_MODE: "${TEST_FORCE_MODE}". Allowed: sleep,wakeup,server_health,news,github,v2ex,v2ex_buffered_push,fitness,vitamin,english,av_update,startgg_watch`);
+      throw new Error(`Invalid TEST_FORCE_MODE: "${TEST_FORCE_MODE}". Allowed: sleep,wakeup,server_health,news,github,v2ex,v2ex_buffered_push,fitness,vitamin,english,av_update,startgg_watch,coffee`);
     }
     console.log(`Test mode enabled. Bypass schedule and force mode: ${forcedMode}`);
     await runMode(forcedMode, chinaDayOfWeek);
@@ -61,6 +62,8 @@ async function main() {
       selectedMode = 'sleep';
     } else if (isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.wakeup)) {
       selectedMode = 'wakeup';
+    } else if (isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.coffee)) {
+      selectedMode = isChinaWorkday(now) ? 'coffee' : null;
     } else if (isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.v2ex_buffered_push)) {
       selectedMode = isChinaWorkday(now) ? 'v2ex_buffered_push' : null;
     } else if (isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.server_health)) {
