@@ -2,21 +2,25 @@
   {
     "alias": "bwgdc01",
     "name": "主机",
+    "host": "144.34.224.170",
     "role": "NotiNews 当前主部署机"
   },
   {
     "alias": "bwgdc6",
     "name": "备机",
+    "host": "80.251.223.124",
     "role": "备用服务器"
   },
   {
     "alias": "rndc02",
     "name": "rndc02",
+    "host": "23.254.214.138",
     "role": "服务器"
   },
   {
     "alias": "jp888",
     "name": "jp888",
+    "host": "45.66.216.45",
     "role": "服务器"
   }
 ]

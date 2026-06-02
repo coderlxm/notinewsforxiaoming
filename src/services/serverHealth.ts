@@ -5,6 +5,7 @@ import { resolve } from 'path';
 export interface ServerHealthTarget {
   alias: string;
   name: string;
+  host: string;
   role: string;
   provider?: string;
   note?: string;
@@ -21,6 +22,7 @@ export interface ServerHealthResult {
 const TARGETS_PATH = resolve(process.cwd(), 'data/server-health-targets.json');
 const SSH_TIMEOUT_MS = 8_000;
 const RETRY_DELAY_MS = 2_000;
+const SSH_KEY_PATH = '/root/.ssh/notinews_health_ed25519';
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -54,7 +56,9 @@ function probeServer(target: ServerHealthTarget): ServerHealthResult {
   const result = spawnSync(
     'ssh',
     [
+      '-i', SSH_KEY_PATH,
       '-o', 'BatchMode=yes',
+      '-o', 'IdentitiesOnly=yes',
       '-o', 'PreferredAuthentications=publickey',
       '-o', 'GSSAPIAuthentication=no',
       '-o', 'ConnectionAttempts=1',
@@ -62,7 +66,8 @@ function probeServer(target: ServerHealthTarget): ServerHealthResult {
       '-o', 'ServerAliveInterval=3',
       '-o', 'ServerAliveCountMax=1',
       '-o', 'LogLevel=ERROR',
-      target.alias,
+      '-l', 'root',
+      target.host,
       'hostname && uptime -p'
     ],
     {

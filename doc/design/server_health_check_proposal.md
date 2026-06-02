@@ -27,27 +27,31 @@ data/server-health-targets.json
   {
     "alias": "bwgdc01",
     "name": "主机",
+    "host": "144.34.224.170",
     "role": "NotiNews 当前主部署机"
   },
   {
     "alias": "bwgdc6",
     "name": "备机",
+    "host": "80.251.223.124",
     "role": "备用服务器"
   },
   {
     "alias": "rndc02",
     "name": "rndc02",
+    "host": "23.254.214.138",
     "role": "服务器"
   },
   {
     "alias": "jp888",
     "name": "jp888",
+    "host": "45.66.216.45",
     "role": "服务器"
   }
 ]
 ```
 
-配置里只保存业务展示信息和 SSH alias，不保存密码、私钥或完整连接串。
+配置里只保存业务展示信息和 SSH 连接地址，不保存密码、私钥或完整连接串。
 
 ## 3. 线上 SSH 前提
 
@@ -55,7 +59,6 @@ data/server-health-targets.json
 
 主部署机已配置：
 
-- `/root/.ssh/config`
 - `/root/.ssh/notinews_health_ed25519`
 - 4 台目标机器的 `authorized_keys`
 
@@ -64,10 +67,10 @@ data/server-health-targets.json
 主部署机需要能直接执行：
 
 ```bash
-ssh bwgdc01 'hostname && uptime -p'
-ssh bwgdc6 'hostname && uptime -p'
-ssh rndc02 'hostname && uptime -p'
-ssh jp888 'hostname && uptime -p'
+ssh -i /root/.ssh/notinews_health_ed25519 -l root 144.34.224.170 'hostname && uptime -p'
+ssh -i /root/.ssh/notinews_health_ed25519 -l root 80.251.223.124 'hostname && uptime -p'
+ssh -i /root/.ssh/notinews_health_ed25519 -l root 23.254.214.138 'hostname && uptime -p'
+ssh -i /root/.ssh/notinews_health_ed25519 -l root 45.66.216.45 'hostname && uptime -p'
 ```
 
 ## 4. 代码实现
@@ -83,7 +86,7 @@ src/services/serverHealth.ts
 职责：
 
 - 读取 `data/server-health-targets.json`
-- 对每个 alias 执行 SSH 探测
+- 对每个 host 执行 SSH 探测
 - 收集 `hostname`、`uptime`、异常原因
 - 返回结构化结果
 
@@ -91,7 +94,9 @@ SSH 命令通过 Node `spawnSync` 执行：
 
 ```bash
 ssh \
+  -i /root/.ssh/notinews_health_ed25519 \
   -o BatchMode=yes \
+  -o IdentitiesOnly=yes \
   -o PreferredAuthentications=publickey \
   -o GSSAPIAuthentication=no \
   -o ConnectionAttempts=1 \
@@ -99,7 +104,8 @@ ssh \
   -o ServerAliveInterval=3 \
   -o ServerAliveCountMax=1 \
   -o LogLevel=ERROR \
-  <alias> 'hostname && uptime -p'
+  -l root \
+  <host> 'hostname && uptime -p'
 ```
 
 当前实现是同步探测，避免异步子进程在服务器 `tsx + ssh` 环境下出现进程不收口的问题。
