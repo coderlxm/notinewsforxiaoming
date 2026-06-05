@@ -17,7 +17,6 @@ import {
   formatReminderCreated,
   formatEmptyReminderList,
   formatReminderList,
-  formatReminderDone,
   formatReminderSnoozed,
   formatReminderCancelled,
   buildCancelButton,
@@ -25,7 +24,6 @@ import {
   formatRecurringCreated,
   formatRecurringCancelled,
   formatRecurringPaused,
-  formatRecurringRunDone,
   formatRecurringRunSkipped,
   buildRecurringRuleButtons,
   formatReminderRangeList,
@@ -793,11 +791,7 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
           if (recurringData.runId) {
             repo.updateRecurringRunAction(recurringData.runId, 'done');
           }
-          try {
-            await ctx.editMessageText(formatRecurringRunDone(), { parse_mode: 'HTML' });
-          } catch {
-            await ctx.reply(formatRecurringRunDone(), { parse_mode: 'HTML' });
-          }
+          await ctx.deleteMessage();
           break;
         }
         case 'skip': {
@@ -839,11 +833,7 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
         repo.markReminderDone(data.id);
         cancelScheduledReminder(data.id);
         await clearSourceButtons(reminder);
-        try {
-          await ctx.editMessageText(formatReminderDone(reminder), { parse_mode: 'HTML' });
-        } catch {
-          await ctx.reply(formatReminderDone(reminder), { parse_mode: 'HTML' });
-        }
+        await ctx.deleteMessage();
         break;
       }
       case 'snooze5': {
