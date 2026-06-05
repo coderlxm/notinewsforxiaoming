@@ -635,6 +635,11 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     );
   }
 
+  async function deleteSourceMessage(reminder: repo.Reminder, currentMessageId?: number): Promise<void> {
+    if (!reminder.source_message_id || reminder.source_message_id === currentMessageId) return;
+    await bot.telegram.deleteMessage(reminder.chat_id, reminder.source_message_id);
+  }
+
   async function clearRecurringSourceButtons(rule: repo.RecurringRule): Promise<void> {
     if (!rule.source_message_id) return;
     await bot.telegram.editMessageReplyMarkup(
@@ -832,7 +837,7 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
       case 'done': {
         repo.markReminderDone(data.id);
         cancelScheduledReminder(data.id);
-        await clearSourceButtons(reminder);
+        await deleteSourceMessage(reminder, ctx.callbackQuery.message?.message_id);
         await ctx.deleteMessage();
         break;
       }
