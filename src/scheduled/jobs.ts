@@ -9,6 +9,7 @@ const VITAMIN_WORKDAY_RANDOM_WINDOW_MS = 15 * 60 * 1000;
 const STARTGG_FAST_WATCH_INTERVAL_MS = 2 * 60 * 1000;
 
 let startggFastWatchTimer: ReturnType<typeof setTimeout> | null = null;
+let startggFastWatchDueAt: Date | null = null;
 let startggPollJob: schedule.Job | null = null;
 
 function scheduleWorkdayVitamin(bot: Telegraf): void {
@@ -19,9 +20,11 @@ function scheduleWorkdayVitamin(bot: Telegraf): void {
 }
 
 function clearStartggFastWatch(): void {
-  if (!startggFastWatchTimer) return;
-  clearTimeout(startggFastWatchTimer);
+  if (startggFastWatchTimer) {
+    clearTimeout(startggFastWatchTimer);
+  }
   startggFastWatchTimer = null;
+  startggFastWatchDueAt = null;
 }
 
 export function updateStartggFastWatch(bot: Telegraf, pendingSetCount: number): void {
@@ -31,8 +34,10 @@ export function updateStartggFastWatch(bot: Telegraf, pendingSetCount: number): 
   }
 
   clearStartggFastWatch();
+  startggFastWatchDueAt = new Date(Date.now() + STARTGG_FAST_WATCH_INTERVAL_MS);
   startggFastWatchTimer = setTimeout(async () => {
     startggFastWatchTimer = null;
+    startggFastWatchDueAt = null;
     await runScheduledStartggWatch(bot);
   }, STARTGG_FAST_WATCH_INTERVAL_MS);
 }
@@ -63,6 +68,20 @@ export function disableStartggPolling(): boolean {
 
 export function isStartggPollingEnabled(): boolean {
   return startggPollJob !== null;
+}
+
+export function getStartggPollingRuntimeStatus(): {
+  pollingEnabled: boolean;
+  nextPollAt: Date | null;
+  fastPollingEnabled: boolean;
+  nextFastPollAt: Date | null;
+} {
+  return {
+    pollingEnabled: startggPollJob !== null,
+    nextPollAt: startggPollJob?.nextInvocation() ?? null,
+    fastPollingEnabled: startggFastWatchTimer !== null,
+    nextFastPollAt: startggFastWatchDueAt,
+  };
 }
 
 export function registerFixedJobs(bot: Telegraf): void {

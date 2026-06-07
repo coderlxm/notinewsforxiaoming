@@ -1,5 +1,6 @@
 import type { StartggWatchStatus } from '../services/startggRepository';
 import { escapeHtml } from '../utils/html';
+import { bjFormat } from '../utils/time';
 
 function normalizeUrl(url: string | null): string {
   if (!url) {
@@ -89,6 +90,7 @@ export function formatStartggGuide(playersCount: number, eventsCount: number): s
   } else {
     lines.push('常用命令：');
     lines.push('• <code>/watch &lt;选手名 | 用户链接 | 项目链接&gt;</code>');
+    lines.push('• <code>/startgg status</code> 查看运行状态');
     lines.push('• <code>/watchlist</code> 查看监控对象和最近状态');
     lines.push('• <code>/fetchstartgg</code> 手动触发一次检查');
     lines.push('• <code>/startggpoll on</code> 开启每 20 分钟自动检查');
@@ -123,6 +125,61 @@ export function buildStartggWatchCandidateButtons(
     callback_data: `sgwatch:add:${candidate.eventRowId}:${candidate.playerId}`,
   }]);
   return { reply_markup: { inline_keyboard: rows } };
+}
+
+function formatOptionalTime(value: Date | string | null): string {
+  return value ? bjFormat(value, 'HH:mm:ss') : '-';
+}
+
+function compactNames(names: string[], limit: number): string {
+  if (names.length <= limit) return names.join(' / ');
+  return `${names.slice(0, limit).join(' / ')} / +${names.length - limit}`;
+}
+
+export function formatStartggRuntimeStatus(input: {
+  pollingEnabled: boolean;
+  nextPollAt: Date | null;
+  fastPollingEnabled: boolean;
+  nextFastPollAt: Date | null;
+  players: Array<{ player_name: string; enabled: number }>;
+  events: Array<{ event_name: string; event_slug: string; active: number }>;
+  statuses: Array<{
+    player_name: string;
+    status: StartggWatchStatus;
+    placement: number | null;
+    last_set_round_label: string | null;
+    last_set_score_text: string | null;
+    captured_at: string;
+  }>;
+}): string {
+  const enabledPlayers = input.players.filter((player) => player.enabled === 1);
+  const activeEvents = input.events.filter((event) => event.active === 1);
+  const configured = enabledPlayers.length > 0 && activeEvents.length > 0;
+  const running = configured && (input.pollingEnabled || input.fastPollingEnabled);
+  const state = !configured ? '未配置' : running ? '监控中' : '待命';
+  const eventText = activeEvents.length === 0
+    ? '-'
+    : activeEvents.length === 1
+      ? activeEvents[0]!.event_name
+      : `${activeEvents[0]!.event_name} / +${activeEvents.length - 1}`;
+  const playerText = enabledPlayers.length === 0
+    ? '-'
+    : compactNames(enabledPlayers.map((player) => player.player_name), 5);
+  const latest = input.statuses[0] ?? null;
+  const latestText = latest
+    ? `${formatOptionalTime(latest.captured_at)} ${latest.player_name} ${statusLabel(latest.status)}`
+    : '-';
+
+  return [
+    '🥊 <b>start.gg 状态</b>',
+    '──────────────────',
+    `状态：<b>${state}</b>`,
+    `赛事：${escapeHtml(eventText)}`,
+    `选手：${enabledPlayers.length} 位 ${escapeHtml(playerText)}`,
+    `固定轮询：${input.pollingEnabled ? '开' : '关'}，下次 ${formatOptionalTime(input.nextPollAt)}`,
+    `加速轮询：${input.fastPollingEnabled ? '开' : '关'}，下次 ${formatOptionalTime(input.nextFastPollAt)}`,
+    `最近快照：${escapeHtml(latestText)}`,
+  ].join('\n');
 }
 
 export function formatStartggWatchList(

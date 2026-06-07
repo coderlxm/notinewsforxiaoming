@@ -46,6 +46,7 @@ import { findPresetByText } from '../reminders/presets';
 import {
   buildStartggWatchCandidateButtons,
   formatStartggGuide,
+  formatStartggRuntimeStatus,
   formatStartggWatchCandidates,
   formatStartggWatchList,
 } from '../formatters/startggFormatter';
@@ -66,7 +67,13 @@ import {
 } from '../services/startggRepository';
 import { runStartggWatchNow, syncStartggPresetPlayers } from '../services/startggPresetSync';
 import { escapeHtml } from '../utils/html';
-import { disableStartggPolling, enableStartggPolling, isStartggPollingEnabled, updateStartggFastWatch } from '../scheduled/jobs';
+import {
+  disableStartggPolling,
+  enableStartggPolling,
+  getStartggPollingRuntimeStatus,
+  isStartggPollingEnabled,
+  updateStartggFastWatch,
+} from '../scheduled/jobs';
 
 interface StartggWatchCandidate {
   eventRowId: number;
@@ -157,6 +164,23 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
   bot.command('startgg', async (ctx) => {
     if (!isAuthorized(ctx)) return;
     try {
+      const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
+      const arg = text.replace(/^\/startgg\s*/, '').trim().toLowerCase();
+      if (arg === 'status') {
+        const players = listStartggWatchPlayers();
+        const events = listStartggWatchEvents().filter((row) => row.active === 1);
+        const statuses = listStartggWatchStatusViews();
+        await ctx.reply(
+          formatStartggRuntimeStatus({
+            ...getStartggPollingRuntimeStatus(),
+            players,
+            events,
+            statuses,
+          }),
+          { parse_mode: 'HTML' },
+        );
+        return;
+      }
       await syncStartggPresetPlayers();
       const players = listStartggWatchPlayers().filter((row) => row.enabled === 1);
       const events = listStartggWatchEvents().filter((row) => row.active === 1);
