@@ -87,23 +87,25 @@ export function updateStartggWatchPlayerName(id: number, playerName: string): vo
   `).run(playerName, new Date().toISOString(), id);
 }
 
-export function createStartggWatchEvent(eventSlug: string, eventName: string): void {
+export function replaceActiveStartggWatchEvent(eventSlug: string, eventName: string): void {
   const db = getDb();
-  db.prepare(`
-    INSERT INTO startgg_watch_events (event_slug, event_name, active, created_at, updated_at)
-    VALUES (?, ?, 1, ?, ?)
-  `).run(eventSlug, eventName, new Date().toISOString(), new Date().toISOString());
-}
-
-export function findStartggWatchEventBySlug(eventSlug: string): StartggWatchEvent | null {
-  const db = getDb();
-  const row = db.prepare(`
-    SELECT *
-    FROM startgg_watch_events
-    WHERE event_slug = ?
-    LIMIT 1
-  `).get(eventSlug);
-  return (row as StartggWatchEvent) ?? null;
+  const now = new Date().toISOString();
+  const replace = db.transaction(() => {
+    db.prepare(`
+      UPDATE startgg_watch_events
+      SET active = 0, updated_at = ?
+      WHERE active = 1
+    `).run(now);
+    db.prepare(`
+      INSERT INTO startgg_watch_events (event_slug, event_name, active, created_at, updated_at)
+      VALUES (?, ?, 1, ?, ?)
+      ON CONFLICT(event_slug) DO UPDATE SET
+        event_name = excluded.event_name,
+        active = 1,
+        updated_at = excluded.updated_at
+    `).run(eventSlug, eventName, now, now);
+  });
+  replace();
 }
 
 export function findStartggWatchEventById(id: number): StartggWatchEvent | null {

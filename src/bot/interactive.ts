@@ -55,14 +55,13 @@ import {
   resolveUserToPlayer,
 } from '../services/startggTracker';
 import {
-  createStartggWatchEvent,
   createStartggWatchPlayer,
   findStartggWatchEventById,
-  findStartggWatchEventBySlug,
   findStartggWatchPlayerByPlayerId,
   listStartggWatchEvents,
   listStartggWatchPlayers,
   listStartggWatchStatusViews,
+  replaceActiveStartggWatchEvent,
   updateStartggWatchPlayerName,
 } from '../services/startggRepository';
 import { runStartggWatchNow, syncStartggPresetPlayers } from '../services/startggPresetSync';
@@ -186,20 +185,14 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     try {
       if (isStartggEventReference(raw)) {
         const event = await fetchEventMeta(raw);
-        const existingEvent = findStartggWatchEventBySlug(event.slug);
-        if (existingEvent) {
-          await ctx.reply(`该项目已在监控列表中：${existingEvent.event_name} (${existingEvent.event_slug})`, { parse_mode: 'HTML' });
-          return;
-        }
-        createStartggWatchEvent(event.slug, event.name);
+        const eventName = event.tournamentName ? `${event.tournamentName} / ${event.name}` : event.name;
+        replaceActiveStartggWatchEvent(event.slug, eventName);
         const enabledPlayers = listStartggWatchPlayers().filter((row) => row.enabled === 1).length;
-        const activeEvents = listStartggWatchEvents().filter((row) => row.active === 1).length;
-        const tournamentPrefix = event.tournamentName ? `${event.tournamentName} / ` : '';
         const nextStep = enabledPlayers === 0
           ? '下一步：发送 /watch <选手名> 或 /watch <user_url> 添加选手。'
           : '下一步：发送 /watchlist 查看当前监控状态。';
         await ctx.reply(
-          `已添加项目：${tournamentPrefix}${event.name}\n当前配置：${enabledPlayers} 位选手，${activeEvents} 个项目。\n${nextStep}`,
+          `已切换监控项目：${eventName}\n当前配置：${enabledPlayers} 位选手，1 个项目。\n${nextStep}`,
           { parse_mode: 'HTML' },
         );
         return;
@@ -321,7 +314,7 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     try {
       await syncStartggPresetPlayers();
       const players = listStartggWatchPlayers();
-      const events = listStartggWatchEvents();
+      const events = listStartggWatchEvents().filter((row) => row.active === 1);
       const statuses = listStartggWatchStatusViews();
       await ctx.reply(formatStartggWatchList(players, events, statuses), { parse_mode: 'HTML' });
     } catch (e) {
