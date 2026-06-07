@@ -33,7 +33,7 @@ import { checkServerHealth } from '../services/serverHealth';
 import { runAvFetchOnce } from '../services/avTracker';
 import { bufferHolidayV2exTopics, pushBufferedV2exIfNeeded } from '../services/v2exBufferedPush';
 import { isVitaminEatenToday, triggerVitaminReminder } from '../services/vitaminReminder';
-import { runStartggWatchByApiWindow } from '../services/startggPresetSync';
+import { runStartggWatchNow } from '../services/startggPresetSync';
 
 export type PushMode = 'sleep' | 'wakeup' | 'server_health' | 'news' | 'github' | 'v2ex' | 'v2ex_buffered_push' | 'fitness' | 'vitamin' | 'english' | 'av_update' | 'startgg_watch' | 'coffee';
 
@@ -169,7 +169,7 @@ export async function runMode(mode: PushMode, chinaDayOfWeek: number, bot?: Tele
 
   if (mode === 'startgg_watch') {
     console.log('Mode: start.gg Watch');
-    const summary = await runStartggWatchByApiWindow(bot);
+    const summary = await runStartggWatchNow(bot);
     console.log(`start.gg watch finished. events=${summary.checkedEvents} players=${summary.checkedPlayers} changed=${summary.changed} pending=${summary.pendingSetCount}`);
     return;
   }

@@ -92,7 +92,7 @@ export function formatStartggGuide(playersCount: number, eventsCount: number): s
     lines.push('• <code>/watchlist</code> 查看监控对象和最近状态');
     lines.push('• <code>/fetchstartgg</code> 手动触发一次检查');
     lines.push('');
-    lines.push('系统会按 start.gg 赛事时间自动判定是否在活跃时段。');
+    lines.push('添加项目后直接检查，不再按赛事时间窗口跳过。');
   }
   return lines.join('\n');
 }

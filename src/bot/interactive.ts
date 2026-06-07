@@ -52,7 +52,6 @@ import {
 import {
   fetchEventMeta,
   listEventEntrantPlayers,
-  normalizeEventSlug,
   resolveUserToPlayer,
 } from '../services/startggTracker';
 import {
@@ -66,9 +65,7 @@ import {
   listStartggWatchStatusViews,
   updateStartggWatchPlayerName,
 } from '../services/startggRepository';
-import { runStartggWatchByApiWindow, syncStartggApiActiveEvents, syncStartggPresetPlayers } from '../services/startggPresetSync';
-import { addStartggTournamentWindow, listStartggTournamentWindows, removeStartggTournamentWindow } from '../services/startggWindowRepository';
-import { parseTournamentWindowFromNaturalLanguage } from '../services/startggWindowParser';
+import { runStartggWatchNow, syncStartggPresetPlayers } from '../services/startggPresetSync';
 import { escapeHtml } from '../utils/html';
 import { updateStartggFastWatch } from '../scheduled/jobs';
 
@@ -143,15 +140,10 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     if (!isAuthorized(ctx)) return;
     await ctx.reply('开始手动检查 start.gg 选手状态...', { parse_mode: 'HTML' });
     try {
-      const summary = await runStartggWatchByApiWindow(bot);
-      if (!summary.inWindow) {
-        await ctx.reply('检查完成：当前不在赛事活跃时段（按 start.gg tournament startAt/endAt 判定），已跳过抓取。', { parse_mode: 'HTML' });
-        updateStartggFastWatch(bot, 0);
-        return;
-      }
+      const summary = await runStartggWatchNow(bot);
       updateStartggFastWatch(bot, summary.pendingSetCount);
       await ctx.reply(
-        `检查完成：活跃项目 ${summary.activeEventCount} 个，本次检查项目 ${summary.checkedEvents} 个，选手 ${summary.checkedPlayers} 个，状态变化 ${summary.changed} 条，进行中 ${summary.pendingSetCount} 条。`,
+        `检查完成：本次检查项目 ${summary.checkedEvents} 个，选手 ${summary.checkedPlayers} 个，状态变化 ${summary.changed} 条，进行中 ${summary.pendingSetCount} 条。`,
         { parse_mode: 'HTML' }
       );
     } catch (e) {
@@ -166,86 +158,13 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
   bot.command('startgg', async (ctx) => {
     if (!isAuthorized(ctx)) return;
     try {
-      const syncSummary = await syncStartggApiActiveEvents(new Date());
+      await syncStartggPresetPlayers();
       const players = listStartggWatchPlayers().filter((row) => row.enabled === 1);
       const events = listStartggWatchEvents().filter((row) => row.active === 1);
-      const activeText = syncSummary.activeEventCount > 0
-        ? `当前活跃项目：${syncSummary.activeEventCount} 个（按 start.gg tournament startAt/endAt 判定）`
-        : '当前活跃项目：0 个（按 start.gg tournament startAt/endAt 判定）';
-      await ctx.reply(`${formatStartggGuide(players.length, events.length)}\n\n${activeText}`, { parse_mode: 'HTML' });
+      await ctx.reply(`${formatStartggGuide(players.length, events.length)}\n\n当前监控项目：${events.length} 个`, { parse_mode: 'HTML' });
     } catch (e) {
       if (e instanceof Error) {
         await ctx.reply(`start.gg 状态读取失败：${e.message}`, { parse_mode: 'HTML' });
-        return;
-      }
-      throw e;
-    }
-  });
-
-  bot.command('startggwindow', async (ctx) => {
-    if (!isAuthorized(ctx)) return;
-    const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
-    const args = text.replace(/^\/startggwindow\s*/, '').trim();
-    if (!args) {
-      await ctx.reply('用法：/startggwindow <自然语言赛事描述>', { parse_mode: 'HTML' });
-      return;
-    }
-
-    try {
-      const window = await parseTournamentWindowFromNaturalLanguage(args, new Date());
-      addStartggTournamentWindow(window);
-      await ctx.reply(
-        `已添加赛事窗口：${window.name}\n时间：${window.start_at} ~ ${window.end_at}\n项目数：${window.events.length}`,
-        { parse_mode: 'HTML' },
-      );
-    } catch (e) {
-      if (e instanceof Error) {
-        await ctx.reply(`添加赛事窗口失败：${e.message}`, { parse_mode: 'HTML' });
-        return;
-      }
-      throw e;
-    }
-  });
-
-  bot.command('startggwindows', async (ctx) => {
-    if (!isAuthorized(ctx)) return;
-    try {
-      const windows = listStartggTournamentWindows();
-      if (windows.length === 0) {
-        await ctx.reply('当前没有配置任何赛事窗口。', { parse_mode: 'HTML' });
-        return;
-      }
-      const lines = ['📅 <b>start.gg 赛事窗口</b>', ''];
-      windows.forEach((window, index) => {
-        lines.push(`${index + 1}. <b>${window.name}</b>`);
-        lines.push(`时间：${window.start_at} ~ ${window.end_at}`);
-        lines.push(`项目：${window.events.map((event) => event.event_name).join(' / ')}`);
-        lines.push('');
-      });
-      await ctx.reply(lines.join('\n'), { parse_mode: 'HTML' });
-    } catch (e) {
-      if (e instanceof Error) {
-        await ctx.reply(`读取赛事窗口失败：${e.message}`, { parse_mode: 'HTML' });
-        return;
-      }
-      throw e;
-    }
-  });
-
-  bot.command('startggwindowdel', async (ctx) => {
-    if (!isAuthorized(ctx)) return;
-    const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
-    const args = text.replace(/^\/startggwindowdel\s*/, '').trim();
-    if (!args) {
-      await ctx.reply('用法：/startggwindowdel <window_name>', { parse_mode: 'HTML' });
-      return;
-    }
-    try {
-      removeStartggTournamentWindow(args);
-      await ctx.reply(`已删除赛事窗口：${args}`, { parse_mode: 'HTML' });
-    } catch (e) {
-      if (e instanceof Error) {
-        await ctx.reply(`删除赛事窗口失败：${e.message}`, { parse_mode: 'HTML' });
         return;
       }
       throw e;
@@ -391,59 +310,6 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     } catch (e) {
       if (e instanceof Error) {
         await ctx.reply(`添加监控失败：${e.message}`, { parse_mode: 'HTML' });
-        return;
-      }
-      throw e;
-    }
-  });
-
-  bot.command('startggaddplayer', async (ctx) => {
-    if (!isAuthorized(ctx)) return;
-    const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
-    const args = text.replace(/^\/startggaddplayer\s*/, '').trim();
-    const pieces = args.split(/\s+/);
-    if (pieces.length < 2) {
-      await ctx.reply('用法：/startggaddplayer <player_id> <player_name>', { parse_mode: 'HTML' });
-      return;
-    }
-
-    const rawPlayerId = pieces[0];
-    const playerName = pieces.slice(1).join(' ').trim();
-    const playerId = Number(rawPlayerId);
-    if (!Number.isInteger(playerId) || playerId <= 0) {
-      await ctx.reply('player_id 必须是正整数。', { parse_mode: 'HTML' });
-      return;
-    }
-    try {
-      createStartggWatchPlayer(playerId, playerName);
-      await ctx.reply(`已添加 start.gg 选手：${playerName} (player_id=${playerId})`, { parse_mode: 'HTML' });
-    } catch (e) {
-      if (e instanceof Error) {
-        await ctx.reply(`添加选手失败：${e.message}`, { parse_mode: 'HTML' });
-        return;
-      }
-      throw e;
-    }
-  });
-
-  bot.command('startggaddevent', async (ctx) => {
-    if (!isAuthorized(ctx)) return;
-    const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
-    const args = text.replace(/^\/startggaddevent\s*/, '').trim();
-    const pieces = args.split(/\s+/);
-    if (pieces.length < 1 || !pieces[0]) {
-      await ctx.reply('用法：/startggaddevent <event_slug_or_url> [event_name]', { parse_mode: 'HTML' });
-      return;
-    }
-
-    const eventSlug = normalizeEventSlug(pieces[0]);
-    const eventName = pieces.slice(1).join(' ').trim() || eventSlug;
-    try {
-      createStartggWatchEvent(eventSlug, eventName);
-      await ctx.reply(`已添加 start.gg 项目：${eventName} (${eventSlug})`, { parse_mode: 'HTML' });
-    } catch (e) {
-      if (e instanceof Error) {
-        await ctx.reply(`添加项目失败：${e.message}`, { parse_mode: 'HTML' });
         return;
       }
       throw e;

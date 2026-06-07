@@ -3,7 +3,7 @@ import type { Telegraf } from 'telegraf';
 import { runMode } from './runMode';
 import { getChinaDayOfWeek } from '../utils/time';
 import { isChinaWorkday } from '../calendar/chinaWorkday';
-import { runStartggWatchByApiWindow } from '../services/startggPresetSync';
+import { runStartggWatchNow } from '../services/startggPresetSync';
 
 const VITAMIN_WORKDAY_RANDOM_WINDOW_MS = 15 * 60 * 1000;
 const STARTGG_FAST_WATCH_INTERVAL_MS = 2 * 60 * 1000;
@@ -38,7 +38,7 @@ export function updateStartggFastWatch(bot: Telegraf, pendingSetCount: number): 
 
 async function runScheduledStartggWatch(bot: Telegraf): Promise<void> {
   console.log('Mode: start.gg Watch');
-  const summary = await runStartggWatchByApiWindow(bot);
+  const summary = await runStartggWatchNow(bot);
   console.log(`start.gg watch finished. events=${summary.checkedEvents} players=${summary.checkedPlayers} changed=${summary.changed} pending=${summary.pendingSetCount}`);
 
   updateStartggFastWatch(bot, summary.pendingSetCount);
