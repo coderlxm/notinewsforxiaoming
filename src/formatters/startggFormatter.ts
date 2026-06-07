@@ -91,6 +91,8 @@ export function formatStartggGuide(playersCount: number, eventsCount: number): s
     lines.push('• <code>/watch &lt;选手名 | 用户链接 | 项目链接&gt;</code>');
     lines.push('• <code>/watchlist</code> 查看监控对象和最近状态');
     lines.push('• <code>/fetchstartgg</code> 手动触发一次检查');
+    lines.push('• <code>/startggpoll on</code> 开启每 20 分钟自动检查');
+    lines.push('• <code>/startggpoll off</code> 关闭自动检查');
     lines.push('');
     lines.push('添加项目后直接检查，不再按赛事时间窗口跳过。');
   }

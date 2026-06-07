@@ -66,7 +66,7 @@ import {
 } from '../services/startggRepository';
 import { runStartggWatchNow, syncStartggPresetPlayers } from '../services/startggPresetSync';
 import { escapeHtml } from '../utils/html';
-import { updateStartggFastWatch } from '../scheduled/jobs';
+import { disableStartggPolling, enableStartggPolling, isStartggPollingEnabled, updateStartggFastWatch } from '../scheduled/jobs';
 
 interface StartggWatchCandidate {
   eventRowId: number;
@@ -160,7 +160,8 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
       await syncStartggPresetPlayers();
       const players = listStartggWatchPlayers().filter((row) => row.enabled === 1);
       const events = listStartggWatchEvents().filter((row) => row.active === 1);
-      await ctx.reply(`${formatStartggGuide(players.length, events.length)}\n\n当前监控项目：${events.length} 个`, { parse_mode: 'HTML' });
+      const pollingText = isStartggPollingEnabled() ? '已开启' : '未开启';
+      await ctx.reply(`${formatStartggGuide(players.length, events.length)}\n\n当前监控项目：${events.length} 个\n自动轮询：${pollingText}`, { parse_mode: 'HTML' });
     } catch (e) {
       if (e instanceof Error) {
         await ctx.reply(`start.gg 状态读取失败：${e.message}`, { parse_mode: 'HTML' });
@@ -168,6 +169,24 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
       }
       throw e;
     }
+  });
+
+  bot.command('startggpoll', async (ctx) => {
+    if (!isAuthorized(ctx)) return;
+    const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
+    const arg = text.replace(/^\/startggpoll\s*/, '').trim().toLowerCase();
+    if (arg === 'on') {
+      const enabled = enableStartggPolling(bot);
+      await ctx.reply(enabled ? 'start.gg 自动轮询已开启：每 20 分钟检查一次。' : 'start.gg 自动轮询已经开启。', { parse_mode: 'HTML' });
+      return;
+    }
+    if (arg === 'off') {
+      const disabled = disableStartggPolling();
+      await ctx.reply(disabled ? 'start.gg 自动轮询已关闭。' : 'start.gg 自动轮询本来就是关闭的。', { parse_mode: 'HTML' });
+      return;
+    }
+    const pollingText = isStartggPollingEnabled() ? '已开启' : '未开启';
+    await ctx.reply(`用法：/startggpoll on 或 /startggpoll off\n当前状态：${pollingText}`, { parse_mode: 'HTML' });
   });
 
   bot.command('watch', async (ctx) => {

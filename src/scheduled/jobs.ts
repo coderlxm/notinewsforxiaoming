@@ -9,6 +9,7 @@ const VITAMIN_WORKDAY_RANDOM_WINDOW_MS = 15 * 60 * 1000;
 const STARTGG_FAST_WATCH_INTERVAL_MS = 2 * 60 * 1000;
 
 let startggFastWatchTimer: ReturnType<typeof setTimeout> | null = null;
+let startggPollJob: schedule.Job | null = null;
 
 function scheduleWorkdayVitamin(bot: Telegraf): void {
   const delay = Math.floor(Math.random() * VITAMIN_WORKDAY_RANDOM_WINDOW_MS);
@@ -42,6 +43,26 @@ async function runScheduledStartggWatch(bot: Telegraf): Promise<void> {
   console.log(`start.gg watch finished. events=${summary.checkedEvents} players=${summary.checkedPlayers} changed=${summary.changed} pending=${summary.pendingSetCount}`);
 
   updateStartggFastWatch(bot, summary.pendingSetCount);
+}
+
+export function enableStartggPolling(bot: Telegraf): boolean {
+  if (startggPollJob) return false;
+  startggPollJob = schedule.scheduleJob({ minute: new schedule.Range(0, 59, 20), tz: 'Asia/Shanghai' }, async () => {
+    await runScheduledStartggWatch(bot);
+  });
+  return true;
+}
+
+export function disableStartggPolling(): boolean {
+  if (!startggPollJob) return false;
+  startggPollJob.cancel();
+  startggPollJob = null;
+  clearStartggFastWatch();
+  return true;
+}
+
+export function isStartggPollingEnabled(): boolean {
+  return startggPollJob !== null;
 }
 
 export function registerFixedJobs(bot: Telegraf): void {
@@ -124,11 +145,6 @@ export function registerFixedJobs(bot: Telegraf): void {
   });
   schedule.scheduleJob({ hour: 23, minute: 30, tz: 'Asia/Shanghai' }, async () => {
     await runMode('av_update', getChinaDayOfWeek(), bot);
-  });
-
-  // startgg_watch: every 20 minutes
-  schedule.scheduleJob({ minute: new schedule.Range(0, 59, 20), tz: 'Asia/Shanghai' }, async () => {
-    await runScheduledStartggWatch(bot);
   });
 
   // english: 21:30
