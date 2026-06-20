@@ -46,9 +46,16 @@ export function renderMarkdownLikeAsHtml(input: string): string {
 }
 
 export function formatTelegramMessage(weather: WeatherData | null, news: GameNews[]): string {
-  let message = `📅 <b>每日简报</b> (${chinaDateLabel()})\n\n`;
+  const isWorkday = isChinaWorkday(new Date());
+  let message = '';
 
-  if (isChinaWorkday(new Date())) {
+  if (isWorkday) {
+    message += '🚨 <b>记得打卡！</b>上下班别忘了打卡，多喝水，保卫工资从打卡开始 💰\n\n';
+  }
+
+  message += `📅 <b>每日简报</b> (${chinaDateLabel()})\n\n`;
+
+  if (isWorkday) {
     message += '┏━━━━━━━━━━━━━━━━━━━━━━━━┓\n';
     message += '┃   🚨 <b>打工人日常提醒</b> 🚨   ┃\n';
     message += '┣━━━━━━━━━━━━━━━━━━━━━━━━┫\n';
