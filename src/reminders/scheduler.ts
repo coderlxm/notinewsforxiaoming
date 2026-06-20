@@ -1,9 +1,9 @@
 import schedule from 'node-schedule';
 import type { Telegraf } from 'telegraf';
-import type { Reminder, RecurringRule } from './repository';
-import * as repo from './repository';
-import { formatReminderMessage, buildReminderButtons, formatRecurringReminderMessage, buildRecurringReminderButtons } from './formatter';
-import { getNextTrigger } from './recurring';
+import type { Reminder, RecurringRule } from './repository.js';
+import * as repo from './repository.js';
+import { formatReminderMessage, buildReminderButtons, formatRecurringReminderMessage, buildRecurringReminderButtons } from './formatter.js';
+import { getNextTrigger } from './recurring.js';
 
 const jobs = new Map<number, schedule.Job>();
 const recurJobs = new Map<number, schedule.Job>();

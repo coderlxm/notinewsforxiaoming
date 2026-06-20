@@ -1,7 +1,7 @@
-import { runMode, parseForcedMode } from './scheduled/runMode';
-import type { PushMode } from './scheduled/runMode';
-import { isChinaWorkday } from './calendar/chinaWorkday';
-import { bj } from './utils/time';
+import { runMode, parseForcedMode } from './scheduled/runMode.js';
+import type { PushMode } from './scheduled/runMode.js';
+import { isChinaWorkday } from './calendar/chinaWorkday.js';
+import { bj } from './utils/time.js';
 
 const MINUTES_PER_DAY = 24 * 60;
 const TOLERANCE_MINUTES = 10;

@@ -1,7 +1,7 @@
 import type { Telegraf } from 'telegraf';
-import { getDb } from '../reminders/db';
-import { config } from '../config';
-import { formatVitaminMessage, buildVitaminButtons } from '../formatters/index';
+import { getDb } from '../reminders/db.js';
+import { config } from '../config/index.js';
+import { formatVitaminMessage, buildVitaminButtons } from '../formatters/index.js';
 
 const LOOP_INTERVAL_MS = 30 * 60 * 1000;
 let vitaminLoopTimer: ReturnType<typeof setTimeout> | null = null;

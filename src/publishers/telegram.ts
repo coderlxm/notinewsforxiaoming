@@ -1,6 +1,6 @@
 import https from 'https';
 import { Telegraf } from 'telegraf';
-import { config } from '../config';
+import { config } from '../config/index.js';
 
 const telegramAgent = new https.Agent({
   family: 4,

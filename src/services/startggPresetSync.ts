@@ -2,12 +2,12 @@ import {
   createStartggWatchPlayer,
   findStartggWatchPlayerByPlayerId,
   updateStartggWatchPlayerName,
-} from './startggRepository';
+} from './startggRepository.js';
 import {
   loadStartggPresetPlayersConfig,
   writeStartggPresetPlayersConfig,
-} from './startggPresetConfig';
-import { resolveUserToPlayer, runStartggWatchOnce } from './startggTracker';
+} from './startggPresetConfig.js';
+import { resolveUserToPlayer, runStartggWatchOnce } from './startggTracker.js';
 import type { Telegraf } from 'telegraf';
 
 export async function syncStartggPresetPlayers(): Promise<number> {

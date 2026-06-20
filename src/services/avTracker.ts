@@ -1,10 +1,10 @@
 import OpenAI from 'openai';
 import Parser from 'rss-parser';
 import type { Telegraf } from 'telegraf';
-import { config } from '../config';
-import { formatAvLabelSummaryMessage, formatAvUpdateMessage } from '../formatters/avFormatter';
-import { sendAvUpdateWithGallery } from '../publishers/avTelegram';
-import { sendTelegramMessage } from '../publishers/telegram';
+import { config } from '../config/index.js';
+import { formatAvLabelSummaryMessage, formatAvUpdateMessage } from '../formatters/avFormatter.js';
+import { sendAvUpdateWithGallery } from '../publishers/avTelegram.js';
+import { sendTelegramMessage } from '../publishers/telegram.js';
 import {
   findAvSourceHealth,
   createPushBatchHistory,
@@ -17,11 +17,11 @@ import {
   updateAvSourceLastAlertAt,
   upsertAvSourceDown,
   type TrackedTarget
-} from './avRepository';
+} from './avRepository.js';
 import {
   parseAvContent,
   pickBestMagnet,
-} from './avContentParser';
+} from './avContentParser.js';
 
 interface FeedItemLike {
   guid?: string;

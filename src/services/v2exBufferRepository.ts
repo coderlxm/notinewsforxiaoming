@@ -1,4 +1,4 @@
-import { getDb } from '../reminders/db';
+import { getDb } from '../reminders/db.js';
 
 export interface V2exBufferBatch {
   id: number;

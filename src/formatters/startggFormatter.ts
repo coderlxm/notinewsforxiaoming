@@ -1,6 +1,6 @@
-import type { StartggWatchStatus } from '../services/startggRepository';
-import { escapeHtml } from '../utils/html';
-import { bjFormat } from '../utils/time';
+import type { StartggWatchStatus } from '../services/startggRepository.js';
+import { escapeHtml } from '../utils/html.js';
+import { bjFormat } from '../utils/time.js';
 
 function normalizeUrl(url: string | null): string {
   if (!url) {

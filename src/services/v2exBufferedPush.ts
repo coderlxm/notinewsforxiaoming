@@ -1,15 +1,15 @@
 import type { Telegraf } from 'telegraf';
-import { summarizeV2exWithAI } from '../ai/deepseek';
-import type { V2exTopic } from '../fetchers/v2ex';
-import { sendTelegramMessage } from '../publishers/telegram';
-import { renderMarkdownLikeAsHtml } from '../formatters';
+import { summarizeV2exWithAI } from '../ai/deepseek.js';
+import type { V2exTopic } from '../fetchers/v2ex.js';
+import { sendTelegramMessage } from '../publishers/telegram.js';
+import { renderMarkdownLikeAsHtml } from '../formatters/index.js';
 import {
   createV2exHolidayBatch,
   findUnconsumedV2exHolidayBatches,
   findV2exItemsByBatchIds,
   insertV2exBatchItems,
   markV2exBatchesConsumed,
-} from './v2exBufferRepository';
+} from './v2exBufferRepository.js';
 
 function chinaDateKey(date: Date): string {
   const parts = new Intl.DateTimeFormat('en-CA', {

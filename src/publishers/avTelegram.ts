@@ -1,8 +1,8 @@
 import type { Telegraf } from 'telegraf';
 import axios from 'axios';
-import { config } from '../config';
-import { sendTelegramMessage } from './telegram';
-import { createBot } from '../bot/createBot';
+import { config } from '../config/index.js';
+import { sendTelegramMessage } from './telegram.js';
+import { createBot } from '../bot/createBot.js';
 
 interface SendAvUpdateInput {
   message: string;

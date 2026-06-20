@@ -1,8 +1,8 @@
 import OpenAI from 'openai';
 import { z } from 'zod';
-import { config } from '../config/index';
-import { bjFormat } from '../utils/time';
-import type { RecurrenceSpec } from './recurring';
+import { config } from '../config/index.js';
+import { bjFormat } from '../utils/time.js';
+import type { RecurrenceSpec } from './recurring.js';
 
 export interface ParsedReminder {
   triggerAt: Date;

@@ -1,9 +1,9 @@
-import { config } from '../config';
-import { getDeepSeekClient, DEEPSEEK_MODEL } from './client';
-import type { GameNews } from '../fetchers/games';
-import type { EnglishContent } from '../fetchers/english';
-import type { V2exTopic } from '../fetchers/v2ex';
-import type { FitnessContext } from '../services/fitness';
+import { config } from '../config/index.js';
+import { getDeepSeekClient, DEEPSEEK_MODEL } from './client.js';
+import type { GameNews } from '../fetchers/games.js';
+import type { EnglishContent } from '../fetchers/english.js';
+import type { V2exTopic } from '../fetchers/v2ex.js';
+import type { FitnessContext } from '../services/fitness.js';
 
 export async function summarizeNewsWithAI(newsList: GameNews[]): Promise<GameNews[]> {
   if (!config.deepseekApiKey) {

@@ -1,10 +1,10 @@
 import type { Telegraf } from 'telegraf';
-import { fetchWeather } from '../fetchers/weather';
-import { fetchGameNews } from '../fetchers/games';
-import { fetchGithubTrending } from '../fetchers/github';
-import { fetchEnglishContent } from '../fetchers/english';
-import { fetchV2exHot } from '../fetchers/v2ex';
-import { isChinaWorkday } from '../calendar/chinaWorkday';
+import { fetchWeather } from '../fetchers/weather.js';
+import { fetchGameNews } from '../fetchers/games.js';
+import { fetchGithubTrending } from '../fetchers/github.js';
+import { fetchEnglishContent } from '../fetchers/english.js';
+import { fetchV2exHot } from '../fetchers/v2ex.js';
+import { isChinaWorkday } from '../calendar/chinaWorkday.js';
 import {
   summarizeNewsWithAI,
   summarizeGithubWithAI,
@@ -14,7 +14,7 @@ import {
   generateEnglishFallbackWithAI,
   summarizeV2exWithAI,
   generateFitnessPlanWithAI,
-} from '../ai/deepseek';
+} from '../ai/deepseek.js';
 import {
   formatTelegramMessage,
   formatGithubMessage,
@@ -26,14 +26,14 @@ import {
   formatVitaminMessage,
   formatServerHealthMessage,
   formatCoffeeMessage,
-} from '../formatters/index';
-import { sendTelegramMessage } from '../publishers/telegram';
-import { getFitnessContext, markFitnessWorkoutGenerated } from '../services/fitness';
-import { checkServerHealth } from '../services/serverHealth';
-import { runAvFetchOnce } from '../services/avTracker';
-import { bufferHolidayV2exTopics, pushBufferedV2exIfNeeded } from '../services/v2exBufferedPush';
-import { isVitaminEatenToday, triggerVitaminReminder } from '../services/vitaminReminder';
-import { runStartggWatchNow } from '../services/startggPresetSync';
+} from '../formatters/index.js';
+import { sendTelegramMessage } from '../publishers/telegram.js';
+import { getFitnessContext, markFitnessWorkoutGenerated } from '../services/fitness.js';
+import { checkServerHealth } from '../services/serverHealth.js';
+import { runAvFetchOnce } from '../services/avTracker.js';
+import { bufferHolidayV2exTopics, pushBufferedV2exIfNeeded } from '../services/v2exBufferedPush.js';
+import { isVitaminEatenToday, triggerVitaminReminder } from '../services/vitaminReminder.js';
+import { runStartggWatchNow } from '../services/startggPresetSync.js';
 
 export type PushMode = 'sleep' | 'wakeup' | 'server_health' | 'news' | 'github' | 'v2ex' | 'v2ex_buffered_push' | 'fitness' | 'vitamin' | 'english' | 'av_update' | 'startgg_watch' | 'coffee';
 

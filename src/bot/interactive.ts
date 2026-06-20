@@ -1,16 +1,16 @@
 import type { Telegraf, Context } from 'telegraf';
 import { message } from 'telegraf/filters';
-import { isAuthorized } from './auth';
+import { isAuthorized } from './auth.js';
 import {
   parseReminderCommand,
   parseNaturalReminder,
   parseRecurringCommand,
   type ParsedListReminders,
   type ParsedCancelReminder,
-} from '../reminders/parser';
-import * as repo from '../reminders/repository';
-import { scheduleReminder, cancelScheduledReminder, scheduleRecurringRule, cancelRecurringJob } from '../reminders/scheduler';
-import { buildRRuleText, getNextTrigger, describeRecurrence, getOccurrencesInRange } from '../reminders/recurring';
+} from '../reminders/parser.js';
+import * as repo from '../reminders/repository.js';
+import { scheduleReminder, cancelScheduledReminder, scheduleRecurringRule, cancelRecurringJob } from '../reminders/scheduler.js';
+import { buildRRuleText, getNextTrigger, describeRecurrence, getOccurrencesInRange } from '../reminders/recurring.js';
 import {
   formatStartMessage,
   formatHelpMessage,
@@ -32,29 +32,29 @@ import {
   buildPresetKeyboard,
   type ReminderListItem,
   type CancelCandidate,
-} from '../reminders/formatter';
+} from '../reminders/formatter.js';
 import {
   parseCallbackData,
   parseRecurringCallbackData,
   parseNaturalCancelCallbackData,
   parseVitaminCallbackData,
   parseStartggWatchCallbackData,
-} from './callbacks';
-import { runAvFetchOnce } from '../services/avTracker';
-import { markVitaminEatenToday, scheduleVitaminSnooze } from '../services/vitaminReminder';
-import { findPresetByText } from '../reminders/presets';
+} from './callbacks.js';
+import { runAvFetchOnce } from '../services/avTracker.js';
+import { markVitaminEatenToday, scheduleVitaminSnooze } from '../services/vitaminReminder.js';
+import { findPresetByText } from '../reminders/presets.js';
 import {
   buildStartggWatchCandidateButtons,
   formatStartggGuide,
   formatStartggRuntimeStatus,
   formatStartggWatchCandidates,
   formatStartggWatchList,
-} from '../formatters/startggFormatter';
+} from '../formatters/startggFormatter.js';
 import {
   fetchEventMeta,
   listEventEntrantPlayers,
   resolveUserToPlayer,
-} from '../services/startggTracker';
+} from '../services/startggTracker.js';
 import {
   createStartggWatchPlayer,
   findStartggWatchEventById,
@@ -64,16 +64,16 @@ import {
   listStartggWatchStatusViews,
   replaceActiveStartggWatchEvent,
   updateStartggWatchPlayerName,
-} from '../services/startggRepository';
-import { runStartggWatchNow, syncStartggPresetPlayers } from '../services/startggPresetSync';
-import { escapeHtml } from '../utils/html';
+} from '../services/startggRepository.js';
+import { runStartggWatchNow, syncStartggPresetPlayers } from '../services/startggPresetSync.js';
+import { escapeHtml } from '../utils/html.js';
 import {
   disableStartggPolling,
   enableStartggPolling,
   getStartggPollingRuntimeStatus,
   isStartggPollingEnabled,
   updateStartggFastWatch,
-} from '../scheduled/jobs';
+} from '../scheduled/jobs.js';
 
 interface StartggWatchCandidate {
   eventRowId: number;

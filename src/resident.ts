@@ -1,8 +1,8 @@
-import { createBot } from './bot/createBot';
-import { registerInteractiveHandlers } from './bot/interactive';
-import { schedulePendingReminders, schedulePendingRecurringRules } from './reminders/scheduler';
-import { registerFixedJobs } from './scheduled/jobs';
-import { restoreVitaminLoop } from './services/vitaminReminder';
+import { createBot } from './bot/createBot.js';
+import { registerInteractiveHandlers } from './bot/interactive.js';
+import { schedulePendingReminders, schedulePendingRecurringRules } from './reminders/scheduler.js';
+import { registerFixedJobs } from './scheduled/jobs.js';
+import { restoreVitaminLoop } from './services/vitaminReminder.js';
 
 async function main() {
   const bot = createBot();

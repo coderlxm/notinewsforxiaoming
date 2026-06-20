@@ -1,8 +1,8 @@
 import axios from 'axios';
 import type { Telegraf } from 'telegraf';
-import { config } from '../config';
-import { formatStartggStatusChangedMessage } from '../formatters/startggFormatter';
-import { sendTelegramMessage } from '../publishers/telegram';
+import { config } from '../config/index.js';
+import { formatStartggStatusChangedMessage } from '../formatters/startggFormatter.js';
+import { sendTelegramMessage } from '../publishers/telegram.js';
 import {
   findStartggWatchSnapshot,
   listActiveStartggWatchEvents,
@@ -15,7 +15,7 @@ import {
   type StartggWatchPlayer,
   hasStartggPushedSet,
   markStartggPushedSet,
-} from './startggRepository';
+} from './startggRepository.js';
 
 const STARTGG_GRAPHQL_ENDPOINT = 'https://api.start.gg/gql/alpha';
 const TRACKING_SETS_PER_PAGE = 120;

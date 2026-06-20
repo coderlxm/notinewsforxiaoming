@@ -1,6 +1,6 @@
 import * as cheerio from 'cheerio';
 import OpenAI from 'openai';
-import { config } from '../config';
+import { config } from '../config/index.js';
 
 export interface Magnet {
   name: string;

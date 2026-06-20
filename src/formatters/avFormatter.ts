@@ -1,4 +1,4 @@
-import { escapeHtml } from '../utils/html';
+import { escapeHtml } from '../utils/html.js';
 
 function normalizeUrl(url: string | null): string {
   if (!url) return '#';

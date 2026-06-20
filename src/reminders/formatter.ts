@@ -1,8 +1,8 @@
-import type { Reminder, RecurringRule } from './repository';
-import { bjFormat, formatShortDisplay } from '../utils/time';
-import { describeRecurrence } from './recurring';
-import { PRESET_REMINDERS } from './presets';
-import { escapeHtml } from '../utils/html';
+import type { Reminder, RecurringRule } from './repository.js';
+import { bjFormat, formatShortDisplay } from '../utils/time.js';
+import { describeRecurrence } from './recurring.js';
+import { PRESET_REMINDERS } from './presets.js';
+import { escapeHtml } from '../utils/html.js';
 
 interface InlineKeyboardMarkup {
   inline_keyboard: Array<Array<{ text: string; callback_data: string }>>;

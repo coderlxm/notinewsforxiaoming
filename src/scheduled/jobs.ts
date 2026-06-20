@@ -1,9 +1,9 @@
 import schedule from 'node-schedule';
 import type { Telegraf } from 'telegraf';
-import { runMode } from './runMode';
-import { getChinaDayOfWeek } from '../utils/time';
-import { isChinaWorkday } from '../calendar/chinaWorkday';
-import { runStartggWatchNow } from '../services/startggPresetSync';
+import { runMode } from './runMode.js';
+import { getChinaDayOfWeek } from '../utils/time.js';
+import { isChinaWorkday } from '../calendar/chinaWorkday.js';
+import { runStartggWatchNow } from '../services/startggPresetSync.js';
 
 const VITAMIN_WORKDAY_RANDOM_WINDOW_MS = 15 * 60 * 1000;
 const STARTGG_FAST_WATCH_INTERVAL_MS = 2 * 60 * 1000;

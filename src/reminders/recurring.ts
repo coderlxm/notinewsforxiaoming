@@ -3,7 +3,7 @@ import type { Weekday } from 'rrule';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
-import type { RecurringRule } from './repository';
+import type { RecurringRule } from './repository.js';
 
 const { RRule, rrulestr, datetime } = rrulePkg as {
   RRule: typeof import('rrule')['RRule'];

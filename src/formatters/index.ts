@@ -1,9 +1,9 @@
-import type { WeatherData } from '../fetchers/weather';
-import type { GameNews } from '../fetchers/games';
-import type { ServerHealthResult } from '../services/serverHealth';
-import { isChinaWorkday } from '../calendar/chinaWorkday';
-import { getCountdownInfo } from '../calendar/countdown';
-import { escapeHtml, escapeHtmlAttr } from '../utils/html';
+import type { WeatherData } from '../fetchers/weather.js';
+import type { GameNews } from '../fetchers/games.js';
+import type { ServerHealthResult } from '../services/serverHealth.js';
+import { isChinaWorkday } from '../calendar/chinaWorkday.js';
+import { getCountdownInfo } from '../calendar/countdown.js';
+import { escapeHtml, escapeHtmlAttr } from '../utils/html.js';
 
 function chinaDateLabel(): string {
   return new Intl.DateTimeFormat('zh-CN', {
