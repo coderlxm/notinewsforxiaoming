@@ -171,15 +171,15 @@ export function registerFixedJobs(bot: Telegraf): void {
     await runMode('english', getChinaDayOfWeek(), bot);
   });
 
-  // fitness: Mon(1) / Wed(3) 20:30
-  schedule.scheduleJob({ dayOfWeek: [1, 3], hour: 20, minute: 30, tz: 'Asia/Shanghai' }, async () => {
-    await runMode('fitness', getChinaDayOfWeek(), bot);
-  });
+  // fitness: Mon(1) / Wed(3) 20:30 — 暂时关闭推送
+  // schedule.scheduleJob({ dayOfWeek: [1, 3], hour: 20, minute: 30, tz: 'Asia/Shanghai' }, async () => {
+  //   await runMode('fitness', getChinaDayOfWeek(), bot);
+  // });
 
-  // fitness: Sat(6) 14:00
-  schedule.scheduleJob({ dayOfWeek: [6], hour: 14, minute: 0, tz: 'Asia/Shanghai' }, async () => {
-    await runMode('fitness', getChinaDayOfWeek(), bot);
-  });
+  // fitness: Sat(6) 14:00 — 暂时关闭推送
+  // schedule.scheduleJob({ dayOfWeek: [6], hour: 14, minute: 0, tz: 'Asia/Shanghai' }, async () => {
+  //   await runMode('fitness', getChinaDayOfWeek(), bot);
+  // });
 
   console.log('Fixed jobs registered.');
 }

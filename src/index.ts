@@ -89,12 +89,13 @@ async function main() {
       selectedMode = 'vitamin';
     } else if (isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.v2ex)) {
       selectedMode = 'v2ex';
-    } else if (
-      ((chinaDayOfWeek === 1 || chinaDayOfWeek === 3) && isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.fitness_weekday)) ||
-      (chinaDayOfWeek === 6 && isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.fitness_weekend))
-    ) {
-      selectedMode = 'fitness';
-    }
+    // fitness: 暂时关闭推送
+    // } else if (
+    //   ((chinaDayOfWeek === 1 || chinaDayOfWeek === 3) && isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.fitness_weekday)) ||
+    //   (chinaDayOfWeek === 6 && isNearSchedule(chinaMinuteOfDay, SPECIAL_SCHEDULE.fitness_weekend))
+    // ) {
+    //   selectedMode = 'fitness';
+    // }
     if (selectedMode) {
       await runMode(selectedMode, chinaDayOfWeek);
     }
