@@ -1,0 +1,15 @@
+services:
+  bot:
+    build: .
+    container_name: noti-news-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - noti-news-data:/app/data
+    environment:
+      - NODE_ENV=production
+      - TZ=Asia/Shanghai
+
+volumes:
+  noti-news-data:
