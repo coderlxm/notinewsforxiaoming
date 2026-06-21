@@ -99,11 +99,27 @@ function scheduleLoopAt(bot: Telegraf, nextTriggerAt: Date): void {
 
 export async function sendVitaminWithButtons(bot: Telegraf): Promise<void> {
   const message = formatVitaminMessage();
-  await bot.telegram.sendMessage(config.tgChatId, message, {
+  const sent = await bot.telegram.sendMessage(config.tgChatId, message, {
     parse_mode: 'HTML',
     link_preview_options: { is_disabled: true },
     ...buildVitaminButtons(),
   });
+  recordVitaminSentMessage(sent.message_id);
+}
+
+function recordVitaminSentMessage(messageId: number): void {
+  ensureTodayRow();
+  const db = getDb();
+  const key = todayKey();
+  db.prepare('INSERT OR IGNORE INTO vitamin_sent_messages (date_key, message_id) VALUES (?, ?)').run(key, messageId);
+}
+
+export function getAndClearVitaminSentMessages(): number[] {
+  const db = getDb();
+  const key = todayKey();
+  const rows = db.prepare('SELECT message_id FROM vitamin_sent_messages WHERE date_key = ?').all(key) as Array<{ message_id: number }>;
+  db.prepare('DELETE FROM vitamin_sent_messages WHERE date_key = ?').run(key);
+  return rows.map(r => r.message_id);
 }
 
 async function runVitaminLoopTick(bot: Telegraf): Promise<void> {

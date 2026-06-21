@@ -129,6 +129,12 @@ export function getDb(): Database.Database {
         count INTEGER NOT NULL DEFAULT 0
       );
 
+      CREATE TABLE IF NOT EXISTS vitamin_sent_messages (
+        date_key TEXT NOT NULL,
+        message_id INTEGER NOT NULL,
+        PRIMARY KEY (date_key, message_id)
+      );
+
       CREATE TABLE IF NOT EXISTS startgg_watch_players (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         player_id INTEGER NOT NULL UNIQUE,

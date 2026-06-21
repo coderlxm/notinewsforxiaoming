@@ -41,7 +41,7 @@ import {
   parseStartggWatchCallbackData,
 } from './callbacks.js';
 import { runAvFetchOnce } from '../services/avTracker.js';
-import { markVitaminEatenToday, scheduleVitaminSnooze } from '../services/vitaminReminder.js';
+import { markVitaminEatenToday, scheduleVitaminSnooze, getAndClearVitaminSentMessages } from '../services/vitaminReminder.js';
 import { findPresetByText } from '../reminders/presets.js';
 import {
   buildStartggWatchCandidateButtons,
@@ -599,10 +599,14 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
 
       if (vitaminAction === 'eaten') {
         markVitaminEatenToday();
-        try {
-          await ctx.deleteMessage();
-        } catch {
-          // message may already be deleted or not deletable
+        const chatId = String(ctx.chat!.id);
+        const messageIds = getAndClearVitaminSentMessages();
+        for (const messageId of messageIds) {
+          try {
+            await bot.telegram.deleteMessage(chatId, messageId);
+          } catch {
+            // message may already be deleted or not deletable
+          }
         }
         return;
       }
