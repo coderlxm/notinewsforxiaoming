@@ -58,6 +58,7 @@ function probeServer(target: ServerHealthTarget): ServerHealthResult {
     [
       '-i', SSH_KEY_PATH,
       '-o', 'BatchMode=yes',
+      '-o', 'StrictHostKeyChecking=accept-new',
       '-o', 'IdentitiesOnly=yes',
       '-o', 'PreferredAuthentications=publickey',
       '-o', 'GSSAPIAuthentication=no',
