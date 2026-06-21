@@ -54,7 +54,7 @@ import {
   fetchEventMeta,
   listEventEntrantPlayers,
   resolveUserToPlayer,
-} from '../services/startggTracker.js';
+} from '../services/startgg/index.js';
 import {
   createStartggWatchPlayer,
   findStartggWatchEventById,
