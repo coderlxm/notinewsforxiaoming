@@ -1,4 +1,6 @@
 import Parser from 'rss-parser';
+import { load as cheerioLoad } from 'cheerio';
+import pTimeout from 'p-timeout';
 
 export interface EnglishContent {
   source: string;
@@ -66,7 +68,9 @@ const SOURCES = [
 ];
 
 function stripHtml(input: string): string {
-  return input.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  const $ = cheerioLoad(input);
+  $('script, style').remove();
+  return $.root().text().replace(/\s+/g, ' ').trim();
 }
 
 function countWords(input: string): number {
@@ -85,18 +89,7 @@ function shuffle<T>(items: T[]): T[] {
 }
 
 async function parseWithTimeout(url: string, timeoutMs: number): Promise<Parser.Output<unknown>> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`Timeout after ${timeoutMs}ms: ${url}`)), timeoutMs);
-    parser.parseURL(url)
-      .then((parsed) => {
-        clearTimeout(timer);
-        resolve(parsed);
-      })
-      .catch((error) => {
-        clearTimeout(timer);
-        reject(error);
-      });
-  });
+  return pTimeout(parser.parseURL(url), { milliseconds: timeoutMs, message: `Timeout after ${timeoutMs}ms: ${url}` });
 }
 
 function pickCandidate(

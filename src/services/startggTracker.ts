@@ -1,4 +1,4 @@
-import axios from 'axios';
+import { GraphQLClient } from 'graphql-request';
 import type { Telegraf } from 'telegraf';
 import { config } from '../config/index.js';
 import { formatStartggStatusChangedMessage } from '../formatters/startggFormatter.js';
@@ -22,6 +22,7 @@ const TRACKING_SETS_PER_PAGE = 120;
 const TRACKING_ENTRANTS_PER_PAGE = 300;
 const TRACKING_STANDINGS_PER_PAGE = 350;
 const ENTRANTS_PER_PAGE = 300;
+const STARTGG_REQUEST_TIMEOUT_MS = 15000;
 
 const EVENT_TRACKING_HEADER_QUERY = `
 query EventTrackingHeader($slug: String!) {
@@ -185,9 +186,22 @@ query EventSetsByEntrants($slug: String!, $entrantIds: [ID!]!, $page: Int!, $per
 }
 `;
 
-interface GraphqlResponse<T> {
-  data?: T;
-  errors?: Array<{ message: string }>;
+const startggClient = new GraphQLClient(STARTGG_GRAPHQL_ENDPOINT, {
+  requestMiddleware: (request) => {
+    request.headers = { ...request.headers, Authorization: `Bearer ${config.startggApiToken}` };
+    return request;
+  },
+});
+
+export async function queryStartgg<TData>(query: string, variables: Record<string, unknown>): Promise<TData> {
+  if (!config.startggApiToken) {
+    throw new Error('STARTGG_API_TOKEN is not set.');
+  }
+  return startggClient.request<TData, Record<string, unknown>>({
+    document: query,
+    variables,
+    signal: AbortSignal.timeout(STARTGG_REQUEST_TIMEOUT_MS),
+  });
 }
 
 interface EventTrackingResponse {
@@ -481,32 +495,6 @@ function buildPlayerDisplayName(gamerTag: string | null, prefix: string | null):
     return `${org} | ${gamer}`;
   }
   return gamer || org;
-}
-
-export async function queryStartgg<TData>(query: string, variables: Record<string, unknown>): Promise<TData> {
-  if (!config.startggApiToken) {
-    throw new Error('STARTGG_API_TOKEN is not set.');
-  }
-
-  const response = await axios.post<GraphqlResponse<TData>>(
-    STARTGG_GRAPHQL_ENDPOINT,
-    { query, variables },
-    {
-      headers: {
-        Authorization: `Bearer ${config.startggApiToken}`,
-        'Content-Type': 'application/json',
-      },
-      timeout: 15000,
-    }
-  );
-
-  if (response.data.errors && response.data.errors.length > 0) {
-    throw new Error(`start.gg GraphQL error: ${response.data.errors[0].message}`);
-  }
-  if (!response.data.data) {
-    throw new Error('start.gg GraphQL returned empty data.');
-  }
-  return response.data.data;
 }
 
 function normalizeTotalPages(totalPages: number | null | undefined): number {

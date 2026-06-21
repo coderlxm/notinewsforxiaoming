@@ -2,7 +2,7 @@ import type { Telegraf } from 'telegraf';
 import { summarizeV2exWithAI } from '../ai/deepseek.js';
 import type { V2exTopic } from '../fetchers/v2ex.js';
 import { sendTelegramMessage } from '../publishers/telegram.js';
-import { renderMarkdownLikeAsHtml } from '../formatters/index.js';
+import { renderMarkdownLikeAsHtml } from '../utils/telegramMarkdown.js';
 import {
   createV2exHolidayBatch,
   findUnconsumedV2exHolidayBatches,

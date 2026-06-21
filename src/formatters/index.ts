@@ -4,6 +4,7 @@ import type { ServerHealthResult } from '../services/serverHealth.js';
 import { isChinaWorkday } from '../calendar/chinaWorkday.js';
 import { getCountdownInfo } from '../calendar/countdown.js';
 import { escapeHtml, escapeHtmlAttr } from '../utils/html.js';
+import { renderMarkdownLikeAsHtml } from '../utils/telegramMarkdown.js';
 
 function chinaDateLabel(): string {
   return new Intl.DateTimeFormat('zh-CN', {
@@ -32,17 +33,6 @@ function normalizeUrl(url: string): string {
     // Ignore invalid URL and fall back to '#'.
   }
   return '#';
-}
-
-export function renderMarkdownLikeAsHtml(input: string): string {
-  let html = escapeHtml(input);
-  html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (_match, label: string, rawUrl: string) => {
-    const safeUrl = escapeHtmlAttr(normalizeUrl(rawUrl));
-    return `<a href="${safeUrl}">${label}</a>`;
-  });
-  html = html.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
-  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
-  return html;
 }
 
 export function formatTelegramMessage(weather: WeatherData | null, news: GameNews[]): string {
