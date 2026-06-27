@@ -89,7 +89,7 @@ export function formatStartggGuide(playersCount: number, eventsCount: number): s
     lines.push('2. <code>/watch https://www.start.gg/tournament/xxx/event/yyy</code>');
   } else {
     lines.push('常用命令：');
-    lines.push('• <code>/startgg go</code> 自动发现当前赛事、立即检查并开启轮询');
+    lines.push('• <code>/startgg go evo</code> 按赛事关键词自动发现项目、立即检查并开启轮询');
     lines.push('• <code>/watch &lt;选手名 | 用户链接 | 项目链接&gt;</code>');
     lines.push('• <code>/startgg status</code> 查看运行状态');
     lines.push('• <code>/watchlist</code> 查看监控对象和最近状态');
@@ -99,6 +99,39 @@ export function formatStartggGuide(playersCount: number, eventsCount: number): s
     lines.push('');
     lines.push('添加项目后直接检查，不再按赛事时间窗口跳过。');
   }
+  return lines.join('\n');
+}
+
+export function formatStartggGoTournamentCandidates(input: {
+  reason: 'missing_keyword' | 'no_match' | 'multiple_matches';
+  keyword: string;
+  syncedPlayers: number;
+  candidates: Array<{
+    tournamentName: string;
+    tournamentSlug: string;
+    events: Array<{ eventName: string }>;
+  }>;
+}): string {
+  const reasonText = input.reason === 'missing_keyword'
+    ? '请指定这次要监控的赛事关键词。'
+    : input.reason === 'no_match'
+      ? `没有命中「${escapeHtml(input.keyword)}」，请改用下面候选赛事的关键词。`
+      : `「${escapeHtml(input.keyword)}」命中了多个赛事，请使用更具体的关键词。`;
+  const lines = [
+    '🥊 <b>start.gg go 候选赛事</b>',
+    '──────────────────',
+    reasonText,
+    `固定选手：${input.syncedPlayers} 位`,
+    '',
+  ];
+
+  input.candidates.forEach((candidate, index) => {
+    const suggestedKeyword = candidate.tournamentSlug.replace(/^tournament\//, '');
+    lines.push(`${index + 1}. ${escapeHtml(candidate.tournamentName)}`);
+    lines.push(`   项目：${candidate.events.length} 个`);
+    lines.push(`   命令：<code>/startgg go ${escapeHtml(suggestedKeyword)}</code>`);
+  });
+
   return lines.join('\n');
 }
 

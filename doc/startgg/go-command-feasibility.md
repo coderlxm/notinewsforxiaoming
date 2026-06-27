@@ -13,14 +13,14 @@
 目标交互应收敛为：
 
 ```text
-/startgg go
+/startgg go <赛事关键词>
 ```
 
 执行后直接：
 
 1. 同步 `data/startgg_preset_players.json` 中的固定选手。
 2. 根据这些选手在 start.gg 上的当前/近期 set 记录发现他们参与的 event。
-3. 激活发现到的 event。
+3. 只激活 tournament name 或 tournament slug 命中关键词的 event。
 4. 立即执行一次检查。
 5. 开启 start.gg 轮询。
 
@@ -30,7 +30,7 @@
 
 但需要明确一个边界：**只靠 player 的 set 历史，适合“比赛已经开始或 bracket 已生成”的场景；如果选手只是报名但尚未生成任何 set，无法稳定从 player sets 反推出 event。**
 
-这个边界符合用户描述的“比赛期间我自己知道什么时候有比赛，直接输入 `/startgg go`”。也就是说，`go` 的语义不应是“全网预测报名赛事”，而应是“现在进入比赛监控模式，基于固定选手清单发现已经可追踪的赛事并订阅”。
+这个边界符合用户描述的“比赛期间我自己知道什么时候有比赛，直接输入命令”。也就是说，`go` 的语义不应是“全网预测报名赛事”，而应是“现在进入比赛监控模式，基于固定选手清单发现已经可追踪的赛事，并按用户给出的赛事关键词订阅”。
 
 不建议优先做复杂的自然语言赛事窗口、全站 tournament 扫描或网页抓取。它们会显著增加不确定性和维护成本，不符合本项目主路径优先的原则。
 
@@ -108,7 +108,7 @@ preset players
 新增：
 
 ```text
-/startgg go
+/startgg go evo
 ```
 
 返回信息建议包含：
@@ -136,6 +136,16 @@ start.gg go 失败：没有从固定选手近期 set 中发现当前赛事。
 
 这里不要静默保留旧 event 后继续轮询，否则用户会以为已经订阅新赛事。
 
+如果不带关键词：
+
+```text
+/startgg go
+```
+
+只展示候选 tournament 和可复制命令，不写入 active events。
+
+如果关键词命中多个 tournament，也只展示候选 tournament，不写入 active events。
+
 ### 5.2 自动发现规则
 
 推荐主规则：
@@ -145,7 +155,9 @@ start.gg go 失败：没有从固定选手近期 set 中发现当前赛事。
 3. 对每个 `player_id` 查询近期 sets。
 4. 从 set 中提取 event。
 5. 保留 tournament 时间覆盖当前时刻的 event。
-6. 去重后按 tournament/event 激活。
+6. 按用户输入的关键词匹配 tournament name / tournament slug。
+7. 若唯一命中 tournament，则激活该 tournament 下发现到的 event。
+8. 若未命中或命中多个 tournament，则只返回候选列表，不写库。
 
 时间判断建议使用 tournament 的 `startAt/endAt`，因为当前项目文档已经说明 start.gg 监控按 tournament 活跃时段判断更合理。
 
@@ -169,7 +181,7 @@ replaceActiveStartggWatchEvents(events)
 
 ### 5.4 立即检查与轮询
 
-`/startgg go` 激活 event 后执行：
+`/startgg go <赛事关键词>` 唯一命中 tournament 并激活 event 后执行：
 
 1. `runStartggWatchNow(bot)`
 2. `updateStartggFastWatch(bot, summary.pendingSetCount)`
@@ -250,16 +262,17 @@ replaceActiveStartggWatchEvents(events)
 新增：
 
 ```ts
-runStartggGo(bot)
+runStartggGo(bot, keyword)
 ```
 
 职责：
 
 1. 同步 preset players。
 2. 发现 active events。
-3. 批量激活 events。
-4. 执行一次检查。
-5. 返回摘要。
+3. 按关键词筛选唯一 tournament。
+4. 批量激活该 tournament 下的 events。
+5. 执行一次检查。
+6. 返回摘要。
 
 ### 6.6 `src/bot/interactive.ts`
 
@@ -337,11 +350,11 @@ arg === 'go'
 
 ## 10. 验收口径
 
-1. 发送 `/startgg go` 后，无需手动 `/watch <event_url>`。
-2. 发送 `/startgg go` 后，无需手动 `/startggpoll on`。
+1. 发送 `/startgg go <赛事关键词>` 后，无需手动 `/watch <event_url>`。
+2. 发送 `/startgg go <赛事关键词>` 后，无需手动 `/startggpoll on`。
 3. 固定选手清单会先同步到 watch players。
-4. 自动发现到的 event 会成为 active events。
+4. 自动发现到且命中唯一 tournament 的 event 会成为 active events。
 5. 发现结果为空时不修改 active events，并直接返回失败原因。
-6. 发现成功后会立即执行一次 start.gg 检查。
-7. 发现成功后会开启 20 分钟轮询。
-
+6. 不带关键词、未命中关键词、命中多个 tournament 时不修改 active events，只返回候选列表。
+7. 发现成功后会立即执行一次 start.gg 检查。
+8. 发现成功后会开启 20 分钟轮询。

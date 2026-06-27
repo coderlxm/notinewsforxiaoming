@@ -9,9 +9,40 @@ import {
   loadStartggPresetPlayersConfig,
   writeStartggPresetPlayersConfig,
 } from './startggPresetConfig.js';
-import { discoverStartggActiveEventsForPlayers } from './startggDiscovery.js';
+import {
+  discoverStartggActiveEventsForPlayers,
+  type StartggDiscoveredEvent,
+} from './startggDiscovery.js';
 import { resolveUserToPlayer, runStartggWatchOnce } from './startgg/index.js';
 import type { Telegraf } from 'telegraf';
+
+export interface StartggGoTournamentCandidate {
+  tournamentId: number;
+  tournamentName: string;
+  tournamentSlug: string;
+  events: StartggDiscoveredEvent[];
+}
+
+export type StartggGoResult =
+  | {
+      status: 'candidates';
+      reason: 'missing_keyword' | 'no_match' | 'multiple_matches';
+      keyword: string;
+      syncedPlayers: number;
+      candidates: StartggGoTournamentCandidate[];
+    }
+  | {
+      status: 'started';
+      keyword: string;
+      syncedPlayers: number;
+      tournamentName: string;
+      tournamentSlug: string;
+      discoveredEvents: number;
+      checkedPlayers: number;
+      checkedEvents: number;
+      changed: number;
+      pendingSetCount: number;
+    };
 
 export async function syncStartggPresetPlayers(): Promise<number> {
   const config = loadStartggPresetPlayersConfig();
@@ -65,14 +96,45 @@ export async function runStartggWatchNow(bot?: Telegraf): Promise<{
   };
 }
 
-export async function runStartggGo(bot?: Telegraf): Promise<{
-  syncedPlayers: number;
-  discoveredEvents: number;
-  checkedPlayers: number;
-  checkedEvents: number;
-  changed: number;
-  pendingSetCount: number;
-}> {
+function groupDiscoveredEventsByTournament(events: StartggDiscoveredEvent[]): StartggGoTournamentCandidate[] {
+  const grouped = new Map<number, StartggGoTournamentCandidate>();
+  for (const event of events) {
+    const existing = grouped.get(event.tournamentId);
+    if (existing) {
+      existing.events.push(event);
+      continue;
+    }
+    grouped.set(event.tournamentId, {
+      tournamentId: event.tournamentId,
+      tournamentName: event.tournamentName,
+      tournamentSlug: event.tournamentSlug,
+      events: [event],
+    });
+  }
+
+  return Array.from(grouped.values()).sort((a, b) => a.tournamentName.localeCompare(b.tournamentName));
+}
+
+function normalizeStartggGoSearchText(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function compactStartggGoSearchText(value: string): string {
+  return normalizeStartggGoSearchText(value).replace(/\s+/g, '');
+}
+
+function matchesStartggGoKeyword(candidate: StartggGoTournamentCandidate, keyword: string): boolean {
+  const query = normalizeStartggGoSearchText(keyword);
+  const compactQuery = compactStartggGoSearchText(keyword);
+  const name = normalizeStartggGoSearchText(candidate.tournamentName);
+  const slug = normalizeStartggGoSearchText(candidate.tournamentSlug);
+  return name.includes(query)
+    || slug.includes(query)
+    || compactStartggGoSearchText(candidate.tournamentName).includes(compactQuery)
+    || compactStartggGoSearchText(candidate.tournamentSlug).includes(compactQuery);
+}
+
+export async function runStartggGo(bot: Telegraf | undefined, keyword: string): Promise<StartggGoResult> {
   const syncedPlayers = await syncStartggPresetPlayers();
   const players = listEnabledStartggWatchPlayers();
   if (players.length === 0) {
@@ -83,20 +145,56 @@ export async function runStartggGo(bot?: Telegraf): Promise<{
   if (events.length === 0) {
     throw new Error('没有从固定选手近期 set 中发现当前赛事。');
   }
+  const candidates = groupDiscoveredEventsByTournament(events);
+  const trimmedKeyword = keyword.trim();
+  if (!trimmedKeyword) {
+    return {
+      status: 'candidates',
+      reason: 'missing_keyword',
+      keyword: trimmedKeyword,
+      syncedPlayers,
+      candidates,
+    };
+  }
 
-  replaceActiveStartggWatchEvents(events.map((event) => ({
+  const matchedCandidates = candidates.filter((candidate) => matchesStartggGoKeyword(candidate, trimmedKeyword));
+  if (matchedCandidates.length === 0) {
+    return {
+      status: 'candidates',
+      reason: 'no_match',
+      keyword: trimmedKeyword,
+      syncedPlayers,
+      candidates,
+    };
+  }
+  if (matchedCandidates.length > 1) {
+    return {
+      status: 'candidates',
+      reason: 'multiple_matches',
+      keyword: trimmedKeyword,
+      syncedPlayers,
+      candidates: matchedCandidates,
+    };
+  }
+
+  const matchedTournament = matchedCandidates[0]!;
+  replaceActiveStartggWatchEvents(matchedTournament.events.map((event) => ({
     event_slug: event.eventSlug,
     event_name: event.eventName,
     event_id: event.eventId,
   })));
 
   const watchSummary = await runStartggWatchOnce(bot, {
-    eventSlugs: events.map((event) => event.eventSlug),
+    eventSlugs: matchedTournament.events.map((event) => event.eventSlug),
   });
 
   return {
+    status: 'started',
+    keyword: trimmedKeyword,
     syncedPlayers,
-    discoveredEvents: events.length,
+    tournamentName: matchedTournament.tournamentName,
+    tournamentSlug: matchedTournament.tournamentSlug,
+    discoveredEvents: matchedTournament.events.length,
     checkedPlayers: watchSummary.checkedPlayers,
     checkedEvents: watchSummary.checkedEvents,
     changed: watchSummary.changed,

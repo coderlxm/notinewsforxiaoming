@@ -11,17 +11,25 @@
 
 比赛期间直接发送：
 
-- `/startgg go`
+- `/startgg go <赛事关键词>`
+
+示例：
+
+- `/startgg go evo`
+- `/startgg go evo-us-2026`
+- `/startgg go evo us 2026`
 
 预期：
 - 自动同步固定选手清单
-- 自动从固定选手近期 set 中发现当前赛事项目
-- 自动订阅发现到的项目
+- 自动从固定选手近期 set 中发现当前候选赛事
+- 只订阅 tournament name 或 tournament slug 命中关键词的项目
 - 立即执行一次检查
 - 自动开启 start.gg 轮询
 
 边界：
 - 如果赛事尚未生成 set，系统无法从 player sets 反推出 event，会直接返回失败原因。
+- `/startgg go` 不带关键词时只展示候选赛事，不会自动订阅。
+- 关键词命中多个 tournament 时只展示候选赛事，不会自动订阅。
 
 ## 3. 手动使用顺序与预期
 
@@ -68,7 +76,7 @@
 
 ## 5. 常用命令
 
-- `/startgg go`：自动发现当前赛事、立即检查并开启轮询
+- `/startgg go <赛事关键词>`：按赛事关键词自动发现项目、立即检查并开启轮询
 - `/startgg`：查看引导、当前配置数量、当前活跃项目数
 - `/watch <选手名 | user链接 | event链接>`：添加选手或项目
 - `/watchlist`：查看监控对象与最近状态

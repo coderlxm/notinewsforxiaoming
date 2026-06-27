@@ -5,6 +5,9 @@ import { normalizeEventSlug } from './startgg/tracker.js';
 const STARTGG_GO_SET_LOOKBACK_SECONDS = 7 * 24 * 60 * 60;
 
 export interface StartggDiscoveredEvent {
+  tournamentId: number;
+  tournamentName: string;
+  tournamentSlug: string;
   eventId: number;
   eventSlug: string;
   eventName: string;
@@ -39,6 +42,9 @@ export async function discoverStartggActiveEventsForPlayers(
       if (!event.tournament) {
         throw new Error(`start.gg event missing tournament: ${event.name}`);
       }
+      if (!event.tournament.slug) {
+        throw new Error(`start.gg tournament missing slug: ${event.tournament.name}`);
+      }
       if (event.tournament.startAt === null || event.tournament.endAt === null) {
         throw new Error(`start.gg tournament missing startAt/endAt: ${event.tournament.name}`);
       }
@@ -47,6 +53,9 @@ export async function discoverStartggActiveEventsForPlayers(
       const eventSlug = normalizeEventSlug(event.slug);
       const eventName = `${event.tournament.name} / ${event.name}`;
       events.set(eventSlug, {
+        tournamentId: event.tournament.id,
+        tournamentName: event.tournament.name,
+        tournamentSlug: event.tournament.slug,
         eventId: event.id,
         eventSlug,
         eventName,
