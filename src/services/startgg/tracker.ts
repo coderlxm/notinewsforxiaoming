@@ -20,6 +20,7 @@ import {
   fetchEventStandings,
   fetchEventEntrantsDetailed,
   fetchEventBasic,
+  fetchUserPlayer,
 } from './client.js';
 import type { TrackedSetNode, TrackedStandingNode } from './queries.js';
 
