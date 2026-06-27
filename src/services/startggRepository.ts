@@ -108,6 +108,41 @@ export function replaceActiveStartggWatchEvent(eventSlug: string, eventName: str
   replace();
 }
 
+export function replaceActiveStartggWatchEvents(events: Array<{
+  event_slug: string;
+  event_name: string;
+  event_id: number;
+}>): void {
+  if (events.length === 0) {
+    throw new Error('start.gg go did not discover any events.');
+  }
+
+  const db = getDb();
+  const now = new Date().toISOString();
+  const replace = db.transaction(() => {
+    db.prepare(`
+      UPDATE startgg_watch_events
+      SET active = 0, updated_at = ?
+      WHERE active = 1
+    `).run(now);
+
+    const upsert = db.prepare(`
+      INSERT INTO startgg_watch_events (event_slug, event_name, event_id, active, created_at, updated_at)
+      VALUES (?, ?, ?, 1, ?, ?)
+      ON CONFLICT(event_slug) DO UPDATE SET
+        event_name = excluded.event_name,
+        event_id = excluded.event_id,
+        active = 1,
+        updated_at = excluded.updated_at
+    `);
+
+    for (const event of events) {
+      upsert.run(event.event_slug, event.event_name, event.event_id, now, now);
+    }
+  });
+  replace();
+}
+
 export function findStartggWatchEventById(id: number): StartggWatchEvent | null {
   const db = getDb();
   const row = db.prepare(`

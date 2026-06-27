@@ -1,12 +1,15 @@
 import {
   createStartggWatchPlayer,
   findStartggWatchPlayerByPlayerId,
+  listEnabledStartggWatchPlayers,
+  replaceActiveStartggWatchEvents,
   updateStartggWatchPlayerName,
 } from './startggRepository.js';
 import {
   loadStartggPresetPlayersConfig,
   writeStartggPresetPlayersConfig,
 } from './startggPresetConfig.js';
+import { discoverStartggActiveEventsForPlayers } from './startggDiscovery.js';
 import { resolveUserToPlayer, runStartggWatchOnce } from './startgg/index.js';
 import type { Telegraf } from 'telegraf';
 
@@ -55,6 +58,45 @@ export async function runStartggWatchNow(bot?: Telegraf): Promise<{
   await syncStartggPresetPlayers();
   const watchSummary = await runStartggWatchOnce(bot);
   return {
+    checkedPlayers: watchSummary.checkedPlayers,
+    checkedEvents: watchSummary.checkedEvents,
+    changed: watchSummary.changed,
+    pendingSetCount: watchSummary.pendingSetCount,
+  };
+}
+
+export async function runStartggGo(bot?: Telegraf): Promise<{
+  syncedPlayers: number;
+  discoveredEvents: number;
+  checkedPlayers: number;
+  checkedEvents: number;
+  changed: number;
+  pendingSetCount: number;
+}> {
+  const syncedPlayers = await syncStartggPresetPlayers();
+  const players = listEnabledStartggWatchPlayers();
+  if (players.length === 0) {
+    throw new Error('固定选手清单为空，无法自动发现赛事。');
+  }
+
+  const events = await discoverStartggActiveEventsForPlayers(players);
+  if (events.length === 0) {
+    throw new Error('没有从固定选手近期 set 中发现当前赛事。');
+  }
+
+  replaceActiveStartggWatchEvents(events.map((event) => ({
+    event_slug: event.eventSlug,
+    event_name: event.eventName,
+    event_id: event.eventId,
+  })));
+
+  const watchSummary = await runStartggWatchOnce(bot, {
+    eventSlugs: events.map((event) => event.eventSlug),
+  });
+
+  return {
+    syncedPlayers,
+    discoveredEvents: events.length,
     checkedPlayers: watchSummary.checkedPlayers,
     checkedEvents: watchSummary.checkedEvents,
     changed: watchSummary.changed,

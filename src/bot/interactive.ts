@@ -65,7 +65,7 @@ import {
   replaceActiveStartggWatchEvent,
   updateStartggWatchPlayerName,
 } from '../services/startggRepository.js';
-import { runStartggWatchNow, syncStartggPresetPlayers } from '../services/startggPresetSync.js';
+import { runStartggGo, runStartggWatchNow, syncStartggPresetPlayers } from '../services/startggPresetSync.js';
 import { escapeHtml } from '../utils/html.js';
 import {
   disableStartggPolling,
@@ -163,9 +163,27 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
 
   bot.command('startgg', async (ctx) => {
     if (!isAuthorized(ctx)) return;
+    const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
+    const arg = text.replace(/^\/startgg\s*/, '').trim().toLowerCase();
     try {
-      const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
-      const arg = text.replace(/^\/startgg\s*/, '').trim().toLowerCase();
+      if (arg === 'go') {
+        await ctx.reply('开始 start.gg go：同步固定选手、自动发现当前赛事并启动监控...', { parse_mode: 'HTML' });
+        const summary = await runStartggGo(bot);
+        updateStartggFastWatch(bot, summary.pendingSetCount);
+        const enabled = enableStartggPolling(bot);
+        await ctx.reply(
+          [
+            'start.gg go 已启动',
+            `固定选手：${summary.syncedPlayers} 位`,
+            `自动订阅项目：${summary.discoveredEvents} 个`,
+            `立即检查：项目 ${summary.checkedEvents} 个，选手 ${summary.checkedPlayers} 位，状态变化 ${summary.changed} 条，进行中 ${summary.pendingSetCount} 条`,
+            `自动轮询：${enabled ? '已开启' : '已经开启'}`,
+          ].join('\n'),
+          { parse_mode: 'HTML' },
+        );
+        return;
+      }
+
       if (arg === 'status') {
         const players = listStartggWatchPlayers();
         const events = listStartggWatchEvents().filter((row) => row.active === 1);
@@ -188,7 +206,7 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
       await ctx.reply(`${formatStartggGuide(players.length, events.length)}\n\n当前监控项目：${events.length} 个\n自动轮询：${pollingText}`, { parse_mode: 'HTML' });
     } catch (e) {
       if (e instanceof Error) {
-        await ctx.reply(`start.gg 状态读取失败：${e.message}`, { parse_mode: 'HTML' });
+        await ctx.reply(`${arg === 'go' ? 'start.gg go 失败' : 'start.gg 状态读取失败'}：${e.message}`, { parse_mode: 'HTML' });
         return;
       }
       throw e;

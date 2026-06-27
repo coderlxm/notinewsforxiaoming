@@ -9,6 +9,8 @@ import {
   type EventEntrantsResponse,
   type UserPlayerResponse,
   type EventBasicResponse,
+  type PlayerRecentSetsResponse,
+  type PlayerRecentSetNode,
   type TrackedSetNode,
   type TrackedStandingNode,
   EVENT_TRACKING_HEADER_QUERY,
@@ -19,6 +21,7 @@ import {
   EVENT_ENTRANTS_QUERY,
   USER_PLAYER_QUERY,
   EVENT_BASIC_QUERY,
+  PLAYER_RECENT_SETS_QUERY,
 } from './queries.js';
 
 const STARTGG_GRAPHQL_ENDPOINT = 'https://api.start.gg/gql/alpha';
@@ -27,6 +30,7 @@ const TRACKING_SETS_PER_PAGE = 120;
 const TRACKING_ENTRANTS_PER_PAGE = 300;
 const TRACKING_STANDINGS_PER_PAGE = 350;
 const ENTRANTS_PER_PAGE = 300;
+const PLAYER_RECENT_SETS_PER_PAGE = 100;
 
 const startggClient = new GraphQLClient(STARTGG_GRAPHQL_ENDPOINT, {
   requestMiddleware: (request) => {
@@ -146,4 +150,16 @@ export async function fetchEventBasic(slug: string): Promise<EventBasicResponse[
 export async function fetchUserPlayer(slug: string): Promise<UserPlayerResponse['user']> {
   const data = await queryStartgg<UserPlayerResponse>(USER_PLAYER_QUERY, { slug });
   return data.user;
+}
+
+export async function fetchPlayerRecentSets(playerId: number, updatedAfter: number): Promise<PlayerRecentSetNode[]> {
+  return fetchAllPages(
+    PLAYER_RECENT_SETS_QUERY,
+    (page, perPage) => ({ playerId, playerIds: [playerId], updatedAfter, page, perPage }),
+    (data: PlayerRecentSetsResponse) => {
+      if (!data.player) return null;
+      return { totalPages: data.player.sets.pageInfo?.totalPages, nodes: data.player.sets.nodes };
+    },
+    PLAYER_RECENT_SETS_PER_PAGE,
+  );
 }

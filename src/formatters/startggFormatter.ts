@@ -89,6 +89,7 @@ export function formatStartggGuide(playersCount: number, eventsCount: number): s
     lines.push('2. <code>/watch https://www.start.gg/tournament/xxx/event/yyy</code>');
   } else {
     lines.push('常用命令：');
+    lines.push('• <code>/startgg go</code> 自动发现当前赛事、立即检查并开启轮询');
     lines.push('• <code>/watch &lt;选手名 | 用户链接 | 项目链接&gt;</code>');
     lines.push('• <code>/startgg status</code> 查看运行状态');
     lines.push('• <code>/watchlist</code> 查看监控对象和最近状态');
