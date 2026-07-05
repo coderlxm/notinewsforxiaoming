@@ -1,10 +1,16 @@
 import OpenAI from 'openai';
 import Parser from 'rss-parser';
 import type { Telegraf } from 'telegraf';
+import { createBot } from '../bot/createBot.js';
 import { config } from '../config/index.js';
 import { formatAvLabelSummaryMessage, formatAvUpdateMessage } from '../formatters/avFormatter.js';
-import { sendAvUpdateWithGallery } from '../publishers/avTelegram.js';
+import { sendAvUpdate } from '../publishers/avTelegram.js';
 import { sendTelegramMessage } from '../publishers/telegram.js';
+import {
+  buildAvTargetRoute,
+  buildAvTargetUrl,
+  isAvBatchTarget,
+} from './avTargets.js';
 import {
   findAvSourceHealth,
   createPushBatchHistory,
@@ -47,6 +53,7 @@ interface TargetRunSummary {
 interface RunAvFetchOptions {
   forceResend?: boolean;
   healthNotify?: boolean;
+  avSendMode?: 'cover' | 'gallery';
 }
 
 const parser = new Parser();
@@ -55,13 +62,6 @@ const AV_LABEL_SUMMARY_TOPK = 10;
 const AV_SOURCE_ALERT_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const LABEL_DELAY_MIN_MS = 5000;
 const LABEL_DELAY_MAX_MS = 10000;
-
-function buildTargetRoute(target: TrackedTarget): string {
-  if (target.target_type === 'label') {
-    return `javbus/label/${target.target_id}`;
-  }
-  return `javbus/star/${target.target_id}`;
-}
 
 function pickItemGuid(item: FeedItemLike): string | null {
   const guid = item.guid || item.id || item.link || item.title;
@@ -194,10 +194,20 @@ export async function runAvFetchOnce(
   const targets = findTrackedTargets();
   const forceResend = options.forceResend === true;
   const healthNotify = options.healthNotify !== false;
+  const avSendMode = options.avSendMode ?? 'gallery';
+  let senderInstance = bot ?? null;
+
+  function getSender(): Telegraf {
+    if (senderInstance) {
+      return senderInstance;
+    }
+    senderInstance = createBot();
+    return senderInstance;
+  }
 
   async function processStarTarget(target: TrackedTarget): Promise<TargetRunSummary> {
     const startedAt = Date.now();
-    const route = buildTargetRoute(target);
+    const route = buildAvTargetRoute(target.target_type, target.target_id);
     let pushed = 0;
     let skipped = 0;
 
@@ -249,10 +259,12 @@ export async function runAvFetchOnce(
 
       const coverUrl = parsed.coverUrl;
       const sendStartedAt = Date.now();
-      const coverSent = await sendAvUpdateWithGallery(
-        { message, coverUrl, sampleUrls: parsed.sampleImages },
-        bot
-      );
+      const coverSent = await sendAvUpdate({
+        message,
+        coverUrl,
+        sampleUrls: parsed.sampleImages,
+        mode: avSendMode,
+      }, getSender());
       console.log(`[av_update] [${route}] send=${Date.now() - sendStartedAt}ms`);
 
       if (!history) {
@@ -272,7 +284,7 @@ export async function runAvFetchOnce(
 
   async function processLabelTarget(target: TrackedTarget): Promise<TargetRunSummary> {
     const startedAt = Date.now();
-    const route = buildTargetRoute(target);
+    const route = buildAvTargetRoute(target.target_type, target.target_id);
     let pushed = 0;
     let skipped = 0;
 
@@ -320,7 +332,7 @@ export async function runAvFetchOnce(
 
     const latestBatchDate = effectiveItems[0].batchDate;
     const latestBatchItems = effectiveItems.filter((item) => item.batchDate === latestBatchDate);
-    const dedupeKey = `javbus:label:${target.target_id}:${latestBatchDate}`;
+    const dedupeKey = `javbus:${target.target_type}:${target.target_id}:${latestBatchDate}`;
     if (!forceResend && findPushBatchHistory(dedupeKey)) {
       skipped += latestBatchItems.length;
       console.log(
@@ -339,15 +351,16 @@ export async function runAvFetchOnce(
     }));
     const summaryMessage = formatAvLabelSummaryMessage({
       targetName: target.name,
+      targetType: target.target_type,
       latestDate: latestBatchDate,
       totalNewCount: latestBatchItems.length,
       items: summaryItems,
       remainingCount: Math.max(0, latestBatchItems.length - summaryItems.length),
-      targetLink: `https://www.javbus.com/label/${target.target_id}`,
+      targetLink: buildAvTargetUrl(target.target_type, target.target_id),
     });
 
     const sendStartedAt = Date.now();
-    await sendTelegramMessage(summaryMessage, bot);
+    await sendTelegramMessage(summaryMessage, getSender());
     console.log(`[av_update] [${route}] send=${Date.now() - sendStartedAt}ms`);
 
     latestBatchItems.forEach((item) => {
@@ -394,17 +407,17 @@ export async function runAvFetchOnce(
       'AV 源站异常（双路失败）',
       ...failures.map((item) => `目标：${item.route} | 类型：${item.errorType} | 错误：${item.errorMessage}`),
     ].join('\n');
-    await sendTelegramMessage(alert, bot);
+    await sendTelegramMessage(alert, getSender());
     updateAvSourceLastAlertAt(sourceKey);
   }
 
   async function processTargetWithHealth(
     target: TrackedTarget
   ): Promise<{ summary: TargetRunSummary; failure: TargetFailure | null }> {
-    const route = buildTargetRoute(target);
+    const route = buildAvTargetRoute(target.target_type, target.target_id);
     const sourceKey = `javbus:${target.target_type}:${target.target_id}`;
     try {
-      const result = target.target_type === 'label'
+      const result = isAvBatchTarget(target.target_type)
         ? await processLabelTarget(target)
         : await processStarTarget(target);
       markSourceUp(sourceKey);
@@ -421,8 +434,8 @@ export async function runAvFetchOnce(
     }
   }
 
-  const starTargets = targets.filter((target) => target.target_type === 'star');
-  const labelTargets = targets.filter((target) => target.target_type === 'label');
+  const starTargets = targets.filter((target) => !isAvBatchTarget(target.target_type));
+  const labelTargets = targets.filter((target) => isAvBatchTarget(target.target_type));
   const results: Array<{ summary: TargetRunSummary; failure: TargetFailure | null }> = [];
 
   for (const target of starTargets) {

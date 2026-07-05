@@ -62,7 +62,7 @@ export function getDb(): Database.Database {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         source TEXT NOT NULL DEFAULT 'javbus',
-        target_type TEXT NOT NULL CHECK (target_type IN ('star', 'label')),
+        target_type TEXT NOT NULL,
         target_id TEXT NOT NULL,
         updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
@@ -202,6 +202,34 @@ export function getDb(): Database.Database {
     const hasCoverSent = pushHistoryColumns.some((column) => column.name === 'cover_sent');
     if (!hasCoverSent) {
       db.exec(`ALTER TABLE push_history ADD COLUMN cover_sent INTEGER NOT NULL DEFAULT 0;`);
+    }
+
+    const trackedTargetsSchema = db.prepare(`
+      SELECT sql FROM sqlite_master
+      WHERE type = 'table' AND name = 'tracked_targets'
+      LIMIT 1
+    `).get() as { sql?: string } | undefined;
+    const needsTrackedTargetsMigration = trackedTargetsSchema?.sql?.includes(
+      `target_type TEXT NOT NULL CHECK (target_type IN ('star', 'label'))`
+    );
+    if (needsTrackedTargetsMigration) {
+      db.exec(`
+        CREATE TABLE tracked_targets_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          source TEXT NOT NULL DEFAULT 'javbus',
+          target_type TEXT NOT NULL,
+          target_id TEXT NOT NULL,
+          updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        INSERT INTO tracked_targets_new (id, name, source, target_type, target_id, updated_at)
+        SELECT id, name, source, target_type, target_id, updated_at
+        FROM tracked_targets;
+        DROP TABLE tracked_targets;
+        ALTER TABLE tracked_targets_new RENAME TO tracked_targets;
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_tracked_targets_unique
+        ON tracked_targets(source, target_type, target_id);
+      `);
     }
   }
   return db;

@@ -1,12 +1,20 @@
 import { getDb } from '../reminders/db.js';
+import type { AvTargetType } from './avTargets.js';
 
 export interface TrackedTarget {
   id: number;
   name: string;
   source: 'javbus';
-  target_type: 'star' | 'label';
+  target_type: AvTargetType;
   target_id: string;
   updated_at: string;
+}
+
+interface CreateTrackedTargetInput {
+  name: string;
+  source?: 'javbus';
+  target_type: AvTargetType;
+  target_id: string;
 }
 
 export interface PushHistoryRow {
@@ -42,6 +50,67 @@ export function findTrackedTargets(): TrackedTarget[] {
     ORDER BY id ASC
   `);
   return stmt.all() as TrackedTarget[];
+}
+
+export function findTrackedTargetById(id: number): TrackedTarget | null {
+  const db = getDb();
+  const stmt = db.prepare(`
+    SELECT * FROM tracked_targets
+    WHERE id = ?
+    LIMIT 1
+  `);
+  return (stmt.get(id) as TrackedTarget) ?? null;
+}
+
+export function findTrackedTargetByKey(
+  source: 'javbus',
+  targetType: AvTargetType,
+  targetId: string
+): TrackedTarget | null {
+  const db = getDb();
+  const stmt = db.prepare(`
+    SELECT * FROM tracked_targets
+    WHERE source = ? AND target_type = ? AND target_id = ?
+    LIMIT 1
+  `);
+  return (stmt.get(source, targetType, targetId) as TrackedTarget) ?? null;
+}
+
+export function createTrackedTarget(input: CreateTrackedTargetInput): TrackedTarget {
+  const db = getDb();
+  const stmt = db.prepare(`
+    INSERT INTO tracked_targets (name, source, target_type, target_id, updated_at)
+    VALUES (?, ?, ?, ?, ?)
+  `);
+  const now = new Date().toISOString();
+  const result = stmt.run(
+    input.name,
+    input.source ?? 'javbus',
+    input.target_type,
+    input.target_id,
+    now
+  );
+
+  const target = findTrackedTargetById(Number(result.lastInsertRowid));
+  if (!target) {
+    throw new Error('Failed to create tracked AV target.');
+  }
+  return target;
+}
+
+export function deleteTrackedTargetById(id: number): TrackedTarget | null {
+  const existing = findTrackedTargetById(id);
+  if (!existing) {
+    return null;
+  }
+
+  const db = getDb();
+  const stmt = db.prepare(`
+    DELETE FROM tracked_targets
+    WHERE id = ?
+  `);
+  stmt.run(id);
+  return existing;
 }
 
 export function findPushHistory(targetId: number, itemGuid: string): PushHistoryRow | null {

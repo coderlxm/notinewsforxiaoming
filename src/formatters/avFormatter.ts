@@ -1,4 +1,5 @@
 import { escapeHtml } from '../utils/html.js';
+import type { AvTargetType } from '../services/avTargets.js';
 
 function normalizeUrl(url: string | null): string {
   if (!url) return '#';
@@ -15,7 +16,7 @@ function normalizeUrl(url: string | null): string {
 
 export interface AvUpdateMessageInput {
   targetName: string;
-  targetType: 'star' | 'label';
+  targetType: AvTargetType;
   title: string;
   translatedTitle: string | null;
   pubDate: string | null;
@@ -30,6 +31,7 @@ export interface AvUpdateMessageInput {
 
 export interface AvLabelSummaryMessageInput {
   targetName: string;
+  targetType: AvTargetType;
   latestDate: string;
   totalNewCount: number;
   items: Array<{ title: string; link: string | null }>;
@@ -43,12 +45,15 @@ export function formatAvUpdateMessage(input: AvUpdateMessageInput): string {
     : null;
   const displayTitle = translated || input.title;
 
-  const lines = [
-    '🌟 <b>关注女优新作更新</b>',
-    '──────────────────',
-  ];
+  let heading = '🌟 <b>关注女优新作更新</b>';
+  let subjectLine = `👩 <b>演员</b>：${escapeHtml(input.targetName)}`;
+  if (input.targetType === 'series') {
+    heading = '📚 <b>关注系列新作更新</b>';
+    subjectLine = `📚 <b>系列</b>：${escapeHtml(input.targetName)}`;
+  }
 
-  lines.push(`👩 <b>演员</b>：${escapeHtml(input.targetName)}`);
+  const lines = [heading, '──────────────────'];
+  lines.push(subjectLine);
 
   if (input.code) {
     lines.push(`🔢 <b>识别码</b>：${escapeHtml(input.code)}`);
@@ -94,6 +99,8 @@ export function formatAvUpdateMessage(input: AvUpdateMessageInput): string {
   const footerTags = ['#新作推送', '#磁力直达'];
   if (input.targetType === 'star') {
     footerTags.push(`#${input.targetName}`);
+  } else if (input.targetType === 'series') {
+    footerTags.push('#系列更新');
   }
   lines.push('──────────────────');
   lines.push(footerTags.join(' '));
@@ -102,8 +109,10 @@ export function formatAvUpdateMessage(input: AvUpdateMessageInput): string {
 }
 
 export function formatAvLabelSummaryMessage(input: AvLabelSummaryMessageInput): string {
+  const heading = input.targetType === 'studio' ? '🏭 <b>制作商更新</b>' : '🏢 <b>发行商更新</b>';
+  const footer = input.targetType === 'studio' ? '#制作商更新 #批量摘要' : '#发行商更新 #批量摘要';
   const lines = [
-    `🏢 <b>片商更新</b>：${escapeHtml(input.targetName)}`,
+    `${heading}：${escapeHtml(input.targetName)}`,
     `最新更新日期：${escapeHtml(input.latestDate)}`,
     `本次新增：${input.totalNewCount} 部`,
     '',
@@ -129,7 +138,7 @@ export function formatAvLabelSummaryMessage(input: AvLabelSummaryMessageInput): 
   }
 
   lines.push('');
-  lines.push('#片商更新 #批量摘要');
+  lines.push(footer);
 
   return lines.join('\n');
 }

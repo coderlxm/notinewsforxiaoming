@@ -40,7 +40,11 @@ import {
   parseVitaminCallbackData,
   parseStartggWatchCallbackData,
 } from './callbacks.js';
+import * as avRepo from '../services/avRepository.js';
+import type { TrackedTarget } from '../services/avRepository.js';
+import { resolveAvSubscription } from '../services/avSubscriptionService.js';
 import { runAvFetchOnce } from '../services/avTracker.js';
+import { buildAvTargetUrl, getAvTargetTypeLabel } from '../services/avTargets.js';
 import { markVitaminEatenToday, scheduleVitaminSnooze, getAndClearVitaminSentMessages } from '../services/vitaminReminder.js';
 import { findPresetByText } from '../reminders/presets.js';
 import {
@@ -105,6 +109,32 @@ function isStartggEventReference(raw: string): boolean {
   return parts.includes('tournament') && parts.includes('event');
 }
 
+function formatAvSubscriptionHelp(): string {
+  return [
+    'AV 订阅管理',
+    '• <code>/avsub add https://www.javbus.com/star/vwq</code>',
+    '• <code>/avsub add https://www.javbus.com/series/12f9</code>',
+    '• <code>/avsub add https://www.javbus.com/studio/ne</code>',
+    '• <code>/avsub add https://www.javbus.com/label/7l</code>',
+    '• <code>/avsub list</code>',
+    '• <code>/avsub remove 3</code>',
+  ].join('\n');
+}
+
+function formatAvSubscriptionList(targets: TrackedTarget[]): string {
+  if (targets.length === 0) {
+    return '当前没有 AV 订阅。';
+  }
+
+  const lines = ['AV 订阅列表'];
+  targets.forEach((target) => {
+    const typeLabel = getAvTargetTypeLabel(target.target_type);
+    lines.push(`${target.id}. ${escapeHtml(target.name)} [${typeLabel}]`);
+    lines.push(buildAvTargetUrl(target.target_type, target.target_id));
+  });
+  return lines.join('\n');
+}
+
 export function registerInteractiveHandlers(bot: Telegraf): void {
   bot.command('start', (ctx) => {
     if (!isAuthorized(ctx)) return;
@@ -137,6 +167,84 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     } catch (e) {
       if (e instanceof Error) {
         await ctx.reply(`AV 检查失败：${e.message}`, { parse_mode: 'HTML' });
+        return;
+      }
+      throw e;
+    }
+  });
+
+  bot.command('avsub', async (ctx) => {
+    if (!isAuthorized(ctx)) return;
+    const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
+    const args = text.replace(/^\/avsub\s*/i, '').trim();
+    if (!args) {
+      await ctx.reply(formatAvSubscriptionHelp(), { parse_mode: 'HTML' });
+      return;
+    }
+
+    const [actionRaw, ...rest] = args.split(/\s+/);
+    const action = actionRaw?.trim().toLowerCase() || '';
+    const payload = rest.join(' ').trim();
+
+    try {
+      if (action === 'list') {
+        await ctx.reply(formatAvSubscriptionList(avRepo.findTrackedTargets()), { parse_mode: 'HTML' });
+        return;
+      }
+
+      if (action === 'add') {
+        if (!payload) {
+          await ctx.reply('用法：/avsub add <javbus_url>', { parse_mode: 'HTML' });
+          return;
+        }
+
+        const resolved = await resolveAvSubscription(payload);
+        const existing = avRepo.findTrackedTargetByKey('javbus', resolved.targetType, resolved.targetId);
+        if (existing) {
+          throw new Error(`该 AV 订阅已存在：${existing.name} (#${existing.id})`);
+        }
+
+        const created = avRepo.createTrackedTarget({
+          name: resolved.name,
+          target_type: resolved.targetType,
+          target_id: resolved.targetId,
+        });
+        const typeLabel = getAvTargetTypeLabel(created.target_type);
+        await ctx.reply(
+          `已添加 AV 订阅：${escapeHtml(created.name)} [${typeLabel}]\n${resolved.url}`,
+          { parse_mode: 'HTML' }
+        );
+        return;
+      }
+
+      if (action === 'remove') {
+        if (!payload) {
+          await ctx.reply('用法：/avsub remove <id>', { parse_mode: 'HTML' });
+          return;
+        }
+
+        const id = Number(payload);
+        if (!Number.isInteger(id) || id <= 0) {
+          throw new Error('删除 AV 订阅时请提供有效的数字 ID。');
+        }
+
+        const deleted = avRepo.deleteTrackedTargetById(id);
+        if (!deleted) {
+          throw new Error(`未找到 id=${id} 的 AV 订阅。`);
+        }
+
+        const typeLabel = getAvTargetTypeLabel(deleted.target_type);
+        await ctx.reply(
+          `已删除 AV 订阅：${escapeHtml(deleted.name)} [${typeLabel}]`,
+          { parse_mode: 'HTML' }
+        );
+        return;
+      }
+
+      await ctx.reply(formatAvSubscriptionHelp(), { parse_mode: 'HTML' });
+    } catch (e) {
+      if (e instanceof Error) {
+        await ctx.reply(`AV 订阅操作失败：${e.message}`, { parse_mode: 'HTML' });
         return;
       }
       throw e;
