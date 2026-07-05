@@ -1,0 +1,92 @@
+import type Database from 'better-sqlite3';
+
+interface DbMigration {
+  version: number;
+  up: (db: Database.Database) => void;
+}
+
+function tableHasColumn(db: Database.Database, tableName: string, columnName: string): boolean {
+  const columns = db.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name: string }>;
+  return columns.some((column) => column.name === columnName);
+}
+
+function getTableSql(db: Database.Database, tableName: string): string | null {
+  const row = db.prepare(`
+    SELECT sql FROM sqlite_master
+    WHERE type = 'table' AND name = ?
+    LIMIT 1
+  `).get(tableName) as { sql?: string } | undefined;
+  return row?.sql ?? null;
+}
+
+const MIGRATIONS: DbMigration[] = [
+  {
+    version: 1,
+    up(db) {
+      if (!tableHasColumn(db, 'push_history', 'cover_sent')) {
+        db.exec(`ALTER TABLE push_history ADD COLUMN cover_sent INTEGER NOT NULL DEFAULT 0;`);
+      }
+    },
+  },
+  {
+    version: 2,
+    up(db) {
+      if (!tableHasColumn(db, 'vitamin_reminders', 'eaten')) {
+        db.exec(`ALTER TABLE vitamin_reminders ADD COLUMN eaten INTEGER NOT NULL DEFAULT 0;`);
+      }
+      if (!tableHasColumn(db, 'vitamin_reminders', 'loop_active')) {
+        db.exec(`ALTER TABLE vitamin_reminders ADD COLUMN loop_active INTEGER NOT NULL DEFAULT 0;`);
+      }
+      if (!tableHasColumn(db, 'vitamin_reminders', 'next_trigger_at')) {
+        db.exec(`ALTER TABLE vitamin_reminders ADD COLUMN next_trigger_at TEXT;`);
+      }
+    },
+  },
+  {
+    version: 3,
+    up(db) {
+      const trackedTargetsSql = getTableSql(db, 'tracked_targets');
+      const needsTrackedTargetsMigration = trackedTargetsSql?.includes(
+        `target_type TEXT NOT NULL CHECK (target_type IN ('star', 'label'))`
+      );
+      if (!needsTrackedTargetsMigration) {
+        return;
+      }
+
+      db.exec(`
+        PRAGMA foreign_keys = OFF;
+        DROP TABLE IF EXISTS tracked_targets_new;
+        BEGIN;
+        CREATE TABLE tracked_targets_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          source TEXT NOT NULL DEFAULT 'javbus',
+          target_type TEXT NOT NULL,
+          target_id TEXT NOT NULL,
+          updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        INSERT INTO tracked_targets_new (id, name, source, target_type, target_id, updated_at)
+        SELECT id, name, source, target_type, target_id, updated_at
+        FROM tracked_targets;
+        DROP TABLE tracked_targets;
+        ALTER TABLE tracked_targets_new RENAME TO tracked_targets;
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_tracked_targets_unique
+        ON tracked_targets(source, target_type, target_id);
+        COMMIT;
+        PRAGMA foreign_keys = ON;
+      `);
+    },
+  },
+];
+
+export function runDbMigrations(db: Database.Database): void {
+  let currentVersion = db.pragma('user_version', { simple: true }) as number;
+  for (const migration of MIGRATIONS) {
+    if (migration.version <= currentVersion) {
+      continue;
+    }
+    migration.up(db);
+    db.pragma(`user_version = ${migration.version}`);
+    currentVersion = migration.version;
+  }
+}

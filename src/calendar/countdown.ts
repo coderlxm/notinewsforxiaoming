@@ -1,5 +1,6 @@
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
+import { bjDate, diffBjDays, isBjWeekend, shiftBjDate } from '../utils/time.js';
 
 interface HolidayCalendar {
   timezone: string;
@@ -26,53 +27,20 @@ const HOLIDAY_NAME_BY_START_DATE: Record<string, string> = {
 
 const GTA6_DATE = '2026-11-19';
 
-function chinaToday(): string {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Shanghai',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(new Date());
-
-  const y = parts.find(p => p.type === 'year')!.value;
-  const m = parts.find(p => p.type === 'month')!.value;
-  const d = parts.find(p => p.type === 'day')!.value;
-
-  return `${y}-${m}-${d}`;
-}
-
 function daysBetween(from: string, to: string): number {
-  const [fy, fm, fd] = from.split('-').map(Number);
-  const [ty, tm, td] = to.split('-').map(Number);
-  const fromDate = new Date(Date.UTC(fy!, (fm ?? 1) - 1, fd!));
-  const toDate = new Date(Date.UTC(ty!, (tm ?? 1) - 1, td!));
-  return Math.round((toDate.getTime() - fromDate.getTime()) / 86_400_000);
+  return diffBjDays(from, to);
 }
 
 function nextDate(date: string): string {
-  const [y, m, d] = date.split('-').map(Number);
-  const dt = new Date(Date.UTC(y!, (m ?? 1) - 1, d!));
-  dt.setUTCDate(dt.getUTCDate() + 1);
-  const ny = dt.getUTCFullYear();
-  const nm = String(dt.getUTCMonth() + 1).padStart(2, '0');
-  const nd = String(dt.getUTCDate()).padStart(2, '0');
-  return `${ny}-${nm}-${nd}`;
+  return shiftBjDate(date, 1);
 }
 
 function prevDate(date: string): string {
-  const [y, m, d] = date.split('-').map(Number);
-  const dt = new Date(Date.UTC(y!, (m ?? 1) - 1, d!));
-  dt.setUTCDate(dt.getUTCDate() - 1);
-  const ny = dt.getUTCFullYear();
-  const nm = String(dt.getUTCMonth() + 1).padStart(2, '0');
-  const nd = String(dt.getUTCDate()).padStart(2, '0');
-  return `${ny}-${nm}-${nd}`;
+  return shiftBjDate(date, -1);
 }
 
 function isWeekend(date: string): boolean {
-  const [y, m, d] = date.split('-').map(Number);
-  const dow = new Date(Date.UTC(y!, (m ?? 1) - 1, d!)).getUTCDay();
-  return dow === 0 || dow === 6;
+  return isBjWeekend(date);
 }
 
 function loadHolidayCalendar(year: number): HolidayCalendar | null {
@@ -137,7 +105,7 @@ export interface CountdownInfo {
 }
 
 export function getCountdownInfo(): CountdownInfo {
-  const today = chinaToday();
+  const today = bjDate();
   const currentYear = parseInt(today.slice(0, 4), 10);
   const calendar = loadHolidayCalendar(currentYear);
   const holidayPeriods = buildHolidayPeriods(calendar?.holiday_overrides ?? [], calendar?.workday_overrides ?? []);

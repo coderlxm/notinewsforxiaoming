@@ -2,17 +2,13 @@ import type { Telegraf } from 'telegraf';
 import { getDb } from '../reminders/db.js';
 import { config } from '../config/index.js';
 import { formatVitaminMessage, buildVitaminButtons } from '../formatters/index.js';
+import { bjDate } from '../utils/time.js';
 
 const LOOP_INTERVAL_MS = 30 * 60 * 1000;
 let vitaminLoopTimer: ReturnType<typeof setTimeout> | null = null;
 
 function todayKey(): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Shanghai',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date());
+  return bjDate();
 }
 
 interface VitaminState {
@@ -22,26 +18,7 @@ interface VitaminState {
   next_trigger_at: string | null;
 }
 
-function ensureVitaminColumns(): void {
-  const db = getDb();
-  const columns = db.prepare('PRAGMA table_info(vitamin_reminders)').all() as Array<{ name: string }>;
-  const hasEaten = columns.some(c => c.name === 'eaten');
-  const hasLoopActive = columns.some(c => c.name === 'loop_active');
-  const hasNextTriggerAt = columns.some(c => c.name === 'next_trigger_at');
-
-  if (!hasEaten) {
-    db.exec('ALTER TABLE vitamin_reminders ADD COLUMN eaten INTEGER NOT NULL DEFAULT 0;');
-  }
-  if (!hasLoopActive) {
-    db.exec('ALTER TABLE vitamin_reminders ADD COLUMN loop_active INTEGER NOT NULL DEFAULT 0;');
-  }
-  if (!hasNextTriggerAt) {
-    db.exec('ALTER TABLE vitamin_reminders ADD COLUMN next_trigger_at TEXT;');
-  }
-}
-
 function ensureTodayRow(): void {
-  ensureVitaminColumns();
   const db = getDb();
   const key = todayKey();
   const row = db.prepare('SELECT date_key FROM vitamin_reminders WHERE date_key = ?').get(key) as { date_key: string } | undefined;

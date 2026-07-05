@@ -1,8 +1,8 @@
 import rrulePkg from 'rrule';
 import type { Weekday } from 'rrule';
 import dayjs from 'dayjs';
-import utc from 'dayjs/plugin/utc';
-import timezone from 'dayjs/plugin/timezone';
+import utc from 'dayjs/plugin/utc.js';
+import timezone from 'dayjs/plugin/timezone.js';
 import type { RecurringRule } from './repository.js';
 
 const { RRule, rrulestr, datetime } = rrulePkg as {

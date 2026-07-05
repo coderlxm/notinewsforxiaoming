@@ -3,6 +3,7 @@ import { summarizeV2exWithAI } from '../ai/deepseek.js';
 import type { V2exTopic } from '../fetchers/v2ex.js';
 import { sendTelegramMessage } from '../publishers/telegram.js';
 import { renderMarkdownLikeAsHtml } from '../utils/telegramMarkdown.js';
+import { bjDate } from '../utils/time.js';
 import {
   createV2exHolidayBatch,
   findUnconsumedV2exHolidayBatches,
@@ -12,16 +13,7 @@ import {
 } from './v2exBufferRepository.js';
 
 function chinaDateKey(date: Date): string {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Shanghai',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(date);
-  const year = parts.find((p) => p.type === 'year')?.value ?? '1970';
-  const month = parts.find((p) => p.type === 'month')?.value ?? '01';
-  const day = parts.find((p) => p.type === 'day')?.value ?? '01';
-  return `${year}-${month}-${day}`;
+  return bjDate(date);
 }
 
 export function bufferHolidayV2exTopics(topics: V2exTopic[], now: Date): void {

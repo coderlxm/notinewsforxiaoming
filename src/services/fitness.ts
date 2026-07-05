@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { dirname, resolve } from 'path';
+import { bjDate } from '../utils/time.js';
 
 export interface FitnessStatus {
   user_profile: {
@@ -35,20 +36,6 @@ const DEFAULT_STATUS: FitnessStatus = {
     last_focus_area: null
   }
 };
-
-function chinaDateString(): string {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Shanghai',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  }).formatToParts(new Date());
-
-  const y = parts.find(p => p.type === 'year')!.value;
-  const m = parts.find(p => p.type === 'month')!.value;
-  const d = parts.find(p => p.type === 'day')!.value;
-  return `${y}-${m}-${d}`;
-}
 
 function writeStatus(status: FitnessStatus): void {
   mkdirSync(dirname(STATUS_PATH), { recursive: true });
@@ -135,7 +122,7 @@ export function markFitnessWorkoutGenerated(status: FitnessStatus, focusArea: st
     training_state: {
       current_level: Math.floor(totalCompleted / 3) + 1,
       total_completed: totalCompleted,
-      last_workout_date: chinaDateString(),
+      last_workout_date: bjDate(),
       last_focus_area: focusArea
     }
   };

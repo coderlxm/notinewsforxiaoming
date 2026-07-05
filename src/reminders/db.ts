@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runDbMigrations } from './migrations.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -126,7 +127,10 @@ export function getDb(): Database.Database {
 
       CREATE TABLE IF NOT EXISTS vitamin_reminders (
         date_key TEXT PRIMARY KEY,
-        count INTEGER NOT NULL DEFAULT 0
+        count INTEGER NOT NULL DEFAULT 0,
+        eaten INTEGER NOT NULL DEFAULT 0,
+        loop_active INTEGER NOT NULL DEFAULT 0,
+        next_trigger_at TEXT
       );
 
       CREATE TABLE IF NOT EXISTS vitamin_sent_messages (
@@ -198,44 +202,7 @@ export function getDb(): Database.Database {
       ON startgg_pushed_sets(watch_player_id, watch_event_id);
     `);
 
-    const pushHistoryColumns = db.prepare(`PRAGMA table_info(push_history)`).all() as Array<{ name: string }>;
-    const hasCoverSent = pushHistoryColumns.some((column) => column.name === 'cover_sent');
-    if (!hasCoverSent) {
-      db.exec(`ALTER TABLE push_history ADD COLUMN cover_sent INTEGER NOT NULL DEFAULT 0;`);
-    }
-
-    const trackedTargetsSchema = db.prepare(`
-      SELECT sql FROM sqlite_master
-      WHERE type = 'table' AND name = 'tracked_targets'
-      LIMIT 1
-    `).get() as { sql?: string } | undefined;
-    const needsTrackedTargetsMigration = trackedTargetsSchema?.sql?.includes(
-      `target_type TEXT NOT NULL CHECK (target_type IN ('star', 'label'))`
-    );
-    if (needsTrackedTargetsMigration) {
-      db.exec(`
-        PRAGMA foreign_keys = OFF;
-        DROP TABLE IF EXISTS tracked_targets_new;
-        BEGIN;
-        CREATE TABLE tracked_targets_new (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          name TEXT NOT NULL,
-          source TEXT NOT NULL DEFAULT 'javbus',
-          target_type TEXT NOT NULL,
-          target_id TEXT NOT NULL,
-          updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-        );
-        INSERT INTO tracked_targets_new (id, name, source, target_type, target_id, updated_at)
-        SELECT id, name, source, target_type, target_id, updated_at
-        FROM tracked_targets;
-        DROP TABLE tracked_targets;
-        ALTER TABLE tracked_targets_new RENAME TO tracked_targets;
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_tracked_targets_unique
-        ON tracked_targets(source, target_type, target_id);
-        COMMIT;
-        PRAGMA foreign_keys = ON;
-      `);
-    }
+    runDbMigrations(db);
   }
   return db;
 }
