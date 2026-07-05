@@ -54,6 +54,8 @@ interface RunAvFetchOptions {
   forceResend?: boolean;
   healthNotify?: boolean;
   avSendMode?: 'cover' | 'gallery';
+  targets?: TrackedTarget[];
+  skipBatchTargetDelay?: boolean;
 }
 
 const parser = new Parser();
@@ -191,10 +193,11 @@ export async function runAvFetchOnce(
   bot?: Telegraf,
   options: RunAvFetchOptions = {}
 ): Promise<AvFetchSummary> {
-  const targets = findTrackedTargets();
+  const targets = options.targets ?? findTrackedTargets();
   const forceResend = options.forceResend === true;
   const healthNotify = options.healthNotify !== false;
   const avSendMode = options.avSendMode ?? 'gallery';
+  const skipBatchTargetDelay = options.skipBatchTargetDelay === true;
   let senderInstance = bot ?? null;
 
   function getSender(): Telegraf {
@@ -442,9 +445,11 @@ export async function runAvFetchOnce(
     results.push(await processTargetWithHealth(target));
   }
   if (labelTargets.length > 0) {
-    const delay = LABEL_DELAY_MIN_MS + Math.floor(Math.random() * (LABEL_DELAY_MAX_MS - LABEL_DELAY_MIN_MS + 1));
-    console.log(`[av_update] delay before label targets: ${delay}ms`);
-    await sleep(delay);
+    if (!skipBatchTargetDelay) {
+      const delay = LABEL_DELAY_MIN_MS + Math.floor(Math.random() * (LABEL_DELAY_MAX_MS - LABEL_DELAY_MIN_MS + 1));
+      console.log(`[av_update] delay before label targets: ${delay}ms`);
+      await sleep(delay);
+    }
     for (const target of labelTargets) {
       results.push(await processTargetWithHealth(target));
     }

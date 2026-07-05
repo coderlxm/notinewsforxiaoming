@@ -211,9 +211,26 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
         });
         const typeLabel = getAvTargetTypeLabel(created.target_type);
         await ctx.reply(
-          `已添加 AV 订阅：${escapeHtml(created.name)} [${typeLabel}]\n${resolved.url}`,
+          `已添加 AV 订阅：${escapeHtml(created.name)} [${typeLabel}]\n${resolved.url}\n开始立即检查这个订阅...`,
           { parse_mode: 'HTML' }
         );
+        try {
+          const summary = await runAvFetchOnce(bot, {
+            healthNotify: false,
+            targets: [created],
+            skipBatchTargetDelay: true,
+          });
+          await ctx.reply(
+            `立即检查完成：新增 ${summary.pushed} 条，已跳过 ${summary.skipped} 条。`,
+            { parse_mode: 'HTML' }
+          );
+        } catch (e) {
+          if (e instanceof Error) {
+            await ctx.reply(`立即检查失败：${e.message}`, { parse_mode: 'HTML' });
+            return;
+          }
+          throw e;
+        }
         return;
       }
 
