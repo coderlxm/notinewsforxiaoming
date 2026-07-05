@@ -214,6 +214,9 @@ export function getDb(): Database.Database {
     );
     if (needsTrackedTargetsMigration) {
       db.exec(`
+        PRAGMA foreign_keys = OFF;
+        DROP TABLE IF EXISTS tracked_targets_new;
+        BEGIN;
         CREATE TABLE tracked_targets_new (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           name TEXT NOT NULL,
@@ -229,6 +232,8 @@ export function getDb(): Database.Database {
         ALTER TABLE tracked_targets_new RENAME TO tracked_targets;
         CREATE UNIQUE INDEX IF NOT EXISTS idx_tracked_targets_unique
         ON tracked_targets(source, target_type, target_id);
+        COMMIT;
+        PRAGMA foreign_keys = ON;
       `);
     }
   }
