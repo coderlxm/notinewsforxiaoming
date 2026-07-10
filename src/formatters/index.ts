@@ -40,24 +40,10 @@ export function formatTelegramMessage(weather: WeatherData | null, news: GameNew
   let message = '';
 
   if (isWorkday) {
-    message += '🚨 <b>记得打卡！</b>上下班别忘了打卡，多喝水，保卫工资从打卡开始 💰\n\n';
+    message += '🚨 上下班记得打卡，保卫工资 💰\n\n';
   }
 
   message += `📅 <b>每日简报</b> (${chinaDateLabel()})\n\n`;
-
-  if (isWorkday) {
-    message += '┏━━━━━━━━━━━━━━━━━━━━━━━━┓\n';
-    message += '┃   🚨 <b>打工人日常提醒</b> 🚨   ┃\n';
-    message += '┣━━━━━━━━━━━━━━━━━━━━━━━━┫\n';
-    message += '┃  ⏱️ <b>记得打卡！</b>           ┃\n';
-    message += '┃  上下班千万别忘了打卡！    ┃\n';
-    message += '┃  保卫工资，从打卡开始！💰  ┃\n';
-    message += '┃                          ┃\n';
-    message += '┃  💧 <b>多喝水！</b>            ┃\n';
-    message += '┃  身体是革命的本钱，        ┃\n';
-    message += '┃  立刻去接一杯水！          ┃\n';
-    message += '┗━━━━━━━━━━━━━━━━━━━━━━━━┛\n\n';
-  }
 
   if (weather) {
     message += '🌤️ <b>今日天气</b>\n';
