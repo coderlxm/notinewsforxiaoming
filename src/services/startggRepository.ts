@@ -62,6 +62,25 @@ export interface StartggWatchStatusView {
   captured_at: string;
 }
 
+export function isStartggPollingPersistedEnabled(): boolean {
+  const row = getDb().prepare(`
+    SELECT polling_enabled
+    FROM startgg_runtime_settings
+    WHERE id = 1
+  `).get() as { polling_enabled: number } | undefined;
+  return row?.polling_enabled === 1;
+}
+
+export function setStartggPollingPersistedEnabled(enabled: boolean): void {
+  getDb().prepare(`
+    INSERT INTO startgg_runtime_settings (id, polling_enabled, updated_at)
+    VALUES (1, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      polling_enabled = excluded.polling_enabled,
+      updated_at = excluded.updated_at
+  `).run(enabled ? 1 : 0, new Date().toISOString());
+}
+
 function clearStartggWatchEventState(db: ReturnType<typeof getDb>, eventRowId: number): void {
   db.prepare(`DELETE FROM startgg_watch_snapshots WHERE watch_event_id = ?`).run(eventRowId);
   db.prepare(`DELETE FROM startgg_watch_event_entrants WHERE watch_event_id = ?`).run(eventRowId);

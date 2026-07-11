@@ -128,7 +128,7 @@ start.gg 功能的主链路是：
 - 取消 20 分钟轮询。
 - 同时取消加速轮询计时器。
 
-轮询开关只存在于当前 bot 进程内，进程重启后需要重新开启。数据库里的快照和去重数据会保留。
+轮询开关会保存在 SQLite。bot 进程重启后，如果此前轮询处于开启状态，会自动重新注册轮询任务；数据库里的快照和去重数据也会保留。
 
 ### `/fetchstartgg`
 
@@ -369,7 +369,7 @@ watch_player_id + watch_event_id + set_id
 
 当前服务器通过 `src/resident.ts` 启动常驻 Telegram bot。
 
-常驻进程注册的固定任务中没有直接注册 start.gg 任务；start.gg 的持续监控主要依赖：
+start.gg 的持续监控主要依赖：
 
 - `/startgg go` 自动开启 20 分钟轮询。
 - `/startggpoll on` 手动开启 20 分钟轮询。
@@ -377,11 +377,11 @@ watch_player_id + watch_event_id + set_id
 
 仓库另有一次性入口 `src/index.ts`，在北京时间约 10:20 和 22:20 的调度窗口选择 `startgg_watch`，执行一次 `runStartggWatchNow()`。这个入口执行完就退出，不会建立常驻轮询任务。
 
-因此常驻 bot 重启后，数据库状态还在，但进程内的轮询开关不会自动恢复；需要再次执行 `/startgg go` 或 `/startggpoll on`。
+轮询开启状态保存在 `startgg_runtime_settings`。常驻 bot 启动时会读取该状态；如果此前已开启轮询，会重新注册 20 分钟轮询任务，并保留已有快照和去重数据。2 分钟加速轮询不单独持久化，恢复后的下一次固定轮询发现进行中的 set 后会重新开启。
 
 ## 7. SQLite 数据模型
 
-当前 start.gg 相关表有 6 张：
+当前 start.gg 相关表有 7 张：
 
 | 表 | 作用 |
 | --- | --- |
@@ -391,6 +391,7 @@ watch_player_id + watch_event_id + set_id
 | `startgg_watch_snapshots` | 每个选手 × event 的最新状态快照 |
 | `startgg_pushed_sets` | 已处理 set 的去重记录 |
 | `startgg_sent_messages` | 已发送 start.gg Telegram 消息的 `message_id` |
+| `startgg_runtime_settings` | 持久化自动轮询开启状态，供常驻进程重启后恢复 |
 
 快照唯一键是：
 
@@ -398,11 +399,12 @@ watch_player_id + watch_event_id + set_id
 watch_player_id + watch_event_id
 ```
 
-当前数据库迁移版本为 6：
+当前数据库迁移版本为 7：
 
 - 版本 4：增加 auto/manual event 来源。
 - 版本 5：增加 Telegram 消息 ID 表。
 - 版本 6：增加首条状态发送标记。
+- 版本 7：增加自动轮询持久化状态。
 
 ## 8. 当前事实下的边界
 

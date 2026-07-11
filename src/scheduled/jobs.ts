@@ -4,7 +4,11 @@ import { runMode } from './runMode.js';
 import { getChinaDayOfWeek } from '../utils/time.js';
 import { isChinaWorkday } from '../calendar/chinaWorkday.js';
 import { runStartggWatchNow } from '../services/startggPresetSync.js';
-import { resetActiveStartggWatchEventStates } from '../services/startggRepository.js';
+import {
+  isStartggPollingPersistedEnabled,
+  resetActiveStartggWatchEventStates,
+  setStartggPollingPersistedEnabled,
+} from '../services/startggRepository.js';
 
 const VITAMIN_WORKDAY_RANDOM_WINDOW_MS = 15 * 60 * 1000;
 const STARTGG_FAST_WATCH_INTERVAL_MS = 2 * 60 * 1000;
@@ -59,15 +63,22 @@ export function enableStartggPolling(bot: Telegraf, resetState = true): boolean 
   startggPollJob = schedule.scheduleJob({ minute: new schedule.Range(0, 59, 20), tz: 'Asia/Shanghai' }, async () => {
     await runScheduledStartggWatch(bot);
   });
+  setStartggPollingPersistedEnabled(true);
   return true;
 }
 
 export function disableStartggPolling(): boolean {
+  setStartggPollingPersistedEnabled(false);
   if (!startggPollJob) return false;
   startggPollJob.cancel();
   startggPollJob = null;
   clearStartggFastWatch();
   return true;
+}
+
+export function restoreStartggPolling(bot: Telegraf): void {
+  if (!isStartggPollingPersistedEnabled()) return;
+  enableStartggPolling(bot, false);
 }
 
 export function isStartggPollingEnabled(): boolean {

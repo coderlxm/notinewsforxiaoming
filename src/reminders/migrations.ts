@@ -129,6 +129,18 @@ const MIGRATIONS: DbMigration[] = [
       }
     },
   },
+  {
+    version: 7,
+    up(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS startgg_runtime_settings (
+          id INTEGER PRIMARY KEY CHECK (id = 1),
+          polling_enabled INTEGER NOT NULL DEFAULT 0 CHECK (polling_enabled IN (0, 1)),
+          updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+    },
+  },
 ];
 
 export function runDbMigrations(db: Database.Database): void {

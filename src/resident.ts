@@ -1,7 +1,7 @@
 import { createBot } from './bot/createBot.js';
 import { registerInteractiveHandlers } from './bot/interactive.js';
 import { schedulePendingReminders, schedulePendingRecurringRules } from './reminders/scheduler.js';
-import { registerFixedJobs } from './scheduled/jobs.js';
+import { registerFixedJobs, restoreStartggPolling } from './scheduled/jobs.js';
 import { restoreVitaminLoop } from './services/vitaminReminder.js';
 
 async function main() {
@@ -10,6 +10,7 @@ async function main() {
   schedulePendingReminders(bot);
   schedulePendingRecurringRules(bot);
   registerFixedJobs(bot);
+  restoreStartggPolling(bot);
   restoreVitaminLoop(bot);
 
   bot.launch({
