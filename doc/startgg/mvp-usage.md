@@ -42,9 +42,8 @@
 
 ### 第一步：确认固定选手已生效
 
-固定选手来源：
-- 原始清单：`doc/startgg/fixlist.md`
-- 生效清单：`data/startgg_preset_players.json`
+固定选手配置：
+- `data/startgg_preset_players.json`
 
 预期：
 - 发送 `/startgg` 或 `/watchlist` 时，会自动把固定选手同步进监控库。
