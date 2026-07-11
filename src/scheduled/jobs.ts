@@ -167,12 +167,6 @@ export function registerFixedJobs(bot: Telegraf): void {
     await runMode('english', getChinaDayOfWeek(), bot);
   });
 
-  // vitamin lunch: 12:30 on non-workdays
-  schedule.scheduleJob({ hour: 12, minute: 30, tz: 'Asia/Shanghai' }, async () => {
-    if (isChinaWorkday(new Date())) return;
-    await runMode('vitamin', getChinaDayOfWeek(), bot);
-  });
-
   // english: 13:30
   schedule.scheduleJob({ hour: 13, minute: 30, tz: 'Asia/Shanghai' }, async () => {
     await runMode('english', getChinaDayOfWeek(), bot);
