@@ -82,7 +82,7 @@ export function formatSleepMessage(tip: string): string {
   return message;
 }
 
-export function formatWakeupMessage(weather: WeatherData | null, quote: string): string {
+export function formatWakeupMessage(weather: WeatherData | null): string {
   let message = `☀️ <b>早安，小明！</b> (${chinaDateLabel()})\n`;
   message += '──────────────────\n';
   const isWorkday = isChinaWorkday(new Date());
@@ -114,7 +114,6 @@ export function formatWakeupMessage(weather: WeatherData | null, quote: string):
     message += '🎮 <b>GTA 6 已发售，准备开玩！</b>\n';
   }
 
-  message += `\n📝 <b>今日励志语录</b>\n${renderMarkdownLikeAsHtml(quote)}\n`;
   message += '──────────────────\n';
 
   if (isWorkday) {

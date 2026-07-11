@@ -9,7 +9,6 @@ import {
   summarizeNewsWithAI,
   summarizeGithubWithAI,
   generateLifeTipWithAI,
-  generateMorningQuoteWithAI,
   teachEnglishWithAI,
   generateEnglishFallbackWithAI,
   summarizeV2exWithAI,
@@ -67,11 +66,8 @@ export async function runMode(mode: PushMode, chinaDayOfWeek: number, bot?: Tele
 
   if (mode === 'wakeup') {
     console.log('Mode: Morning Wake-up');
-    const [weather, quote] = await Promise.all([
-      fetchWeather(),
-      generateMorningQuoteWithAI()
-    ]);
-    const message = formatWakeupMessage(weather, quote);
+    const weather = await fetchWeather();
+    const message = formatWakeupMessage(weather);
     await sendTelegramMessage(message, bot);
     return;
   }

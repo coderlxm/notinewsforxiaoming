@@ -116,28 +116,6 @@ export async function generateLifeTipWithAI(): Promise<string> {
   }
 }
 
-export async function generateMorningQuoteWithAI(): Promise<string> {
-  if (!config.deepseekApiKey) {
-    return '早安！新的一天，加油！☀️';
-  }
-
-  const openai = getDeepSeekClient();
-
-  const prompt = '请生成一段简短、充满力量、能让人瞬间清醒并感到温暖的晨间励志语录。要求：适合程序员阅读，带上 1-2 个积极的 Emoji，字数 40 字以内。';
-
-  try {
-    const completion = await openai.chat.completions.create({
-      messages: [{ role: 'user', content: prompt }],
-      model: DEEPSEEK_MODEL,
-    });
-
-    return completion.choices[0].message.content || '加油，你是最棒的！☀️';
-  } catch (error) {
-    console.error('Failed to generate morning quote with DeepSeek:', error);
-    return '早安！今天又是充满可能的一天。🚀';
-  }
-}
-
 export async function teachEnglishWithAI(article: EnglishContent): Promise<string> {
   if (!config.deepseekApiKey) {
     return '名师英语教学暂时掉线，请稍后再试。';

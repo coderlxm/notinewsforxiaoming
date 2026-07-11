@@ -80,7 +80,7 @@ ssh bwgdc01 systemctl status notinews-bot.service --no-pager -l
 | 时间 | 模式 | 内容 |
 |------|------|------|
 | 00:10 | sleep | 睡眠提醒 + AI 生活建议 |
-| 08:30 | wakeup | 天气 + 早安语录 |
+| 08:30 | wakeup | 天气 + 倒计时 |
 | 09:10 | server_health | 服务器健康检查 |
 | 09:55 | news | 天气 + 游戏新闻 AI 摘要 |
 | 12:30 | vitamin | 维生素提醒 |
