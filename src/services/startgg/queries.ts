@@ -23,6 +23,7 @@ query EventTrackingSetsPage($slug: String!, $page: Int!, $perPage: Int!) {
       nodes {
         id
         state
+        startedAt
         round
         fullRoundText
         displayScore
@@ -69,6 +70,7 @@ query EventTrackingStandingsPage($slug: String!, $page: Int!, $perPage: Int!) {
       }
       nodes {
         placement
+        isFinal
         entrant {
           id
         }
@@ -145,7 +147,6 @@ query PlayerRecentSets($playerId: ID!, $playerIds: [ID!]!, $updatedAfter: Timest
       }
       nodes {
         id
-        state
         completedAt
         event {
           id
@@ -158,7 +159,6 @@ query PlayerRecentSets($playerId: ID!, $playerIds: [ID!]!, $updatedAfter: Timest
             slug
             startAt
             endAt
-            timezone
           }
         }
       }
@@ -200,6 +200,7 @@ interface PageInfo {
 interface SetNodeFields {
   id: number;
   state: number | null;
+  startedAt: number | null;
   round: number | null;
   fullRoundText: string | null;
   displayScore: string | null;
@@ -234,6 +235,7 @@ interface EntrantNodeWithPlayerFields {
 
 interface StandingNodeFields {
   placement: number;
+  isFinal: boolean | null;
   entrant: { id: number } | null;
 }
 
@@ -332,7 +334,6 @@ export interface PlayerRecentSetsResponse {
       pageInfo: PageInfo | null;
       nodes: Array<{
         id: number;
-        state: number | null;
         completedAt: number | null;
         event: {
           id: number;
@@ -345,7 +346,6 @@ export interface PlayerRecentSetsResponse {
             slug: string | null;
             startAt: number | null;
             endAt: number | null;
-            timezone: string | null;
           } | null;
         } | null;
       }>;

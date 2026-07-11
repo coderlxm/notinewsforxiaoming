@@ -149,6 +149,17 @@ const MIGRATIONS: DbMigration[] = [
       }
     },
   },
+  {
+    version: 9,
+    up(db) {
+      if (!tableHasColumn(db, 'startgg_watch_events', 'tournament_name')) {
+        db.exec(`ALTER TABLE startgg_watch_events ADD COLUMN tournament_name TEXT;`);
+      }
+      if (!tableHasColumn(db, 'startgg_watch_events', 'event_display_name')) {
+        db.exec(`ALTER TABLE startgg_watch_events ADD COLUMN event_display_name TEXT;`);
+      }
+    },
+  },
 ];
 
 export function runDbMigrations(db: Database.Database): void {

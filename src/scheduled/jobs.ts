@@ -35,8 +35,8 @@ function clearStartggFastWatch(): void {
   startggFastWatchDueAt = null;
 }
 
-export function updateStartggFastWatch(bot: Telegraf, pendingEventSlugs: string[]): void {
-  if (pendingEventSlugs.length === 0) {
+export function updateStartggFastWatch(bot: Telegraf, activeEventSlugs: string[]): void {
+  if (activeEventSlugs.length === 0) {
     clearStartggFastWatch();
     return;
   }
@@ -46,24 +46,25 @@ export function updateStartggFastWatch(bot: Telegraf, pendingEventSlugs: string[
   startggFastWatchTimer = setTimeout(async () => {
     startggFastWatchTimer = null;
     startggFastWatchDueAt = null;
-    await runScheduledStartggFastWatch(bot, pendingEventSlugs);
+    await runScheduledStartggFastWatch(bot, activeEventSlugs);
   }, STARTGG_FAST_WATCH_INTERVAL_MS);
 }
 
 async function runScheduledStartggFastWatch(bot: Telegraf, eventSlugs: string[]): Promise<void> {
   console.log(`Mode: start.gg Fast Watch (${eventSlugs.join(', ')})`);
-  const summary = await runStartggWatchOnce(bot, { eventSlugs });
-  console.log(`start.gg fast watch finished. events=${summary.checkedEvents} players=${summary.checkedPlayers} changed=${summary.changed} pending=${summary.pendingSetCount}`);
-  updateStartggFastWatch(bot, summary.pendingEventSlugs);
+  const summary = await runStartggWatchOnce(bot, {
+    eventSlugs,
+    refreshEntrantMappings: false,
+    refreshEventMeta: false,
+  });
+  console.log(`start.gg fast watch finished. events=${summary.checkedEvents} players=${summary.checkedPlayers} changed=${summary.changed} active=${summary.activeSetCount}`);
+  updateStartggFastWatch(bot, summary.activeEventSlugs);
 }
 
 async function runScheduledStartggWatch(bot: Telegraf): Promise<void> {
-  console.log('Mode: start.gg Watch');
-  const summary = await runStartggWatchNow(bot);
-  console.log(`start.gg watch finished. events=${summary.checkedEvents} players=${summary.checkedPlayers} changed=${summary.changed} pending=${summary.pendingSetCount}`);
-
-  const activeEvents = listActiveStartggWatchEvents();
-  const allTournamentsEnded = activeEvents.length === 0 || activeEvents.every((event) => {
+  clearStartggFastWatch();
+  const subscribedEvents = listActiveStartggWatchEvents();
+  const allTournamentsEnded = subscribedEvents.length > 0 && subscribedEvents.every((event) => {
     if (!event.tournament_end_at) {
       throw new Error(`start.gg active event missing tournament_end_at: ${event.event_slug}`);
     }
@@ -78,7 +79,10 @@ async function runScheduledStartggWatch(bot: Telegraf): Promise<void> {
     return;
   }
 
-  updateStartggFastWatch(bot, summary.pendingEventSlugs);
+  console.log('Mode: start.gg Watch');
+  const summary = await runStartggWatchNow(bot);
+  console.log(`start.gg watch finished. events=${summary.checkedEvents} players=${summary.checkedPlayers} changed=${summary.changed} active=${summary.activeSetCount}`);
+  updateStartggFastWatch(bot, summary.activeEventSlugs);
 }
 
 export function enableStartggPolling(bot: Telegraf, resetState = true): boolean {

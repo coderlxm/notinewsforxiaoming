@@ -11,6 +11,7 @@ import {
   upsertStartggWatchEventEntrant,
   findStartggWatchEventEntrant,
   type StartggWatchPlayer,
+  type StartggWatchEvent,
   hasStartggPushedSet,
   markStartggPushedSet,
   markStartggInitialMessageSent,
@@ -19,7 +20,7 @@ import {
 import {
   fetchEventHeader,
   fetchEventSetsByEntrants,
-  fetchEventStandings,
+  fetchEntrantStandings,
   fetchEventEntrantsDetailed,
   fetchEventBasic,
   fetchUserPlayer,
@@ -166,19 +167,21 @@ interface PlayerStatusSnapshot {
   lastSetScoreText: string | null;
   lastSetState: number | null;
   setPageUrl: string | null;
-  pendingSetExists: boolean;
+  activeSetExists: boolean;
 }
 
 export interface StartggWatchSummary {
   checkedPlayers: number;
   changed: number;
   checkedEvents: number;
-  pendingSetCount: number;
-  pendingEventSlugs: string[];
+  activeSetCount: number;
+  activeEventSlugs: string[];
 }
 
 export interface RunStartggWatchOptions {
   eventSlugs?: string[];
+  refreshEntrantMappings?: boolean;
+  refreshEventMeta?: boolean;
 }
 
 function buildSetScoreText(displayScore: string | null): string | null {
@@ -201,14 +204,17 @@ async function ensureEventEntrantMappings(
   eventSlug: string,
   watchEventId: number,
   players: StartggWatchPlayer[],
+  refreshMissing: boolean,
 ): Promise<Map<number, number | null>> {
   const result = new Map<number, number | null>();
   const playersNeedingMapping: StartggWatchPlayer[] = [];
 
   for (const player of players) {
     const existing = findStartggWatchEventEntrant(player.id, watchEventId);
-    if (existing) {
+    if (existing?.entrant_id !== null && existing?.entrant_id !== undefined) {
       result.set(player.id, existing.entrant_id);
+    } else if (!refreshMissing) {
+      result.set(player.id, null);
     } else {
       playersNeedingMapping.push(player);
     }
@@ -224,12 +230,14 @@ async function ensureEventEntrantMappings(
   for (const player of playersNeedingMapping) {
     const entrant = entrantByPlayerId.get(player.player_id) ?? null;
 
-    upsertStartggWatchEventEntrant({
-      watch_player_id: player.id,
-      watch_event_id: watchEventId,
-      entrant_id: entrant?.entrantId ?? null,
-      entrant_name: entrant?.entrantName ?? null,
-    });
+    if (entrant) {
+      upsertStartggWatchEventEntrant({
+        watch_player_id: player.id,
+        watch_event_id: watchEventId,
+        entrant_id: entrant.entrantId,
+        entrant_name: entrant.entrantName,
+      });
+    }
 
     result.set(player.id, entrant?.entrantId ?? null);
   }
@@ -257,7 +265,7 @@ function computePlayerSnapshot(
       lastSetScoreText: null,
       lastSetState: null,
       setPageUrl: null,
-      pendingSetExists: false,
+      activeSetExists: false,
     };
   }
 
@@ -268,15 +276,13 @@ function computePlayerSnapshot(
     (latestSet?.round !== null && latestSet?.round !== undefined && latestSet.round < 0)
     || (latestSet?.fullRoundText && /losers/i.test(latestSet.fullRoundText)),
   );
-  const pendingSetExists = playerSets.some((set) => set.completedAt === null);
+  const activeSetExists = playerSets.some((set) => set.startedAt !== null && set.completedAt === null);
   const standing = standings.find((node) => node.entrant?.id === entrantId) ?? null;
 
   let status: StartggWatchStatus;
   if (latestSet && latestSetLost) {
-    if (pendingSetExists || inLosersSignal) {
+    if (activeSetExists || inLosersSignal || !standing?.isFinal) {
       status = 'in_losers';
-    } else if (standing) {
-      status = 'eliminated';
     } else {
       status = 'eliminated';
     }
@@ -286,7 +292,7 @@ function computePlayerSnapshot(
     status = 'in_winners';
   }
 
-  if (standing?.placement === 1 && latestSet?.winnerId === entrantId && !pendingSetExists) {
+  if (standing?.placement === 1 && standing.isFinal && !activeSetExists) {
     status = 'completed';
   }
 
@@ -303,7 +309,7 @@ function computePlayerSnapshot(
     lastSetScoreText: latestSet ? buildSetScoreText(latestSet.displayScore) : null,
     lastSetState: latestSet?.state ?? null,
     setPageUrl,
-    pendingSetExists,
+    activeSetExists,
   };
 }
 
@@ -361,38 +367,50 @@ function selectSetsToPush(
 
 interface EventProcessResult {
   changed: number;
-  pendingSetCount: number;
+  activeSetCount: number;
 }
 
 async function processEvent(
-  eventRow: { id: number; event_slug: string },
+  eventRow: StartggWatchEvent,
   players: StartggWatchPlayer[],
   bot: Telegraf | undefined,
+  refreshEntrantMappings: boolean,
+  refreshEventMeta: boolean,
 ): Promise<EventProcessResult> {
   const normalizedSlug = normalizeEventSlug(eventRow.event_slug);
-  const header = await fetchEventHeader(normalizedSlug);
-  if (!header) {
-    throw new Error(`start.gg event not found: ${normalizedSlug}`);
+  let tournamentName = eventRow.tournament_name;
+  let eventDisplayName = eventRow.event_display_name;
+  let resolvedEventSlug = normalizedSlug;
+  if (refreshEventMeta) {
+    const header = await fetchEventHeader(normalizedSlug);
+    if (!header?.slug) {
+      throw new Error(`start.gg event not found or missing slug: ${normalizedSlug}`);
+    }
+    if (!header.tournament?.name || header.tournament.endAt === null) {
+      throw new Error(`start.gg event missing tournament metadata: ${normalizedSlug}`);
+    }
+    tournamentName = header.tournament.name;
+    eventDisplayName = header.name;
+    resolvedEventSlug = header.slug;
+    updateStartggWatchEventResolved(
+      eventRow.id,
+      header.id,
+      `${tournamentName} / ${eventDisplayName}`,
+      new Date(header.tournament.endAt * 1000).toISOString(),
+      tournamentName,
+      eventDisplayName,
+    );
   }
-  if (!header.slug) {
-    throw new Error(`start.gg event missing slug: ${normalizedSlug}`);
-  }
-  if (!header.tournament?.name) {
-    throw new Error(`start.gg event missing tournament name: ${normalizedSlug}`);
-  }
-  if (header.tournament.endAt === null) {
-    throw new Error(`start.gg tournament missing endAt: ${normalizedSlug}`);
+  if (!tournamentName || !eventDisplayName) {
+    throw new Error(`start.gg event missing cached metadata: ${normalizedSlug}`);
   }
 
-  const resolvedEventName = `${header.tournament.name} / ${header.name}`;
-  updateStartggWatchEventResolved(
+  const entrantMappings = await ensureEventEntrantMappings(
+    normalizedSlug,
     eventRow.id,
-    header.id,
-    resolvedEventName,
-    new Date(header.tournament.endAt * 1000).toISOString(),
+    players,
+    refreshEntrantMappings,
   );
-
-  const entrantMappings = await ensureEventEntrantMappings(normalizedSlug, eventRow.id, players);
 
   const mappedEntrantIds = Array.from(entrantMappings.values()).filter((id): id is number => id !== null);
   const [entrantSets, eventStandings] = await Promise.all([
@@ -400,22 +418,24 @@ async function processEvent(
       ? fetchEventSetsByEntrants(normalizedSlug, mappedEntrantIds)
       : Promise.resolve([]),
     mappedEntrantIds.length > 0
-      ? fetchEventStandings(normalizedSlug)
+      ? fetchEntrantStandings(mappedEntrantIds)
       : Promise.resolve([]),
   ]);
 
   let changed = 0;
-  let pendingSetCount = 0;
+  let activeSetCount = 0;
 
   for (const player of players) {
     const entrantId = entrantMappings.get(player.id) ?? null;
+    const eventPlayerName = findStartggWatchEventEntrant(player.id, eventRow.id)?.entrant_name
+      ?? player.player_name;
     const playerSets = entrantSets.filter((set) =>
       set.slots.some((slot) => slot.entrant?.id === entrantId),
     );
 
     const snapshot = computePlayerSnapshot(normalizedSlug, playerSets, entrantId, eventStandings);
-    if (snapshot.pendingSetExists) {
-      pendingSetCount += 1;
+    if (snapshot.activeSetExists) {
+      activeSetCount += 1;
     }
     const previous = findStartggWatchSnapshot(player.id, eventRow.id);
     const initialMessagePending = !previous || previous.initial_message_sent === 0;
@@ -442,10 +462,10 @@ async function processEvent(
 
       changed += 1;
       const message = formatStartggStatusChangedMessage({
-        tournamentName: header.tournament.name,
-        eventName: header.name,
-        eventSlug: header.slug,
-        playerName: player.player_name,
+        tournamentName,
+        eventName: eventDisplayName,
+        eventSlug: resolvedEventSlug,
+        playerName: eventPlayerName,
         status: snapshot.status,
         placement: snapshot.placement,
         roundLabel: snapshot.lastSetRoundLabel,
@@ -464,10 +484,10 @@ async function processEvent(
     if (setsToPush.length === 0) {
       changed += 1;
       const message = formatStartggStatusChangedMessage({
-        tournamentName: header.tournament.name,
-        eventName: header.name,
-        eventSlug: header.slug,
-        playerName: player.player_name,
+        tournamentName,
+        eventName: eventDisplayName,
+        eventSlug: resolvedEventSlug,
+        playerName: eventPlayerName,
         status: snapshot.status,
         placement: snapshot.placement,
         roundLabel: snapshot.lastSetRoundLabel,
@@ -483,10 +503,10 @@ async function processEvent(
       changed += 1;
       const setPageUrl = `https://www.start.gg/${normalizedSlug}/set/${set.id}`;
       const message = formatStartggStatusChangedMessage({
-        tournamentName: header.tournament.name,
-        eventName: header.name,
-        eventSlug: header.slug,
-        playerName: player.player_name,
+        tournamentName,
+        eventName: eventDisplayName,
+        eventSlug: resolvedEventSlug,
+        playerName: eventPlayerName,
         status: snapshot.status,
         placement: snapshot.placement,
         roundLabel: set.fullRoundText,
@@ -499,7 +519,7 @@ async function processEvent(
     }
   }
 
-  return { changed, pendingSetCount };
+  return { changed, activeSetCount };
 }
 
 export async function runStartggWatchOnce(bot?: Telegraf, options?: RunStartggWatchOptions): Promise<StartggWatchSummary> {
@@ -513,16 +533,22 @@ export async function runStartggWatchOnce(bot?: Telegraf, options?: RunStartggWa
     : events;
 
   const results = await Promise.all(
-    targetEvents.map((eventRow) => processEvent(eventRow, players, bot)),
+    targetEvents.map((eventRow) => processEvent(
+      eventRow,
+      players,
+      bot,
+      options?.refreshEntrantMappings !== false,
+      options?.refreshEventMeta !== false,
+    )),
   );
 
   return {
     checkedPlayers: players.length,
     checkedEvents: targetEvents.length,
     changed: results.reduce((sum, r) => sum + r.changed, 0),
-    pendingSetCount: results.reduce((sum, r) => sum + r.pendingSetCount, 0),
-    pendingEventSlugs: targetEvents
-      .filter((_, index) => results[index]!.pendingSetCount > 0)
+    activeSetCount: results.reduce((sum, r) => sum + r.activeSetCount, 0),
+    activeEventSlugs: targetEvents
+      .filter((_, index) => results[index]!.activeSetCount > 0)
       .map((event) => normalizeEventSlug(event.event_slug)),
   };
 }

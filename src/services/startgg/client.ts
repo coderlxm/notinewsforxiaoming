@@ -27,9 +27,9 @@ import {
 const STARTGG_GRAPHQL_ENDPOINT = 'https://api.start.gg/gql/alpha';
 const STARTGG_REQUEST_TIMEOUT_MS = 15000;
 const TRACKING_SETS_PER_PAGE = 120;
-const TRACKING_ENTRANTS_PER_PAGE = 300;
-const TRACKING_STANDINGS_PER_PAGE = 350;
-const ENTRANTS_PER_PAGE = 300;
+const TRACKING_ENTRANTS_PER_PAGE = 200;
+const TRACKING_STANDINGS_PER_PAGE = 250;
+const ENTRANTS_PER_PAGE = 200;
 const PLAYER_RECENT_SETS_PER_PAGE = 100;
 
 const startggClient = new GraphQLClient(STARTGG_GRAPHQL_ENDPOINT, {
@@ -116,6 +116,27 @@ export function fetchEventStandings(slug: string): Promise<TrackedStandingNode[]
     },
     TRACKING_STANDINGS_PER_PAGE,
   );
+}
+
+export async function fetchEntrantStandings(entrantIds: number[]): Promise<TrackedStandingNode[]> {
+  const variables = Object.fromEntries(entrantIds.map((entrantId, index) => [`entrantId${index}`, entrantId]));
+  const declarations = entrantIds.map((_, index) => `$entrantId${index}: ID!`).join(', ');
+  const fields = entrantIds.map((_, index) => `
+    entrant${index}: entrant(id: $entrantId${index}) {
+      id
+      standing {
+        placement
+        isFinal
+      }
+    }
+  `).join('');
+  const data = await queryStartgg<Record<string, {
+    id: number;
+    standing: { placement: number; isFinal: boolean | null } | null;
+  } | null>>(`query EntrantStandings(${declarations}) {${fields}}`, variables);
+  return Object.values(data).flatMap((entrant) => entrant?.standing
+    ? [{ placement: entrant.standing.placement, isFinal: entrant.standing.isFinal, entrant: { id: entrant.id } }]
+    : []);
 }
 
 export function fetchEventSetsByEntrants(slug: string, entrantIds: number[]): Promise<TrackedSetNode[]> {

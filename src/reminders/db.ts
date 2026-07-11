@@ -156,6 +156,8 @@ export function getDb(): Database.Database {
         active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
         subscription_source TEXT NOT NULL DEFAULT 'manual' CHECK (subscription_source IN ('manual', 'auto')),
         tournament_end_at TEXT,
+        tournament_name TEXT,
+        event_display_name TEXT,
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       );

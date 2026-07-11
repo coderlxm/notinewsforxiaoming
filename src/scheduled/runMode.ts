@@ -166,7 +166,7 @@ export async function runMode(mode: PushMode, chinaDayOfWeek: number, bot?: Tele
   if (mode === 'startgg_watch') {
     console.log('Mode: start.gg Watch');
     const summary = await runStartggWatchNow(bot);
-    console.log(`start.gg watch finished. events=${summary.checkedEvents} players=${summary.checkedPlayers} changed=${summary.changed} pending=${summary.pendingSetCount}`);
+    console.log(`start.gg watch finished. events=${summary.checkedEvents} players=${summary.checkedPlayers} changed=${summary.changed} active=${summary.activeSetCount}`);
     return;
   }
 

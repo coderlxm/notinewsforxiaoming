@@ -42,8 +42,8 @@ export type StartggGoResult =
       checkedPlayers: number;
       checkedEvents: number;
       changed: number;
-      pendingSetCount: number;
-      pendingEventSlugs: string[];
+      activeSetCount: number;
+      activeEventSlugs: string[];
     };
 
 function toWatchEventInput(event: StartggDiscoveredEvent): {
@@ -51,12 +51,16 @@ function toWatchEventInput(event: StartggDiscoveredEvent): {
   event_name: string;
   event_id: number;
   tournament_end_at: string;
+  tournament_name: string;
+  event_display_name: string;
 } {
   return {
     event_slug: event.eventSlug,
     event_name: event.eventName,
     event_id: event.eventId,
     tournament_end_at: new Date(event.tournamentEndAt * 1000).toISOString(),
+    tournament_name: event.tournamentName,
+    event_display_name: event.eventDisplayName,
   };
 }
 
@@ -100,8 +104,8 @@ export async function runStartggWatchNow(bot?: Telegraf): Promise<{
   checkedPlayers: number;
   checkedEvents: number;
   changed: number;
-  pendingSetCount: number;
-  pendingEventSlugs: string[];
+  activeSetCount: number;
+  activeEventSlugs: string[];
 }> {
   await syncStartggPresetPlayers();
   const players = listEnabledStartggWatchPlayers();
@@ -112,8 +116,8 @@ export async function runStartggWatchNow(bot?: Telegraf): Promise<{
     checkedPlayers: watchSummary.checkedPlayers,
     checkedEvents: watchSummary.checkedEvents,
     changed: watchSummary.changed,
-    pendingSetCount: watchSummary.pendingSetCount,
-    pendingEventSlugs: watchSummary.pendingEventSlugs,
+    activeSetCount: watchSummary.activeSetCount,
+    activeEventSlugs: watchSummary.activeEventSlugs,
   };
 }
 
@@ -183,8 +187,8 @@ export async function runStartggGo(bot: Telegraf | undefined, keyword: string): 
       checkedPlayers: watchSummary.checkedPlayers,
       checkedEvents: watchSummary.checkedEvents,
       changed: watchSummary.changed,
-      pendingSetCount: watchSummary.pendingSetCount,
-      pendingEventSlugs: watchSummary.pendingEventSlugs,
+      activeSetCount: watchSummary.activeSetCount,
+      activeEventSlugs: watchSummary.activeEventSlugs,
     };
   }
 
@@ -225,7 +229,7 @@ export async function runStartggGo(bot: Telegraf | undefined, keyword: string): 
     checkedPlayers: watchSummary.checkedPlayers,
     checkedEvents: watchSummary.checkedEvents,
     changed: watchSummary.changed,
-    pendingSetCount: watchSummary.pendingSetCount,
-    pendingEventSlugs: watchSummary.pendingEventSlugs,
+    activeSetCount: watchSummary.activeSetCount,
+    activeEventSlugs: watchSummary.activeEventSlugs,
   };
 }

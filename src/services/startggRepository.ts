@@ -20,6 +20,8 @@ export interface StartggWatchEvent {
   active: number;
   subscription_source: StartggWatchEventSource;
   tournament_end_at: string | null;
+  tournament_name: string | null;
+  event_display_name: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -116,7 +118,13 @@ export function updateStartggWatchPlayerName(id: number, playerName: string): vo
   `).run(playerName, new Date().toISOString(), id);
 }
 
-export function replaceActiveStartggWatchEvent(eventSlug: string, eventName: string): void {
+export function replaceActiveStartggWatchEvent(
+  eventSlug: string,
+  eventName: string,
+  tournamentName: string,
+  eventDisplayName: string,
+  tournamentEndAt: string,
+): void {
   const db = getDb();
   const now = new Date().toISOString();
   const replace = db.transaction(() => {
@@ -131,16 +139,22 @@ export function replaceActiveStartggWatchEvent(eventSlug: string, eventName: str
         event_name,
         active,
         subscription_source,
+        tournament_end_at,
+        tournament_name,
+        event_display_name,
         created_at,
         updated_at
       )
-      VALUES (?, ?, 1, 'manual', ?, ?)
+      VALUES (?, ?, 1, 'manual', ?, ?, ?, ?, ?)
       ON CONFLICT(event_slug) DO UPDATE SET
         event_name = excluded.event_name,
         active = 1,
         subscription_source = 'manual',
+        tournament_end_at = excluded.tournament_end_at,
+        tournament_name = excluded.tournament_name,
+        event_display_name = excluded.event_display_name,
         updated_at = excluded.updated_at
-    `).run(eventSlug, eventName, now, now);
+    `).run(eventSlug, eventName, tournamentEndAt, tournamentName, eventDisplayName, now, now);
     const event = db.prepare(`
       SELECT id
       FROM startgg_watch_events
@@ -157,6 +171,8 @@ export function replaceActiveStartggWatchEvents(events: Array<{
   event_name: string;
   event_id: number;
   tournament_end_at: string;
+  tournament_name: string;
+  event_display_name: string;
 }>, source: StartggWatchEventSource = 'manual'): void {
   if (events.length === 0) {
     throw new Error('start.gg go did not discover any events.');
@@ -186,21 +202,25 @@ export function replaceActiveStartggWatchEvents(events: Array<{
         active,
         subscription_source,
         tournament_end_at,
+        tournament_name,
+        event_display_name,
         created_at,
         updated_at
       )
-      VALUES (?, ?, ?, 1, ?, ?, ?, ?)
+      VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(event_slug) DO UPDATE SET
         event_name = excluded.event_name,
         event_id = excluded.event_id,
         active = 1,
         subscription_source = excluded.subscription_source,
         tournament_end_at = excluded.tournament_end_at,
+        tournament_name = excluded.tournament_name,
+        event_display_name = excluded.event_display_name,
         updated_at = excluded.updated_at
     `);
 
     for (const event of events) {
-      upsert.run(event.event_slug, event.event_name, event.event_id, source, event.tournament_end_at, now, now);
+      upsert.run(event.event_slug, event.event_name, event.event_id, source, event.tournament_end_at, event.tournament_name, event.event_display_name, now, now);
       const eventRow = db.prepare(`
         SELECT id
         FROM startgg_watch_events
@@ -220,6 +240,8 @@ export function syncAutoDiscoveredStartggWatchEvents(events: Array<{
   event_name: string;
   event_id: number;
   tournament_end_at: string;
+  tournament_name: string;
+  event_display_name: string;
 }>): void {
   const db = getDb();
   const now = new Date().toISOString();
@@ -257,8 +279,10 @@ export function syncAutoDiscoveredStartggWatchEvents(events: Array<{
     db.prepare(`
       UPDATE startgg_watch_events
       SET active = 0, updated_at = ?
-      WHERE active = 1 AND subscription_source = 'auto'
-    `).run(now);
+      WHERE active = 1
+        AND subscription_source = 'auto'
+        AND tournament_end_at <= ?
+    `).run(now, now);
 
     const upsert = db.prepare(`
       INSERT INTO startgg_watch_events (
@@ -268,16 +292,20 @@ export function syncAutoDiscoveredStartggWatchEvents(events: Array<{
         active,
         subscription_source,
         tournament_end_at,
+        tournament_name,
+        event_display_name,
         created_at,
         updated_at
       )
-      VALUES (?, ?, ?, 1, ?, ?, ?, ?)
+      VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(event_slug) DO UPDATE SET
         event_name = excluded.event_name,
         event_id = excluded.event_id,
         active = 1,
         subscription_source = excluded.subscription_source,
         tournament_end_at = excluded.tournament_end_at,
+        tournament_name = excluded.tournament_name,
+        event_display_name = excluded.event_display_name,
         updated_at = excluded.updated_at
     `);
 
@@ -286,7 +314,7 @@ export function syncAutoDiscoveredStartggWatchEvents(events: Array<{
       const source = existing?.active === 1 && existing.subscription_source === 'manual'
         ? 'manual'
         : 'auto';
-      upsert.run(event.event_slug, event.event_name, event.event_id, source, event.tournament_end_at, now, now);
+      upsert.run(event.event_slug, event.event_name, event.event_id, source, event.tournament_end_at, event.tournament_name, event.event_display_name, now, now);
       if (existing && existing.active === 0) {
         clearStartggWatchEventState(db, existing.id);
       }
@@ -414,13 +442,15 @@ export function updateStartggWatchEventResolved(
   eventId: number,
   eventName: string,
   tournamentEndAt: string,
+  tournamentName: string,
+  eventDisplayName: string,
 ): void {
   const db = getDb();
   db.prepare(`
     UPDATE startgg_watch_events
-    SET event_id = ?, event_name = ?, tournament_end_at = ?, updated_at = ?
+    SET event_id = ?, event_name = ?, tournament_end_at = ?, tournament_name = ?, event_display_name = ?, updated_at = ?
     WHERE id = ?
-  `).run(eventId, eventName, tournamentEndAt, new Date().toISOString(), eventRowId);
+  `).run(eventId, eventName, tournamentEndAt, tournamentName, eventDisplayName, new Date().toISOString(), eventRowId);
 }
 
 export interface StartggWatchEventEntrant {

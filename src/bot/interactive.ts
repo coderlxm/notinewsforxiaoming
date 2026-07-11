@@ -276,9 +276,9 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     await ctx.reply('开始手动检查 start.gg 选手状态...', { parse_mode: 'HTML' });
     try {
       const summary = await runStartggWatchNow(bot);
-      updateStartggFastWatch(bot, summary.pendingEventSlugs);
+      updateStartggFastWatch(bot, summary.activeEventSlugs);
       await ctx.reply(
-        `检查完成：本次检查项目 ${summary.checkedEvents} 个，选手 ${summary.checkedPlayers} 个，状态变化 ${summary.changed} 条，进行中 ${summary.pendingSetCount} 条。`,
+        `检查完成：本次检查项目 ${summary.checkedEvents} 个，选手 ${summary.checkedPlayers} 个，状态变化 ${summary.changed} 条，进行中 ${summary.activeSetCount} 条。`,
         { parse_mode: 'HTML' }
       );
     } catch (e) {
@@ -321,7 +321,7 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
           await ctx.reply(formatStartggGoTournamentCandidates(summary), { parse_mode: 'HTML' });
           return;
         }
-        updateStartggFastWatch(bot, summary.pendingEventSlugs);
+        updateStartggFastWatch(bot, summary.activeEventSlugs);
         const enabled = enableStartggPolling(bot, false);
         await ctx.reply(
           [
@@ -329,7 +329,7 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
             `固定选手：${summary.syncedPlayers} 位`,
             `赛事：${summary.tournamentName}`,
             `自动订阅项目：${summary.discoveredEvents} 个`,
-            `立即检查：项目 ${summary.checkedEvents} 个，选手 ${summary.checkedPlayers} 位，状态变化 ${summary.changed} 条，进行中 ${summary.pendingSetCount} 条`,
+            `立即检查：项目 ${summary.checkedEvents} 个，选手 ${summary.checkedPlayers} 位，状态变化 ${summary.changed} 条，进行中 ${summary.activeSetCount} 条`,
             `自动轮询：${enabled ? '已开启' : '已经开启'}`,
           ].join('\n'),
           { parse_mode: 'HTML' },
@@ -405,7 +405,16 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
       if (isStartggEventReference(raw)) {
         const event = await fetchEventMeta(raw);
         const eventName = event.tournamentName ? `${event.tournamentName} / ${event.name}` : event.name;
-        replaceActiveStartggWatchEvent(event.slug, eventName);
+        if (!event.tournamentName || event.tournamentEndAt === null) {
+          throw new Error(`start.gg 项目缺少 tournament 元数据：${event.slug}`);
+        }
+        replaceActiveStartggWatchEvent(
+          event.slug,
+          eventName,
+          event.tournamentName,
+          event.name,
+          new Date(event.tournamentEndAt * 1000).toISOString(),
+        );
         const enabledPlayers = listStartggWatchPlayers().filter((row) => row.enabled === 1).length;
         const nextStep = enabledPlayers === 0
           ? '下一步：发送 /watch <选手名> 或 /watch <user_url> 添加选手。'

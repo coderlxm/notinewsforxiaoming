@@ -13,6 +13,7 @@ export interface StartggDiscoveredEvent {
   eventId: number;
   eventSlug: string;
   eventName: string;
+  eventDisplayName: string;
 }
 
 function nowAsStartggTimestamp(now: Date): number {
@@ -75,6 +76,7 @@ export async function discoverStartggActiveEventsForPlayers(
         eventId: event.id,
         eventSlug,
         eventName,
+        eventDisplayName: event.name,
       });
     }
   }

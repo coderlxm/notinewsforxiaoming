@@ -225,7 +225,8 @@ player(id).sets(
 
 - 如果当前存在 active 的 manual event，自动发现不会改写 active event。
 - 没有 active manual event 时，当前 active 的 auto event 会按本轮发现结果更新。
-- 本轮不再发现的 auto event 会被设为 inactive。
+- 本轮暂时不再发现、但 tournament 尚未到 `endAt` 的 auto event 会继续保持 active，避免跨日休赛期丢失订阅。
+- 已到 `endAt` 且本轮不再发现的 auto event 会被设为 inactive。
 - inactive event 重新出现时，会清除它之前的状态，重新建立基线。
 
 需要注意：手动 event 一旦 active，后续自动轮询不会自动替换它；需要再次执行 `/watch <event_url>`、`/startgg go` 或 `/startgg deleteall` 改变状态。
@@ -247,16 +248,16 @@ player(id).sets(
 
 映射保存在 `startgg_watch_event_entrants`。
 
-找不到 entrant 的选手会保留 `NULL` 映射，并得到“未在该项目出战”状态，不会产生赛况推送。
+找不到 entrant 的选手会得到“未在该项目出战”状态，不会产生赛况推送。NULL 映射不会被永久视为最终结果；固定轮询会重新读取 entrants，以适配晚报名或主办方稍后补全数据。
 
 ### 5.3 查询对局和排名
 
 只对已经找到 entrant 的选手查询：
 
 - 该 event 中属于这些 entrant 的全部 sets。
-- 该 event 的 standings。
+- 已映射 entrant 的 standing。
 
-sets 和 standings 是并行查询的，接口会自动处理分页。
+sets 和 standings 是并行查询的。sets 会自动处理分页；standing 通过 GraphQL entrant 根字段只查询关注 entrant，不读取整场排名。
 
 ### 5.4 状态计算
 
@@ -359,20 +360,20 @@ watch_player_id + watch_event_id + set_id
 
 ### 6.2 进行中对局的 2 分钟加速轮询
 
-每次检查会返回 `pendingSetCount`：
+每次检查会返回实际进行中的 `activeSetCount`：
 
-- 大于 0：2 分钟后再次检查。
-- 等于 0：停止加速轮询。
+- 存在 `startedAt` 非空且 `completedAt` 为空的 set：2 分钟后再次检查。
+- 不存在实际进行中的 set：停止加速轮询。
 
 固定轮询会执行完整的 `runStartggWatchNow()`，负责同步选手、自动发现赛事并检查全部 active event。
 
-加速轮询只检查上一轮确认存在进行中 set 的 event，不再同步预设选手、查询全部选手近期 sets 或检查其他 event。某个 event 不再存在进行中 set 后会退出加速范围；所有加速 event 都没有进行中 set 后，加速轮询停止。下一次固定轮询仍会发现新的 event 或重新进入进行中状态的 event。
+加速轮询只检查上一轮确认存在实际进行中 set 的 event，不再同步预设选手、查询全部选手近期 sets、刷新未映射 entrant 或检查其他 event。某个 event 不再存在进行中 set 后会退出加速范围；所有加速 event 都没有进行中 set 后，加速轮询停止。下一次固定轮询仍会发现新的 event 或重新进入进行中状态的 event。
 
 ### 6.3 赛事完赛后自动停止
 
-每次固定或加速轮询完整执行成功后，会读取当前 active event 对应 tournament 的 `endAt`。当所有 active event 所属赛事都已到达结束时间时，系统会关闭 20 分钟固定轮询和 2 分钟加速轮询，将关闭状态写入 SQLite，并发送一条 Telegram 通知。
+每次固定轮询开始前，会读取当前 active event 对应 tournament 的 `endAt`。只有存在 active event 且它们所属赛事都已到达结束时间时，系统才会关闭 20 分钟固定轮询和 2 分钟加速轮询，将关闭状态写入 SQLite，并发送一条 Telegram 通知。active event 为空不会被解释为赛事完赛。
 
-选手淘汰、暂时没有新对局或 `pendingSetCount=0` 都不会触发固定轮询停止。
+选手淘汰、暂时没有新对局或 `activeSetCount=0` 都不会触发固定轮询停止。
 
 ### 6.4 Resident 常驻进程和一次性入口
 
@@ -395,7 +396,7 @@ start.gg 的持续监控主要依赖：
 | 表 | 作用 |
 | --- | --- |
 | `startgg_watch_players` | 预设和手动添加的选手，按 `player_id` 唯一 |
-| `startgg_watch_events` | event 订阅、active 状态、auto/manual 来源和 tournament 结束时间 |
+| `startgg_watch_events` | event 订阅、active 状态、auto/manual 来源、tournament 结束时间和加速轮询所需的赛事名称缓存 |
 | `startgg_watch_event_entrants` | 选手在某个 event 中对应的 entrant |
 | `startgg_watch_snapshots` | 每个选手 × event 的最新状态快照 |
 | `startgg_pushed_sets` | 已处理 set 的去重记录 |
@@ -408,13 +409,14 @@ start.gg 的持续监控主要依赖：
 watch_player_id + watch_event_id
 ```
 
-当前数据库迁移版本为 8：
+当前数据库迁移版本为 9：
 
 - 版本 4：增加 auto/manual event 来源。
 - 版本 5：增加 Telegram 消息 ID 表。
 - 版本 6：增加首条状态发送标记。
 - 版本 7：增加自动轮询持久化状态。
 - 版本 8：增加 tournament 结束时间，用于完赛后自动停止轮询。
+- 版本 9：增加 tournament/event 名称缓存，让加速轮询不再请求 event header。
 
 ## 8. 当前事实下的边界
 
