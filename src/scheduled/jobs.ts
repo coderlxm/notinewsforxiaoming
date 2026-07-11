@@ -205,8 +205,8 @@ export function registerFixedJobs(bot: Telegraf): void {
     await runMode('av_update', getChinaDayOfWeek(), bot);
   });
 
-  // english: 21:30
-  schedule.scheduleJob({ hour: 21, minute: 30, tz: 'Asia/Shanghai' }, async () => {
+  // english: 00:11, after the nightly sleep reminder
+  schedule.scheduleJob({ hour: 0, minute: 11, tz: 'Asia/Shanghai' }, async () => {
     await runMode('english', getChinaDayOfWeek(), bot);
   });
 
