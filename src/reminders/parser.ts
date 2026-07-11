@@ -66,7 +66,7 @@ export function parseRecurringCommand(args: string, _now: Date): ParsedRecurring
     const [, time, text] = everyDayMatch;
     if (!text?.trim()) return { error: '提醒内容不能为空。' };
     return {
-      spec: { freq: 'DAILY', byweekday: [], bymonthday: [], time: time!, timezone: 'Asia/Shanghai' },
+      spec: { freq: 'DAILY', byweekday: [], bymonthday: [], time: time!, timezone: 'Asia/Shanghai', calendarFilter: null },
       text: text.trim(),
       source: 'deterministic',
     };
@@ -83,7 +83,7 @@ export function parseRecurringCommand(args: string, _now: Date): ParsedRecurring
     if (byweekday.length === 0) return { error: '请指定至少一个星期几。如: mon,wed,fri' };
     if (!text?.trim()) return { error: '提醒内容不能为空。' };
     return {
-      spec: { freq: 'WEEKLY', byweekday, bymonthday: [], time: time!, timezone: 'Asia/Shanghai' },
+      spec: { freq: 'WEEKLY', byweekday, bymonthday: [], time: time!, timezone: 'Asia/Shanghai', calendarFilter: null },
       text: text.trim(),
       source: 'deterministic',
     };
@@ -96,7 +96,7 @@ export function parseRecurringCommand(args: string, _now: Date): ParsedRecurring
     if (dayNum < 1 || dayNum > 31) return { error: '日期必须在 1-31 之间。' };
     if (!text?.trim()) return { error: '提醒内容不能为空。' };
     return {
-      spec: { freq: 'MONTHLY', byweekday: [], bymonthday: [dayNum], time: time!, timezone: 'Asia/Shanghai' },
+      spec: { freq: 'MONTHLY', byweekday: [], bymonthday: [dayNum], time: time!, timezone: 'Asia/Shanghai', calendarFilter: null },
       text: text.trim(),
       source: 'deterministic',
     };
@@ -184,6 +184,7 @@ const recurrenceSchema = z.object({
     bymonthday: z.array(z.number()),
     time: z.string().regex(/^\d{2}:\d{2}$/),
     timezone: z.string(),
+    calendar_filter: z.enum(['china_workday']).nullable(),
   }),
   text: z.string().min(1),
 });
@@ -232,10 +233,13 @@ export async function parseNaturalReminder(
     "byweekday": [],
     "bymonthday": [],
     "time": "22:00",
-    "timezone": "Asia/Shanghai"
+    "timezone": "Asia/Shanghai",
+    "calendar_filter": null
   },
   "text": "做俯卧撑"
 }
+
+用户说“工作日”或“上班日”时，必须输出 DAILY、空 byweekday，并把 calendar_filter 设为 "china_workday"；禁止用周一至周五代替中国工作日。其他循环提醒 calendar_filter 必须为 null。
 
 如果用户想要一次性提醒，输出：
 {
@@ -285,6 +289,10 @@ target 枚举：once（一次性）、recurring（循环）、any（两者都查
         return { error: '没有识别到有效的循环提醒格式。' };
       }
       const { recurrence, text: reminderText } = result.data;
+      const requiresChinaWorkday = /工作日|上班日/.test(text);
+      if (requiresChinaWorkday && recurrence.calendar_filter !== 'china_workday') {
+        return { error: '工作日提醒必须使用中国工作日日历。' };
+      }
       return {
         spec: {
           freq: recurrence.freq,
@@ -292,6 +300,7 @@ target 枚举：once（一次性）、recurring（循环）、any（两者都查
           bymonthday: recurrence.bymonthday,
           time: recurrence.time,
           timezone: recurrence.timezone,
+          calendarFilter: recurrence.calendar_filter,
         },
         text: reminderText,
         source: 'ai',

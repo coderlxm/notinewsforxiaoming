@@ -35,6 +35,7 @@ export function getDb(): Database.Database {
         text TEXT NOT NULL,
         timezone TEXT NOT NULL,
         rrule_text TEXT NOT NULL,
+        calendar_filter TEXT CHECK (calendar_filter IS NULL OR calendar_filter = 'china_workday'),
         next_trigger_at TEXT NOT NULL,
         status TEXT NOT NULL CHECK (status IN ('active', 'paused', 'cancelled')),
         source TEXT NOT NULL CHECK (source IN ('deterministic', 'ai')),

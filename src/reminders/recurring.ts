@@ -4,6 +4,7 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc.js';
 import timezone from 'dayjs/plugin/timezone.js';
 import type { RecurringRule } from './repository.js';
+import { isChinaWorkdayStrict } from '../calendar/chinaWorkday.js';
 
 const { RRule, rrulestr, datetime } = rrulePkg as {
   RRule: typeof import('rrule')['RRule'];
@@ -20,6 +21,7 @@ export interface RecurrenceSpec {
   bymonthday: number[];
   time: string;
   timezone: string;
+  calendarFilter: 'china_workday' | null;
 }
 
 const TZ = 'Asia/Shanghai';
@@ -101,18 +103,26 @@ export function getNextTrigger(
   timezoneName: string,
   after: Date = new Date(),
   inclusive = true,
+  calendarFilter: 'china_workday' | null = null,
 ): Date {
   const normalizedText = normalizeRRuleText(rruleText);
   const rule = rrulestr(normalizedText);
   const tzid = timezoneName || getRRuleTimezone(rruleText);
   const pseudoAfter = toPseudoUtc(after, tzid);
-  const next = rule.after(pseudoAfter, inclusive);
-  if (!next) throw new Error(`No next trigger for rrule: ${normalizedText}`);
-  return fromPseudoUtc(next, tzid);
+  let next = rule.after(pseudoAfter, inclusive);
+  while (next) {
+    const triggerAt = fromPseudoUtc(next, tzid);
+    if (calendarFilter === null || isChinaWorkdayStrict(triggerAt)) {
+      return triggerAt;
+    }
+    next = rule.after(next, false);
+  }
+  throw new Error(`No next trigger for rrule: ${normalizedText}`);
 }
 
 export function describeRecurrence(spec: RecurrenceSpec): string {
   const time = spec.time;
+  if (spec.calendarFilter === 'china_workday') return `每个中国工作日 ${time}`;
   if (spec.freq === 'DAILY') return `每天 ${time}`;
 
   if (spec.freq === 'WEEKLY') {
@@ -148,7 +158,7 @@ export function getOccurrencesInRange(
   let cursor = start;
 
   while (results.length <= MAX_OCCURRENCES) {
-    const next = getNextTrigger(rule.rrule_text, rule.timezone, cursor, inclusive);
+    const next = getNextTrigger(rule.rrule_text, rule.timezone, cursor, inclusive, rule.calendar_filter);
     if (next > end) break;
     if (results.length === MAX_OCCURRENCES) {
       throw new Error(`循环提醒「${rule.text}」在范围内展开超过 ${MAX_OCCURRENCES} 次，请缩小查询范围。`);

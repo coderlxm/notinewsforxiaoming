@@ -110,6 +110,7 @@ export interface RecurringRule {
   text: string;
   timezone: string;
   rrule_text: string;
+  calendar_filter: 'china_workday' | null;
   next_trigger_at: string;
   status: 'active' | 'paused' | 'cancelled';
   source: 'deterministic' | 'ai';
@@ -134,6 +135,7 @@ export interface CreateRecurringRuleInput {
   text: string;
   timezone: string;
   rrule_text: string;
+  calendar_filter?: 'china_workday' | null;
   next_trigger_at: Date;
   source: 'deterministic' | 'ai';
   source_message_id?: number;
@@ -144,11 +146,11 @@ export function createRecurringRule(input: CreateRecurringRuleInput): RecurringR
   const now = new Date().toISOString();
   const stmt = db.prepare(`
     INSERT INTO recurring_reminder_rules
-      (chat_id, text, timezone, rrule_text, next_trigger_at, status, source, source_message_id, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)
+      (chat_id, text, timezone, rrule_text, calendar_filter, next_trigger_at, status, source, source_message_id, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)
   `);
   const result = stmt.run(
-    input.chat_id, input.text, input.timezone, input.rrule_text,
+    input.chat_id, input.text, input.timezone, input.rrule_text, input.calendar_filter ?? null,
     input.next_trigger_at.toISOString(), input.source,
     input.source_message_id ?? null, now, now
   );

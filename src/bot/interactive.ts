@@ -582,12 +582,13 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
       const recurringResult = parseRecurringCommand(args, now);
       if (recurringResult && !('error' in recurringResult)) {
         const rruleText = buildRRuleText(recurringResult.spec, now);
-        const nextTrigger = getNextTrigger(rruleText, recurringResult.spec.timezone, now, true);
+        const nextTrigger = getNextTrigger(rruleText, recurringResult.spec.timezone, now, true, recurringResult.spec.calendarFilter);
         const rule = repo.createRecurringRule({
           chat_id: String(ctx.chat!.id),
           text: recurringResult.text,
           timezone: recurringResult.spec.timezone,
           rrule_text: rruleText,
+          calendar_filter: recurringResult.spec.calendarFilter,
           next_trigger_at: nextTrigger,
           source: recurringResult.source,
         });
@@ -678,12 +679,13 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
 
     if ('spec' in result) {
       const rruleText = buildRRuleText(result.spec, receivedAt);
-      const nextTrigger = getNextTrigger(rruleText, result.spec.timezone, receivedAt, true);
+      const nextTrigger = getNextTrigger(rruleText, result.spec.timezone, receivedAt, true, result.spec.calendarFilter);
       const rule = repo.createRecurringRule({
         chat_id: String(ctx.chat!.id),
         text: result.text,
         timezone: result.spec.timezone,
         rrule_text: rruleText,
+        calendar_filter: result.spec.calendarFilter,
         next_trigger_at: nextTrigger,
         source: result.source,
       });

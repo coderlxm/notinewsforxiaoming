@@ -1,5 +1,7 @@
 # 循环提醒功能设计方案
 
+补充实现：循环规则可通过 `calendar_filter=china_workday` 表达中国法定工作日。RRULE 生成每日候选时间，严格工作日日历负责过滤法定节假日和周末调休补班；缺少年份日历时直接报错。
+
 ## 1. 目标
 
 将当前“一次性提醒”扩展为“支持循环提醒”，覆盖典型场景：
@@ -370,4 +372,3 @@ ON recurring_reminder_runs(rule_id, trigger_at);
 
 3. 风险：callback_data 复杂度升高
 - 决策：保持短格式（`recur:<action>:<id>`），不把大 payload 放进 callback_data
-

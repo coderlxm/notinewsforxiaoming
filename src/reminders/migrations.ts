@@ -160,6 +160,18 @@ const MIGRATIONS: DbMigration[] = [
       }
     },
   },
+  {
+    version: 10,
+    up(db) {
+      if (!tableHasColumn(db, 'recurring_reminder_rules', 'calendar_filter')) {
+        db.exec(`
+          ALTER TABLE recurring_reminder_rules
+          ADD COLUMN calendar_filter TEXT
+          CHECK (calendar_filter IS NULL OR calendar_filter = 'china_workday');
+        `);
+      }
+    },
+  },
 ];
 
 export function runDbMigrations(db: Database.Database): void {

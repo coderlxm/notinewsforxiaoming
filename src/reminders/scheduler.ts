@@ -89,7 +89,13 @@ function scheduleRecurringRule(bot: Telegraf, rule: RecurringRule): void {
       repo.setRecurringRunSentMessageId(run.id, msg.message_id);
 
       const currentTriggerAt = new Date(current.next_trigger_at);
-      const nextTrigger = getNextTrigger(current.rrule_text, current.timezone, currentTriggerAt, false);
+      const nextTrigger = getNextTrigger(
+        current.rrule_text,
+        current.timezone,
+        currentTriggerAt,
+        false,
+        current.calendar_filter,
+      );
       repo.updateRecurringNextTrigger(rule.id, nextTrigger, currentTriggerAt);
       scheduleRecurringRule(bot, { ...current, next_trigger_at: nextTrigger.toISOString() });
     } catch (err) {
