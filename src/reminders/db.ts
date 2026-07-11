@@ -170,6 +170,7 @@ export function getDb(): Database.Database {
         last_set_round_label TEXT,
         last_set_score_text TEXT,
         last_set_state INTEGER,
+        initial_message_sent INTEGER NOT NULL DEFAULT 0 CHECK (initial_message_sent IN (0, 1)),
         captured_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY(watch_player_id) REFERENCES startgg_watch_players(id),
         FOREIGN KEY(watch_event_id) REFERENCES startgg_watch_events(id),

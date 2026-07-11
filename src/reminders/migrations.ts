@@ -117,6 +117,18 @@ const MIGRATIONS: DbMigration[] = [
       `);
     },
   },
+  {
+    version: 6,
+    up(db) {
+      if (!tableHasColumn(db, 'startgg_watch_snapshots', 'initial_message_sent')) {
+        db.exec(`
+          ALTER TABLE startgg_watch_snapshots
+          ADD COLUMN initial_message_sent INTEGER NOT NULL DEFAULT 0
+          CHECK (initial_message_sent IN (0, 1));
+        `);
+      }
+    },
+  },
 ];
 
 export function runDbMigrations(db: Database.Database): void {

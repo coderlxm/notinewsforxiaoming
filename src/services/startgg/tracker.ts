@@ -13,6 +13,7 @@ import {
   type StartggWatchPlayer,
   hasStartggPushedSet,
   markStartggPushedSet,
+  markStartggInitialMessageSent,
   recordStartggSentMessage,
 } from '../startggRepository.js';
 import {
@@ -335,7 +336,8 @@ function selectSetsToPush(
     for (const set of playerSets) {
       markStartggPushedSet(watchPlayerId, watchEventId, set.id);
     }
-    return [];
+    const latestSet = [...playerSets].sort(compareSetRecency)[0];
+    return latestSet ? [latestSet] : [];
   }
 
   const sortedSets = [...playerSets].sort(compareSetChronology);
@@ -407,6 +409,7 @@ async function processEvent(
       pendingSetCount += 1;
     }
     const previous = findStartggWatchSnapshot(player.id, eventRow.id);
+    const initialMessagePending = !previous || previous.initial_message_sent === 0;
     const setsToPush = selectSetsToPush(playerSets, previous, player.id, eventRow.id);
     upsertStartggWatchSnapshot({
       watch_player_id: player.id,
@@ -421,7 +424,30 @@ async function processEvent(
       captured_at: new Date().toISOString(),
     });
 
-    if (!previous) continue;
+    if (initialMessagePending) {
+      if (playerSets.length === 0) continue;
+
+      for (const set of playerSets) {
+        markStartggPushedSet(player.id, eventRow.id, set.id);
+      }
+
+      changed += 1;
+      const message = formatStartggStatusChangedMessage({
+        tournamentName: header.tournament.name,
+        eventName: header.name,
+        eventSlug: header.slug,
+        playerName: player.player_name,
+        status: snapshot.status,
+        placement: snapshot.placement,
+        roundLabel: snapshot.lastSetRoundLabel,
+        scoreText: snapshot.lastSetScoreText,
+        setPageUrl: snapshot.setPageUrl,
+      });
+      const messageId = await sendTelegramMessageWithId(message, bot);
+      recordStartggSentMessage(messageId);
+      markStartggInitialMessageSent(player.id, eventRow.id);
+      continue;
+    }
 
     const changedNow = hasSnapshotChanged(snapshot, previous);
     if (setsToPush.length === 0 && !changedNow) continue;

@@ -34,6 +34,7 @@ export interface StartggWatchSnapshot {
   last_set_round_label: string | null;
   last_set_score_text: string | null;
   last_set_state: number | null;
+  initial_message_sent: number;
   captured_at: string;
 }
 
@@ -142,6 +143,13 @@ export function replaceActiveStartggWatchEvents(events: Array<{
 
   const db = getDb();
   const now = new Date().toISOString();
+  const activeEventSlugs = new Set(
+    (db.prepare(`
+      SELECT event_slug
+      FROM startgg_watch_events
+      WHERE active = 1
+    `).all() as Array<{ event_slug: string }>).map((event) => event.event_slug),
+  );
   const replace = db.transaction(() => {
     db.prepare(`
       UPDATE startgg_watch_events
@@ -176,7 +184,9 @@ export function replaceActiveStartggWatchEvents(events: Array<{
         WHERE event_slug = ?
         LIMIT 1
       `).get(event.event_slug) as { id: number };
-      clearStartggWatchEventState(db, eventRow.id);
+      if (!activeEventSlugs.has(event.event_slug)) {
+        clearStartggWatchEventState(db, eventRow.id);
+      }
     }
   });
   replace();
@@ -459,6 +469,15 @@ export function recordStartggSentMessage(messageId: number): void {
     INSERT INTO startgg_sent_messages (message_id, sent_at)
     VALUES (?, ?)
   `).run(messageId, new Date().toISOString());
+}
+
+export function markStartggInitialMessageSent(watchPlayerId: number, watchEventId: number): void {
+  const db = getDb();
+  db.prepare(`
+    UPDATE startgg_watch_snapshots
+    SET initial_message_sent = 1
+    WHERE watch_player_id = ? AND watch_event_id = ?
+  `).run(watchPlayerId, watchEventId);
 }
 
 export function listStartggSentMessageIds(): number[] {
