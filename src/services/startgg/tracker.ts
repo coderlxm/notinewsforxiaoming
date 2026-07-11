@@ -174,6 +174,7 @@ export interface StartggWatchSummary {
   changed: number;
   checkedEvents: number;
   pendingSetCount: number;
+  pendingEventSlugs: string[];
 }
 
 export interface RunStartggWatchOptions {
@@ -520,5 +521,8 @@ export async function runStartggWatchOnce(bot?: Telegraf, options?: RunStartggWa
     checkedEvents: targetEvents.length,
     changed: results.reduce((sum, r) => sum + r.changed, 0),
     pendingSetCount: results.reduce((sum, r) => sum + r.pendingSetCount, 0),
+    pendingEventSlugs: targetEvents
+      .filter((_, index) => results[index]!.pendingSetCount > 0)
+      .map((event) => normalizeEventSlug(event.event_slug)),
   };
 }

@@ -43,6 +43,7 @@ export type StartggGoResult =
       checkedEvents: number;
       changed: number;
       pendingSetCount: number;
+      pendingEventSlugs: string[];
     };
 
 function toWatchEventInput(event: StartggDiscoveredEvent): {
@@ -100,6 +101,7 @@ export async function runStartggWatchNow(bot?: Telegraf): Promise<{
   checkedEvents: number;
   changed: number;
   pendingSetCount: number;
+  pendingEventSlugs: string[];
 }> {
   await syncStartggPresetPlayers();
   const players = listEnabledStartggWatchPlayers();
@@ -111,6 +113,7 @@ export async function runStartggWatchNow(bot?: Telegraf): Promise<{
     checkedEvents: watchSummary.checkedEvents,
     changed: watchSummary.changed,
     pendingSetCount: watchSummary.pendingSetCount,
+    pendingEventSlugs: watchSummary.pendingEventSlugs,
   };
 }
 
@@ -181,6 +184,7 @@ export async function runStartggGo(bot: Telegraf | undefined, keyword: string): 
       checkedEvents: watchSummary.checkedEvents,
       changed: watchSummary.changed,
       pendingSetCount: watchSummary.pendingSetCount,
+      pendingEventSlugs: watchSummary.pendingEventSlugs,
     };
   }
 
@@ -222,5 +226,6 @@ export async function runStartggGo(bot: Telegraf | undefined, keyword: string): 
     checkedEvents: watchSummary.checkedEvents,
     changed: watchSummary.changed,
     pendingSetCount: watchSummary.pendingSetCount,
+    pendingEventSlugs: watchSummary.pendingEventSlugs,
   };
 }

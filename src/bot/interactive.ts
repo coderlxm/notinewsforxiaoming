@@ -276,7 +276,7 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     await ctx.reply('开始手动检查 start.gg 选手状态...', { parse_mode: 'HTML' });
     try {
       const summary = await runStartggWatchNow(bot);
-      updateStartggFastWatch(bot, summary.pendingSetCount);
+      updateStartggFastWatch(bot, summary.pendingEventSlugs);
       await ctx.reply(
         `检查完成：本次检查项目 ${summary.checkedEvents} 个，选手 ${summary.checkedPlayers} 个，状态变化 ${summary.changed} 条，进行中 ${summary.pendingSetCount} 条。`,
         { parse_mode: 'HTML' }
@@ -297,7 +297,7 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     try {
       if (arg === 'deleteall') {
         disableStartggPolling();
-        updateStartggFastWatch(bot, 0);
+        updateStartggFastWatch(bot, []);
         const messageIds = listStartggSentMessageIds();
         for (const messageId of messageIds) {
           await bot.telegram.deleteMessage(config.tgChatId, messageId);
@@ -321,7 +321,7 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
           await ctx.reply(formatStartggGoTournamentCandidates(summary), { parse_mode: 'HTML' });
           return;
         }
-        updateStartggFastWatch(bot, summary.pendingSetCount);
+        updateStartggFastWatch(bot, summary.pendingEventSlugs);
         const enabled = enableStartggPolling(bot, false);
         await ctx.reply(
           [

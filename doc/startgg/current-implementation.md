@@ -364,7 +364,9 @@ watch_player_id + watch_event_id + set_id
 - 大于 0：2 分钟后再次检查。
 - 等于 0：停止加速轮询。
 
-加速轮询每次仍然执行完整的 `runStartggWatchNow()`，不是只请求某一个 set。
+固定轮询会执行完整的 `runStartggWatchNow()`，负责同步选手、自动发现赛事并检查全部 active event。
+
+加速轮询只检查上一轮确认存在进行中 set 的 event，不再同步预设选手、查询全部选手近期 sets 或检查其他 event。某个 event 不再存在进行中 set 后会退出加速范围；所有加速 event 都没有进行中 set 后，加速轮询停止。下一次固定轮询仍会发现新的 event 或重新进入进行中状态的 event。
 
 ### 6.3 赛事完赛后自动停止
 

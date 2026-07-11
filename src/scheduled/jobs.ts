@@ -5,6 +5,7 @@ import { runMode } from './runMode.js';
 import { getChinaDayOfWeek } from '../utils/time.js';
 import { isChinaWorkday } from '../calendar/chinaWorkday.js';
 import { runStartggWatchNow } from '../services/startggPresetSync.js';
+import { runStartggWatchOnce } from '../services/startgg/index.js';
 import {
   isStartggPollingPersistedEnabled,
   listActiveStartggWatchEvents,
@@ -34,8 +35,8 @@ function clearStartggFastWatch(): void {
   startggFastWatchDueAt = null;
 }
 
-export function updateStartggFastWatch(bot: Telegraf, pendingSetCount: number): void {
-  if (pendingSetCount === 0) {
+export function updateStartggFastWatch(bot: Telegraf, pendingEventSlugs: string[]): void {
+  if (pendingEventSlugs.length === 0) {
     clearStartggFastWatch();
     return;
   }
@@ -45,8 +46,15 @@ export function updateStartggFastWatch(bot: Telegraf, pendingSetCount: number): 
   startggFastWatchTimer = setTimeout(async () => {
     startggFastWatchTimer = null;
     startggFastWatchDueAt = null;
-    await runScheduledStartggWatch(bot);
+    await runScheduledStartggFastWatch(bot, pendingEventSlugs);
   }, STARTGG_FAST_WATCH_INTERVAL_MS);
+}
+
+async function runScheduledStartggFastWatch(bot: Telegraf, eventSlugs: string[]): Promise<void> {
+  console.log(`Mode: start.gg Fast Watch (${eventSlugs.join(', ')})`);
+  const summary = await runStartggWatchOnce(bot, { eventSlugs });
+  console.log(`start.gg fast watch finished. events=${summary.checkedEvents} players=${summary.checkedPlayers} changed=${summary.changed} pending=${summary.pendingSetCount}`);
+  updateStartggFastWatch(bot, summary.pendingEventSlugs);
 }
 
 async function runScheduledStartggWatch(bot: Telegraf): Promise<void> {
@@ -70,7 +78,7 @@ async function runScheduledStartggWatch(bot: Telegraf): Promise<void> {
     return;
   }
 
-  updateStartggFastWatch(bot, summary.pendingSetCount);
+  updateStartggFastWatch(bot, summary.pendingEventSlugs);
 }
 
 export function enableStartggPolling(bot: Telegraf, resetState = true): boolean {
@@ -87,10 +95,10 @@ export function enableStartggPolling(bot: Telegraf, resetState = true): boolean 
 
 export function disableStartggPolling(): boolean {
   setStartggPollingPersistedEnabled(false);
+  clearStartggFastWatch();
   if (!startggPollJob) return false;
   startggPollJob.cancel();
   startggPollJob = null;
-  clearStartggFastWatch();
   return true;
 }
 
