@@ -106,6 +106,17 @@ const MIGRATIONS: DbMigration[] = [
       }
     },
   },
+  {
+    version: 5,
+    up(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS startgg_sent_messages (
+          message_id INTEGER PRIMARY KEY,
+          sent_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+    },
+  },
 ];
 
 export function runDbMigrations(db: Database.Database): void {

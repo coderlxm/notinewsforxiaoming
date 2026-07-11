@@ -1,6 +1,6 @@
 import type { Telegraf } from 'telegraf';
 import { formatStartggStatusChangedMessage } from '../../formatters/startggFormatter.js';
-import { sendTelegramMessage } from '../../publishers/telegram.js';
+import { sendTelegramMessageWithId } from '../../publishers/telegram.js';
 import {
   findStartggWatchSnapshot,
   listActiveStartggWatchEvents,
@@ -13,6 +13,7 @@ import {
   type StartggWatchPlayer,
   hasStartggPushedSet,
   markStartggPushedSet,
+  recordStartggSentMessage,
 } from '../startggRepository.js';
 import {
   fetchEventHeader,
@@ -438,7 +439,8 @@ async function processEvent(
         scoreText: snapshot.lastSetScoreText,
         setPageUrl: snapshot.setPageUrl,
       });
-      await sendTelegramMessage(message, bot);
+      const messageId = await sendTelegramMessageWithId(message, bot);
+      recordStartggSentMessage(messageId);
       continue;
     }
 
@@ -456,7 +458,8 @@ async function processEvent(
         scoreText: buildSetScoreText(set.displayScore),
         setPageUrl,
       });
-      await sendTelegramMessage(message, bot);
+      const messageId = await sendTelegramMessageWithId(message, bot);
+      recordStartggSentMessage(messageId);
       markStartggPushedSet(player.id, eventRow.id, set.id);
     }
   }

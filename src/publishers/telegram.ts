@@ -8,25 +8,27 @@ const telegramAgent = new https.Agent({
 });
 
 export async function sendTelegramMessage(message: string, bot?: Telegraf): Promise<boolean> {
+  await sendTelegramMessageWithId(message, bot);
+  return true;
+}
+
+export async function sendTelegramMessageWithId(message: string, bot?: Telegraf): Promise<number> {
   if (!config.tgToken || !config.tgChatId) {
     throw new Error('Telegram Token or Chat ID is not set.');
   }
 
-  if (bot) {
-    await bot.telegram.sendMessage(config.tgChatId, message, {
+  const sent = bot
+    ? await bot.telegram.sendMessage(config.tgChatId, message, {
       parse_mode: 'HTML',
       link_preview_options: { is_disabled: true }
-    });
-  } else {
-    const instance = new Telegraf(config.tgToken, {
+    })
+    : await new Telegraf(config.tgToken, {
       telegram: { agent: telegramAgent }
-    });
-    await instance.telegram.sendMessage(config.tgChatId, message, {
+    }).telegram.sendMessage(config.tgChatId, message, {
       parse_mode: 'HTML',
       link_preview_options: { is_disabled: true }
     });
-  }
 
   console.log('Successfully sent message to Telegram.');
-  return true;
+  return sent.message_id;
 }

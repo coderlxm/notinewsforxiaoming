@@ -201,6 +201,11 @@ export function getDb(): Database.Database {
       );
       CREATE INDEX IF NOT EXISTS idx_startgg_pushed_sets_player_event
       ON startgg_pushed_sets(watch_player_id, watch_event_id);
+
+      CREATE TABLE IF NOT EXISTS startgg_sent_messages (
+        message_id INTEGER PRIMARY KEY,
+        sent_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
     `);
 
     runDbMigrations(db);

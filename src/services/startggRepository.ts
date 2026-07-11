@@ -453,6 +453,36 @@ export function markStartggPushedSet(watchPlayerId: number, watchEventId: number
   `).run(watchPlayerId, watchEventId, setId, new Date().toISOString());
 }
 
+export function recordStartggSentMessage(messageId: number): void {
+  const db = getDb();
+  db.prepare(`
+    INSERT INTO startgg_sent_messages (message_id, sent_at)
+    VALUES (?, ?)
+  `).run(messageId, new Date().toISOString());
+}
+
+export function listStartggSentMessageIds(): number[] {
+  const db = getDb();
+  const rows = db.prepare(`
+    SELECT message_id
+    FROM startgg_sent_messages
+    ORDER BY message_id ASC
+  `).all() as Array<{ message_id: number }>;
+  return rows.map((row) => row.message_id);
+}
+
+export function clearStartggWatchState(): void {
+  const db = getDb();
+  const clear = db.transaction(() => {
+    db.prepare('DELETE FROM startgg_sent_messages').run();
+    db.prepare('DELETE FROM startgg_pushed_sets').run();
+    db.prepare('DELETE FROM startgg_watch_event_entrants').run();
+    db.prepare('DELETE FROM startgg_watch_snapshots').run();
+    db.prepare('DELETE FROM startgg_watch_events').run();
+  });
+  clear();
+}
+
 export function listStartggWatchStatusViews(): StartggWatchStatusView[] {
   const db = getDb();
   return db.prepare(`

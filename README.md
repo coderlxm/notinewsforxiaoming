@@ -93,6 +93,8 @@ Node 版本硬约束写在 [scripts/ensure-node-lts.mjs](/Users/xiaomingli/Code/
   按赛事关键词筛选自动发现的项目、立即检查并开启轮询
 - `/startgg status`
   查看 start.gg 运行状态
+- `/startgg deleteall`
+  删除已记录的 start.gg 推送消息，并清空本地赛事、快照和去重状态
 - `/startggpoll on`
   开启 start.gg 固定轮询
 - `/startggpoll off`

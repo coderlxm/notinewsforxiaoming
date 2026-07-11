@@ -1,6 +1,7 @@
 import type { Telegraf, Context } from 'telegraf';
 import { message } from 'telegraf/filters';
 import { isAuthorized } from './auth.js';
+import { config } from '../config/index.js';
 import {
   parseReminderCommand,
   parseNaturalReminder,
@@ -67,7 +68,9 @@ import {
   listStartggWatchEvents,
   listStartggWatchPlayers,
   listStartggWatchStatusViews,
+  listStartggSentMessageIds,
   replaceActiveStartggWatchEvent,
+  clearStartggWatchState,
   updateStartggWatchPlayerName,
 } from '../services/startggRepository.js';
 import { runStartggGo, runStartggWatchNow, syncStartggPresetPlayers } from '../services/startggPresetSync.js';
@@ -292,6 +295,21 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
     const arg = text.replace(/^\/startgg\s*/, '').trim().toLowerCase();
     try {
+      if (arg === 'deleteall') {
+        disableStartggPolling();
+        updateStartggFastWatch(bot, 0);
+        const messageIds = listStartggSentMessageIds();
+        for (const messageId of messageIds) {
+          await bot.telegram.deleteMessage(config.tgChatId, messageId);
+        }
+        clearStartggWatchState();
+        await ctx.reply(
+          `已删除 ${messageIds.length} 条已记录的 start.gg 推送消息，并清空本地赛事、快照和去重状态。此前未记录 message_id 的历史消息无法定位删除。`,
+          { parse_mode: 'HTML' },
+        );
+        return;
+      }
+
       if (arg === 'go' || arg.startsWith('go ')) {
         const keyword = text.replace(/^\/startgg\s*/i, '').trim().replace(/^go\b/i, '').trim();
         const startMessage = keyword
@@ -341,7 +359,12 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
       await ctx.reply(`${formatStartggGuide(players.length, events.length)}\n\n当前监控项目：${events.length} 个\n自动轮询：${pollingText}`, { parse_mode: 'HTML' });
     } catch (e) {
       if (e instanceof Error) {
-        await ctx.reply(`${arg === 'go' || arg.startsWith('go ') ? 'start.gg go 失败' : 'start.gg 状态读取失败'}：${e.message}`, { parse_mode: 'HTML' });
+        const errorPrefix = arg === 'deleteall'
+          ? 'start.gg 消息清理失败'
+          : arg === 'go' || arg.startsWith('go ')
+            ? 'start.gg go 失败'
+            : 'start.gg 状态读取失败';
+        await ctx.reply(`${errorPrefix}：${e.message}`, { parse_mode: 'HTML' });
         return;
       }
       throw e;

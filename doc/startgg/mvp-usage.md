@@ -89,7 +89,10 @@
 
 - `/startgg go`：自动发现固定选手当前参加的赛事、立即检查并开启轮询
 - `/startgg go <赛事关键词>`：按赛事关键词筛选自动发现的项目、立即检查并开启轮询
+- `/startgg deleteall`：删除已记录的 start.gg 推送消息，并清空本地赛事、快照和去重状态
 - `/startgg`：查看引导、当前配置数量、当前活跃项目数
 - `/watch <选手名 | user链接 | event链接>`：添加选手或项目
 - `/watchlist`：查看监控对象与最近状态
 - `/fetchstartgg`：立即执行一次检查（自动活跃时段判定）
+
+`/startgg deleteall` 只会删除当前实现已记录 `message_id` 的 start.gg 推送；历史上未记录 ID 的消息无法定位删除。清理后会保留固定选手配置，下一次 `/startgg go` 会重新发现赛事。
