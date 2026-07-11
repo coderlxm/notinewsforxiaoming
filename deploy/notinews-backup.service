@@ -1,0 +1,12 @@
+[Unit]
+Description=NotiNews Google Drive backup
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Environment=RCLONE_CONFIG=/root/.config/rclone/rclone.conf
+ExecStartPre=/usr/bin/systemctl stop notinews-bot.service
+ExecStart=/usr/local/sbin/notinews-backup
+ExecStopPost=/usr/bin/systemctl start notinews-bot.service

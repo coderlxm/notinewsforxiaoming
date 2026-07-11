@@ -1,0 +1,10 @@
+[Unit]
+Description=Run NotiNews backup every day at 04:50 Asia/Shanghai
+
+[Timer]
+OnCalendar=*-*-* 04:50:00 Asia/Shanghai
+Persistent=true
+Unit=notinews-backup.service
+
+[Install]
+WantedBy=timers.target

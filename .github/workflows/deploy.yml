@@ -57,6 +57,7 @@ jobs:
             find . -mindepth 1 -maxdepth 1 ! -name '.env' ! -name '.npmrc' ! -name 'data' -exec rm -rf {} +"
           git archive --format=tar HEAD | \
             ssh -p "$PORT" "$SERVER_USER@$SERVER_HOST" "tar -xf - -C '$SERVER_PROJECT_DIR'"
+          ssh -p "$PORT" "$SERVER_USER@$SERVER_HOST" "printf '%s\n' '$GITHUB_SHA' > '$SERVER_PROJECT_DIR/.deploy-commit'"
 
       - name: Install dependencies on server
         run: |

@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PROJECT_DIR=/root/NotiNewsForXiaoming
+BACKUP_WORK_DIR=/var/lib/notinews-backup
+BACKUP_TIMESTAMP=$(TZ=Asia/Shanghai date +%Y-%m-%d-%H%M%S)
+BACKUP_NAME=notinews-backup-${BACKUP_TIMESTAMP}.tar.gz
+MANIFEST_PATH=${BACKUP_WORK_DIR}/backup-manifest.txt
+ARCHIVE_PATH=${BACKUP_WORK_DIR}/${BACKUP_NAME}
+DEPLOY_COMMIT=$(<"${PROJECT_DIR}/.deploy-commit")
+
+install -d -m 700 "${BACKUP_WORK_DIR}"
+
+{
+  echo "backup_time=${BACKUP_TIMESTAMP}"
+  echo "git_commit=${DEPLOY_COMMIT}"
+  echo "hostname=$(hostname)"
+  echo "project_dir=${PROJECT_DIR}"
+} > "${MANIFEST_PATH}"
+
+tar -czf "${ARCHIVE_PATH}" \
+  -C / \
+  root/NotiNewsForXiaoming/.env \
+  root/NotiNewsForXiaoming/.deploy-commit \
+  root/NotiNewsForXiaoming/data \
+  etc/systemd/system/notinews-bot.service \
+  -C "${BACKUP_WORK_DIR}" \
+  backup-manifest.txt
+
+rclone copyto "${ARCHIVE_PATH}" "notinews-drive:NotiNewsBackups/${BACKUP_NAME}"
+rm "${ARCHIVE_PATH}" "${MANIFEST_PATH}"
+rclone delete "notinews-drive:NotiNewsBackups" --min-age 30d
