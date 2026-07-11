@@ -7,6 +7,7 @@ query EventTrackingHeader($slug: String!) {
     tournament {
       id
       name
+      endAt
     }
   }
 }
@@ -244,6 +245,7 @@ export interface EventTrackingHeaderResponse {
     tournament: {
       id: number;
       name: string;
+      endAt: number | null;
     } | null;
   } | null;
 }

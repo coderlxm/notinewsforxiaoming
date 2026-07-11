@@ -379,9 +379,17 @@ async function processEvent(
   if (!header.tournament?.name) {
     throw new Error(`start.gg event missing tournament name: ${normalizedSlug}`);
   }
+  if (header.tournament.endAt === null) {
+    throw new Error(`start.gg tournament missing endAt: ${normalizedSlug}`);
+  }
 
   const resolvedEventName = `${header.tournament.name} / ${header.name}`;
-  updateStartggWatchEventResolved(eventRow.id, header.id, resolvedEventName);
+  updateStartggWatchEventResolved(
+    eventRow.id,
+    header.id,
+    resolvedEventName,
+    new Date(header.tournament.endAt * 1000).toISOString(),
+  );
 
   const entrantMappings = await ensureEventEntrantMappings(normalizedSlug, eventRow.id, players);
 

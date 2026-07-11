@@ -49,11 +49,13 @@ function toWatchEventInput(event: StartggDiscoveredEvent): {
   event_slug: string;
   event_name: string;
   event_id: number;
+  tournament_end_at: string;
 } {
   return {
     event_slug: event.eventSlug,
     event_name: event.eventName,
     event_id: event.eventId,
+    tournament_end_at: new Date(event.tournamentEndAt * 1000).toISOString(),
   };
 }
 

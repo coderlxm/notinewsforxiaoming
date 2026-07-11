@@ -19,6 +19,7 @@ export interface StartggWatchEvent {
   event_id: number | null;
   active: number;
   subscription_source: StartggWatchEventSource;
+  tournament_end_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -155,6 +156,7 @@ export function replaceActiveStartggWatchEvents(events: Array<{
   event_slug: string;
   event_name: string;
   event_id: number;
+  tournament_end_at: string;
 }>, source: StartggWatchEventSource = 'manual'): void {
   if (events.length === 0) {
     throw new Error('start.gg go did not discover any events.');
@@ -183,20 +185,22 @@ export function replaceActiveStartggWatchEvents(events: Array<{
         event_id,
         active,
         subscription_source,
+        tournament_end_at,
         created_at,
         updated_at
       )
-      VALUES (?, ?, ?, 1, ?, ?, ?)
+      VALUES (?, ?, ?, 1, ?, ?, ?, ?)
       ON CONFLICT(event_slug) DO UPDATE SET
         event_name = excluded.event_name,
         event_id = excluded.event_id,
         active = 1,
         subscription_source = excluded.subscription_source,
+        tournament_end_at = excluded.tournament_end_at,
         updated_at = excluded.updated_at
     `);
 
     for (const event of events) {
-      upsert.run(event.event_slug, event.event_name, event.event_id, source, now, now);
+      upsert.run(event.event_slug, event.event_name, event.event_id, source, event.tournament_end_at, now, now);
       const eventRow = db.prepare(`
         SELECT id
         FROM startgg_watch_events
@@ -215,6 +219,7 @@ export function syncAutoDiscoveredStartggWatchEvents(events: Array<{
   event_slug: string;
   event_name: string;
   event_id: number;
+  tournament_end_at: string;
 }>): void {
   const db = getDb();
   const now = new Date().toISOString();
@@ -262,15 +267,17 @@ export function syncAutoDiscoveredStartggWatchEvents(events: Array<{
         event_id,
         active,
         subscription_source,
+        tournament_end_at,
         created_at,
         updated_at
       )
-      VALUES (?, ?, ?, 1, ?, ?, ?)
+      VALUES (?, ?, ?, 1, ?, ?, ?, ?)
       ON CONFLICT(event_slug) DO UPDATE SET
         event_name = excluded.event_name,
         event_id = excluded.event_id,
         active = 1,
         subscription_source = excluded.subscription_source,
+        tournament_end_at = excluded.tournament_end_at,
         updated_at = excluded.updated_at
     `);
 
@@ -279,7 +286,7 @@ export function syncAutoDiscoveredStartggWatchEvents(events: Array<{
       const source = existing?.active === 1 && existing.subscription_source === 'manual'
         ? 'manual'
         : 'auto';
-      upsert.run(event.event_slug, event.event_name, event.event_id, source, now, now);
+      upsert.run(event.event_slug, event.event_name, event.event_id, source, event.tournament_end_at, now, now);
       if (existing && existing.active === 0) {
         clearStartggWatchEventState(db, existing.id);
       }
@@ -402,13 +409,18 @@ export function upsertStartggWatchSnapshot(input: UpsertStartggSnapshotInput): v
   );
 }
 
-export function updateStartggWatchEventResolved(eventRowId: number, eventId: number, eventName: string): void {
+export function updateStartggWatchEventResolved(
+  eventRowId: number,
+  eventId: number,
+  eventName: string,
+  tournamentEndAt: string,
+): void {
   const db = getDb();
   db.prepare(`
     UPDATE startgg_watch_events
-    SET event_id = ?, event_name = ?, updated_at = ?
+    SET event_id = ?, event_name = ?, tournament_end_at = ?, updated_at = ?
     WHERE id = ?
-  `).run(eventId, eventName, new Date().toISOString(), eventRowId);
+  `).run(eventId, eventName, tournamentEndAt, new Date().toISOString(), eventRowId);
 }
 
 export interface StartggWatchEventEntrant {

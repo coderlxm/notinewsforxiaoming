@@ -111,6 +111,7 @@ start.gg 功能的主链路是：
 - 固定轮询是否开启、下次时间。
 - 加速轮询是否开启、下次时间。
 - 最近生成的快照。
+- 当前订阅赛事的最晚结束时间。
 
 它不会主动请求 start.gg。
 
@@ -365,7 +366,13 @@ watch_player_id + watch_event_id + set_id
 
 加速轮询每次仍然执行完整的 `runStartggWatchNow()`，不是只请求某一个 set。
 
-### 6.3 Resident 常驻进程和一次性入口
+### 6.3 赛事完赛后自动停止
+
+每次固定或加速轮询完整执行成功后，会读取当前 active event 对应 tournament 的 `endAt`。当所有 active event 所属赛事都已到达结束时间时，系统会关闭 20 分钟固定轮询和 2 分钟加速轮询，将关闭状态写入 SQLite，并发送一条 Telegram 通知。
+
+选手淘汰、暂时没有新对局或 `pendingSetCount=0` 都不会触发固定轮询停止。
+
+### 6.4 Resident 常驻进程和一次性入口
 
 当前服务器通过 `src/resident.ts` 启动常驻 Telegram bot。
 
@@ -386,7 +393,7 @@ start.gg 的持续监控主要依赖：
 | 表 | 作用 |
 | --- | --- |
 | `startgg_watch_players` | 预设和手动添加的选手，按 `player_id` 唯一 |
-| `startgg_watch_events` | event 订阅、active 状态、auto/manual 来源 |
+| `startgg_watch_events` | event 订阅、active 状态、auto/manual 来源和 tournament 结束时间 |
 | `startgg_watch_event_entrants` | 选手在某个 event 中对应的 entrant |
 | `startgg_watch_snapshots` | 每个选手 × event 的最新状态快照 |
 | `startgg_pushed_sets` | 已处理 set 的去重记录 |
@@ -399,12 +406,13 @@ start.gg 的持续监控主要依赖：
 watch_player_id + watch_event_id
 ```
 
-当前数据库迁移版本为 7：
+当前数据库迁移版本为 8：
 
 - 版本 4：增加 auto/manual event 来源。
 - 版本 5：增加 Telegram 消息 ID 表。
 - 版本 6：增加首条状态发送标记。
 - 版本 7：增加自动轮询持久化状态。
+- 版本 8：增加 tournament 结束时间，用于完赛后自动停止轮询。
 
 ## 8. 当前事实下的边界
 

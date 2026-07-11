@@ -177,7 +177,7 @@ export function formatStartggRuntimeStatus(input: {
   fastPollingEnabled: boolean;
   nextFastPollAt: Date | null;
   players: Array<{ player_name: string; enabled: number }>;
-  events: Array<{ event_name: string; event_slug: string; active: number }>;
+  events: Array<{ event_name: string; event_slug: string; active: number; tournament_end_at: string | null }>;
   statuses: Array<{
     player_name: string;
     status: StartggWatchStatus;
@@ -200,6 +200,11 @@ export function formatStartggRuntimeStatus(input: {
   const playerText = enabledPlayers.length === 0
     ? '-'
     : compactNames(enabledPlayers.map((player) => player.player_name), 5);
+  const tournamentEndAt = activeEvents.reduce<string | null>((latest, event) => {
+    if (!event.tournament_end_at) return latest;
+    if (!latest) return event.tournament_end_at;
+    return new Date(event.tournament_end_at) > new Date(latest) ? event.tournament_end_at : latest;
+  }, null);
   const latest = input.statuses[0] ?? null;
   const latestText = latest
     ? `${formatOptionalTime(latest.captured_at)} ${latest.player_name} ${statusLabel(latest.status)}`
@@ -210,6 +215,7 @@ export function formatStartggRuntimeStatus(input: {
     '──────────────────',
     `状态：<b>${state}</b>`,
     `赛事：${escapeHtml(eventText)}`,
+    `赛事结束：${formatOptionalTime(tournamentEndAt)}`,
     `选手：${enabledPlayers.length} 位 ${escapeHtml(playerText)}`,
     `固定轮询：${input.pollingEnabled ? '开' : '关'}，下次 ${formatOptionalTime(input.nextPollAt)}`,
     `加速轮询：${input.fastPollingEnabled ? '开' : '关'}，下次 ${formatOptionalTime(input.nextFastPollAt)}`,

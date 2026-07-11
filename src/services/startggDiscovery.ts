@@ -9,6 +9,7 @@ export interface StartggDiscoveredEvent {
   tournamentId: number;
   tournamentName: string;
   tournamentSlug: string;
+  tournamentEndAt: number;
   eventId: number;
   eventSlug: string;
   eventName: string;
@@ -70,6 +71,7 @@ export async function discoverStartggActiveEventsForPlayers(
         tournamentId: event.tournament.id,
         tournamentName: event.tournament.name,
         tournamentSlug: event.tournament.slug,
+        tournamentEndAt: event.tournament.endAt,
         eventId: event.id,
         eventSlug,
         eventName,

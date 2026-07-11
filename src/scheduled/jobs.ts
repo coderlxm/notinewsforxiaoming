@@ -1,11 +1,13 @@
 import schedule from 'node-schedule';
 import type { Telegraf } from 'telegraf';
+import { config } from '../config/index.js';
 import { runMode } from './runMode.js';
 import { getChinaDayOfWeek } from '../utils/time.js';
 import { isChinaWorkday } from '../calendar/chinaWorkday.js';
 import { runStartggWatchNow } from '../services/startggPresetSync.js';
 import {
   isStartggPollingPersistedEnabled,
+  listActiveStartggWatchEvents,
   resetActiveStartggWatchEventStates,
   setStartggPollingPersistedEnabled,
 } from '../services/startggRepository.js';
@@ -51,6 +53,22 @@ async function runScheduledStartggWatch(bot: Telegraf): Promise<void> {
   console.log('Mode: start.gg Watch');
   const summary = await runStartggWatchNow(bot);
   console.log(`start.gg watch finished. events=${summary.checkedEvents} players=${summary.checkedPlayers} changed=${summary.changed} pending=${summary.pendingSetCount}`);
+
+  const activeEvents = listActiveStartggWatchEvents();
+  const allTournamentsEnded = activeEvents.length === 0 || activeEvents.every((event) => {
+    if (!event.tournament_end_at) {
+      throw new Error(`start.gg active event missing tournament_end_at: ${event.event_slug}`);
+    }
+    return new Date(event.tournament_end_at).getTime() <= Date.now();
+  });
+  if (allTournamentsEnded) {
+    disableStartggPolling();
+    await bot.telegram.sendMessage(
+      config.tgChatId,
+      'start.gg 当前订阅赛事已结束，自动轮询已关闭。',
+    );
+    return;
+  }
 
   updateStartggFastWatch(bot, summary.pendingSetCount);
 }
