@@ -84,11 +84,12 @@ export function formatStartggGuide(playersCount: number, eventsCount: number): s
   ];
 
   if (isEmpty) {
-    lines.push('建议按这两步完成首次配置：');
-    lines.push('1. <code>/watch Tokido</code> 或 <code>/watch https://www.start.gg/user/xxxx</code>');
-    lines.push('2. <code>/watch https://www.start.gg/tournament/xxx/event/yyy</code>');
+    lines.push('建议先执行自动监控：');
+    lines.push('1. <code>/startgg go</code> 自动发现固定选手当前参加的赛事');
+    lines.push('2. 如需手动指定项目，再使用 <code>/watch &lt;event_url&gt;</code>');
   } else {
     lines.push('常用命令：');
+    lines.push('• <code>/startgg go</code> 自动发现并同步当前进行中的赛事');
     lines.push('• <code>/startgg go evo</code> 按赛事关键词自动发现项目、立即检查并开启轮询');
     lines.push('• <code>/watch &lt;选手名 | 用户链接 | 项目链接&gt;</code>');
     lines.push('• <code>/startgg status</code> 查看运行状态');
@@ -97,13 +98,13 @@ export function formatStartggGuide(playersCount: number, eventsCount: number): s
     lines.push('• <code>/startggpoll on</code> 开启每 20 分钟自动检查');
     lines.push('• <code>/startggpoll off</code> 关闭自动检查');
     lines.push('');
-    lines.push('添加项目后直接检查，不再按赛事时间窗口跳过。');
+    lines.push('每次检查前都会自动同步固定选手并发现当前进行中的项目。');
   }
   return lines.join('\n');
 }
 
 export function formatStartggGoTournamentCandidates(input: {
-  reason: 'missing_keyword' | 'no_match' | 'multiple_matches';
+  reason: 'no_match' | 'multiple_matches';
   keyword: string;
   syncedPlayers: number;
   candidates: Array<{
@@ -112,11 +113,9 @@ export function formatStartggGoTournamentCandidates(input: {
     events: Array<{ eventName: string }>;
   }>;
 }): string {
-  const reasonText = input.reason === 'missing_keyword'
-    ? '请指定这次要监控的赛事关键词。'
-    : input.reason === 'no_match'
-      ? `没有命中「${escapeHtml(input.keyword)}」，请改用下面候选赛事的关键词。`
-      : `「${escapeHtml(input.keyword)}」命中了多个赛事，请使用更具体的关键词。`;
+  const reasonText = input.reason === 'no_match'
+    ? `没有命中「${escapeHtml(input.keyword)}」，请改用下面候选赛事的关键词。`
+    : `「${escapeHtml(input.keyword)}」命中了多个赛事，请使用更具体的关键词。`;
   const lines = [
     '🥊 <b>start.gg go 候选赛事</b>',
     '──────────────────',

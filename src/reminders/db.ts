@@ -154,6 +154,7 @@ export function getDb(): Database.Database {
         event_name TEXT NOT NULL,
         event_id INTEGER,
         active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
+        subscription_source TEXT NOT NULL DEFAULT 'manual' CHECK (subscription_source IN ('manual', 'auto')),
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       );

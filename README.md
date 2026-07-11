@@ -19,7 +19,7 @@ README 以“我自己后续部署维护”为目标，只记录当前代码事�
 - 一次性提醒：支持明确格式和自然语言创建，状态持久化到 SQLite
 - 循环提醒：支持 `every day / week / month` 和自然语言循环提醒
 - 固定时点推送：睡觉提醒、早安、咖啡、新闻、GitHub、V2EX、英语、维生素、服务器巡检、AV 更新、start.gg 监控
-- start.gg 监控：固定选手自动同步、按赛事关键词自动发现项目、轮询推送状态变化
+- start.gg 监控：固定选手自动同步、自动发现当前赛事项目、轮询推送状态变化
 - AV 订阅：按 `star` / `label` 跟踪，去重后推送图文
 - 节假日逻辑：中国工作日判断、V2EX 节假日缓存、假期倒计时
 
@@ -87,8 +87,10 @@ Node 版本硬约束写在 [scripts/ensure-node-lts.mjs](/Users/xiaomingli/Code/
   强制重发 AV 更新
 - `/startgg`
   查看 start.gg 引导和当前配置
+- `/startgg go`
+  自动发现固定选手当前参加的赛事、立即检查并开启轮询
 - `/startgg go <关键词>`
-  自动同步固定选手、发现赛事项目、立即检查并开启轮询
+  按赛事关键词筛选自动发现的项目、立即检查并开启轮询
 - `/startgg status`
   查看 start.gg 运行状态
 - `/startggpoll on`

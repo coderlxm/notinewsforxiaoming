@@ -1,6 +1,7 @@
 import { getDb } from '../reminders/db.js';
 
 export type StartggWatchStatus = 'not_entered' | 'in_winners' | 'in_losers' | 'eliminated' | 'completed';
+export type StartggWatchEventSource = 'manual' | 'auto';
 
 export interface StartggWatchPlayer {
   id: number;
@@ -17,6 +18,7 @@ export interface StartggWatchEvent {
   event_name: string;
   event_id: number | null;
   active: number;
+  subscription_source: StartggWatchEventSource;
   created_at: string;
   updated_at: string;
 }
@@ -59,6 +61,12 @@ export interface StartggWatchStatusView {
   captured_at: string;
 }
 
+function clearStartggWatchEventState(db: ReturnType<typeof getDb>, eventRowId: number): void {
+  db.prepare(`DELETE FROM startgg_watch_snapshots WHERE watch_event_id = ?`).run(eventRowId);
+  db.prepare(`DELETE FROM startgg_watch_event_entrants WHERE watch_event_id = ?`).run(eventRowId);
+  db.prepare(`DELETE FROM startgg_pushed_sets WHERE watch_event_id = ?`).run(eventRowId);
+}
+
 export function createStartggWatchPlayer(playerId: number, playerName: string): void {
   const db = getDb();
   db.prepare(`
@@ -97,13 +105,28 @@ export function replaceActiveStartggWatchEvent(eventSlug: string, eventName: str
       WHERE active = 1
     `).run(now);
     db.prepare(`
-      INSERT INTO startgg_watch_events (event_slug, event_name, active, created_at, updated_at)
-      VALUES (?, ?, 1, ?, ?)
+      INSERT INTO startgg_watch_events (
+        event_slug,
+        event_name,
+        active,
+        subscription_source,
+        created_at,
+        updated_at
+      )
+      VALUES (?, ?, 1, 'manual', ?, ?)
       ON CONFLICT(event_slug) DO UPDATE SET
         event_name = excluded.event_name,
         active = 1,
+        subscription_source = 'manual',
         updated_at = excluded.updated_at
     `).run(eventSlug, eventName, now, now);
+    const event = db.prepare(`
+      SELECT id
+      FROM startgg_watch_events
+      WHERE event_slug = ?
+      LIMIT 1
+    `).get(eventSlug) as { id: number };
+    clearStartggWatchEventState(db, event.id);
   });
   replace();
 }
@@ -112,7 +135,7 @@ export function replaceActiveStartggWatchEvents(events: Array<{
   event_slug: string;
   event_name: string;
   event_id: number;
-}>): void {
+}>, source: StartggWatchEventSource = 'manual'): void {
   if (events.length === 0) {
     throw new Error('start.gg go did not discover any events.');
   }
@@ -127,20 +150,124 @@ export function replaceActiveStartggWatchEvents(events: Array<{
     `).run(now);
 
     const upsert = db.prepare(`
-      INSERT INTO startgg_watch_events (event_slug, event_name, event_id, active, created_at, updated_at)
-      VALUES (?, ?, ?, 1, ?, ?)
+      INSERT INTO startgg_watch_events (
+        event_slug,
+        event_name,
+        event_id,
+        active,
+        subscription_source,
+        created_at,
+        updated_at
+      )
+      VALUES (?, ?, ?, 1, ?, ?, ?)
       ON CONFLICT(event_slug) DO UPDATE SET
         event_name = excluded.event_name,
         event_id = excluded.event_id,
         active = 1,
+        subscription_source = excluded.subscription_source,
         updated_at = excluded.updated_at
     `);
 
     for (const event of events) {
-      upsert.run(event.event_slug, event.event_name, event.event_id, now, now);
+      upsert.run(event.event_slug, event.event_name, event.event_id, source, now, now);
+      const eventRow = db.prepare(`
+        SELECT id
+        FROM startgg_watch_events
+        WHERE event_slug = ?
+        LIMIT 1
+      `).get(event.event_slug) as { id: number };
+      clearStartggWatchEventState(db, eventRow.id);
     }
   });
   replace();
+}
+
+export function syncAutoDiscoveredStartggWatchEvents(events: Array<{
+  event_slug: string;
+  event_name: string;
+  event_id: number;
+}>): void {
+  const db = getDb();
+  const now = new Date().toISOString();
+  const sync = db.transaction(() => {
+    const manualEvent = db.prepare(`
+      SELECT 1
+      FROM startgg_watch_events
+      WHERE active = 1 AND subscription_source = 'manual'
+      LIMIT 1
+    `).get();
+    if (manualEvent) return;
+
+    const findExisting = db.prepare(`
+      SELECT id, active, subscription_source
+      FROM startgg_watch_events
+      WHERE event_slug = ?
+      LIMIT 1
+    `);
+    const existingEvents = new Map<string, {
+      id: number;
+      active: number;
+      subscription_source: StartggWatchEventSource;
+    }>();
+    for (const event of events) {
+      const existing = findExisting.get(event.event_slug) as { id: number; active: number } | undefined;
+      if (existing) {
+        existingEvents.set(event.event_slug, existing);
+      }
+    }
+
+    db.prepare(`
+      UPDATE startgg_watch_events
+      SET active = 0, updated_at = ?
+      WHERE active = 1 AND subscription_source = 'auto'
+    `).run(now);
+
+    const upsert = db.prepare(`
+      INSERT INTO startgg_watch_events (
+        event_slug,
+        event_name,
+        event_id,
+        active,
+        subscription_source,
+        created_at,
+        updated_at
+      )
+      VALUES (?, ?, ?, 1, ?, ?, ?)
+      ON CONFLICT(event_slug) DO UPDATE SET
+        event_name = excluded.event_name,
+        event_id = excluded.event_id,
+        active = 1,
+        subscription_source = excluded.subscription_source,
+        updated_at = excluded.updated_at
+    `);
+
+    for (const event of events) {
+      const existing = existingEvents.get(event.event_slug);
+      const source = existing?.active === 1 && existing.subscription_source === 'manual'
+        ? 'manual'
+        : 'auto';
+      upsert.run(event.event_slug, event.event_name, event.event_id, source, now, now);
+      if (existing && existing.active === 0) {
+        clearStartggWatchEventState(db, existing.id);
+      }
+    }
+  });
+  sync();
+}
+
+export function resetActiveStartggWatchEventStates(): void {
+  const db = getDb();
+  const activeEvents = db.prepare(`
+    SELECT id
+    FROM startgg_watch_events
+    WHERE active = 1
+  `).all() as Array<{ id: number }>;
+  const reset = db.transaction(() => {
+    for (const event of activeEvents) {
+      clearStartggWatchEventState(db, event.id);
+    }
+  });
+  reset();
 }
 
 export function findStartggWatchEventById(id: number): StartggWatchEvent | null {

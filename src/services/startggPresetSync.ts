@@ -3,6 +3,7 @@ import {
   findStartggWatchPlayerByPlayerId,
   listEnabledStartggWatchPlayers,
   replaceActiveStartggWatchEvents,
+  syncAutoDiscoveredStartggWatchEvents,
   updateStartggWatchPlayerName,
 } from './startggRepository.js';
 import {
@@ -26,7 +27,7 @@ export interface StartggGoTournamentCandidate {
 export type StartggGoResult =
   | {
       status: 'candidates';
-      reason: 'missing_keyword' | 'no_match' | 'multiple_matches';
+      reason: 'no_match' | 'multiple_matches';
       keyword: string;
       syncedPlayers: number;
       candidates: StartggGoTournamentCandidate[];
@@ -43,6 +44,18 @@ export type StartggGoResult =
       changed: number;
       pendingSetCount: number;
     };
+
+function toWatchEventInput(event: StartggDiscoveredEvent): {
+  event_slug: string;
+  event_name: string;
+  event_id: number;
+} {
+  return {
+    event_slug: event.eventSlug,
+    event_name: event.eventName,
+    event_id: event.eventId,
+  };
+}
 
 export async function syncStartggPresetPlayers(): Promise<number> {
   const config = loadStartggPresetPlayersConfig();
@@ -87,6 +100,9 @@ export async function runStartggWatchNow(bot?: Telegraf): Promise<{
   pendingSetCount: number;
 }> {
   await syncStartggPresetPlayers();
+  const players = listEnabledStartggWatchPlayers();
+  const discoveredEvents = await discoverStartggActiveEventsForPlayers(players);
+  syncAutoDiscoveredStartggWatchEvents(discoveredEvents.map(toWatchEventInput));
   const watchSummary = await runStartggWatchOnce(bot);
   return {
     checkedPlayers: watchSummary.checkedPlayers,
@@ -148,12 +164,21 @@ export async function runStartggGo(bot: Telegraf | undefined, keyword: string): 
   const candidates = groupDiscoveredEventsByTournament(events);
   const trimmedKeyword = keyword.trim();
   if (!trimmedKeyword) {
+    replaceActiveStartggWatchEvents(events.map(toWatchEventInput), 'auto');
+    const watchSummary = await runStartggWatchOnce(bot, {
+      eventSlugs: events.map((event) => event.eventSlug),
+    });
     return {
-      status: 'candidates',
-      reason: 'missing_keyword',
+      status: 'started',
       keyword: trimmedKeyword,
       syncedPlayers,
-      candidates,
+      tournamentName: '自动发现当前进行中的赛事',
+      tournamentSlug: '',
+      discoveredEvents: events.length,
+      checkedPlayers: watchSummary.checkedPlayers,
+      checkedEvents: watchSummary.checkedEvents,
+      changed: watchSummary.changed,
+      pendingSetCount: watchSummary.pendingSetCount,
     };
   }
 
@@ -178,11 +203,7 @@ export async function runStartggGo(bot: Telegraf | undefined, keyword: string): 
   }
 
   const matchedTournament = matchedCandidates[0]!;
-  replaceActiveStartggWatchEvents(matchedTournament.events.map((event) => ({
-    event_slug: event.eventSlug,
-    event_name: event.eventName,
-    event_id: event.eventId,
-  })));
+  replaceActiveStartggWatchEvents(matchedTournament.events.map(toWatchEventInput), 'manual');
 
   const watchSummary = await runStartggWatchOnce(bot, {
     eventSlugs: matchedTournament.events.map((event) => event.eventSlug),

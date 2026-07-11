@@ -77,6 +77,35 @@ const MIGRATIONS: DbMigration[] = [
       `);
     },
   },
+  {
+    version: 4,
+    up(db) {
+      if (!tableHasColumn(db, 'startgg_watch_events', 'subscription_source')) {
+        db.exec(`
+          ALTER TABLE startgg_watch_events
+          ADD COLUMN subscription_source TEXT NOT NULL DEFAULT 'manual'
+          CHECK (subscription_source IN ('manual', 'auto'));
+
+          UPDATE startgg_watch_events
+          SET subscription_source = 'auto'
+          WHERE active = 1;
+
+          DELETE FROM startgg_watch_event_entrants
+          WHERE watch_event_id IN (
+            SELECT id FROM startgg_watch_events WHERE active = 1
+          );
+          DELETE FROM startgg_watch_snapshots
+          WHERE watch_event_id IN (
+            SELECT id FROM startgg_watch_events WHERE active = 1
+          );
+          DELETE FROM startgg_pushed_sets
+          WHERE watch_event_id IN (
+            SELECT id FROM startgg_watch_events WHERE active = 1
+          );
+        `);
+      }
+    },
+  },
 ];
 
 export function runDbMigrations(db: Database.Database): void {

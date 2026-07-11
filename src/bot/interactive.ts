@@ -294,16 +294,17 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     try {
       if (arg === 'go' || arg.startsWith('go ')) {
         const keyword = text.replace(/^\/startgg\s*/i, '').trim().replace(/^go\b/i, '').trim();
-        if (keyword) {
-          await ctx.reply('开始 start.gg go：同步固定选手、按赛事关键词自动发现项目并启动监控...', { parse_mode: 'HTML' });
-        }
+        const startMessage = keyword
+          ? '开始 start.gg go：同步固定选手、按赛事关键词自动发现项目并启动监控...'
+          : '开始 start.gg 自动监控：同步固定选手并自动发现当前进行中的赛事...';
+        await ctx.reply(startMessage, { parse_mode: 'HTML' });
         const summary = await runStartggGo(bot, keyword);
         if (summary.status === 'candidates') {
           await ctx.reply(formatStartggGoTournamentCandidates(summary), { parse_mode: 'HTML' });
           return;
         }
         updateStartggFastWatch(bot, summary.pendingSetCount);
-        const enabled = enableStartggPolling(bot);
+        const enabled = enableStartggPolling(bot, false);
         await ctx.reply(
           [
             'start.gg go 已启动',
