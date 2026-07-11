@@ -406,7 +406,6 @@ async function processEvent(
       pendingSetCount += 1;
     }
     const previous = findStartggWatchSnapshot(player.id, eventRow.id);
-    const changedNow = hasSnapshotChanged(snapshot, previous);
     const setsToPush = selectSetsToPush(playerSets, previous, player.id, eventRow.id);
     upsertStartggWatchSnapshot({
       watch_player_id: player.id,
@@ -421,6 +420,9 @@ async function processEvent(
       captured_at: new Date().toISOString(),
     });
 
+    if (!previous) continue;
+
+    const changedNow = hasSnapshotChanged(snapshot, previous);
     if (setsToPush.length === 0 && !changedNow) continue;
 
     if (setsToPush.length === 0) {

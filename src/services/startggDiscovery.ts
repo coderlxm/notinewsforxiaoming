@@ -3,6 +3,7 @@ import { fetchPlayerRecentSets } from './startgg/client.js';
 import { normalizeEventSlug } from './startgg/tracker.js';
 
 const STARTGG_GO_SET_LOOKBACK_SECONDS = 7 * 24 * 60 * 60;
+const STARTGG_ACTIVE_EVENT_LOOKBACK_SECONDS = 2 * 24 * 60 * 60;
 
 export interface StartggDiscoveredEvent {
   tournamentId: number;
@@ -19,6 +20,18 @@ function nowAsStartggTimestamp(now: Date): number {
 
 function isActiveTournament(nowTimestamp: number, startAt: number, endAt: number): boolean {
   return startAt <= nowTimestamp && nowTimestamp <= endAt;
+}
+
+function hasRecentEventActivity(
+  nowTimestamp: number,
+  eventStartAt: number | null,
+  setCompletedAt: number | null,
+): boolean {
+  const cutoff = nowTimestamp - STARTGG_ACTIVE_EVENT_LOOKBACK_SECONDS;
+  if (setCompletedAt !== null) {
+    return setCompletedAt >= cutoff;
+  }
+  return eventStartAt !== null && eventStartAt <= nowTimestamp && eventStartAt >= cutoff;
 }
 
 export async function discoverStartggActiveEventsForPlayers(
@@ -49,6 +62,7 @@ export async function discoverStartggActiveEventsForPlayers(
         throw new Error(`start.gg tournament missing startAt/endAt: ${event.tournament.name}`);
       }
       if (!isActiveTournament(nowTimestamp, event.tournament.startAt, event.tournament.endAt)) continue;
+      if (!hasRecentEventActivity(nowTimestamp, event.startAt, set.completedAt)) continue;
 
       const eventSlug = normalizeEventSlug(event.slug);
       const eventName = `${event.tournament.name} / ${event.name}`;

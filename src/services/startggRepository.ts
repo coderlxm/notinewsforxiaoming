@@ -210,7 +210,11 @@ export function syncAutoDiscoveredStartggWatchEvents(events: Array<{
       subscription_source: StartggWatchEventSource;
     }>();
     for (const event of events) {
-      const existing = findExisting.get(event.event_slug) as { id: number; active: number } | undefined;
+      const existing = findExisting.get(event.event_slug) as {
+        id: number;
+        active: number;
+        subscription_source: StartggWatchEventSource;
+      } | undefined;
       if (existing) {
         existingEvents.set(event.event_slug, existing);
       }
