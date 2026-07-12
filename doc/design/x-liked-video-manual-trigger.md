@@ -32,7 +32,7 @@
 
 ## 调用方式
 
-在 Bot 项目中增加一个独立服务模块，使用 Node.js `child_process.spawn` 启动固定程序和固定参数：
+在 Bot 项目中增加一个独立服务模块，使用 Node.js `child_process.execFile` 启动固定程序和固定参数：
 
 ```text
 /usr/bin/docker compose \
@@ -62,7 +62,7 @@ NotiNewsForXiaoming：
 - 在 `src/bot/interactive.ts` 注册 `/syncx`，复用现有授权校验和消息风格。
 - 在 `/help` 内容中增加命令说明。
 
-X 点赞视频下载器无需修改。
+基础 `/syncx` 命令无需修改 X 点赞视频下载器；增加下方 Telegram 下载明细时，需要扩展其 CLI JSON 输出。
 
 ## 并发和错误处理
 
@@ -104,3 +104,39 @@ X 点赞视频下载器无需修改。
 - 保留北京时间凌晨 2 点自动任务，还是改成仅 `/syncx` 手动触发。
 
 已确认按“保留自动任务，同时增加 `/syncx`”实施。
+
+## Telegram 下载明细建议
+
+同步完成消息增加本次成功上传视频的必要信息，并且不增加 X API 请求。下载器在现有 liked posts 响应中已经获得并保存了作者、正文、推文 ID 和媒体信息。
+
+推荐每条展示：
+
+- 作者：`@username`
+- 正文：去掉链接后的前 80 个字符
+- 文件大小：使用易读的 MiB / GiB
+- 原推文：`https://x.com/{username}/status/{tweet_id}`
+
+示例：
+
+```text
+同步完成：下载 2 个，上传 2 个。
+
+1. @example
+   正文摘要……
+   38.6 MiB · 查看原推文
+
+2. @example2
+   正文摘要……
+   112.3 MiB · 查看原推文
+```
+
+不展示本地路径、rclone 远端路径、媒体源 URL、文件名和任何凭据。暂不展示 Google Drive 点击链接，因为当前 rclone 上传结果只有远端路径；获取 Drive 文件 ID 会额外增加实现和外部请求。
+
+### 实现影响
+
+当前下载器 CLI 只输出汇总数字，因此需要对两个项目做小幅调整：
+
+- X 点赞视频下载器：在 `SyncStats` 中增加本次成功上传的 `items`，每项返回 `tweet_id`、`author_username`、`text`、`file_size` 和上传状态。
+- NotiNewsForXiaoming：扩展现有 JSON schema，并把 `items` 格式化为 Telegram HTML 消息。
+
+同一条推文包含多个视频时按视频分别计数，但消息中按推文归组，避免重复展示作者和正文。消息最多展示前 10 条，超过部分只显示“另有 N 条”，防止 Telegram 消息过长。

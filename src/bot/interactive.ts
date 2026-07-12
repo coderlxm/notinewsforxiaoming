@@ -75,7 +75,11 @@ import {
 } from '../services/startggRepository.js';
 import { runStartggGo, runStartggWatchNow, syncStartggPresetPlayers } from '../services/startggPresetSync.js';
 import { escapeHtml } from '../utils/html.js';
-import { isXLikedVideoSyncRunning, runXLikedVideoSync } from '../services/xLikedVideoSync.js';
+import {
+  formatXLikedVideoSyncResult,
+  isXLikedVideoSyncRunning,
+  runXLikedVideoSync,
+} from '../services/xLikedVideoSync.js';
 import {
   disableStartggPolling,
   enableStartggPolling,
@@ -167,9 +171,10 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
         await ctx.reply('同步完成：没有发现新的点赞视频。');
         return;
       }
-      await ctx.reply(
-        `同步完成：发现 ${summary.discovered} 条，下载 ${summary.downloaded} 个，上传 ${summary.uploaded} 个，错误 ${summary.errors} 个。`
-      );
+      await ctx.reply(formatXLikedVideoSyncResult(summary), {
+        parse_mode: 'HTML',
+        link_preview_options: { is_disabled: true },
+      });
     } catch (e) {
       if (e instanceof Error) {
         await ctx.reply(`X 点赞视频同步失败：${e.message}`);
