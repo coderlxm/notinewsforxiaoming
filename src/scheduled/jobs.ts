@@ -177,6 +177,11 @@ export function registerFixedJobs(bot: Telegraf): void {
     await runMode('github', getChinaDayOfWeek(), bot);
   });
 
+  // x liked video: 11:00
+  schedule.scheduleJob({ hour: 11, minute: 0, tz: 'Asia/Shanghai' }, async () => {
+    await runMode('x_liked_video_status', getChinaDayOfWeek(), bot);
+  });
+
   // vitamin dinner: 18:30 on non-workdays
   schedule.scheduleJob({ hour: 18, minute: 30, tz: 'Asia/Shanghai' }, async () => {
     if (isChinaWorkday(new Date())) return;
