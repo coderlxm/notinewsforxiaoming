@@ -22,6 +22,11 @@ export interface StartggWatchEvent {
   tournament_end_at: string | null;
   tournament_name: string | null;
   event_display_name: string | null;
+  event_state: string | null;
+  final_phase_id: number | null;
+  final_phase_name: string | null;
+  final_phase_num_seeds: number | null;
+  final_phase_tracking_completed: number;
   created_at: string;
   updated_at: string;
 }
@@ -88,6 +93,16 @@ function clearStartggWatchEventState(db: ReturnType<typeof getDb>, eventRowId: n
   db.prepare(`DELETE FROM startgg_watch_snapshots WHERE watch_event_id = ?`).run(eventRowId);
   db.prepare(`DELETE FROM startgg_watch_event_entrants WHERE watch_event_id = ?`).run(eventRowId);
   db.prepare(`DELETE FROM startgg_pushed_sets WHERE watch_event_id = ?`).run(eventRowId);
+  db.prepare(`DELETE FROM startgg_event_pushed_sets WHERE watch_event_id = ?`).run(eventRowId);
+  db.prepare(`
+    UPDATE startgg_watch_events
+    SET event_state = NULL,
+        final_phase_id = NULL,
+        final_phase_name = NULL,
+        final_phase_num_seeds = NULL,
+        final_phase_tracking_completed = 0
+    WHERE id = ?
+  `).run(eventRowId);
 }
 
 export function createStartggWatchPlayer(playerId: number, playerName: string): void {
@@ -453,6 +468,39 @@ export function updateStartggWatchEventResolved(
   `).run(eventId, eventName, tournamentEndAt, tournamentName, eventDisplayName, new Date().toISOString(), eventRowId);
 }
 
+export function updateStartggWatchEventFinalPhase(input: {
+  eventRowId: number;
+  eventState: string;
+  phaseId: number | null;
+  phaseName: string | null;
+  phaseNumSeeds: number | null;
+}): void {
+  getDb().prepare(`
+    UPDATE startgg_watch_events
+    SET event_state = ?,
+        final_phase_id = COALESCE(final_phase_id, ?),
+        final_phase_name = COALESCE(final_phase_name, ?),
+        final_phase_num_seeds = COALESCE(final_phase_num_seeds, ?),
+        updated_at = ?
+    WHERE id = ?
+  `).run(
+    input.eventState,
+    input.phaseId,
+    input.phaseName,
+    input.phaseNumSeeds,
+    new Date().toISOString(),
+    input.eventRowId,
+  );
+}
+
+export function markStartggFinalPhaseTrackingCompleted(eventRowId: number): void {
+  getDb().prepare(`
+    UPDATE startgg_watch_events
+    SET final_phase_tracking_completed = 1, updated_at = ?
+    WHERE id = ?
+  `).run(new Date().toISOString(), eventRowId);
+}
+
 export interface StartggWatchEventEntrant {
   id: number;
   watch_player_id: number;
@@ -524,6 +572,29 @@ export function markStartggPushedSet(watchPlayerId: number, watchEventId: number
   `).run(watchPlayerId, watchEventId, setId, new Date().toISOString());
 }
 
+export function hasAnyStartggPlayerPushedSet(watchEventId: number, setId: number): boolean {
+  return Boolean(getDb().prepare(`
+    SELECT 1 FROM startgg_pushed_sets
+    WHERE watch_event_id = ? AND set_id = ?
+    LIMIT 1
+  `).get(watchEventId, setId));
+}
+
+export function hasStartggEventPushedSet(watchEventId: number, setId: number): boolean {
+  return Boolean(getDb().prepare(`
+    SELECT 1 FROM startgg_event_pushed_sets
+    WHERE watch_event_id = ? AND set_id = ?
+    LIMIT 1
+  `).get(watchEventId, setId));
+}
+
+export function markStartggEventPushedSet(watchEventId: number, setId: number): void {
+  getDb().prepare(`
+    INSERT OR IGNORE INTO startgg_event_pushed_sets (watch_event_id, set_id, pushed_at)
+    VALUES (?, ?, ?)
+  `).run(watchEventId, setId, new Date().toISOString());
+}
+
 export function recordStartggSentMessage(messageId: number): void {
   const db = getDb();
   db.prepare(`
@@ -556,6 +627,7 @@ export function clearStartggWatchState(): void {
   const clear = db.transaction(() => {
     db.prepare('DELETE FROM startgg_sent_messages').run();
     db.prepare('DELETE FROM startgg_pushed_sets').run();
+    db.prepare('DELETE FROM startgg_event_pushed_sets').run();
     db.prepare('DELETE FROM startgg_watch_event_entrants').run();
     db.prepare('DELETE FROM startgg_watch_snapshots').run();
     db.prepare('DELETE FROM startgg_watch_events').run();

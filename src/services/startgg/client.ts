@@ -11,6 +11,9 @@ import {
   type EventBasicResponse,
   type PlayerRecentSetsResponse,
   type PlayerRecentSetNode,
+  type EventFinalPhaseMetaResponse,
+  type PhaseSeedsResponse,
+  type PhaseSetsResponse,
   type TrackedSetNode,
   type TrackedStandingNode,
   EVENT_TRACKING_HEADER_QUERY,
@@ -22,6 +25,9 @@ import {
   USER_PLAYER_QUERY,
   EVENT_BASIC_QUERY,
   PLAYER_RECENT_SETS_QUERY,
+  EVENT_FINAL_PHASE_META_QUERY,
+  PHASE_SEEDS_QUERY,
+  PHASE_SETS_QUERY,
 } from './queries.js';
 
 const STARTGG_GRAPHQL_ENDPOINT = 'https://api.start.gg/gql/alpha';
@@ -80,6 +86,48 @@ async function fetchAllPages<TNode>(
 export async function fetchEventHeader(slug: string): Promise<EventTrackingHeaderResponse['event']> {
   const data = await queryStartgg<EventTrackingHeaderResponse>(EVENT_TRACKING_HEADER_QUERY, { slug });
   return data.event;
+}
+
+export async function fetchEventFinalPhaseMeta(slug: string): Promise<EventFinalPhaseMetaResponse['event']> {
+  const data = await queryStartgg<EventFinalPhaseMetaResponse>(EVENT_FINAL_PHASE_META_QUERY, { slug });
+  return data.event;
+}
+
+export function fetchPhaseSeeds(phaseId: number): Promise<NonNullable<PhaseSeedsResponse['phase']>['seeds']['nodes']> {
+  return fetchAllPages(
+    PHASE_SEEDS_QUERY,
+    (page, perPage) => ({ phaseId, page, perPage }),
+    (data: PhaseSeedsResponse) => {
+      if (!data.phase) return null;
+      return { totalPages: data.phase.seeds.pageInfo?.totalPages, nodes: data.phase.seeds.nodes };
+    },
+    50,
+  );
+}
+
+export async function fetchPhaseTracking(phaseId: number): Promise<{
+  eventState: string;
+  sets: TrackedSetNode[];
+}> {
+  const sets: TrackedSetNode[] = [];
+  let page = 1;
+  let totalPages = 1;
+  let eventState = '';
+  while (page <= totalPages) {
+    const data = await queryStartgg<PhaseSetsResponse>(PHASE_SETS_QUERY, {
+      phaseId,
+      page,
+      perPage: TRACKING_SETS_PER_PAGE,
+    });
+    if (!data.phase) {
+      throw new Error(`start.gg phase not found: ${phaseId}`);
+    }
+    eventState = data.phase.event.state;
+    sets.push(...data.phase.sets.nodes);
+    totalPages = normalizeTotalPages(data.phase.sets.pageInfo?.totalPages);
+    page += 1;
+  }
+  return { eventState, sets };
 }
 
 export function fetchEventSetsPages(slug: string): Promise<TrackedSetNode[]> {

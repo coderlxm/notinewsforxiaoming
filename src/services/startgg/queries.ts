@@ -73,6 +73,7 @@ query EventTrackingStandingsPage($slug: String!, $page: Int!, $perPage: Int!) {
         isFinal
         entrant {
           id
+          name
         }
       }
     }
@@ -177,6 +178,7 @@ query EventSetsByEntrants($slug: String!, $entrantIds: [ID!]!, $page: Int!, $per
       nodes {
         id
         state
+        startedAt
         round
         fullRoundText
         displayScore
@@ -187,6 +189,57 @@ query EventSetsByEntrants($slug: String!, $entrantIds: [ID!]!, $page: Int!, $per
             id
           }
         }
+      }
+    }
+  }
+}
+`;
+
+export const EVENT_FINAL_PHASE_META_QUERY = `
+query EventFinalPhaseMeta($slug: String!) {
+  event(slug: $slug) {
+    state
+    phases {
+      id
+      name
+      phaseOrder
+      numSeeds
+      state
+    }
+  }
+}
+`;
+
+export const PHASE_SEEDS_QUERY = `
+query PhaseSeeds($phaseId: ID!, $page: Int!, $perPage: Int!) {
+  phase(id: $phaseId) {
+    seeds(query: { page: $page, perPage: $perPage }) {
+      pageInfo { totalPages }
+      nodes {
+        seedNum
+        entrant { id name }
+      }
+    }
+  }
+}
+`;
+
+export const PHASE_SETS_QUERY = `
+query PhaseSets($phaseId: ID!, $page: Int!, $perPage: Int!) {
+  phase(id: $phaseId) {
+    event { state }
+    sets(page: $page, perPage: $perPage, sortType: STANDARD) {
+      pageInfo { totalPages }
+      nodes {
+        id
+        state
+        startedAt
+        round
+        fullRoundText
+        displayScore
+        winnerId
+        completedAt
+        slots { entrant { id name } }
       }
     }
   }
@@ -207,7 +260,7 @@ interface SetNodeFields {
   winnerId: number | null;
   completedAt: number | null;
   slots: Array<{
-    entrant: { id: number } | null;
+    entrant: { id: number; name?: string } | null;
   }>;
 }
 
@@ -236,7 +289,7 @@ interface EntrantNodeWithPlayerFields {
 interface StandingNodeFields {
   placement: number;
   isFinal: boolean | null;
-  entrant: { id: number } | null;
+  entrant: { id: number; name?: string } | null;
 }
 
 export interface EventTrackingHeaderResponse {
@@ -281,6 +334,41 @@ export interface EventTrackingStandingsPageResponse {
 
 export interface EventSetsByEntrantsResponse {
   event: {
+    sets: {
+      pageInfo: PageInfo | null;
+      nodes: SetNodeFields[];
+    };
+  } | null;
+}
+
+export interface EventFinalPhaseMetaResponse {
+  event: {
+    state: string;
+    phases: Array<{
+      id: number;
+      name: string;
+      phaseOrder: number;
+      numSeeds: number | null;
+      state: string;
+    }>;
+  } | null;
+}
+
+export interface PhaseSeedsResponse {
+  phase: {
+    seeds: {
+      pageInfo: PageInfo | null;
+      nodes: Array<{
+        seedNum: number;
+        entrant: { id: number; name: string } | null;
+      }>;
+    };
+  } | null;
+}
+
+export interface PhaseSetsResponse {
+  phase: {
+    event: { state: string };
     sets: {
       pageInfo: PageInfo | null;
       nodes: SetNodeFields[];

@@ -159,6 +159,11 @@ export function getDb(): Database.Database {
         tournament_end_at TEXT,
         tournament_name TEXT,
         event_display_name TEXT,
+        event_state TEXT,
+        final_phase_id INTEGER,
+        final_phase_name TEXT,
+        final_phase_num_seeds INTEGER,
+        final_phase_tracking_completed INTEGER NOT NULL DEFAULT 0 CHECK (final_phase_tracking_completed IN (0, 1)),
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
@@ -206,6 +211,15 @@ export function getDb(): Database.Database {
       );
       CREATE INDEX IF NOT EXISTS idx_startgg_pushed_sets_player_event
       ON startgg_pushed_sets(watch_player_id, watch_event_id);
+
+      CREATE TABLE IF NOT EXISTS startgg_event_pushed_sets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        watch_event_id INTEGER NOT NULL,
+        set_id INTEGER NOT NULL,
+        pushed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(watch_event_id) REFERENCES startgg_watch_events(id),
+        UNIQUE(watch_event_id, set_id)
+      );
 
       CREATE TABLE IF NOT EXISTS startgg_sent_messages (
         message_id INTEGER PRIMARY KEY,

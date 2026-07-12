@@ -1,5 +1,10 @@
 import type { Telegraf } from 'telegraf';
-import { formatStartggStatusChangedMessage } from '../../formatters/startggFormatter.js';
+import {
+  formatStartggFinalPhaseSetResult,
+  formatStartggFinalPhaseStarted,
+  formatStartggFinalStandings,
+  formatStartggStatusChangedMessage,
+} from '../../formatters/startggFormatter.js';
 import { sendTelegramMessageWithId } from '../../publishers/telegram.js';
 import {
   findStartggWatchSnapshot,
@@ -16,6 +21,11 @@ import {
   markStartggPushedSet,
   markStartggInitialMessageSent,
   recordStartggSentMessage,
+  hasAnyStartggPlayerPushedSet,
+  hasStartggEventPushedSet,
+  markStartggEventPushedSet,
+  markStartggFinalPhaseTrackingCompleted,
+  updateStartggWatchEventFinalPhase,
 } from '../startggRepository.js';
 import {
   fetchEventHeader,
@@ -24,6 +34,10 @@ import {
   fetchEventEntrantsDetailed,
   fetchEventBasic,
   fetchUserPlayer,
+  fetchEventFinalPhaseMeta,
+  fetchEventStandings,
+  fetchPhaseSeeds,
+  fetchPhaseTracking,
 } from './client.js';
 import type { TrackedSetNode, TrackedStandingNode } from './queries.js';
 
@@ -370,6 +384,26 @@ interface EventProcessResult {
   activeSetCount: number;
 }
 
+const FINAL_PHASE_STATES = new Set(['READY', 'ACTIVE', 'COMPLETED']);
+
+function selectFinalPhase(phases: Array<{
+  id: number;
+  name: string;
+  phaseOrder: number;
+  numSeeds: number | null;
+  state: string;
+}>): { id: number; name: string; numSeeds: number } | null {
+  const phase = phases
+    .filter((item) => item.numSeeds !== null
+      && item.numSeeds >= 2
+      && item.numSeeds <= 8
+      && FINAL_PHASE_STATES.has(item.state))
+    .sort((a, b) => b.phaseOrder - a.phaseOrder)[0];
+  return phase?.numSeeds === null || !phase
+    ? null
+    : { id: phase.id, name: phase.name, numSeeds: phase.numSeeds };
+}
+
 async function processEvent(
   eventRow: StartggWatchEvent,
   players: StartggWatchPlayer[],
@@ -516,6 +550,118 @@ async function processEvent(
       const messageId = await sendTelegramMessageWithId(message, bot);
       recordStartggSentMessage(messageId);
       markStartggPushedSet(player.id, eventRow.id, set.id);
+    }
+  }
+
+  let finalPhaseId = eventRow.final_phase_id;
+  let finalPhaseName = eventRow.final_phase_name;
+  let finalPhaseNumSeeds = eventRow.final_phase_num_seeds;
+  let eventState = eventRow.event_state;
+  let phaseTracking: Awaited<ReturnType<typeof fetchPhaseTracking>> | null = null;
+
+  if (refreshEventMeta) {
+    const phaseMeta = await fetchEventFinalPhaseMeta(normalizedSlug);
+    if (!phaseMeta) {
+      throw new Error(`start.gg event phase metadata missing: ${normalizedSlug}`);
+    }
+    eventState = phaseMeta.state;
+    const discoveredPhase = finalPhaseId === null ? selectFinalPhase(phaseMeta.phases) : null;
+    updateStartggWatchEventFinalPhase({
+      eventRowId: eventRow.id,
+      eventState,
+      phaseId: discoveredPhase?.id ?? null,
+      phaseName: discoveredPhase?.name ?? null,
+      phaseNumSeeds: discoveredPhase?.numSeeds ?? null,
+    });
+
+    if (discoveredPhase) {
+      finalPhaseId = discoveredPhase.id;
+      finalPhaseName = discoveredPhase.name;
+      finalPhaseNumSeeds = discoveredPhase.numSeeds;
+      const [seeds, baselineTracking] = await Promise.all([
+        fetchPhaseSeeds(discoveredPhase.id),
+        fetchPhaseTracking(discoveredPhase.id),
+      ]);
+      phaseTracking = baselineTracking;
+      eventState = baselineTracking.eventState;
+      for (const set of baselineTracking.sets.filter((item) => item.completedAt !== null)) {
+        markStartggEventPushedSet(eventRow.id, set.id);
+      }
+      const entrants = seeds
+        .filter((seed): seed is { seedNum: number; entrant: { id: number; name: string } } => seed.entrant !== null)
+        .sort((a, b) => a.seedNum - b.seedNum)
+        .map((seed) => ({ seedNum: seed.seedNum, name: seed.entrant.name }));
+      if (eventState !== 'COMPLETED') {
+        const messageId = await sendTelegramMessageWithId(formatStartggFinalPhaseStarted({
+          tournamentName,
+          eventName: eventDisplayName,
+          eventSlug: resolvedEventSlug,
+          phaseName: discoveredPhase.name,
+          entrants,
+        }), bot);
+        recordStartggSentMessage(messageId);
+        changed += 1;
+      }
+    }
+  }
+
+  if (finalPhaseId !== null && finalPhaseName && finalPhaseNumSeeds !== null) {
+    phaseTracking ??= await fetchPhaseTracking(finalPhaseId);
+    eventState = phaseTracking.eventState;
+    const phaseSets = phaseTracking.sets;
+    const activePhaseSetCount = phaseSets.filter((set) => set.startedAt !== null && set.completedAt === null).length;
+    const finalPhaseStarted = phaseSets.some((set) => set.startedAt !== null);
+    if (finalPhaseStarted && eventState !== 'COMPLETED') {
+      activeSetCount += Math.max(1, activePhaseSetCount);
+    }
+
+    const completedSets = phaseSets
+      .filter((set) => set.completedAt !== null)
+      .sort(compareSetChronology);
+    for (const set of completedSets) {
+      if (hasStartggEventPushedSet(eventRow.id, set.id)) continue;
+      if (!hasAnyStartggPlayerPushedSet(eventRow.id, set.id)) {
+        const entrants = set.slots
+          .map((slot) => slot.entrant)
+          .filter((entrant): entrant is { id: number; name: string } => Boolean(entrant?.name));
+        const winner = entrants.find((entrant) => entrant.id === set.winnerId);
+        if (!winner) {
+          throw new Error(`start.gg completed final phase set missing winner entrant: ${set.id}`);
+        }
+        const messageId = await sendTelegramMessageWithId(formatStartggFinalPhaseSetResult({
+          tournamentName,
+          eventName: eventDisplayName,
+          phaseName: finalPhaseName,
+          roundLabel: set.fullRoundText,
+          entrantNames: entrants.map((entrant) => entrant.name),
+          scoreText: buildSetScoreText(set.displayScore),
+          winnerName: winner.name,
+          setUrl: `https://www.start.gg/${normalizedSlug}/set/${set.id}`,
+        }), bot);
+        recordStartggSentMessage(messageId);
+        changed += 1;
+      }
+      markStartggEventPushedSet(eventRow.id, set.id);
+    }
+
+    if (eventState === 'COMPLETED' && eventRow.final_phase_tracking_completed === 0) {
+      const standings = (await fetchEventStandings(normalizedSlug))
+        .filter((standing) => standing.placement <= 8 && standing.entrant?.name)
+        .map((standing) => ({
+          placement: standing.placement,
+          entrantName: standing.entrant!.name!,
+        }));
+      if (standings.length === 0) {
+        throw new Error(`start.gg completed event missing final standings: ${normalizedSlug}`);
+      }
+      const messageId = await sendTelegramMessageWithId(formatStartggFinalStandings({
+        tournamentName,
+        eventName: eventDisplayName,
+        standings,
+      }), bot);
+      recordStartggSentMessage(messageId);
+      markStartggFinalPhaseTrackingCompleted(eventRow.id);
+      changed += 1;
     }
   }
 

@@ -172,6 +172,40 @@ const MIGRATIONS: DbMigration[] = [
       }
     },
   },
+  {
+    version: 11,
+    up(db) {
+      if (!tableHasColumn(db, 'startgg_watch_events', 'event_state')) {
+        db.exec(`ALTER TABLE startgg_watch_events ADD COLUMN event_state TEXT;`);
+      }
+      if (!tableHasColumn(db, 'startgg_watch_events', 'final_phase_id')) {
+        db.exec(`ALTER TABLE startgg_watch_events ADD COLUMN final_phase_id INTEGER;`);
+      }
+      if (!tableHasColumn(db, 'startgg_watch_events', 'final_phase_name')) {
+        db.exec(`ALTER TABLE startgg_watch_events ADD COLUMN final_phase_name TEXT;`);
+      }
+      if (!tableHasColumn(db, 'startgg_watch_events', 'final_phase_num_seeds')) {
+        db.exec(`ALTER TABLE startgg_watch_events ADD COLUMN final_phase_num_seeds INTEGER;`);
+      }
+      if (!tableHasColumn(db, 'startgg_watch_events', 'final_phase_tracking_completed')) {
+        db.exec(`
+          ALTER TABLE startgg_watch_events
+          ADD COLUMN final_phase_tracking_completed INTEGER NOT NULL DEFAULT 0
+          CHECK (final_phase_tracking_completed IN (0, 1));
+        `);
+      }
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS startgg_event_pushed_sets (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          watch_event_id INTEGER NOT NULL,
+          set_id INTEGER NOT NULL,
+          pushed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY(watch_event_id) REFERENCES startgg_watch_events(id),
+          UNIQUE(watch_event_id, set_id)
+        );
+      `);
+    },
+  },
 ];
 
 export function runDbMigrations(db: Database.Database): void {

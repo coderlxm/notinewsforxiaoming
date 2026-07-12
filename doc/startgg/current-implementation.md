@@ -17,6 +17,8 @@ start.gg 功能的主链路是：
   -> SQLite 保存快照、去重记录和 Telegram message_id
 ```
 
+在选手跟踪之外，active event 还会自动发现`numSeeds<=8`的明确决赛Phase，进入赛事级跟踪并推送后续全部完赛set和最终排名。
+
 它不是全网赛事搜索器，也不是把 start.gg 上所有历史对局搬到 Telegram，而是围绕已经关注的选手做赛事状态监控。
 
 ## 2. 监控对象从哪里来
@@ -139,7 +141,7 @@ start.gg 功能的主链路是：
 2. 自动发现当前活跃 event。
 3. 更新自动订阅的 active event。
 4. 检查所有 active event，包括手动订阅的 event。
-5. 如果有进行中的 set，开启 2 分钟加速轮询。
+5. 如果有订阅选手正在比赛，或决赛 Phase 已经开打且赛事尚未完赛，开启 2 分钟加速轮询。
 
 它不会自动开启 20 分钟固定轮询。
 
@@ -173,6 +175,7 @@ start.gg 功能的主链路是：
 4. 删除成功后清空：
    - `startgg_sent_messages`
    - `startgg_pushed_sets`
+   - `startgg_event_pushed_sets`
    - `startgg_watch_event_entrants`
    - `startgg_watch_snapshots`
    - `startgg_watch_events`
@@ -360,14 +363,15 @@ watch_player_id + watch_event_id + set_id
 
 ### 6.2 进行中对局的 2 分钟加速轮询
 
-每次检查会返回实际进行中的 `activeSetCount`：
+每次检查会返回用于维持加速轮询的 `activeSetCount`：
 
-- 存在 `startedAt` 非空且 `completedAt` 为空的 set：2 分钟后再次检查。
-- 不存在实际进行中的 set：停止加速轮询。
+- 订阅选手存在 `startedAt` 非空且 `completedAt` 为空的 set：2 分钟后再次检查。
+- 决赛Phase已有任意set开打且Event尚未完赛：即使正处于两场串行比赛之间，也在2分钟后再次检查。
+- 两种条件都不满足：停止该event的加速轮询。
 
 固定轮询会执行完整的 `runStartggWatchNow()`，负责同步选手、自动发现赛事并检查全部 active event。
 
-加速轮询只检查上一轮确认存在实际进行中 set 的 event，不再同步预设选手、查询全部选手近期 sets、刷新未映射 entrant 或检查其他 event。某个 event 不再存在进行中 set 后会退出加速范围；所有加速 event 都没有进行中 set 后，加速轮询停止。下一次固定轮询仍会发现新的 event 或重新进入进行中状态的 event。
+加速轮询只检查上一轮确认需要加速的event，不再同步预设选手、查询全部选手近期sets、刷新未映射entrant或检查其他event。订阅选手的对局结束后可以退出加速；决赛Phase开打后则持续加速到`Event.state=COMPLETED`。所有event都不再满足条件后，加速轮询停止。下一次固定轮询仍会发现新的event或重新进入加速状态。
 
 ### 6.3 赛事完赛后自动停止
 
@@ -375,7 +379,30 @@ watch_player_id + watch_event_id + set_id
 
 选手淘汰、暂时没有新对局或 `activeSetCount=0` 都不会触发固定轮询停止。
 
-### 6.4 Resident 常驻进程和一次性入口
+### 6.4 决赛Phase赛事级跟踪
+
+20分钟固定轮询会读取active event的Phase结构，选择`phaseOrder`最高且满足以下条件的Phase：
+
+```text
+2 <= numSeeds <= 8
+state 为 READY、ACTIVE 或 COMPLETED
+```
+
+首次发现后：
+
+1. 保存Phase id、名称和numSeeds。
+2. 将该Phase已完成sets建立为赛事级已读基线。
+3. 使用Phase seeds推送决赛阶段名单。
+4. 后续推送该Phase全部新完成set。
+5. 与选手维度已推送set去重，同一set只发送一次。
+
+目标Phase第一场set出现`startedAt`后会加入2分钟连续轮询，直到`Event.state=COMPLETED`。两场串行比赛之间即使暂时没有进行中的set，也不会退出加速轮询。加速轮询使用一个GraphQL请求同时读取已保存Phase的sets和Event状态，不重新发现Phase，也不查询整个event的历史对局。
+
+当`Event.state=COMPLETED`时，系统读取event standings前8名，推送最终排名并退出该event的加速轮询。最终排名不依赖`Standing.isFinal`。
+
+没有独立`numSeeds<=8` Phase的event不会猜测八强阶段。
+
+### 6.5 Resident 常驻进程和一次性入口
 
 当前服务器通过 `src/resident.ts` 启动常驻 Telegram bot。
 
@@ -383,15 +410,15 @@ start.gg 的持续监控主要依赖：
 
 - `/startgg go` 自动开启 20 分钟轮询。
 - `/startggpoll on` 手动开启 20 分钟轮询。
-- 有进行中 set 时的 2 分钟加速轮询。
+- 订阅选手正在比赛，或决赛Phase已经开打时的2分钟加速轮询。
 
 仓库另有一次性入口 `src/index.ts`，在北京时间约 10:20 和 22:20 的调度窗口选择 `startgg_watch`，执行一次 `runStartggWatchNow()`。这个入口执行完就退出，不会建立常驻轮询任务。
 
-轮询开启状态保存在 `startgg_runtime_settings`。常驻 bot 启动时会读取该状态；如果此前已开启轮询，会重新注册 20 分钟轮询任务，并保留已有快照和去重数据。2 分钟加速轮询不单独持久化，恢复后的下一次固定轮询发现进行中的 set 后会重新开启。
+轮询开启状态保存在 `startgg_runtime_settings`。常驻 bot 启动时会读取该状态；如果此前已开启轮询，会重新注册 20 分钟轮询任务，并保留已有快照和去重数据。2 分钟加速轮询不单独持久化，恢复后的下一次固定轮询发现订阅选手正在比赛，或决赛Phase已经开打后会重新开启。
 
 ## 7. SQLite 数据模型
 
-当前 start.gg 相关表有 7 张：
+当前 start.gg 相关表有 8 张：
 
 | 表 | 作用 |
 | --- | --- |
@@ -400,6 +427,7 @@ start.gg 的持续监控主要依赖：
 | `startgg_watch_event_entrants` | 选手在某个 event 中对应的 entrant |
 | `startgg_watch_snapshots` | 每个选手 × event 的最新状态快照 |
 | `startgg_pushed_sets` | 已处理 set 的去重记录 |
+| `startgg_event_pushed_sets` | 决赛Phase赛事级set去重记录 |
 | `startgg_sent_messages` | 已发送 start.gg Telegram 消息的 `message_id` |
 | `startgg_runtime_settings` | 持久化自动轮询开启状态，供常驻进程重启后恢复 |
 
@@ -409,7 +437,7 @@ start.gg 的持续监控主要依赖：
 watch_player_id + watch_event_id
 ```
 
-当前数据库迁移版本为 9：
+当前数据库迁移版本为 11：
 
 - 版本 4：增加 auto/manual event 来源。
 - 版本 5：增加 Telegram 消息 ID 表。
@@ -417,6 +445,8 @@ watch_player_id + watch_event_id
 - 版本 7：增加自动轮询持久化状态。
 - 版本 8：增加 tournament 结束时间，用于完赛后自动停止轮询。
 - 版本 9：增加 tournament/event 名称缓存，让加速轮询不再请求 event header。
+- 版本 10：增加中国工作日循环提醒过滤字段。
+- 版本 11：增加决赛Phase跟踪状态和赛事级set去重表。
 
 ## 8. 当前事实下的边界
 

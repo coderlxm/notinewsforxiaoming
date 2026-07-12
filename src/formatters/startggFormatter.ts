@@ -74,6 +74,63 @@ export function formatStartggStatusChangedMessage(input: StartggStatusChangedMes
   return lines.join('\n');
 }
 
+export function formatStartggFinalPhaseStarted(input: {
+  tournamentName: string;
+  eventName: string;
+  eventSlug: string;
+  phaseName: string;
+  entrants: Array<{ seedNum: number; name: string }>;
+}): string {
+  const lines = [
+    `🏆 <b>${escapeHtml(input.tournamentName)} / ${escapeHtml(input.eventName)} 已进入 ${escapeHtml(input.phaseName)}</b>`,
+    '──────────────────',
+    ...input.entrants.map((entrant) => `${entrant.seedNum}. ${escapeHtml(entrant.name)}`),
+    '──────────────────',
+    `🔗 <a href="${escapeHtml(normalizeUrl(`https://www.start.gg/${input.eventSlug}`))}">查看赛事</a>`,
+  ];
+  return lines.join('\n');
+}
+
+export function formatStartggFinalPhaseSetResult(input: {
+  tournamentName: string;
+  eventName: string;
+  phaseName: string;
+  roundLabel: string | null;
+  entrantNames: string[];
+  scoreText: string | null;
+  winnerName: string;
+  setUrl: string;
+}): string {
+  return [
+    `🏆 <b>${escapeHtml(input.phaseName)} 赛果</b>`,
+    `${escapeHtml(input.tournamentName)} / ${escapeHtml(input.eventName)}`,
+    '',
+    input.roundLabel ? escapeHtml(input.roundLabel) : null,
+    escapeHtml(input.scoreText || input.entrantNames.join(' vs ')),
+    `胜者：${escapeHtml(input.winnerName)}`,
+    '',
+    `🔎 <a href="${escapeHtml(normalizeUrl(input.setUrl))}">查看对局</a>`,
+  ].filter((line): line is string => line !== null).join('\n');
+}
+
+export function formatStartggFinalStandings(input: {
+  tournamentName: string;
+  eventName: string;
+  standings: Array<{ placement: number; entrantName: string }>;
+}): string {
+  const medal = (placement: number): string => {
+    if (placement === 1) return '🥇';
+    if (placement === 2) return '🥈';
+    if (placement === 3) return '🥉';
+    return `${placement}.`;
+  };
+  return [
+    `🏆 <b>${escapeHtml(input.tournamentName)} / ${escapeHtml(input.eventName)} 最终结果</b>`,
+    '──────────────────',
+    ...input.standings.map((standing) => `${medal(standing.placement)} ${escapeHtml(standing.entrantName)}`),
+  ].join('\n');
+}
+
 export function formatStartggGuide(playersCount: number, eventsCount: number): string {
   const isEmpty = playersCount === 0 || eventsCount === 0;
   const lines = [
@@ -177,7 +234,15 @@ export function formatStartggRuntimeStatus(input: {
   fastPollingEnabled: boolean;
   nextFastPollAt: Date | null;
   players: Array<{ player_name: string; enabled: number }>;
-  events: Array<{ event_name: string; event_slug: string; active: number; tournament_end_at: string | null }>;
+  events: Array<{
+    event_name: string;
+    event_slug: string;
+    active: number;
+    tournament_end_at: string | null;
+    final_phase_name: string | null;
+    final_phase_num_seeds: number | null;
+    final_phase_tracking_completed: number;
+  }>;
   statuses: Array<{
     player_name: string;
     status: StartggWatchStatus;
@@ -209,6 +274,15 @@ export function formatStartggRuntimeStatus(input: {
   const latestText = latest
     ? `${formatOptionalTime(latest.captured_at)} ${latest.player_name} ${statusLabel(latest.status)}`
     : '-';
+  const finalPhaseText = activeEvents.length === 0
+    ? '-'
+    : activeEvents.map((event) => {
+      if (event.final_phase_tracking_completed === 1) return `${event.event_name}：已完成`;
+      if (event.final_phase_name && event.final_phase_num_seeds) {
+        return `${event.event_name}：${event.final_phase_name} 跟踪中`;
+      }
+      return `${event.event_name}：等待发现`;
+    }).join(' / ');
 
   return [
     '🥊 <b>start.gg 状态</b>',
@@ -217,6 +291,7 @@ export function formatStartggRuntimeStatus(input: {
     `赛事：${escapeHtml(eventText)}`,
     `赛事结束：${formatOptionalTime(tournamentEndAt)}`,
     `选手：${enabledPlayers.length} 位 ${escapeHtml(playerText)}`,
+    `决赛阶段：${escapeHtml(finalPhaseText)}`,
     `固定轮询：${input.pollingEnabled ? '开' : '关'}，下次 ${formatOptionalTime(input.nextPollAt)}`,
     `加速轮询：${input.fastPollingEnabled ? '开' : '关'}，下次 ${formatOptionalTime(input.nextFastPollAt)}`,
     `最近快照：${escapeHtml(latestText)}`,
