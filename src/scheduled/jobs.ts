@@ -177,8 +177,8 @@ export function registerFixedJobs(bot: Telegraf): void {
     await runMode('github', getChinaDayOfWeek(), bot);
   });
 
-  // x liked video: 11:00
-  schedule.scheduleJob({ hour: 11, minute: 0, tz: 'Asia/Shanghai' }, async () => {
+  // x liked video: 08:31
+  schedule.scheduleJob({ hour: 8, minute: 31, tz: 'Asia/Shanghai' }, async () => {
     await runMode('x_liked_video_status', getChinaDayOfWeek(), bot);
   });
 
