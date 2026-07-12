@@ -75,6 +75,7 @@ import {
 } from '../services/startggRepository.js';
 import { runStartggGo, runStartggWatchNow, syncStartggPresetPlayers } from '../services/startggPresetSync.js';
 import { escapeHtml } from '../utils/html.js';
+import { isXLikedVideoSyncRunning, runXLikedVideoSync } from '../services/xLikedVideoSync.js';
 import {
   disableStartggPolling,
   enableStartggPolling,
@@ -150,6 +151,32 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
   bot.command('help', (ctx) => {
     if (!isAuthorized(ctx)) return;
     ctx.reply(formatHelpMessage(), { parse_mode: 'HTML' });
+  });
+
+  bot.command('syncx', async (ctx) => {
+    if (!isAuthorized(ctx)) return;
+    if (isXLikedVideoSyncRunning()) {
+      await ctx.reply('X 点赞视频同步正在运行中。');
+      return;
+    }
+
+    await ctx.reply('开始检查 X 点赞视频...');
+    try {
+      const summary = await runXLikedVideoSync();
+      if (summary.discovered === 0 && summary.downloaded === 0 && summary.uploaded === 0) {
+        await ctx.reply('同步完成：没有发现新的点赞视频。');
+        return;
+      }
+      await ctx.reply(
+        `同步完成：发现 ${summary.discovered} 条，下载 ${summary.downloaded} 个，上传 ${summary.uploaded} 个，错误 ${summary.errors} 个。`
+      );
+    } catch (e) {
+      if (e instanceof Error) {
+        await ctx.reply(`X 点赞视频同步失败：${e.message}`);
+        return;
+      }
+      throw e;
+    }
   });
 
   bot.command('fetchav', async (ctx) => {
