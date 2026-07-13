@@ -46,7 +46,7 @@ export function formatXLikedVideoStatusMessage(status: XLikedVideoStatus): strin
   if (!latestRun) {
     return [
       '🎬 <b>X 点赞视频</b>',
-      '⚠️ 今日 11:00 巡检异常',
+      '⚠️ 同步状态异常',
       '还没有找到任何同步记录。',
     ].join('\n');
   }
@@ -59,7 +59,7 @@ export function formatXLikedVideoStatusMessage(status: XLikedVideoStatus): strin
   if (!isToday) {
     return [
       '🎬 <b>X 点赞视频</b>',
-      '⚠️ 今日 11:00 巡检异常',
+      '⚠️ 同步状态异常',
       `今天还没看到同步记录，最近一次是 ${latestRunTime}。`,
       `结果：${escapeHtml(formatRunResult(latestRun.result))}`,
     ].join('\n');
@@ -90,14 +90,6 @@ export function formatXLikedVideoStatusMessage(status: XLikedVideoStatus): strin
     `最近运行：${latestRunTime}`,
     `今天成功下载并上传 ${latestRun.uploaded} 个视频。`,
     '服务器没有残留待上传文件。',
-  ].join('\n');
-}
-
-export function formatXLikedVideoStatusCheckFailure(error: Error): string {
-  return [
-    '🎬 <b>X 点赞视频</b>',
-    '🚨 今日 11:00 巡检执行失败',
-    escapeHtml(error.message),
   ].join('\n');
 }
 

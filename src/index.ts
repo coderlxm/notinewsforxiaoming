@@ -50,7 +50,7 @@ async function main() {
   if (TEST_MODE_ENABLED) {
     const forcedMode = parseForcedMode(TEST_FORCE_MODE);
     if (!forcedMode) {
-      throw new Error(`Invalid TEST_FORCE_MODE: "${TEST_FORCE_MODE}". Allowed: sleep,wakeup,server_health,news,github,v2ex,v2ex_buffered_push,fitness,vitamin,english,av_update,startgg_watch,coffee,x_liked_video_status`);
+      throw new Error(`Invalid TEST_FORCE_MODE: "${TEST_FORCE_MODE}". Allowed: sleep,wakeup,server_health,news,github,v2ex,v2ex_buffered_push,fitness,vitamin,english,av_update,startgg_watch,coffee`);
     }
     console.log(`Test mode enabled. Bypass schedule and force mode: ${forcedMode}`);
     await runMode(forcedMode, chinaDayOfWeek);

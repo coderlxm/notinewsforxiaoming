@@ -34,12 +34,11 @@ import { bufferHolidayV2exTopics, pushBufferedV2exIfNeeded } from '../services/v
 import { isVitaminEatenToday, triggerVitaminReminder } from '../services/vitaminReminder.js';
 import { runStartggWatchNow } from '../services/startggPresetSync.js';
 import {
-  formatXLikedVideoStatusCheckFailure,
   formatXLikedVideoStatusMessage,
   readXLikedVideoStatus,
 } from '../services/xLikedVideoStatus.js';
 
-export type PushMode = 'sleep' | 'wakeup' | 'server_health' | 'news' | 'github' | 'v2ex' | 'v2ex_buffered_push' | 'fitness' | 'vitamin' | 'english' | 'av_update' | 'startgg_watch' | 'coffee' | 'x_liked_video_status';
+export type PushMode = 'sleep' | 'wakeup' | 'server_health' | 'news' | 'github' | 'v2ex' | 'v2ex_buffered_push' | 'fitness' | 'vitamin' | 'english' | 'av_update' | 'startgg_watch' | 'coffee';
 
 export function parseForcedMode(rawMode: string): PushMode | null {
   const modeMap: Record<string, PushMode> = {
@@ -56,7 +55,6 @@ export function parseForcedMode(rawMode: string): PushMode | null {
     av_update: 'av_update',
     startgg_watch: 'startgg_watch',
     coffee: 'coffee',
-    x_liked_video_status: 'x_liked_video_status',
   };
   return modeMap[rawMode] ?? null;
 }
@@ -72,8 +70,14 @@ export async function runMode(mode: PushMode, chinaDayOfWeek: number, bot?: Tele
 
   if (mode === 'wakeup') {
     console.log('Mode: Morning Wake-up');
-    const weather = await fetchWeather();
-    const message = formatWakeupMessage(weather);
+    const [weather, xLikedVideoStatus] = await Promise.all([
+      fetchWeather(),
+      readXLikedVideoStatus(),
+    ]);
+    const message = [
+      formatWakeupMessage(weather),
+      formatXLikedVideoStatusMessage(xLikedVideoStatus),
+    ].join('\n\n');
     await sendTelegramMessage(message, bot);
     return;
   }
@@ -181,19 +185,6 @@ export async function runMode(mode: PushMode, chinaDayOfWeek: number, bot?: Tele
     const message = formatCoffeeMessage();
     await sendTelegramMessage(message, bot);
     return;
-  }
-
-  if (mode === 'x_liked_video_status') {
-    console.log('Mode: X Liked Video Daily Status');
-    try {
-      const status = await readXLikedVideoStatus();
-      await sendTelegramMessage(formatXLikedVideoStatusMessage(status), bot);
-      return;
-    } catch (error) {
-      const message = formatXLikedVideoStatusCheckFailure(error instanceof Error ? error : new Error(String(error)));
-      await sendTelegramMessage(message, bot);
-      throw error;
-    }
   }
 
   console.log('Mode: Daily English Teacher');
