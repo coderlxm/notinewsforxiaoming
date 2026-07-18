@@ -232,6 +232,15 @@ export function getDb(): Database.Database {
         updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
 
+      CREATE TABLE IF NOT EXISTS masturbation_records (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        occurred_at TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_masturbation_records_occurred_at
+      ON masturbation_records(occurred_at);
+
       CREATE TABLE IF NOT EXISTS steam_price_watches (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         app_id INTEGER NOT NULL UNIQUE,

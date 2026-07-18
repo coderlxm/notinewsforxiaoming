@@ -40,6 +40,7 @@ import {
   parseNaturalCancelCallbackData,
   parseVitaminCallbackData,
   parseStartggWatchCallbackData,
+  parseMasturbationCallbackData,
 } from './callbacks.js';
 import * as avRepo from '../services/avRepository.js';
 import type { TrackedTarget } from '../services/avRepository.js';
@@ -101,6 +102,18 @@ import {
   formatSteamPriceHelp,
   formatSteamPriceCheckSummary,
 } from '../formatters/steamPriceFormatter.js';
+import * as masturbationRepo from '../services/masturbationRepository.js';
+import { buildSummary } from '../services/masturbationTracker.js';
+import {
+  formatMasturbationStatusCard,
+  formatMasturbationConfirmCard,
+  formatMasturbationUndoCard,
+  formatMasturbationUndoCommand,
+  formatMasturbationStatsCard,
+  buildMasturbationStatusButtons,
+  buildMasturbationConfirmButtons,
+  buildMasturbationStatsButtons,
+} from '../formatters/masturbationFormatter.js';
 
 interface StartggWatchCandidate {
   eventRowId: number;
@@ -717,6 +730,37 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     }
   });
 
+  bot.command('lu', async (ctx) => {
+    if (!isAuthorized(ctx)) return;
+    const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
+    const arg = text.replace(/^\/lu\s*/, '').trim().toLowerCase();
+
+    if (arg === 'undo') {
+      const latest = masturbationRepo.deleteLatestRecord();
+      if (!latest) {
+        await ctx.reply('当前没有可撤销内容。', { parse_mode: 'HTML' });
+        return;
+      }
+      await ctx.reply(formatMasturbationUndoCommand(latest), { parse_mode: 'HTML' });
+      return;
+    }
+
+    if (arg === 'stats') {
+      const summary = buildSummary();
+      await ctx.reply(formatMasturbationStatsCard(summary), {
+        parse_mode: 'HTML',
+        ...buildMasturbationStatsButtons(),
+      });
+      return;
+    }
+
+    const summary = buildSummary();
+    await ctx.reply(formatMasturbationStatusCard(summary), {
+      parse_mode: 'HTML',
+      ...buildMasturbationStatusButtons(),
+    });
+  });
+
   bot.command('remind', async (ctx) => {
     if (!isAuthorized(ctx)) return;
 
@@ -800,6 +844,15 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
 
     const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
     if (!text || text.startsWith('/')) return;
+
+    if (text === '📝 撸了吗' || text === '撸了吗') {
+      const summary = buildSummary();
+      await ctx.reply(formatMasturbationStatusCard(summary), {
+        parse_mode: 'HTML',
+        ...buildMasturbationStatusButtons(),
+      });
+      return;
+    }
 
     if (isStartggGoNaturalAlias(text)) {
       await handleStartggGo(ctx, '');
@@ -908,6 +961,48 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     if (!isAuthorized(ctx)) return;
 
     const cbData = ctx.callbackQuery && 'data' in ctx.callbackQuery ? ctx.callbackQuery.data : undefined;
+
+    const masturbationAction = parseMasturbationCallbackData(cbData);
+    if (masturbationAction) {
+      await ctx.answerCbQuery();
+
+      if (masturbationAction.type === 'add') {
+        const record = masturbationRepo.createRecord(new Date());
+        const summary = buildSummary();
+        await ctx.reply(formatMasturbationConfirmCard(record, summary.todayCount), {
+          parse_mode: 'HTML',
+          ...buildMasturbationConfirmButtons(record.id),
+        });
+        return;
+      }
+
+      if (masturbationAction.type === 'stats') {
+        const summary = buildSummary();
+        await ctx.reply(formatMasturbationStatsCard(summary), {
+          parse_mode: 'HTML',
+          ...buildMasturbationStatsButtons(),
+        });
+        return;
+      }
+
+      if (masturbationAction.type === 'refresh') {
+        const summary = buildSummary();
+        await ctx.reply(formatMasturbationStatsCard(summary), {
+          parse_mode: 'HTML',
+          ...buildMasturbationStatsButtons(),
+        });
+        return;
+      }
+
+      const deleted = masturbationRepo.deleteRecordById(masturbationAction.recordId);
+      const summary = buildSummary();
+      if (!deleted) {
+        await ctx.editMessageText('该记录已不存在。', { parse_mode: 'HTML' });
+        return;
+      }
+      await ctx.editMessageText(formatMasturbationUndoCard(summary.todayCount), { parse_mode: 'HTML' });
+      return;
+    }
 
     const startggWatchData = parseStartggWatchCallbackData(cbData);
     if (startggWatchData) {

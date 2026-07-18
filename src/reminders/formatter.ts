@@ -33,6 +33,7 @@ export function formatHelpMessage(): string {
     '• <code>/watch https://www.start.gg/tournament/xxx/event/yyy</code> - 按项目页添加监控',
     '• <code>/watchlist</code> - 查看监控列表与最近状态',
     '• <code>/steam</code> - Steam 价格监控管理（<code>add/list/set/remove/check</code>）',
+    '• <code>/lu</code> - 查看撸了吗状态卡片（<code>/lu stats</code> 统计、<code>/lu undo</code> 撤销最新一次）',
     '',
     '🤖 <b>自然语言对话：</b>',
     '直接发送 <code>10 分钟后提醒我下楼</code> 即可。',
@@ -273,6 +274,7 @@ export function buildPresetKeyboard(): { reply_markup: { keyboard: Array<Array<{
       .filter((preset) => preset.id !== 'laundry' && preset.id !== 'workout')
       .map((preset) => ({ text: `${preset.emoji} ${preset.label}` })),
     { text: `${STARTGG_GO_SHORTCUT.emoji} ${STARTGG_GO_SHORTCUT.label}` },
+    { text: '📝 撸了吗' },
   ];
   const rows: Array<Array<{ text: string }>> = [];
   for (let i = 0; i < buttons.length; i += 3) {
