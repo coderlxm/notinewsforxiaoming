@@ -6,6 +6,11 @@ export interface PresetReminder {
   minutes: number;
 }
 
+export const STARTGG_GO_SHORTCUT = {
+  emoji: '👊',
+  label: '比赛了',
+} as const;
+
 export const PRESET_REMINDERS: PresetReminder[] = [
   { id: 'noodles',  emoji: '🍜', label: '吃泡面',   reminderText: '吃泡面', minutes: 7  },
   { id: 'pomodoro', emoji: '🍅', label: '番茄钟',   reminderText: '番茄钟结束', minutes: 25 },

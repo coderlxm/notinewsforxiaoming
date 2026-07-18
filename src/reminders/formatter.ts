@@ -1,7 +1,7 @@
 import type { Reminder, RecurringRule } from './repository.js';
 import { bjFormat, formatShortDisplay } from '../utils/time.js';
 import { describeRecurrence } from './recurring.js';
-import { PRESET_REMINDERS } from './presets.js';
+import { PRESET_REMINDERS, STARTGG_GO_SHORTCUT } from './presets.js';
 import { escapeHtml } from '../utils/html.js';
 
 interface InlineKeyboardMarkup {
@@ -268,7 +268,12 @@ export function buildCancelCandidateButtons(
 }
 
 export function buildPresetKeyboard(): { reply_markup: { keyboard: Array<Array<{ text: string }>>; resize_keyboard: boolean; one_time_keyboard: boolean } } {
-  const buttons = PRESET_REMINDERS.map(p => ({ text: `${p.emoji} ${p.label}` }));
+  const buttons = [
+    ...PRESET_REMINDERS
+      .filter((preset) => preset.id !== 'laundry' && preset.id !== 'workout')
+      .map((preset) => ({ text: `${preset.emoji} ${preset.label}` })),
+    { text: `${STARTGG_GO_SHORTCUT.emoji} ${STARTGG_GO_SHORTCUT.label}` },
+  ];
   const rows: Array<Array<{ text: string }>> = [];
   for (let i = 0; i < buttons.length; i += 3) {
     rows.push(buttons.slice(i, i + 3));

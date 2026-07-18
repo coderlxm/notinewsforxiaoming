@@ -47,7 +47,7 @@ import { resolveAvSubscription } from '../services/avSubscriptionService.js';
 import { runAvFetchOnce } from '../services/avTracker.js';
 import { buildAvTargetUrl, getAvTargetTypeLabel } from '../services/avTargets.js';
 import { markVitaminEatenToday, scheduleVitaminSnooze, getAndClearVitaminSentMessages } from '../services/vitaminReminder.js';
-import { findPresetByText } from '../reminders/presets.js';
+import { findPresetByText, STARTGG_GO_SHORTCUT } from '../reminders/presets.js';
 import {
   buildStartggWatchCandidateButtons,
   formatStartggGoTournamentCandidates,
@@ -109,7 +109,14 @@ interface StartggWatchCandidate {
   playerName: string;
 }
 
-const STARTGG_GO_NATURAL_ALIASES = new Set(['比赛了', '街霸', '街霸6', '饿狼传说', '拳皇']);
+const STARTGG_GO_NATURAL_ALIASES = new Set([
+  '比赛了',
+  '街霸',
+  '街霸6',
+  '饿狼传说',
+  '拳皇',
+  `${STARTGG_GO_SHORTCUT.emoji}${STARTGG_GO_SHORTCUT.label}`,
+]);
 
 function isStartggGoNaturalAlias(text: string): boolean {
   return STARTGG_GO_NATURAL_ALIASES.has(text.trim().replace(/\s+/g, ''));
