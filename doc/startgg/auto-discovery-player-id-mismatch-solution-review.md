@@ -4,32 +4,41 @@ Review 日期：2026-07-18（Asia/Shanghai）
 问题报告：[`auto-discovery-player-id-mismatch-report.md`](./auto-discovery-player-id-mismatch-report.md)  
 被评审方案：[`startgg-player-id-mismatch-solution.md`](../design/startgg-player-id-mismatch-solution.md)
 
+## 范围更正
+
+用户随后明确：自动发现功能面向关注选手在 start.gg 中参加的所有游戏赛事，不是 SF6 专用功能。因此，本报告中“用 SF6 tournament 候选目录替换 Player Sets 发现入口”的产品级结论无效。
+
+本报告对目标事故的 API 证据、身份断链结论和确定性 entrant 匹配规则仍然有效。正确实施关系是：
+
+1. 保留 Player Sets 作为跨游戏的正常关联发现来源。
+2. 将本报告验证过的 SF6 tournament 候选查询作为本次断链事故的补充发现来源。
+3. 两类结果统一去重并进入同一 entrant 映射和监控流程。
+
+在没有新的 API 证据和范围设计前，不应宣称其他游戏的完全断链赛事已获得与 SF6 相同的候选扫描覆盖。
+
 ## 1. 结论
 
 当前方案不是“自动发现赛事最便利、最智能”目标下的最佳方案，不应按现状直接实施。
 
-它正确解决了“event 已知以后，如何把全局选手映射到赛事 Entrant”的问题，但主动保留了导致本次漏发现的入口：
+它正确解决了“event 已知以后，如何把全局选手映射到赛事 Entrant”的问题，但没有解决全局 Player ID 与赛事记录断链时的自动发现。另一方面，本报告最初建议用 SF6 tournament 候选目录完全替换 Player Sets，也会错误丢失其他游戏的正常发现能力。
+
+最终方案必须同时保留两种互补来源：
 
 ```text
-全局 Player ID
+跨游戏正常关联
   -> player(id).sets()
-  -> 发现 event
-```
+  -> 发现任意游戏 event
 
-因此，在本次真实赛事中，它实施完成后的实际体验仍然是：自动发现失败，用户必须自己找到 event URL，再执行 `/watch <event_url>`。这是一条可靠的手动修复路径，但不符合本次明确的自动发现目标。
+本次已证实的 SF6 身份断链
+  -> 当前活动 SF6 tournament 候选
+  -> User / gamerTag 身份确认
+  -> 补充发现 event 和 entrant_id
 
-推荐改为一条 API 原生、范围受控的主路径：
-
-```text
-Street Fighter 6 + 最近两天有数据变化的 tournament
-  -> 按 startAt/endAt 保留当前活动候选
-  -> 在候选中同时查询全局 User 精确 Entrant 和 Participant gamerTag
-  -> 对名称候选做边界明确的本地确认
-  -> 唯一命中后直接得到 event + entrant_id
+两类结果按 event slug 合并
   -> 自动订阅并进入现有监控
 ```
 
-这不是全网赛事扫描。它先用官方 `tournaments` 过滤能力把范围限制到一个游戏和一个短活动窗口，再只对当前活动候选做定向身份查询。
+SF6 候选查询不是全网赛事扫描，也不是 Player Sets 失败后才启动的 fallback；它是每轮固定执行、范围受控的补充来源。当前证据只足以支持 SF6 断链候选扫描，不能据此限制整个产品的游戏范围，也不能宣称其他游戏的断链场景已被同样覆盖。
 
 当前方案中“保留全局身份、监控使用 event 内 entrant_id、不把赛事侧 Player ID 写回预设、歧义时不猜”的部分应继续保留；需要重写的是发现入口和身份数据模型。
 
@@ -44,19 +53,19 @@ Street Fighter 6 + 最近两天有数据变化的 tournament
 | 目标赛事真实 API 响应 | 判断候选发现和身份查询能否命中本次事故 | 已确认当前运行时行为 |
 | 设计推断 | 决定如何组合查询、处理歧义和控制请求量 | 推荐方案，不冒充平台保证 |
 
-“当前全局 Player 发现覆盖绝大多数赛事”在现有方案中没有统计数据支持。本报告不以该判断作为保留旧发现路径的依据。
+“当前全局 Player 发现覆盖绝大多数赛事”没有统计数据支持，不能量化其覆盖率。但用户已明确产品要发现所有游戏，而该链路的源码行为不限制 videogame；因此保留它是维持既有跨游戏能力的直接要求，不依赖“绝大多数”这一未经证实的判断。
 
-## 3. 当前源码事实
+## 3. 修复前源码事实
 
 ### 3.1 自动发现只依赖全局 Player Sets
 
-[`src/services/startggDiscovery.ts`](../../src/services/startggDiscovery.ts) 对每名启用选手调用 `fetchPlayerRecentSets(player.player_id, updatedAfter)`，再从 Set 反查 event 和 tournament。
+修复前的 [`src/services/startggDiscovery.ts`](../../src/services/startggDiscovery.ts) 对每名启用选手调用 `fetchPlayerRecentSets(player.player_id, updatedAfter)`，再从 Set 反查 event 和 tournament。
 
 [`PLAYER_RECENT_SETS_QUERY`](../../src/services/startgg/queries.ts) 的根节点是 `player(id)`，并再次用同一个全局 Player ID 过滤 sets。本次赛事的孤立赛事 Player ID 不属于这个全局 Player，所以该链路没有机会看到 event。
 
 ### 3.2 已知 event 后仍只按 Player ID 映射
 
-[`ensureEventEntrantMappings()`](../../src/services/startgg/tracker.ts) 当前把 event 全部 Entrant 转成 `playerId -> entrant`，然后只执行：
+修复前的 [`ensureEventEntrantMappings()`](../../src/services/startgg/tracker.ts) 把 event 全部 Entrant 转成 `playerId -> entrant`，然后只执行：
 
 ```text
 watch_player.player_id === participant.player.id
@@ -66,7 +75,7 @@ watch_player.player_id === participant.player.id
 
 ### 3.3 现有数据模型无法实施方案声明的 User slug 匹配
 
-当前 `resolveUserToPlayer()` 已返回 `userSlug`，但 `syncStartggPresetPlayers()` 没有把它写入数据库。`startgg_watch_players` 也只有 `player_id`、`player_name` 和 `enabled`。
+修复前 `resolveUserToPlayer()` 已返回 `userSlug`，但 `syncStartggPresetPlayers()` 没有把它写入数据库。`startgg_watch_players` 也只有 `player_id`、`player_name` 和 `enabled`。
 
 被评审方案的匹配顺序包含“User slug 精确匹配”，但其 migration 只计划增加 `gamer_tag`，没有增加 `user_slug` 或 `user_id`。所以该方案即使按文档实施，第二级匹配也缺少持久化数据来源。
 
@@ -110,7 +119,7 @@ Event.userEntrant(userId)
 1. `userEntrant(userId)` 负责正常关联。
 2. `participants(filter: { gamerTag })` 负责本次这类 User 断链记录。
 
-这是一条统一的候选身份解析主路径，不需要先让 Player Sets 失败后再进入另一套 fallback。
+这构成一条统一的候选身份解析路径。它应与 Player Sets 一起固定执行并合并结果，不需要先判断 Player Sets 是否失败，也不是异常后的 fallback。
 
 ## 5. 目标赛事运行时研究结果
 
@@ -212,7 +221,7 @@ Participant
 | 修复本次自动发现 | 保留 Player Sets，孤立赛事要求手动 URL | 未修复根因 |
 | 用户便利性 | 用户必须先在别处发现赛事并复制 URL | 不符合目标 |
 | API 能力利用 | 未评估按游戏筛 tournament 和按 gamerTag 筛 Participant | 关键遗漏 |
-| 请求量 | 以“不增加请求”为主要理由保留旧入口 | 目标赛事取样显示新路径可更少 |
+| 请求量 | 以“不增加请求”为主要理由拒绝候选发现 | SF6 补充路径会增加请求，但本次取样范围可控 |
 | 名称安全性 | 只要求 event 内唯一，规则描述较宽泛 | 自动发现需跨全部活动候选去歧义 |
 | 数据模型 | 只增加 `gamer_tag` | 无法实施文档声明的 User 精确匹配 |
 | 监控身份 | 最终使用 `entrant_id` | 应保留 |
@@ -238,9 +247,15 @@ Participant
 
 不需要把赛事侧 Player ID 保存为新的全局身份，也不需要新增身份历史表、别名表或学习状态。
 
-### 7.2 用候选赛事目录替换 Player Sets 发现入口
+### 7.2 保留跨游戏发现，并增加 SF6 断链候选
 
-固定轮询中的发现阶段改为：
+固定轮询首先保留原有 Player Sets 来源：
+
+1. 对每名启用选手查询近期 `player(id).sets()`。
+2. 按 tournament 活动时间和 event 最近活动过滤。
+3. 不限制 videogame，继续发现所有正常关联的游戏赛事。
+
+同一轮发现再增加 SF6 断链候选：
 
 1. 查询 `videogameIds: [43868]`。
 2. 使用 `computedUpdatedAt = now - 48h`，与当前“两天内有赛事活动”的业务边界一致。
@@ -248,7 +263,7 @@ Participant
 4. 分页只读取 tournament 的 id、name、slug、startAt、endAt。
 5. 本地只保留 `startAt <= now <= endAt` 的活动 tournament。
 
-这是新的唯一目录发现主路径。旧 `player(id).sets()` 不再承担 event 发现职责，避免把同一个业务目标拆成主路径和失败后的 fallback。
+两类结果按规范化 event slug 取并集。候选路径只补充 Player ID 断链时缺失的 SF6 event，不得删除、过滤或覆盖 Player Sets 已发现的其他游戏 event。
 
 ### 7.3 在同一次候选身份查询中组合精确与名称信号
 
@@ -286,7 +301,7 @@ match_kind: user | player | gamer_tag
 ### 7.5 Telegram 只处理真正歧义
 
 - 精确身份或全局唯一名称命中：直接自动订阅，不要求用户确认。
-- 同一选手有多个有效名称候选：不猜测，把候选交给现有 `/startgg go` 交互选择，并复用当前消息。
+- 同一选手有多个有效名称候选：不猜测，不建立该选手的 entrant 映射；现有 `/startgg go` 只负责 tournament 关键词歧义，不应被描述成已经支持身份候选确认。
 - `/watch <event_url>`：继续作为用户明确指定 event 的控制入口，不再承担正常自动发现的必需步骤。
 
 ## 8. 最小实施范围
@@ -296,7 +311,7 @@ match_kind: user | player | gamer_tag
 1. [`src/services/startggPresetConfig.ts`](../../src/services/startggPresetConfig.ts)：预设同步继续从 user URL 解析身份，不改变用户配置方式。
 2. [`src/services/startgg/queries.ts`](../../src/services/startgg/queries.ts)：增加 tournament 候选与候选身份查询字段；`USER_PLAYER_QUERY` 增加 `user.id`。
 3. [`src/services/startgg/client.ts`](../../src/services/startgg/client.ts)：增加分页候选查询和小批量身份查询。
-4. [`src/services/startggDiscovery.ts`](../../src/services/startggDiscovery.ts)：用候选目录与统一身份解析替换 Player Sets 发现。
+4. [`src/services/startggDiscovery.ts`](../../src/services/startggDiscovery.ts)：保留 Player Sets，并合并候选目录与统一身份解析结果。
 5. [`src/services/startggPresetSync.ts`](../../src/services/startggPresetSync.ts)：保存 `user_id`、`gamer_tag`，并在发现 event 时一并落 entrant 映射。
 6. [`src/services/startggRepository.ts`](../../src/services/startggRepository.ts) 与 migration：只增加两列及相应读写。
 7. [`src/services/startgg/tracker.ts`](../../src/services/startgg/tracker.ts)：手动 event 路径复用同一确定性身份规则。
@@ -305,7 +320,7 @@ match_kind: user | player | gamer_tag
 
 - 新服务或外部赛事源。
 - LLM、模糊匹配库或自学习别名系统。
-- 扫描所有游戏或所有历史赛事。
+- 扫描所有游戏的 tournament 目录或所有历史赛事。
 - 新的失败重试、fallback、降级或静默跳过。
 - 修改赛况查询、决赛 Phase、快照、去重和 Telegram 推送主逻辑。
 
@@ -313,14 +328,15 @@ match_kind: user | player | gamer_tag
 
 1. 不按现有 `startgg-player-id-mismatch-solution.md` 原样实施。
 2. 保留其中“赛事内 Entrant 是最终监控身份”的部分。
-3. 将其“全局 Player Sets 继续作为发现主键”和“孤立赛事只能手动 URL”的结论替换为本报告的受限候选发现。
+3. 保留跨游戏 Player Sets 发现，并用本报告的受限 SF6 候选发现补齐已证实的断链事故。
 4. 将方案状态从“方案已确定”改为“需按 Review 修订”后再进入实施。
 
 在本次真实事故上，推荐方案已经同时满足：
 
 - 用户不需要知道或复制 event URL。
 - 不依赖断裂的全局 Player -> Sets 关联。
-- 不扫描无关游戏和历史赛事。
+- 不扫描无关游戏和历史 tournament 目录。
+- 不损失既有的跨游戏正常关联发现能力。
 - 不把赛事 Player ID 污染到全局预设。
 - 自动发现时直接得到正确 Entrant ID。
 - 能识别并拒绝 `Zhen -> Zheng ze` 这类 API 子串假阳性。

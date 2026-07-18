@@ -8,9 +8,9 @@ start.gg 功能的主链路是：
 
 ```text
 预设/手动添加选手
-  -> 查询最近更新的 Street Fighter 6 tournament 目录
-  -> 筛选当前活动 tournament 并定向解析选手身份
-  -> 自动发现 event 并直接得到 entrant 映射
+  -> 从每名选手近期 Player Sets 发现任意游戏的正常关联 event
+  -> 额外扫描当前活动的 SF6 tournament，识别本次 Player ID 断链赛事
+  -> 合并 event，并携带已经确认的 entrant 映射
   -> 建立 active event 订阅
   -> 查询参赛关系、对局、排名
   -> 计算每个“选手 × 项目”的状态
@@ -89,11 +89,12 @@ start.gg 功能的主链路是：
 
 1. 同步预设选手。
 2. 读取全部启用的 `startgg_watch_players`，包括预设和手动选手。
-3. 查询最近 48 小时有数据变化的 Street Fighter 6 tournament 目录，并保留当前处于 `startAt/endAt` 范围内的 tournament。
-4. 在候选 tournament 中组合 User 精确 Entrant 与 Participant gamerTag 查询，确认固定选手参加的 event。
-5. 不带关键词时，将发现到的所有 event 设为 active。
-6. 立即执行一次状态检查。
-7. 开启进程内每 20 分钟一次的 start.gg 轮询。
+3. 查询每名选手最近 7 天更新过的 Player Sets，从中发现任意游戏的正常关联 event。
+4. 同时查询最近 48 小时有数据变化的 Street Fighter 6 tournament，在候选中识别本次这类 Player ID 断链 event。
+5. 按 event slug 合并两类发现结果。
+6. 不带关键词时，将发现到的所有 event 设为 active。
+7. 立即执行一次状态检查。
+8. 开启进程内每 20 分钟一次的 start.gg 轮询。
 
 `/startgg go <关键词>` 的区别是：
 
@@ -189,9 +190,19 @@ start.gg 功能的主链路是：
 
 代码位于 `src/services/startggDiscovery.ts`。
 
-### 4.1 候选 tournament
+### 4.1 跨游戏 Player Sets 发现
 
-目录查询固定使用 Street Fighter 6 的 `videogame.id = 43868`，并要求：
+对每名启用选手查询最近 7 天更新过的 `player(id).sets()`。Set 对应的 event 必须满足：
+
+1. tournament 有 slug、`startAt` 和 `endAt`。
+2. 当前时间处于 tournament 的 `[startAt, endAt]` 内。
+3. Set 在最近两天完成，或 event 在最近两天开始且 Set 尚未完成。
+
+这条链路不限制 videogame，是原有的跨游戏自动发现来源。
+
+### 4.2 Player ID 断链补充发现
+
+为覆盖本次已确认的 SF6 Player ID 断链事故，额外查询 `videogame.id = 43868` 的 tournament，并要求：
 
 1. `computedUpdatedAt >= now - 48 hours`。
 2. tournament 已发布且可公开搜索。
@@ -200,7 +211,9 @@ start.gg 功能的主链路是：
 
 目录分页只读取 tournament 标量字段；当前活动候选再按固定小批次查询身份。
 
-### 4.2 候选中的身份确认
+这条补充来源不会替换或限制 4.1 的跨游戏发现；两者按 event slug 合并。目前断链候选扫描的实证范围是 SF6，不应表述成其他游戏也已经获得同等断链覆盖。
+
+### 4.3 候选中的身份确认
 
 每名启用选手按以下顺序匹配：
 
@@ -210,11 +223,11 @@ start.gg 功能的主链路是：
 
 API 的 gamerTag 子串结果不会直接采用。名称级匹配必须在全部当前候选中只对应一个 Participant；同一 Participant 报名多个 event 时，会保留它的全部 entrant。发现结果会直接携带 `watch_player_id -> entrant_id` 映射。
 
-### 4.3 自动 event 与手动 event 的优先级
+### 4.4 自动 event 与手动 event 的优先级
 
 `startgg_watch_events.subscription_source` 有两种值：
 
-- `auto`：由当前活动 tournament 的身份查询自动发现。
+- `auto`：由跨游戏 Player Sets 或断链 tournament 身份查询自动发现。
 - `manual`：由 `/watch <event_url>` 或带关键词的 `/startgg go` 产生。
 
 自动同步时：
@@ -366,7 +379,7 @@ watch_player_id + watch_event_id + set_id
 
 固定轮询会执行完整的 `runStartggWatchNow()`，负责同步选手、自动发现赛事并检查全部 active event。
 
-加速轮询只检查上一轮确认需要加速的event，不再同步预设选手、查询全部选手近期sets、刷新未映射entrant或检查其他event。订阅选手的对局结束后可以退出加速；决赛Phase开打后则持续加速到`Event.state=COMPLETED`。所有event都不再满足条件后，加速轮询停止。下一次固定轮询仍会发现新的event或重新进入加速状态。
+加速轮询只检查上一轮确认需要加速的event，不再同步预设选手、查询全部选手近期sets、扫描SF6候选、刷新未映射entrant或检查其他event。订阅选手的对局结束后可以退出加速；决赛Phase开打后则持续加速到`Event.state=COMPLETED`。所有event都不再满足条件后，加速轮询停止。下一次固定轮询仍会发现新的event或重新进入加速状态。
 
 ### 6.3 赛事完赛后自动停止
 
@@ -417,7 +430,7 @@ start.gg 的持续监控主要依赖：
 
 | 表 | 作用 |
 | --- | --- |
-| `startgg_watch_players` | 预设和手动添加的选手，按 `player_id` 唯一 |
+| `startgg_watch_players` | 预设和手动添加的选手，按 `player_id` 唯一，并保存精确 User 与原始 gamerTag 身份 |
 | `startgg_watch_events` | event 订阅、active 状态、auto/manual 来源、tournament 结束时间和加速轮询所需的赛事名称缓存 |
 | `startgg_watch_event_entrants` | 选手在某个 event 中对应的 entrant |
 | `startgg_watch_snapshots` | 每个选手 × event 的最新状态快照 |
@@ -432,7 +445,7 @@ start.gg 的持续监控主要依赖：
 watch_player_id + watch_event_id
 ```
 
-当前数据库迁移版本为 11：
+当前数据库迁移版本为 13：
 
 - 版本 4：增加 auto/manual event 来源。
 - 版本 5：增加 Telegram 消息 ID 表。
@@ -442,14 +455,16 @@ watch_player_id + watch_event_id
 - 版本 9：增加 tournament/event 名称缓存，让加速轮询不再请求 event header。
 - 版本 10：增加中国工作日循环提醒过滤字段。
 - 版本 11：增加决赛Phase跟踪状态和赛事级set去重表。
+- 版本 12：增加 Steam 价格监控表。
+- 版本 13：为 start.gg 选手增加 `user_id` 和 `gamer_tag`。
 
 ## 8. 当前事实下的边界
 
-1. 赛事尚未生成 set 时，自动发现不到 event。
-2. 自动发现只看启用选手最近 7 天的 sets，并要求 event 最近两天有活动。
-3. 自动发现要求 tournament 当前处于 startAt/endAt 时间段内。
-4. 手动 active event 不受自动 event 替换影响，直到用户改变订阅。
-5. 自动发现不是全局赛事搜索，不会仅凭选手报名信息猜测赛事。
+1. 跨游戏正常来源只看启用选手最近 7 天的 Player Sets，并要求 event 最近两天有活动；尚未形成 Set 关联的 event 不会从这条来源出现。
+2. SF6 断链来源可以从当前活动 tournament 的报名身份发现尚未出现在全局 Player Sets 中的 event。
+3. 两类自动发现都要求 tournament 当前处于 startAt/endAt 时间段内。
+4. SF6 以外的游戏如果同时缺失全局 Player、User 和 Sets 关联，目前没有同等的候选目录扫描覆盖。
+5. 手动 active event 不受自动 event 替换影响，直到用户改变订阅。
 6. `/startgg deleteall` 只能删除已经保存 `message_id` 的消息；旧消息无法定位。
 7. `message_id` 只记录消息 ID 和发送时间，没有保存选手/event 反向关联。
 8. 当前没有单个选手、单个 event 或单条消息的独立删除命令。

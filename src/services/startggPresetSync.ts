@@ -188,7 +188,7 @@ export async function runStartggGo(bot: Telegraf | undefined, keyword: string): 
 
   const events = await discoverStartggActiveEventsForPlayers(players);
   if (events.length === 0) {
-    throw new Error('没有从当前活动的 Street Fighter 6 赛事中发现固定选手。');
+    throw new Error('没有从固定选手关联或当前活动候选中发现赛事。');
   }
   const candidates = groupDiscoveredEventsByTournament(events);
   const trimmedKeyword = keyword.trim();

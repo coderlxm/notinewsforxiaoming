@@ -13,7 +13,7 @@
 
 - `/startgg go`
 
-系统会自动同步固定选手，从最近两天有数据变化的 Street Fighter 6 tournament 中筛出当前活动赛事，再按选手身份确认 event，不需要手动查询赛事名称。
+系统会自动同步固定选手，通过近期 Player Sets 发现他们在任意游戏中的当前赛事，并额外识别本次这类 SF6 Player ID 断链赛事，不需要手动查询赛事名称。
 
 如果需要限定某个赛事，也可以发送：
 
@@ -27,14 +27,16 @@
 
 预期：
 - 自动同步固定选手清单
-- 自动从当前活动的 Street Fighter 6 tournament 中确认固定选手参加的 event
+- 自动发现固定选手在任意游戏中正常关联的当前 event
+- 补充发现本次这类 SF6 Player ID 断链 event
 - 不带关键词时自动订阅当前发现到的所有项目
 - 带关键词时只订阅 tournament name 或 tournament slug 命中的项目
 - 立即执行一次检查
 - 自动开启 start.gg 轮询
 
 边界：
-- 候选目录限定为最近 48 小时有数据变化、已发布且可公开搜索的 Street Fighter 6 tournament，并按 `startAt/endAt` 保留当前活动赛事。
+- 跨游戏主来源仍是每名选手最近 7 天更新过的 Player Sets，并按 tournament 时间和最近两天 event 活动过滤。
+- SF6 断链补充来源限定为最近 48 小时有数据变化、已发布且可公开搜索的 tournament。
 - 身份优先使用全局 User / Player 精确匹配；断链记录只在 gamerTag 边界匹配且当前候选中的 Participant 唯一时自动确认。
 - 名称候选有歧义时不会自动选择。
 - 关键词命中多个 tournament 时只展示候选赛事，不会自动订阅。

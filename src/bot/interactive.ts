@@ -128,6 +128,8 @@ const STARTGG_GO_NATURAL_ALIASES = new Set([
   '比赛了',
   '街霸',
   '街霸6',
+  '饿狼传说',
+  '拳皇',
   `${STARTGG_GO_SHORTCUT.emoji}${STARTGG_GO_SHORTCUT.label}`,
 ]);
 
@@ -390,7 +392,7 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     } catch (e) {
       if (e instanceof Error) {
         const errorMessage = await ctx.reply(`start.gg go 失败：${e.message}`, { parse_mode: 'HTML' });
-        if (e.message === '没有从当前活动的 Street Fighter 6 赛事中发现固定选手。') {
+        if (e.message === '没有从固定选手关联或当前活动候选中发现赛事。') {
           await ctx.telegram.deleteMessage(ctx.chat!.id, startMessageResult.message_id);
           await ctx.telegram.deleteMessage(ctx.chat!.id, errorMessage.message_id);
         }

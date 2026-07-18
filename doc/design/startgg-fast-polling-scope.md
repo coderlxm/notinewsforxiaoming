@@ -8,7 +8,7 @@
 
 ```text
 同步预设选手
-→ 查询当前活动 tournament 并解析选手身份
+→ 查询选手近期 sets，并补充查询断链候选 tournament
 → 自动发现赛事
 → 检查全部 active event
 ```

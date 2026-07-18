@@ -296,7 +296,9 @@ export function replaceActiveStartggWatchEvents(
       if (!activeEventSlugs.has(event.event_slug)) {
         clearStartggWatchEventState(db, eventRow.id);
       }
-      replaceStartggWatchEventEntrants(db, eventRow.id, event.entrant_mappings);
+      if (event.entrant_mappings.length > 0) {
+        replaceStartggWatchEventEntrants(db, eventRow.id, event.entrant_mappings);
+      }
     }
   });
   replace();
@@ -384,7 +386,9 @@ export function syncAutoDiscoveredStartggWatchEvents(events: StartggWatchEventIn
         WHERE event_slug = ?
         LIMIT 1
       `).get(event.event_slug) as { id: number };
-      replaceStartggWatchEventEntrants(db, eventRow.id, event.entrant_mappings);
+      if (event.entrant_mappings.length > 0) {
+        replaceStartggWatchEventEntrants(db, eventRow.id, event.entrant_mappings);
+      }
     }
   });
   sync();

@@ -9,6 +9,8 @@ import {
   type EventEntrantsResponse,
   type UserPlayerResponse,
   type EventBasicResponse,
+  type PlayerRecentSetsResponse,
+  type PlayerRecentSetNode,
   type TournamentCandidateNode,
   type TournamentCandidatesResponse,
   type TournamentIdentityEntrantNode,
@@ -27,6 +29,7 @@ import {
   EVENT_ENTRANTS_QUERY,
   USER_PLAYER_QUERY,
   EVENT_BASIC_QUERY,
+  PLAYER_RECENT_SETS_QUERY,
   TOURNAMENT_CANDIDATES_QUERY,
   TOURNAMENT_IDENTITY_EVENT_FIELDS,
   TOURNAMENT_IDENTITY_PARTICIPANT_FIELDS,
@@ -41,6 +44,7 @@ const TRACKING_SETS_PER_PAGE = 120;
 const TRACKING_ENTRANTS_PER_PAGE = 200;
 const TRACKING_STANDINGS_PER_PAGE = 250;
 const ENTRANTS_PER_PAGE = 200;
+const PLAYER_RECENT_SETS_PER_PAGE = 100;
 const TOURNAMENT_CANDIDATES_PER_PAGE = 200;
 const TOURNAMENT_IDENTITY_BATCH_SIZE = 20;
 const TOURNAMENT_IDENTITY_PARTICIPANTS_PER_PAGE = 10;
@@ -226,6 +230,18 @@ export async function fetchEventBasic(slug: string): Promise<EventBasicResponse[
 export async function fetchUserPlayer(slug: string): Promise<UserPlayerResponse['user']> {
   const data = await queryStartgg<UserPlayerResponse>(USER_PLAYER_QUERY, { slug });
   return data.user;
+}
+
+export async function fetchPlayerRecentSets(playerId: number, updatedAfter: number): Promise<PlayerRecentSetNode[]> {
+  return fetchAllPages(
+    PLAYER_RECENT_SETS_QUERY,
+    (page, perPage) => ({ playerId, playerIds: [playerId], updatedAfter, page, perPage }),
+    (data: PlayerRecentSetsResponse) => {
+      if (!data.player) return null;
+      return { totalPages: data.player.sets.pageInfo?.totalPages, nodes: data.player.sets.nodes };
+    },
+    PLAYER_RECENT_SETS_PER_PAGE,
+  );
 }
 
 export function fetchTournamentCandidates(

@@ -144,6 +144,36 @@ query UserPlayer($slug: String!) {
 }
 `;
 
+export const PLAYER_RECENT_SETS_QUERY = `
+query PlayerRecentSets($playerId: ID!, $playerIds: [ID!]!, $updatedAfter: Timestamp, $page: Int!, $perPage: Int!) {
+  player(id: $playerId) {
+    id
+    sets(page: $page, perPage: $perPage, filters: { playerIds: $playerIds, updatedAfter: $updatedAfter }) {
+      pageInfo {
+        totalPages
+      }
+      nodes {
+        id
+        completedAt
+        event {
+          id
+          name
+          slug
+          startAt
+          tournament {
+            id
+            name
+            slug
+            startAt
+            endAt
+          }
+        }
+      }
+    }
+  }
+}
+`;
+
 export const TOURNAMENT_CANDIDATES_QUERY = `
 query TournamentCandidates($videogameId: ID!, $computedUpdatedAt: Timestamp!, $page: Int!, $perPage: Int!) {
   tournaments(query: {
@@ -457,6 +487,32 @@ export interface UserPlayerResponse {
   } | null;
 }
 
+export interface PlayerRecentSetsResponse {
+  player: {
+    id: number;
+    sets: {
+      pageInfo: PageInfo | null;
+      nodes: Array<{
+        id: number;
+        completedAt: number | null;
+        event: {
+          id: number;
+          name: string;
+          slug: string | null;
+          startAt: number | null;
+          tournament: {
+            id: number;
+            name: string;
+            slug: string | null;
+            startAt: number | null;
+            endAt: number | null;
+          } | null;
+        } | null;
+      }>;
+    };
+  } | null;
+}
+
 export interface TournamentCandidateNode {
   id: number;
   name: string;
@@ -508,3 +564,4 @@ export interface TournamentIdentityParticipantNode {
 
 export type TrackedSetNode = SetNodeFields;
 export type TrackedStandingNode = StandingNodeFields;
+export type PlayerRecentSetNode = NonNullable<PlayerRecentSetsResponse['player']>['sets']['nodes'][number];
