@@ -969,7 +969,7 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
       if (masturbationAction.type === 'add') {
         const record = masturbationRepo.createRecord(new Date());
         const summary = buildSummary();
-        await ctx.reply(formatMasturbationConfirmCard(record, summary.todayCount), {
+        await ctx.editMessageText(formatMasturbationConfirmCard(record, summary.todayCount), {
           parse_mode: 'HTML',
           ...buildMasturbationConfirmButtons(record.id),
         });
@@ -978,16 +978,7 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
 
       if (masturbationAction.type === 'stats') {
         const summary = buildSummary();
-        await ctx.reply(formatMasturbationStatsCard(summary), {
-          parse_mode: 'HTML',
-          ...buildMasturbationStatsButtons(),
-        });
-        return;
-      }
-
-      if (masturbationAction.type === 'refresh') {
-        const summary = buildSummary();
-        await ctx.reply(formatMasturbationStatsCard(summary), {
+        await ctx.editMessageText(formatMasturbationStatsCard(summary), {
           parse_mode: 'HTML',
           ...buildMasturbationStatsButtons(),
         });

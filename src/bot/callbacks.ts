@@ -89,7 +89,6 @@ export function parseStartggWatchCallbackData(data: string | undefined): Startgg
 export type MasturbationCallback =
   | { type: 'add' }
   | { type: 'stats' }
-  | { type: 'refresh' }
   | { type: 'undo'; recordId: number };
 
 export function parseMasturbationCallbackData(data: string | undefined): MasturbationCallback | null {
@@ -99,7 +98,6 @@ export function parseMasturbationCallbackData(data: string | undefined): Masturb
   const action = parts[1];
   if (parts.length === 2 && action === 'add') return { type: 'add' };
   if (parts.length === 2 && action === 'stats') return { type: 'stats' };
-  if (parts.length === 2 && action === 'refresh') return { type: 'refresh' };
   if (action === 'undo') {
     if (parts.length !== 3) return null;
     const recordId = Number(parts[2]);

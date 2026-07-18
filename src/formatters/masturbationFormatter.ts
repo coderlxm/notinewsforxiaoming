@@ -102,7 +102,6 @@ export function buildMasturbationStatsButtons(): { reply_markup: InlineKeyboardM
     reply_markup: {
       inline_keyboard: [[
         { text: '记一次', callback_data: 'masturbation:add' },
-        { text: '刷新', callback_data: 'masturbation:refresh' },
       ]],
     },
   };

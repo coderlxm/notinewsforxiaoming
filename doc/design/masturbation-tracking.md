@@ -113,7 +113,7 @@
 07-17  0
 07-18  1
 
-[记一次] [刷新]
+[记一次]
 ```
 
 统计保持中性，只展示原始频率：
@@ -189,7 +189,7 @@ ON masturbation_records(occurred_at);
 - `src/bot/interactive.ts`
   - 注册 `/lu`
   - 处理“📝 撸了吗”和“撸了吗”文本入口
-  - 处理新增、撤销、统计和刷新按钮
+  - 处理新增、撤销和统计按钮
 - `src/reminders/formatter.ts`
   - 在现有常驻键盘末尾增加“📝 撸了吗”
   - 在帮助信息中增加 `/lu` 说明
@@ -211,7 +211,6 @@ Inline 回调：
 ```text
 masturbation:add
 masturbation:stats
-masturbation:refresh
 masturbation:undo:<recordId>
 ```
 
@@ -246,6 +245,8 @@ Telegram 聊天中仍会保留 bot 回复的次数和时间，这是选择 Teleg
 ```
 
 统计是这条主路径的旁支，不引入提醒、后台任务、缓存或额外状态机。
+
+状态卡片、记录确认和统计共用同一条 bot 消息。点击 Inline 按钮时直接编辑当前卡片，不新增 bot 消息；“撤销本次”也把当前确认卡片更新为撤销结果。统计卡片不提供单独的刷新按钮，每次从状态卡片或确认卡片进入统计时读取即时数据。
 
 ## 10. 后续独立 Web 看板扩展
 
