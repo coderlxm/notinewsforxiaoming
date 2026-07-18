@@ -144,6 +144,8 @@ export function getDb(): Database.Database {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         player_id INTEGER NOT NULL UNIQUE,
         player_name TEXT NOT NULL,
+        user_id INTEGER,
+        gamer_tag TEXT,
         enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP

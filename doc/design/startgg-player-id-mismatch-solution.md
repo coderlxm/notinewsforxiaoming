@@ -1,7 +1,8 @@
 # start.gg Player ID 关联问题解决方案
 
-状态：方案已确定，待实施  
-确定日期：2026-07-18
+状态：已被 Review 方案取代，不再作为实施依据  
+原确定日期：2026-07-18  
+当前实施依据：[`auto-discovery-player-id-mismatch-solution-review.md`](../startgg/auto-discovery-player-id-mismatch-solution-review.md)
 
 ## 1. 要解决的实际问题
 

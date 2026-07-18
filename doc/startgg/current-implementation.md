@@ -8,8 +8,9 @@ start.gg 功能的主链路是：
 
 ```text
 预设/手动添加选手
-  -> start.gg GraphQL 查询选手近期对局
-  -> 自动发现当前活跃赛事项目
+  -> 查询最近更新的 Street Fighter 6 tournament 目录
+  -> 筛选当前活动 tournament 并定向解析选手身份
+  -> 自动发现 event 并直接得到 entrant 映射
   -> 建立 active event 订阅
   -> 查询参赛关系、对局、排名
   -> 计算每个“选手 × 项目”的状态
@@ -34,6 +35,7 @@ start.gg 功能的主链路是：
 - Zhen
 - Vxbao
 - gachikun
+- XiaoXu
 
 每项通常只需要维护：
 
@@ -47,10 +49,10 @@ start.gg 功能的主链路是：
 运行时 `syncStartggPresetPlayers()` 会：
 
 1. 读取预设文件。
-2. 通过 `user_url` 查询 start.gg 用户对应的 `player_id`、战队前缀和 gamerTag。
-3. 将选手写入 SQLite 的 `startgg_watch_players`。
+2. 通过 `user_url` 查询 start.gg 用户对应的 `user_id`、`player_id`、战队前缀和原始 gamerTag。
+3. 将身份和显示名写入 SQLite 的 `startgg_watch_players`；旧记录缺少身份字段时会在本次同步补齐。
 4. 如果文件里还没有 `player_id` / `player_name`，解析后会回写预设文件。
-5. 如果数据库已有该选手但名称发生变化，只更新数据库中的显示名。
+5. 数据库已有该选手时，更新显示名和已解析的身份字段。
 
 预设同步只负责“确保预设选手存在”，不会删除手动添加的选手。
 
@@ -87,8 +89,8 @@ start.gg 功能的主链路是：
 
 1. 同步预设选手。
 2. 读取全部启用的 `startgg_watch_players`，包括预设和手动选手。
-3. 查询每个选手最近 7 天更新过的 sets。
-4. 从这些 sets 中自动发现当前活跃的 event。
+3. 查询最近 48 小时有数据变化的 Street Fighter 6 tournament 目录，并保留当前处于 `startAt/endAt` 范围内的 tournament。
+4. 在候选 tournament 中组合 User 精确 Entrant 与 Participant gamerTag 查询，确认固定选手参加的 event。
 5. 不带关键词时，将发现到的所有 event 设为 active。
 6. 立即执行一次状态检查。
 7. 开启进程内每 20 分钟一次的 start.gg 轮询。
@@ -187,41 +189,32 @@ start.gg 功能的主链路是：
 
 代码位于 `src/services/startggDiscovery.ts`。
 
-### 4.1 数据来源
+### 4.1 候选 tournament
 
-对每个启用选手请求：
+目录查询固定使用 Street Fighter 6 的 `videogame.id = 43868`，并要求：
 
-```text
-player(id).sets(
-  filters: {
-    playerIds: [player_id],
-    updatedAfter: now - 7 days
-  }
-)
-```
+1. `computedUpdatedAt >= now - 48 hours`。
+2. tournament 已发布且可公开搜索。
+3. tournament 有 `startAt`、`endAt` 和 slug。
+4. 当前时间处于 tournament 的 `[startAt, endAt]` 内。
 
-如果一场赛事还没有生成 set，系统无法通过选手近期对局反推出该赛事，因此不会猜测赛事。
+目录分页只读取 tournament 标量字段；当前活动候选再按固定小批次查询身份。
 
-### 4.2 赛事必须满足的条件
+### 4.2 候选中的身份确认
 
-一个 set 对应的 event 会被发现，必须同时满足：
+每名启用选手按以下顺序匹配：
 
-1. tournament 有 `startAt` 和 `endAt`。
-2. 当前时间处于 tournament 的 `[startAt, endAt]` 内。
-3. 该 event 最近两天有活动：
-   - 已完成 set 的 `completedAt` 在最近两天内；或
-   - 未完成 set，且 event 的 `startAt` 在最近两天内并且已经开始。
+1. `Event.userEntrant(user_id)` 精确命中。
+2. Participant 的 `user.id` 或 `player.id` 与关注选手精确一致。
+3. Participant gamerTag 等于全局 gamerTag，或以明确的战队分隔边界加完整 gamerTag 结尾。
 
-这两个时间窗口分别解决不同问题：
-
-- 7 天：给选手近期对局查询足够的发现范围。
-- 2 天：避免长期 tournament 中已经结束的旧周赛持续被重新发现。
+API 的 gamerTag 子串结果不会直接采用。名称级匹配必须在全部当前候选中只对应一个 Participant；同一 Participant 报名多个 event 时，会保留它的全部 entrant。发现结果会直接携带 `watch_player_id -> entrant_id` 映射。
 
 ### 4.3 自动 event 与手动 event 的优先级
 
 `startgg_watch_events.subscription_source` 有两种值：
 
-- `auto`：由选手近期 sets 自动发现。
+- `auto`：由当前活动 tournament 的身份查询自动发现。
 - `manual`：由 `/watch <event_url>` 或带关键词的 `/startgg go` 产生。
 
 自动同步时：
@@ -244,7 +237,9 @@ player(id).sets(
 
 ### 5.2 建立选手与 entrant 的映射
 
-对当前 event 分页读取 entrants，把关注选手的 `player_id` 映射到：
+自动发现已经确认的 entrant 会随 event 一起写入。尚未映射的选手会对当前 event 分页读取 entrants，并复用同一身份顺序：User 精确、Player 精确、唯一的 gamerTag 边界匹配。
+
+映射结果保存为：
 
 - `entrant_id`
 - `entrant_name`

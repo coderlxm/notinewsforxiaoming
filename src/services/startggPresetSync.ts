@@ -4,6 +4,8 @@ import {
   listEnabledStartggWatchPlayers,
   replaceActiveStartggWatchEvents,
   syncAutoDiscoveredStartggWatchEvents,
+  type StartggWatchEventInput,
+  updateStartggWatchPlayerIdentity,
   updateStartggWatchPlayerName,
 } from './startggRepository.js';
 import {
@@ -46,14 +48,7 @@ export type StartggGoResult =
       activeEventSlugs: string[];
     };
 
-function toWatchEventInput(event: StartggDiscoveredEvent): {
-  event_slug: string;
-  event_name: string;
-  event_id: number;
-  tournament_end_at: string;
-  tournament_name: string;
-  event_display_name: string;
-} {
+function toWatchEventInput(event: StartggDiscoveredEvent): StartggWatchEventInput {
   return {
     event_slug: event.eventSlug,
     event_name: event.eventName,
@@ -61,6 +56,11 @@ function toWatchEventInput(event: StartggDiscoveredEvent): {
     tournament_end_at: new Date(event.tournamentEndAt * 1000).toISOString(),
     tournament_name: event.tournamentName,
     event_display_name: event.eventDisplayName,
+    entrant_mappings: event.entrantMappings.map((mapping) => ({
+      watch_player_id: mapping.watchPlayerId,
+      entrant_id: mapping.entrantId,
+      entrant_name: mapping.entrantName,
+    })),
   };
 }
 
@@ -71,24 +71,44 @@ export async function syncStartggPresetPlayers(): Promise<number> {
   for (const player of config.players) {
     let playerId: number;
     let playerName: string;
+    let userId: number | null = null;
+    let gamerTag: string | null = null;
+    const cachedPlayer = player.player_id
+      ? findStartggWatchPlayerByPlayerId(player.player_id)
+      : null;
+    const hasCachedIdentity = cachedPlayer?.user_id !== null
+      && cachedPlayer?.user_id !== undefined
+      && Boolean(cachedPlayer.gamer_tag);
 
-    if (player.player_id) {
-      playerId = player.player_id;
-      playerName = player.player_name || player.alias;
-    } else if (player.user_url) {
+    if (player.user_url && !hasCachedIdentity) {
       const resolved = await resolveUserToPlayer(player.user_url);
       playerId = resolved.playerId;
       playerName = resolved.playerName;
-      player.player_id = resolved.playerId;
-      player.player_name = resolved.playerName;
-      updatedConfig = true;
+      userId = resolved.userId;
+      gamerTag = resolved.gamerTag;
+      if (player.player_id !== resolved.playerId || player.player_name !== resolved.playerName) {
+        player.player_id = resolved.playerId;
+        player.player_name = resolved.playerName;
+        updatedConfig = true;
+      }
+    } else if (player.player_id) {
+      playerId = player.player_id;
+      playerName = player.player_name || cachedPlayer?.player_name || player.alias;
+      userId = cachedPlayer?.user_id ?? null;
+      gamerTag = cachedPlayer?.gamer_tag ?? null;
     } else {
       throw new Error(`无效选手配置：${player.alias}`);
     }
 
     const existing = findStartggWatchPlayerByPlayerId(playerId);
     if (!existing) {
-      createStartggWatchPlayer(playerId, playerName);
+      createStartggWatchPlayer(playerId, playerName, userId, gamerTag);
+    } else if (userId !== null && gamerTag !== null && (
+      existing.player_name !== playerName
+      || existing.user_id !== userId
+      || existing.gamer_tag !== gamerTag
+    )) {
+      updateStartggWatchPlayerIdentity(existing.id, playerName, userId, gamerTag);
     } else if (existing.player_name !== playerName) {
       updateStartggWatchPlayerName(existing.id, playerName);
     }
@@ -168,7 +188,7 @@ export async function runStartggGo(bot: Telegraf | undefined, keyword: string): 
 
   const events = await discoverStartggActiveEventsForPlayers(players);
   if (events.length === 0) {
-    throw new Error('没有从固定选手近期 set 中发现当前赛事。');
+    throw new Error('没有从当前活动的 Street Fighter 6 赛事中发现固定选手。');
   }
   const candidates = groupDiscoveredEventsByTournament(events);
   const trimmedKeyword = keyword.trim();

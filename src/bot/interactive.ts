@@ -72,7 +72,7 @@ import {
   listStartggSentMessageIds,
   replaceActiveStartggWatchEvent,
   clearStartggWatchState,
-  updateStartggWatchPlayerName,
+  updateStartggWatchPlayerIdentity,
 } from '../services/startggRepository.js';
 import { runStartggGo, runStartggWatchNow, syncStartggPresetPlayers } from '../services/startggPresetSync.js';
 import { escapeHtml } from '../utils/html.js';
@@ -120,14 +120,14 @@ interface StartggWatchCandidate {
   eventName: string;
   playerId: number;
   playerName: string;
+  userId: number | null;
+  gamerTag: string;
 }
 
 const STARTGG_GO_NATURAL_ALIASES = new Set([
   '比赛了',
   '街霸',
   '街霸6',
-  '饿狼传说',
-  '拳皇',
   `${STARTGG_GO_SHORTCUT.emoji}${STARTGG_GO_SHORTCUT.label}`,
 ]);
 
@@ -390,7 +390,7 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     } catch (e) {
       if (e instanceof Error) {
         const errorMessage = await ctx.reply(`start.gg go 失败：${e.message}`, { parse_mode: 'HTML' });
-        if (e.message === '没有从固定选手近期 set 中发现当前赛事。') {
+        if (e.message === '没有从当前活动的 Street Fighter 6 赛事中发现固定选手。') {
           await ctx.telegram.deleteMessage(ctx.chat!.id, startMessageResult.message_id);
           await ctx.telegram.deleteMessage(ctx.chat!.id, errorMessage.message_id);
         }
@@ -519,9 +519,12 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
         const resolved = await resolveUserToPlayer(raw);
         const existingPlayer = findStartggWatchPlayerByPlayerId(resolved.playerId);
         if (existingPlayer) {
-          if (existingPlayer.player_name !== resolved.playerName) {
-            updateStartggWatchPlayerName(existingPlayer.id, resolved.playerName);
-          }
+          updateStartggWatchPlayerIdentity(
+            existingPlayer.id,
+            resolved.playerName,
+            resolved.userId,
+            resolved.gamerTag,
+          );
           await ctx.reply(
             `该选手已在监控中：${resolved.playerName} (player_id=${resolved.playerId})`,
             { parse_mode: 'HTML' },
@@ -529,10 +532,15 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
           return;
         }
 
-        createStartggWatchPlayer(resolved.playerId, resolved.playerName);
+        createStartggWatchPlayer(
+          resolved.playerId,
+          resolved.playerName,
+          resolved.userId,
+          resolved.gamerTag,
+        );
         const activeEvents = listStartggWatchEvents().filter((row) => row.active === 1).length;
         const nextStep = activeEvents === 0
-          ? '下一步：发送 /watch <event_url> 添加项目链接。'
+          ? '下一步：发送 /startgg go 自动发现当前赛事。'
           : '下一步：发送 /watchlist 查看当前监控状态。';
         await ctx.reply(
           `已添加选手：${resolved.playerName} (player_id=${resolved.playerId})\n${nextStep}`,
@@ -564,6 +572,8 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
             eventName: eventRow.event_name,
             playerId: entrant.playerId,
             playerName: entrant.playerName,
+            userId: entrant.userId,
+            gamerTag: entrant.gamerTag,
           });
         }
       }
@@ -581,16 +591,24 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
         const candidate = candidates[0]!;
         const existingPlayer = findStartggWatchPlayerByPlayerId(candidate.playerId);
         if (existingPlayer) {
-          if (existingPlayer.player_name !== candidate.playerName) {
-            updateStartggWatchPlayerName(existingPlayer.id, candidate.playerName);
-          }
+          updateStartggWatchPlayerIdentity(
+            existingPlayer.id,
+            candidate.playerName,
+            candidate.userId ?? existingPlayer.user_id,
+            candidate.gamerTag,
+          );
           await ctx.reply(
             `该选手已在监控中：${candidate.playerName} (player_id=${candidate.playerId})`,
             { parse_mode: 'HTML' },
           );
           return;
         }
-        createStartggWatchPlayer(candidate.playerId, candidate.playerName);
+        createStartggWatchPlayer(
+          candidate.playerId,
+          candidate.playerName,
+          candidate.userId,
+          candidate.gamerTag,
+        );
         await ctx.reply(
           `已添加选手：${candidate.playerName} (player_id=${candidate.playerId})\n来源项目：${candidate.eventName}`,
           { parse_mode: 'HTML' },
@@ -1017,9 +1035,12 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
 
       const existingPlayer = findStartggWatchPlayerByPlayerId(selected.playerId);
       if (existingPlayer) {
-        if (existingPlayer.player_name !== selected.playerName) {
-          updateStartggWatchPlayerName(existingPlayer.id, selected.playerName);
-        }
+        updateStartggWatchPlayerIdentity(
+          existingPlayer.id,
+          selected.playerName,
+          selected.userId ?? existingPlayer.user_id,
+          selected.gamerTag,
+        );
         await ctx.reply(
           `该选手已在监控中：${selected.playerName} (player_id=${selected.playerId})`,
           { parse_mode: 'HTML' },
@@ -1027,7 +1048,12 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
         return;
       }
 
-      createStartggWatchPlayer(selected.playerId, selected.playerName);
+      createStartggWatchPlayer(
+        selected.playerId,
+        selected.playerName,
+        selected.userId,
+        selected.gamerTag,
+      );
       await ctx.reply(
         `已添加选手：${selected.playerName} (player_id=${selected.playerId})\n来源项目：${eventRow.event_name}`,
         { parse_mode: 'HTML' },

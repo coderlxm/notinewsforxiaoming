@@ -9,8 +9,11 @@ import {
   type EventEntrantsResponse,
   type UserPlayerResponse,
   type EventBasicResponse,
-  type PlayerRecentSetsResponse,
-  type PlayerRecentSetNode,
+  type TournamentCandidateNode,
+  type TournamentCandidatesResponse,
+  type TournamentIdentityEntrantNode,
+  type TournamentIdentityEventNode,
+  type TournamentIdentityParticipantNode,
   type EventFinalPhaseMetaResponse,
   type PhaseSeedsResponse,
   type PhaseSetsResponse,
@@ -24,7 +27,9 @@ import {
   EVENT_ENTRANTS_QUERY,
   USER_PLAYER_QUERY,
   EVENT_BASIC_QUERY,
-  PLAYER_RECENT_SETS_QUERY,
+  TOURNAMENT_CANDIDATES_QUERY,
+  TOURNAMENT_IDENTITY_EVENT_FIELDS,
+  TOURNAMENT_IDENTITY_PARTICIPANT_FIELDS,
   EVENT_FINAL_PHASE_META_QUERY,
   PHASE_SEEDS_QUERY,
   PHASE_SETS_QUERY,
@@ -36,7 +41,9 @@ const TRACKING_SETS_PER_PAGE = 120;
 const TRACKING_ENTRANTS_PER_PAGE = 200;
 const TRACKING_STANDINGS_PER_PAGE = 250;
 const ENTRANTS_PER_PAGE = 200;
-const PLAYER_RECENT_SETS_PER_PAGE = 100;
+const TOURNAMENT_CANDIDATES_PER_PAGE = 200;
+const TOURNAMENT_IDENTITY_BATCH_SIZE = 20;
+const TOURNAMENT_IDENTITY_PARTICIPANTS_PER_PAGE = 10;
 
 const startggClient = new GraphQLClient(STARTGG_GRAPHQL_ENDPOINT, {
   requestMiddleware: (request) => {
@@ -221,14 +228,210 @@ export async function fetchUserPlayer(slug: string): Promise<UserPlayerResponse[
   return data.user;
 }
 
-export async function fetchPlayerRecentSets(playerId: number, updatedAfter: number): Promise<PlayerRecentSetNode[]> {
+export function fetchTournamentCandidates(
+  videogameId: number,
+  computedUpdatedAt: number,
+): Promise<TournamentCandidateNode[]> {
   return fetchAllPages(
-    PLAYER_RECENT_SETS_QUERY,
-    (page, perPage) => ({ playerId, playerIds: [playerId], updatedAfter, page, perPage }),
-    (data: PlayerRecentSetsResponse) => {
-      if (!data.player) return null;
-      return { totalPages: data.player.sets.pageInfo?.totalPages, nodes: data.player.sets.nodes };
+    TOURNAMENT_CANDIDATES_QUERY,
+    (page, perPage) => ({ videogameId, computedUpdatedAt, page, perPage }),
+    (data: TournamentCandidatesResponse) => {
+      return {
+        totalPages: data.tournaments.pageInfo?.totalPages,
+        nodes: data.tournaments.nodes,
+      };
     },
-    PLAYER_RECENT_SETS_PER_PAGE,
+    TOURNAMENT_CANDIDATES_PER_PAGE,
   );
+}
+
+export interface StartggIdentityQueryPlayer {
+  watchPlayerId: number;
+  userId: number | null;
+  gamerTag: string | null;
+}
+
+export interface StartggCandidateEntrantIdentity {
+  tournamentId: number;
+  participantId: number | null;
+  eventId: number;
+  eventName: string;
+  eventSlug: string;
+  entrantId: number;
+  entrantName: string;
+  userId: number | null;
+  playerId: number | null;
+  gamerTag: string | null;
+}
+
+interface TournamentIdentityConnection {
+  pageInfo: {
+    totalPages: number | null;
+  } | null;
+  nodes: TournamentIdentityParticipantNode[];
+}
+
+function splitIntoBatches<T>(values: T[], size: number): T[][] {
+  const batches: T[][] = [];
+  for (let index = 0; index < values.length; index += size) {
+    batches.push(values.slice(index, index + size));
+  }
+  return batches;
+}
+
+function buildTournamentIdentityQuery(
+  tournamentCount: number,
+  players: StartggIdentityQueryPlayer[],
+): string {
+  const userPlayers = players.filter((player) => player.userId !== null);
+  const gamerTagPlayers = players.filter((player) => player.gamerTag !== null);
+  const declarations = [
+    ...Array.from({ length: tournamentCount }, (_, index) => `$tournamentId${index}: ID!`),
+    ...(userPlayers.length > 0 ? ['$videogameIds: [ID]!'] : []),
+    ...userPlayers.map((player) => `$userId${player.watchPlayerId}: ID!`),
+    ...gamerTagPlayers.map((player) => `$gamerTag${player.watchPlayerId}: String!`),
+    ...(gamerTagPlayers.length > 0 ? ['$participantPage: Int!', '$participantPerPage: Int!'] : []),
+  ].join(', ');
+  const userEntrantFields = userPlayers.map((player) => `
+    userEntrant${player.watchPlayerId}: userEntrant(userId: $userId${player.watchPlayerId}) {
+      id
+      name
+    }
+  `).join('');
+  const participantFields = gamerTagPlayers.map((player) => `
+    participant${player.watchPlayerId}: participants(query: {
+      page: $participantPage
+      perPage: $participantPerPage
+      filter: { gamerTag: $gamerTag${player.watchPlayerId} }
+    }) {
+      ${TOURNAMENT_IDENTITY_PARTICIPANT_FIELDS}
+    }
+  `).join('');
+  const tournamentFields = Array.from({ length: tournamentCount }, (_, index) => `
+    tournament${index}: tournament(id: $tournamentId${index}) {
+      id
+      ${userPlayers.length > 0 ? `events(filter: { videogameId: $videogameIds }) {
+        ${TOURNAMENT_IDENTITY_EVENT_FIELDS}
+        ${userEntrantFields}
+      }` : ''}
+      ${participantFields}
+    }
+  `).join('');
+  return `query TournamentCandidateIdentities(${declarations}) {${tournamentFields}}`;
+}
+
+async function fetchTournamentIdentityBatch(
+  tournaments: TournamentCandidateNode[],
+  players: StartggIdentityQueryPlayer[],
+  videogameId: number,
+): Promise<StartggCandidateEntrantIdentity[]> {
+  const userPlayers = players.filter((player) => player.userId !== null);
+  const gamerTagPlayers = players.filter((player) => player.gamerTag !== null);
+  if (userPlayers.length === 0 && gamerTagPlayers.length === 0) return [];
+
+  const query = buildTournamentIdentityQuery(tournaments.length, players);
+  const variables: Record<string, unknown> = {};
+  tournaments.forEach((tournament, index) => {
+    variables[`tournamentId${index}`] = tournament.id;
+  });
+  userPlayers.forEach((player) => {
+    variables[`userId${player.watchPlayerId}`] = player.userId;
+  });
+  if (userPlayers.length > 0) {
+    variables.videogameIds = [videogameId];
+  }
+  gamerTagPlayers.forEach((player) => {
+    variables[`gamerTag${player.watchPlayerId}`] = player.gamerTag;
+  });
+  if (gamerTagPlayers.length > 0) {
+    variables.participantPerPage = TOURNAMENT_IDENTITY_PARTICIPANTS_PER_PAGE;
+  }
+
+  const identities: StartggCandidateEntrantIdentity[] = [];
+  let participantPage = 1;
+  let totalParticipantPages = 1;
+  while (participantPage <= totalParticipantPages) {
+    if (gamerTagPlayers.length > 0) {
+      variables.participantPage = participantPage;
+    }
+    const data = await queryStartgg<Record<string, unknown>>(query, variables);
+    let pageTotal = 1;
+
+    tournaments.forEach((tournament, tournamentIndex) => {
+      const tournamentData = data[`tournament${tournamentIndex}`] as Record<string, unknown> | null;
+      if (!tournamentData) {
+        throw new Error(`start.gg tournament not found during identity discovery: ${tournament.id}`);
+      }
+
+      if (participantPage === 1) {
+        const events = (tournamentData.events ?? []) as Array<TournamentIdentityEventNode & Record<string, unknown>>;
+        for (const event of events) {
+          if (!event.slug) {
+            throw new Error(`start.gg event missing slug during identity discovery: ${event.id}`);
+          }
+          for (const player of userPlayers) {
+            const entrant = event[`userEntrant${player.watchPlayerId}`] as TournamentIdentityEntrantNode | null;
+            if (!entrant) continue;
+            identities.push({
+              tournamentId: tournament.id,
+              participantId: null,
+              eventId: event.id,
+              eventName: event.name,
+              eventSlug: event.slug,
+              entrantId: entrant.id,
+              entrantName: entrant.name,
+              userId: player.userId,
+              playerId: null,
+              gamerTag: null,
+            });
+          }
+        }
+      }
+
+      for (const player of gamerTagPlayers) {
+        const connection = tournamentData[`participant${player.watchPlayerId}`] as TournamentIdentityConnection | undefined;
+        if (!connection) {
+          throw new Error(`start.gg participant identity result missing: ${tournament.id}/${player.watchPlayerId}`);
+        }
+        pageTotal = Math.max(pageTotal, normalizeTotalPages(connection.pageInfo?.totalPages));
+        for (const participant of connection.nodes) {
+          for (const entrant of participant.entrants) {
+            const event = entrant.event;
+            if (!event || event.videogame?.id !== videogameId) continue;
+            if (!event.slug) {
+              throw new Error(`start.gg participant event missing slug during identity discovery: ${event.id}`);
+            }
+            identities.push({
+              tournamentId: tournament.id,
+              participantId: participant.id,
+              eventId: event.id,
+              eventName: event.name,
+              eventSlug: event.slug,
+              entrantId: entrant.id,
+              entrantName: entrant.name,
+              userId: participant.user?.id ?? null,
+              playerId: participant.player?.id ?? null,
+              gamerTag: participant.gamerTag,
+            });
+          }
+        }
+      }
+    });
+
+    totalParticipantPages = pageTotal;
+    participantPage += 1;
+  }
+  return identities;
+}
+
+export async function fetchTournamentCandidateIdentities(
+  tournaments: TournamentCandidateNode[],
+  players: StartggIdentityQueryPlayer[],
+  videogameId: number,
+): Promise<StartggCandidateEntrantIdentity[]> {
+  const identities: StartggCandidateEntrantIdentity[] = [];
+  for (const batch of splitIntoBatches(tournaments, TOURNAMENT_IDENTITY_BATCH_SIZE)) {
+    identities.push(...await fetchTournamentIdentityBatch(batch, players, videogameId));
+  }
+  return identities;
 }

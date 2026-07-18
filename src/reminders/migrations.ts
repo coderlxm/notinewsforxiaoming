@@ -227,6 +227,17 @@ const MIGRATIONS: DbMigration[] = [
       `);
     },
   },
+  {
+    version: 13,
+    up(db) {
+      if (!tableHasColumn(db, 'startgg_watch_players', 'user_id')) {
+        db.exec(`ALTER TABLE startgg_watch_players ADD COLUMN user_id INTEGER;`);
+      }
+      if (!tableHasColumn(db, 'startgg_watch_players', 'gamer_tag')) {
+        db.exec(`ALTER TABLE startgg_watch_players ADD COLUMN gamer_tag TEXT;`);
+      }
+    },
+  },
 ];
 
 export function runDbMigrations(db: Database.Database): void {

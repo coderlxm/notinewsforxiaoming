@@ -7,6 +7,8 @@ export interface StartggWatchPlayer {
   id: number;
   player_id: number;
   player_name: string;
+  user_id: number | null;
+  gamer_tag: string | null;
   enabled: number;
   created_at: string;
   updated_at: string;
@@ -105,12 +107,19 @@ function clearStartggWatchEventState(db: ReturnType<typeof getDb>, eventRowId: n
   `).run(eventRowId);
 }
 
-export function createStartggWatchPlayer(playerId: number, playerName: string): void {
+export function createStartggWatchPlayer(
+  playerId: number,
+  playerName: string,
+  userId: number | null,
+  gamerTag: string | null,
+): void {
   const db = getDb();
   db.prepare(`
-    INSERT INTO startgg_watch_players (player_id, player_name, enabled, created_at, updated_at)
-    VALUES (?, ?, 1, ?, ?)
-  `).run(playerId, playerName, new Date().toISOString(), new Date().toISOString());
+    INSERT INTO startgg_watch_players (
+      player_id, player_name, user_id, gamer_tag, enabled, created_at, updated_at
+    )
+    VALUES (?, ?, ?, ?, 1, ?, ?)
+  `).run(playerId, playerName, userId, gamerTag, new Date().toISOString(), new Date().toISOString());
 }
 
 export function findStartggWatchPlayerByPlayerId(playerId: number): StartggWatchPlayer | null {
@@ -131,6 +140,52 @@ export function updateStartggWatchPlayerName(id: number, playerName: string): vo
     SET player_name = ?, updated_at = ?
     WHERE id = ?
   `).run(playerName, new Date().toISOString(), id);
+}
+
+export function updateStartggWatchPlayerIdentity(
+  id: number,
+  playerName: string,
+  userId: number | null,
+  gamerTag: string,
+): void {
+  getDb().prepare(`
+    UPDATE startgg_watch_players
+    SET player_name = ?, user_id = ?, gamer_tag = ?, updated_at = ?
+    WHERE id = ?
+  `).run(playerName, userId, gamerTag, new Date().toISOString(), id);
+}
+
+export interface StartggWatchEventEntrantMappingInput {
+  watch_player_id: number;
+  entrant_id: number;
+  entrant_name: string;
+}
+
+export interface StartggWatchEventInput {
+  event_slug: string;
+  event_name: string;
+  event_id: number;
+  tournament_end_at: string;
+  tournament_name: string;
+  event_display_name: string;
+  entrant_mappings: StartggWatchEventEntrantMappingInput[];
+}
+
+function replaceStartggWatchEventEntrants(
+  db: ReturnType<typeof getDb>,
+  watchEventId: number,
+  mappings: StartggWatchEventEntrantMappingInput[],
+): void {
+  db.prepare(`DELETE FROM startgg_watch_event_entrants WHERE watch_event_id = ?`).run(watchEventId);
+  const insert = db.prepare(`
+    INSERT INTO startgg_watch_event_entrants (
+      watch_player_id, watch_event_id, entrant_id, entrant_name
+    )
+    VALUES (?, ?, ?, ?)
+  `);
+  for (const mapping of mappings) {
+    insert.run(mapping.watch_player_id, watchEventId, mapping.entrant_id, mapping.entrant_name);
+  }
 }
 
 export function replaceActiveStartggWatchEvent(
@@ -181,14 +236,10 @@ export function replaceActiveStartggWatchEvent(
   replace();
 }
 
-export function replaceActiveStartggWatchEvents(events: Array<{
-  event_slug: string;
-  event_name: string;
-  event_id: number;
-  tournament_end_at: string;
-  tournament_name: string;
-  event_display_name: string;
-}>, source: StartggWatchEventSource = 'manual'): void {
+export function replaceActiveStartggWatchEvents(
+  events: StartggWatchEventInput[],
+  source: StartggWatchEventSource = 'manual',
+): void {
   if (events.length === 0) {
     throw new Error('start.gg go did not discover any events.');
   }
@@ -245,19 +296,13 @@ export function replaceActiveStartggWatchEvents(events: Array<{
       if (!activeEventSlugs.has(event.event_slug)) {
         clearStartggWatchEventState(db, eventRow.id);
       }
+      replaceStartggWatchEventEntrants(db, eventRow.id, event.entrant_mappings);
     }
   });
   replace();
 }
 
-export function syncAutoDiscoveredStartggWatchEvents(events: Array<{
-  event_slug: string;
-  event_name: string;
-  event_id: number;
-  tournament_end_at: string;
-  tournament_name: string;
-  event_display_name: string;
-}>): void {
+export function syncAutoDiscoveredStartggWatchEvents(events: StartggWatchEventInput[]): void {
   const db = getDb();
   const now = new Date().toISOString();
   const sync = db.transaction(() => {
@@ -333,6 +378,13 @@ export function syncAutoDiscoveredStartggWatchEvents(events: Array<{
       if (existing && existing.active === 0) {
         clearStartggWatchEventState(db, existing.id);
       }
+      const eventRow = db.prepare(`
+        SELECT id
+        FROM startgg_watch_events
+        WHERE event_slug = ?
+        LIMIT 1
+      `).get(event.event_slug) as { id: number };
+      replaceStartggWatchEventEntrants(db, eventRow.id, event.entrant_mappings);
     }
   });
   sync();

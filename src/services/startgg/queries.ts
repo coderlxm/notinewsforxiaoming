@@ -112,6 +112,11 @@ query EventEntrants($slug: String!, $page: Int!, $perPage: Int!) {
         id
         name
         participants {
+          id
+          gamerTag
+          user {
+            id
+          }
           player {
             id
             gamerTag
@@ -127,6 +132,7 @@ query EventEntrants($slug: String!, $page: Int!, $perPage: Int!) {
 export const USER_PLAYER_QUERY = `
 query UserPlayer($slug: String!) {
   user(slug: $slug) {
+    id
     slug
     discriminator
     player {
@@ -138,30 +144,60 @@ query UserPlayer($slug: String!) {
 }
 `;
 
-export const PLAYER_RECENT_SETS_QUERY = `
-query PlayerRecentSets($playerId: ID!, $playerIds: [ID!]!, $updatedAfter: Timestamp, $page: Int!, $perPage: Int!) {
-  player(id: $playerId) {
+export const TOURNAMENT_CANDIDATES_QUERY = `
+query TournamentCandidates($videogameId: ID!, $computedUpdatedAt: Timestamp!, $page: Int!, $perPage: Int!) {
+  tournaments(query: {
+    page: $page
+    perPage: $perPage
+    filter: {
+      videogameIds: [$videogameId]
+      computedUpdatedAt: $computedUpdatedAt
+      published: true
+      publiclySearchable: true
+    }
+  }) {
+    pageInfo {
+      totalPages
+    }
+    nodes {
+      id
+      name
+      slug
+      startAt
+      endAt
+    }
+  }
+}
+`;
+
+export const TOURNAMENT_IDENTITY_EVENT_FIELDS = `
+id
+name
+slug
+`;
+
+export const TOURNAMENT_IDENTITY_PARTICIPANT_FIELDS = `
+pageInfo {
+  totalPages
+}
+nodes {
+  id
+  gamerTag
+  user {
     id
-    sets(page: $page, perPage: $perPage, filters: { playerIds: $playerIds, updatedAfter: $updatedAfter }) {
-      pageInfo {
-        totalPages
-      }
-      nodes {
+  }
+  player {
+    id
+  }
+  entrants {
+    id
+    name
+    event {
+      id
+      name
+      slug
+      videogame {
         id
-        completedAt
-        event {
-          id
-          name
-          slug
-          startAt
-          tournament {
-            id
-            name
-            slug
-            startAt
-            endAt
-          }
-        }
       }
     }
   }
@@ -278,6 +314,11 @@ interface EntrantNodeWithPlayerFields {
   id: number;
   name: string;
   participants: Array<{
+    id: number;
+    gamerTag: string | null;
+    user: {
+      id: number;
+    } | null;
     player: {
       id: number;
       gamerTag: string | null;
@@ -405,6 +446,7 @@ export interface EventEntrantsResponse {
 
 export interface UserPlayerResponse {
   user: {
+    id: number;
     slug: string | null;
     discriminator: string | null;
     player: {
@@ -415,32 +457,54 @@ export interface UserPlayerResponse {
   } | null;
 }
 
-export interface PlayerRecentSetsResponse {
+export interface TournamentCandidateNode {
+  id: number;
+  name: string;
+  slug: string | null;
+  startAt: number | null;
+  endAt: number | null;
+}
+
+export interface TournamentCandidatesResponse {
+  tournaments: {
+    pageInfo: PageInfo | null;
+    nodes: TournamentCandidateNode[];
+  };
+}
+
+export interface TournamentIdentityEntrantNode {
+  id: number;
+  name: string;
+}
+
+export interface TournamentIdentityEventNode {
+  id: number;
+  name: string;
+  slug: string | null;
+}
+
+export interface TournamentIdentityParticipantNode {
+  id: number;
+  gamerTag: string | null;
+  user: {
+    id: number;
+  } | null;
   player: {
     id: number;
-    sets: {
-      pageInfo: PageInfo | null;
-      nodes: Array<{
-        id: number;
-        completedAt: number | null;
-        event: {
-          id: number;
-          name: string;
-          slug: string | null;
-          startAt: number | null;
-          tournament: {
-            id: number;
-            name: string;
-            slug: string | null;
-            startAt: number | null;
-            endAt: number | null;
-          } | null;
-        } | null;
-      }>;
-    };
   } | null;
+  entrants: Array<{
+    id: number;
+    name: string;
+    event: {
+      id: number;
+      name: string;
+      slug: string | null;
+      videogame: {
+        id: number;
+      } | null;
+    } | null;
+  }>;
 }
 
 export type TrackedSetNode = SetNodeFields;
 export type TrackedStandingNode = StandingNodeFields;
-export type PlayerRecentSetNode = NonNullable<PlayerRecentSetsResponse['player']>['sets']['nodes'][number];

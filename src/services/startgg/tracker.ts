@@ -40,6 +40,10 @@ import {
   fetchPhaseTracking,
 } from './client.js';
 import type { TrackedSetNode, TrackedStandingNode } from './queries.js';
+import {
+  resolveStartggEntrantIdentities,
+  type StartggEntrantIdentityCandidate,
+} from '../startggIdentity.js';
 
 export function normalizeEventSlug(raw: string): string {
   const trimmed = raw.trim();
@@ -103,13 +107,17 @@ export interface StartggEventMeta {
 export interface StartggEventEntrantPlayer {
   playerId: number;
   playerName: string;
+  userId: number | null;
+  gamerTag: string;
   entrantId: number;
   entrantName: string;
 }
 
 export interface StartggUserResolvedPlayer {
+  userId: number;
   playerId: number;
   playerName: string;
+  gamerTag: string;
   userSlug: string;
 }
 
@@ -139,11 +147,15 @@ export async function listEventEntrantPlayers(rawEventSlugOrUrl: string): Promis
       const player = participant.player;
       if (!player) continue;
       if (unique.has(player.id)) continue;
-      const playerName = buildPlayerDisplayName(player.gamerTag, player.prefix);
+      const gamerTag = player.gamerTag?.trim() || participant.gamerTag?.trim();
+      if (!gamerTag) continue;
+      const playerName = buildPlayerDisplayName(gamerTag, player.prefix);
       if (!playerName) continue;
       unique.set(player.id, {
         playerId: player.id,
         playerName,
+        userId: participant.user?.id ?? null,
+        gamerTag,
         entrantId: entrant.id,
         entrantName: entrant.name,
       });
@@ -161,15 +173,40 @@ export async function resolveUserToPlayer(rawUserSlugOrUrl: string): Promise<Sta
   if (!user.player) {
     throw new Error('该 start.gg 用户没有关联 player，无法用于赛事状态追踪。');
   }
+  const gamerTag = user.player.gamerTag?.trim();
+  if (!gamerTag) {
+    throw new Error(`start.gg 用户 player gamerTag 为空：${slug}`);
+  }
   const playerName = buildPlayerDisplayName(user.player.gamerTag, user.player.prefix);
   if (!playerName) {
     throw new Error(`start.gg 用户 player 名称为空：${slug}`);
   }
   return {
+    userId: user.id,
     playerId: user.player.id,
     playerName,
+    gamerTag,
     userSlug: user.slug ?? slug,
   };
+}
+
+function buildEventEntrantIdentityCandidates(
+  eventSlug: string,
+  eventId: number,
+  entrants: Awaited<ReturnType<typeof fetchEventEntrantsDetailed>>,
+): StartggEntrantIdentityCandidate[] {
+  return entrants.flatMap((entrant) => entrant.participants.map((participant) => ({
+    tournamentId: 0,
+    participantId: participant.id,
+    eventId,
+    eventName: eventSlug,
+    eventSlug,
+    entrantId: entrant.id,
+    entrantName: entrant.name,
+    userId: participant.user?.id ?? null,
+    playerId: participant.player?.id ?? null,
+    gamerTag: participant.gamerTag,
+  })));
 }
 
 interface PlayerStatusSnapshot {
@@ -238,11 +275,13 @@ async function ensureEventEntrantMappings(
     return result;
   }
 
-  const allEntrants = await listEventEntrantPlayers(eventSlug);
-  const entrantByPlayerId = new Map(allEntrants.map((entrant) => [entrant.playerId, entrant]));
+  const allEntrants = await fetchEventEntrantsDetailed(eventSlug);
+  const identityCandidates = buildEventEntrantIdentityCandidates(eventSlug, watchEventId, allEntrants);
+  const matches = resolveStartggEntrantIdentities(playersNeedingMapping, identityCandidates);
+  const matchByPlayerId = new Map(matches.map((match) => [match.watchPlayerId, match]));
 
   for (const player of playersNeedingMapping) {
-    const entrant = entrantByPlayerId.get(player.player_id) ?? null;
+    const entrant = matchByPlayerId.get(player.id) ?? null;
 
     if (entrant) {
       upsertStartggWatchEventEntrant({
