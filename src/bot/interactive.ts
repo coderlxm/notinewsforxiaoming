@@ -366,7 +366,7 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     const startMessage = keyword
       ? '开始 start.gg go：同步固定选手、按赛事关键词自动发现项目并启动监控...'
       : '开始 start.gg 自动监控：同步固定选手并自动发现当前进行中的赛事...';
-    await ctx.reply(startMessage, { parse_mode: 'HTML' });
+    const startMessageResult = await ctx.reply(startMessage, { parse_mode: 'HTML' });
 
     try {
       const summary = await runStartggGo(bot, keyword);
@@ -389,7 +389,11 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
       );
     } catch (e) {
       if (e instanceof Error) {
-        await ctx.reply(`start.gg go 失败：${e.message}`, { parse_mode: 'HTML' });
+        const errorMessage = await ctx.reply(`start.gg go 失败：${e.message}`, { parse_mode: 'HTML' });
+        if (e.message === '没有从固定选手近期 set 中发现当前赛事。') {
+          await ctx.telegram.deleteMessage(ctx.chat!.id, startMessageResult.message_id);
+          await ctx.telegram.deleteMessage(ctx.chat!.id, errorMessage.message_id);
+        }
         return;
       }
       throw e;
