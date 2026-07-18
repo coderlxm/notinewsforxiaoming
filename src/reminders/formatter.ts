@@ -32,6 +32,7 @@ export function formatHelpMessage(): string {
     '• <code>/watch https://www.start.gg/user/xxxx</code> - 按用户页添加监控',
     '• <code>/watch https://www.start.gg/tournament/xxx/event/yyy</code> - 按项目页添加监控',
     '• <code>/watchlist</code> - 查看监控列表与最近状态',
+    '• <code>/steam</code> - Steam 价格监控管理（<code>add/list/set/remove/check</code>）',
     '',
     '🤖 <b>自然语言对话：</b>',
     '直接发送 <code>10 分钟后提醒我下楼</code> 即可。',

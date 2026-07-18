@@ -6,6 +6,7 @@ import { getChinaDayOfWeek } from '../utils/time.js';
 import { isChinaWorkday } from '../calendar/chinaWorkday.js';
 import { runStartggWatchNow } from '../services/startggPresetSync.js';
 import { runStartggWatchOnce } from '../services/startgg/index.js';
+import { runSteamPriceWatchOnce } from '../services/steamPriceTracker.js';
 import {
   isStartggPollingPersistedEnabled,
   listActiveStartggWatchEvents,
@@ -214,6 +215,20 @@ export function registerFixedJobs(bot: Telegraf): void {
   // schedule.scheduleJob({ dayOfWeek: [6], hour: 14, minute: 0, tz: 'Asia/Shanghai' }, async () => {
   //   await runMode('fitness', getChinaDayOfWeek(), bot);
   // });
+
+  // steam_price_watch: 02:15 / 08:15 / 14:15 / 20:15 Beijing time
+  schedule.scheduleJob({ hour: 2, minute: 15, tz: 'Asia/Shanghai' }, async () => {
+    await runSteamPriceWatchOnce(bot);
+  });
+  schedule.scheduleJob({ hour: 8, minute: 15, tz: 'Asia/Shanghai' }, async () => {
+    await runSteamPriceWatchOnce(bot);
+  });
+  schedule.scheduleJob({ hour: 14, minute: 15, tz: 'Asia/Shanghai' }, async () => {
+    await runSteamPriceWatchOnce(bot);
+  });
+  schedule.scheduleJob({ hour: 20, minute: 15, tz: 'Asia/Shanghai' }, async () => {
+    await runSteamPriceWatchOnce(bot);
+  });
 
   console.log('Fixed jobs registered.');
 }

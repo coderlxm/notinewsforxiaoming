@@ -206,6 +206,27 @@ const MIGRATIONS: DbMigration[] = [
       `);
     },
   },
+  {
+    version: 12,
+    up(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS steam_price_watches (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          app_id INTEGER NOT NULL UNIQUE,
+          name TEXT NOT NULL,
+          currency TEXT NOT NULL CHECK (currency = 'CNY'),
+          target_price_minor INTEGER NOT NULL CHECK (target_price_minor > 0),
+          initial_price_minor INTEGER NOT NULL CHECK (initial_price_minor >= 0),
+          final_price_minor INTEGER NOT NULL CHECK (final_price_minor >= 0),
+          discount_percent INTEGER NOT NULL CHECK (discount_percent BETWEEN 0 AND 100),
+          lowest_price_minor INTEGER NOT NULL CHECK (lowest_price_minor >= 0),
+          last_checked_at TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+      `);
+    },
+  },
 ];
 
 export function runDbMigrations(db: Database.Database): void {

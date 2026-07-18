@@ -87,6 +87,20 @@ import {
   isStartggPollingEnabled,
   updateStartggFastWatch,
 } from '../scheduled/jobs.js';
+import {
+  parseTargetPrice,
+  createSteamPriceWatch,
+  runSteamPriceWatchOnce,
+} from '../services/steamPriceTracker.js';
+import * as steamRepo from '../services/steamPriceRepository.js';
+import {
+  formatSteamPriceAddSuccess,
+  formatSteamPriceWatchList,
+  formatSteamPriceSetTargetSuccess,
+  formatSteamPriceRemoveSuccess,
+  formatSteamPriceHelp,
+  formatSteamPriceCheckSummary,
+} from '../formatters/steamPriceFormatter.js';
 
 interface StartggWatchCandidate {
   eventRowId: number;
@@ -588,6 +602,94 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
 
   bot.command('startggwatchlist', handleWatchList);
   bot.command('watchlist', handleWatchList);
+
+  bot.command('steam', async (ctx) => {
+    if (!isAuthorized(ctx)) return;
+    const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
+    const args = text.replace(/^\/steam\s*/i, '').trim();
+    if (!args) {
+      await ctx.reply(formatSteamPriceHelp(), { parse_mode: 'HTML' });
+      return;
+    }
+
+    const [actionRaw, ...rest] = args.split(/\s+/);
+    const action = actionRaw?.trim().toLowerCase() || '';
+    const payload = rest.join(' ').trim();
+
+    try {
+      if (action === 'list') {
+        await ctx.reply(formatSteamPriceWatchList(steamRepo.listSteamPriceWatches()), { parse_mode: 'HTML' });
+        return;
+      }
+
+      if (action === 'check') {
+        const summary = await runSteamPriceWatchOnce(bot);
+        await ctx.reply(formatSteamPriceCheckSummary(summary.checked, summary.notified), { parse_mode: 'HTML' });
+        return;
+      }
+
+      if (action === 'add') {
+        const subArgs = payload.split(/\s+/);
+        if (subArgs.length < 2) {
+          await ctx.reply('用法：/steam add <Steam App URL | AppID> <目标价>', { parse_mode: 'HTML' });
+          return;
+        }
+        const appRef = subArgs.slice(0, -1).join(' ');
+        const targetPriceRaw = subArgs[subArgs.length - 1]!;
+        const result = await createSteamPriceWatch(appRef, targetPriceRaw);
+        await ctx.reply(
+          formatSteamPriceAddSuccess(result.watch, result.atTarget),
+          { parse_mode: 'HTML', link_preview_options: { is_disabled: true } },
+        );
+        return;
+      }
+
+      if (action === 'set') {
+        const subArgs = payload.split(/\s+/);
+        if (subArgs.length < 2) {
+          await ctx.reply('用法：/steam set <订阅ID> <新目标价>', { parse_mode: 'HTML' });
+          return;
+        }
+        const id = Number(subArgs[0]);
+        if (!Number.isInteger(id) || id <= 0) {
+          throw new Error('订阅 ID 无效。');
+        }
+        const watch = steamRepo.findSteamPriceWatchById(id);
+        if (!watch) {
+          throw new Error(`未找到 id=${id} 的 Steam 订阅。`);
+        }
+        const newTargetMinor = parseTargetPrice(subArgs[1]!);
+        steamRepo.updateSteamPriceTarget(id, newTargetMinor);
+        await ctx.reply(formatSteamPriceSetTargetSuccess(id, newTargetMinor), { parse_mode: 'HTML' });
+        return;
+      }
+
+      if (action === 'remove') {
+        if (!payload) {
+          await ctx.reply('用法：/steam remove <订阅ID>', { parse_mode: 'HTML' });
+          return;
+        }
+        const id = Number(payload);
+        if (!Number.isInteger(id) || id <= 0) {
+          throw new Error('删除 Steam 订阅时请提供有效的数字 ID。');
+        }
+        const deleted = steamRepo.deleteSteamPriceWatch(id);
+        if (!deleted) {
+          throw new Error(`未找到 id=${id} 的 Steam 订阅。`);
+        }
+        await ctx.reply(formatSteamPriceRemoveSuccess(deleted), { parse_mode: 'HTML' });
+        return;
+      }
+
+      await ctx.reply(formatSteamPriceHelp(), { parse_mode: 'HTML' });
+    } catch (e) {
+      if (e instanceof Error) {
+        await ctx.reply(`Steam 操作失败：${escapeHtml(e.message)}`, { parse_mode: 'HTML' });
+        return;
+      }
+      throw e;
+    }
+  });
 
   bot.command('remind', async (ctx) => {
     if (!isAuthorized(ctx)) return;

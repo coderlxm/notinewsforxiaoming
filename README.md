@@ -15,10 +15,10 @@ README 以“我自己后续部署维护”为目标，只记录当前代码事�
 
 当前代码里已经落地的主功能有：
 
-- Telegram 交互 bot：`/start`、`/help`、`/remind`、`/watch`、`/watchlist`、`/startgg`、`/startggpoll`、`/fetchav`、`/fetchstartgg`
+- Telegram 交互 bot：`/start`、`/help`、`/remind`、`/watch`、`/watchlist`、`/startgg`、`/startggpoll`、`/fetchav`、`/fetchstartgg`、`/steam`
 - 一次性提醒：支持明确格式和自然语言创建，状态持久化到 SQLite
 - 循环提醒：支持 `every day / week / month` 和自然语言循环提醒
-- 固定时点推送：睡觉提醒、早安、咖啡、新闻、GitHub、V2EX、英语、维生素、服务器巡检、AV 更新、start.gg 监控
+- 固定时点推送：睡觉提醒、早安、咖啡、新闻、GitHub、V2EX、英语、维生素、服务器巡检、AV 更新、start.gg 监控、Steam 价格监控
 - start.gg 监控：固定选手自动同步、自动发现当前赛事项目、轮询推送状态变化
 - AV 订阅：按 `star` / `label` 跟踪，去重后推送图文
 - 节假日逻辑：中国工作日判断、V2EX 节假日缓存、假期倒计时
@@ -105,6 +105,18 @@ Node 版本硬约束写在 [scripts/ensure-node-lts.mjs](/Users/xiaomingli/Code/
   查看当前监控对象和最近状态
 - `/fetchstartgg`
   立即执行一次 start.gg 检查
+- `/steam`
+  查看 Steam 价格监控引导
+- `/steam add <App URL | AppID> <目标价>`
+  添加 Steam 价格监控
+- `/steam list`
+  列出所有 Steam 价格监控
+- `/steam set <订阅ID> <新目标价>`
+  修改目标价
+- `/steam remove <订阅ID>`
+  删除监控
+- `/steam check`
+  立即执行一次 Steam 价格检查
 
 ## 部署现状
 
