@@ -109,6 +109,12 @@ interface StartggWatchCandidate {
   playerName: string;
 }
 
+const STARTGG_GO_NATURAL_ALIASES = new Set(['比赛了', '街霸', '街霸6', '饿狼传说', '拳皇']);
+
+function isStartggGoNaturalAlias(text: string): boolean {
+  return STARTGG_GO_NATURAL_ALIASES.has(text.trim().replace(/\s+/g, ''));
+}
+
 function isStartggUrl(raw: string): boolean {
   return raw.startsWith('http://') || raw.startsWith('https://');
 }
@@ -336,6 +342,40 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     }
   });
 
+  async function handleStartggGo(ctx: Context, keyword: string): Promise<void> {
+    const startMessage = keyword
+      ? '开始 start.gg go：同步固定选手、按赛事关键词自动发现项目并启动监控...'
+      : '开始 start.gg 自动监控：同步固定选手并自动发现当前进行中的赛事...';
+    await ctx.reply(startMessage, { parse_mode: 'HTML' });
+
+    try {
+      const summary = await runStartggGo(bot, keyword);
+      if (summary.status === 'candidates') {
+        await ctx.reply(formatStartggGoTournamentCandidates(summary), { parse_mode: 'HTML' });
+        return;
+      }
+      updateStartggFastWatch(bot, summary.activeEventSlugs);
+      const enabled = enableStartggPolling(bot, false);
+      await ctx.reply(
+        [
+          'start.gg go 已启动',
+          `固定选手：${summary.syncedPlayers} 位`,
+          `赛事：${summary.tournamentName}`,
+          `自动订阅项目：${summary.discoveredEvents} 个`,
+          `立即检查：项目 ${summary.checkedEvents} 个，选手 ${summary.checkedPlayers} 位，状态变化 ${summary.changed} 条，进行中 ${summary.activeSetCount} 条`,
+          `自动轮询：${enabled ? '已开启' : '已经开启'}`,
+        ].join('\n'),
+        { parse_mode: 'HTML' },
+      );
+    } catch (e) {
+      if (e instanceof Error) {
+        await ctx.reply(`start.gg go 失败：${e.message}`, { parse_mode: 'HTML' });
+        return;
+      }
+      throw e;
+    }
+  }
+
   bot.command('startgg', async (ctx) => {
     if (!isAuthorized(ctx)) return;
     const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
@@ -358,28 +398,7 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
 
       if (arg === 'go' || arg.startsWith('go ')) {
         const keyword = text.replace(/^\/startgg\s*/i, '').trim().replace(/^go\b/i, '').trim();
-        const startMessage = keyword
-          ? '开始 start.gg go：同步固定选手、按赛事关键词自动发现项目并启动监控...'
-          : '开始 start.gg 自动监控：同步固定选手并自动发现当前进行中的赛事...';
-        await ctx.reply(startMessage, { parse_mode: 'HTML' });
-        const summary = await runStartggGo(bot, keyword);
-        if (summary.status === 'candidates') {
-          await ctx.reply(formatStartggGoTournamentCandidates(summary), { parse_mode: 'HTML' });
-          return;
-        }
-        updateStartggFastWatch(bot, summary.activeEventSlugs);
-        const enabled = enableStartggPolling(bot, false);
-        await ctx.reply(
-          [
-            'start.gg go 已启动',
-            `固定选手：${summary.syncedPlayers} 位`,
-            `赛事：${summary.tournamentName}`,
-            `自动订阅项目：${summary.discoveredEvents} 个`,
-            `立即检查：项目 ${summary.checkedEvents} 个，选手 ${summary.checkedPlayers} 位，状态变化 ${summary.changed} 条，进行中 ${summary.activeSetCount} 条`,
-            `自动轮询：${enabled ? '已开启' : '已经开启'}`,
-          ].join('\n'),
-          { parse_mode: 'HTML' },
-        );
+        await handleStartggGo(ctx, keyword);
         return;
       }
 
@@ -774,6 +793,11 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
 
     const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
     if (!text || text.startsWith('/')) return;
+
+    if (isStartggGoNaturalAlias(text)) {
+      await handleStartggGo(ctx, '');
+      return;
+    }
 
     const preset = findPresetByText(text);
     if (preset) {
