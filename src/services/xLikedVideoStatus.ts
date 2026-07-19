@@ -15,6 +15,7 @@ const latestRunSchema = z.object({
   downloaded: z.number(),
   uploaded: z.number(),
   bytes_downloaded: z.number(),
+  average_upload_seconds: z.number().nullable(),
   errors: z.number(),
   result: z.string().nullable(),
 });
@@ -75,6 +76,7 @@ export function formatXLikedVideoStatusMessage(status: XLikedVideoStatus): strin
       '⚠️ 今日同步有异常',
       `最近运行：${latestRunTime} · ${escapeHtml(formatRunResult(latestRun.result))} · ${todayDurationLabel}`,
       `本次已下载：${latestRun.downloaded} 个 · ${formatBytes(latestRun.bytes_downloaded)}`,
+      ...formatAverageUploadLine(latestRun.average_upload_seconds),
       `本地待处理：${pendingCount} 个`,
       `本次错误：${latestRun.errors} 个`,
     ].join('\n');
@@ -94,6 +96,7 @@ export function formatXLikedVideoStatusMessage(status: XLikedVideoStatus): strin
     '✅ 今日同步正常',
     `最近运行：${latestRunTime} · ${todayDurationLabel}`,
     `今天成功下载并上传 ${latestRun.uploaded} 个视频，总大小 ${formatBytes(latestRun.bytes_downloaded)}。`,
+    ...formatAverageUploadLine(latestRun.average_upload_seconds),
     '服务器没有残留待上传文件。',
   ].join('\n');
 }
@@ -146,4 +149,10 @@ function formatBytes(bytes: number): string {
   const gib = 1024 ** 3;
   const mib = 1024 ** 2;
   return bytes >= gib ? `${(bytes / gib).toFixed(2)} GiB` : `${(bytes / mib).toFixed(1)} MiB`;
+}
+
+function formatAverageUploadLine(seconds: number | null): string[] {
+  if (seconds === null) return [];
+  const rounded = Math.round(seconds * 10) / 10;
+  return [`平均每个视频上传耗时 ${rounded} 秒。`];
 }
