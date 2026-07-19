@@ -14,6 +14,7 @@ const latestRunSchema = z.object({
   finished_at: z.string().nullable(),
   downloaded: z.number(),
   uploaded: z.number(),
+  bytes_downloaded: z.number(),
   errors: z.number(),
   result: z.string().nullable(),
 });
@@ -73,6 +74,7 @@ export function formatXLikedVideoStatusMessage(status: XLikedVideoStatus): strin
       '🎬 <b>X 点赞视频</b>',
       '⚠️ 今日同步有异常',
       `最近运行：${latestRunTime} · ${escapeHtml(formatRunResult(latestRun.result))} · ${todayDurationLabel}`,
+      `本次已下载：${latestRun.downloaded} 个 · ${formatBytes(latestRun.bytes_downloaded)}`,
       `本地待处理：${pendingCount} 个`,
       `本次错误：${latestRun.errors} 个`,
     ].join('\n');
@@ -91,7 +93,7 @@ export function formatXLikedVideoStatusMessage(status: XLikedVideoStatus): strin
     '🎬 <b>X 点赞视频</b>',
     '✅ 今日同步正常',
     `最近运行：${latestRunTime} · ${todayDurationLabel}`,
-    `今天成功下载并上传 ${latestRun.uploaded} 个视频。`,
+    `今天成功下载并上传 ${latestRun.uploaded} 个视频，总大小 ${formatBytes(latestRun.bytes_downloaded)}。`,
     '服务器没有残留待上传文件。',
   ].join('\n');
 }
@@ -138,4 +140,10 @@ function formatRunDuration(run: XLikedVideoStatus['latest_run']): string | null 
 
 function pad2(value: number): string {
   return value.toString().padStart(2, '0');
+}
+
+function formatBytes(bytes: number): string {
+  const gib = 1024 ** 3;
+  const mib = 1024 ** 2;
+  return bytes >= gib ? `${(bytes / gib).toFixed(2)} GiB` : `${(bytes / mib).toFixed(1)} MiB`;
 }
