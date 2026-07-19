@@ -4,8 +4,6 @@ type TelegramRecord = Record<string, unknown>;
 
 const commandPrefix = /^\/(?:note|post)(?:@[A-Za-z0-9_]+)?(?:\s+|$)/i;
 const structuredKeys = [
-  'entities',
-  'caption_entities',
   'location',
   'venue',
   'contact',

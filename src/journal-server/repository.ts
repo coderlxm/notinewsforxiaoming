@@ -59,6 +59,14 @@ function decodeCursor(value: string): Cursor {
   return cursorSchema.parse(JSON.parse(Buffer.from(value, 'base64url').toString('utf8')));
 }
 
+function parseStructuredContent(value: string | null): Record<string, unknown> | null {
+  if (value === null) return null;
+  const content = z.record(z.string(), z.unknown()).parse(JSON.parse(value));
+  delete content.entities;
+  delete content.caption_entities;
+  return Object.keys(content).length === 0 ? null : content;
+}
+
 export class JournalRepository {
   constructor(private readonly database: Database.Database) {}
 
@@ -312,9 +320,7 @@ export class JournalRepository {
       visibility: row.visibility,
       tags: z.array(z.string()).parse(JSON.parse(row.tags_json)),
       pinned: row.pinned === 1,
-      structuredContent: row.structured_content_json === null
-        ? null
-        : z.record(z.string(), z.unknown()).parse(JSON.parse(row.structured_content_json)),
+      structuredContent: parseStructuredContent(row.structured_content_json),
       sourceCreatedAt: row.source_created_at,
       capturedAt: row.captured_at,
       updatedAt: row.updated_at,

@@ -25,9 +25,11 @@ const emit = defineEmits<{
 
 const editing = shallowRef(false);
 const draft = shallowRef(props.entry.contentText);
+const hiddenStructuredKeys = new Set(['entities', 'caption_entities']);
 
 const formattedTime = computed(() => formatEntryTime(props.entry.sourceCreatedAt));
-const structuredRows = computed(() => Object.entries(props.entry.structuredContent ?? {}));
+const structuredRows = computed(() => Object.entries(props.entry.structuredContent ?? {})
+  .filter(([key]) => !hiddenStructuredKeys.has(key)));
 const canSave = computed(() => draft.value !== props.entry.contentText && !props.busy);
 const nextVisibility = computed<JournalVisibility>(() =>
   props.entry.visibility === 'public' ? 'private' : 'public',
