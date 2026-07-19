@@ -1,4 +1,4 @@
-name: Deploy To Server
+name: Deploy To Servers
 
 on:
   push:
@@ -8,13 +8,154 @@ on:
       - 'doc/**'
       - '**/*.md'
   workflow_dispatch:
+    inputs:
+      deploy_journal:
+        description: Deploy Journal to rndc02
+        required: true
+        type: boolean
+        default: true
+      deploy_bot:
+        description: Deploy bot to bwgdc01
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
 
 concurrency:
   group: deploy-main
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
-  deploy:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      journal: ${{ steps.scope.outputs.journal }}
+      bot: ${{ steps.scope.outputs.bot }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect changed deployment scope
+        id: paths
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            journal:
+              - 'src/journal-server/**'
+              - 'src/shared/journalProtocol.ts'
+              - 'web/**'
+              - 'deploy/journal/**'
+              - 'scripts/journal-backup'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'tsconfig.json'
+              - '.github/workflows/deploy.yml'
+            bot:
+              - 'src/**'
+              - '!src/journal-server/**'
+              - 'deploy/notinews-bot.service'
+              - 'scripts/notinews-backup'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'tsconfig.json'
+              - '.github/workflows/deploy.yml'
+
+      - name: Resolve deployment scope
+        id: scope
+        env:
+          PUSH_JOURNAL: ${{ steps.paths.outputs.journal }}
+          PUSH_BOT: ${{ steps.paths.outputs.bot }}
+          MANUAL_JOURNAL: ${{ inputs.deploy_journal }}
+          MANUAL_BOT: ${{ inputs.deploy_bot }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "journal=$MANUAL_JOURNAL" >> "$GITHUB_OUTPUT"
+            echo "bot=$MANUAL_BOT" >> "$GITHUB_OUTPUT"
+          else
+            echo "journal=$PUSH_JOURNAL" >> "$GITHUB_OUTPUT"
+            echo "bot=$PUSH_BOT" >> "$GITHUB_OUTPUT"
+          fi
+
+  journal:
+    needs: changes
+    if: needs.changes.outputs.journal == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      JOURNAL_SERVER_HOST: ${{ secrets.JOURNAL_SERVER_HOST }}
+      JOURNAL_SERVER_PORT: ${{ secrets.JOURNAL_SERVER_PORT }}
+      JOURNAL_SERVER_USER: ${{ secrets.JOURNAL_SERVER_USER }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate Journal secrets
+        run: |
+          test -n "$JOURNAL_SERVER_HOST"
+          test -n "$JOURNAL_SERVER_USER"
+          test -n "${{ secrets.JOURNAL_SERVER_SSH_KEY }}"
+          test -n "${{ secrets.JOURNAL_SERVER_KNOWN_HOSTS }}"
+
+      - name: Build immutable Journal image
+        run: |
+          docker build \
+            --file deploy/journal/Dockerfile \
+            --tag "notinews-journal:$GITHUB_SHA" \
+            .
+          docker save "notinews-journal:$GITHUB_SHA" > "/tmp/journal-$GITHUB_SHA.tar"
+
+      - name: Setup Journal SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.JOURNAL_SERVER_SSH_KEY }}
+
+      - name: Install trusted Journal host key
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' '${{ secrets.JOURNAL_SERVER_KNOWN_HOSTS }}' > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Upload Journal image
+        run: |
+          PORT="${JOURNAL_SERVER_PORT:-22}"
+          tar -C /tmp -cf - "journal-$GITHUB_SHA.tar" | \
+            ssh -p "$PORT" "$JOURNAL_SERVER_USER@$JOURNAL_SERVER_HOST" \
+              "tar -xf - -C /var/lib/journal-deploy/incoming"
+
+      - name: Activate Journal release
+        run: |
+          PORT="${JOURNAL_SERVER_PORT:-22}"
+          ssh -p "$PORT" "$JOURNAL_SERVER_USER@$JOURNAL_SERVER_HOST" \
+            "sudo -n /usr/local/sbin/journal-deploy-release '$GITHUB_SHA'"
+
+      - name: Notify Journal deploy success to Telegram
+        env:
+          TG_TOKEN: ${{ secrets.TG_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          RELEASE_TIME="$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S %Z')"
+          MSG="$(printf '✅ Journal 已更新\n发布时间: %s\nCommit: %s\n服务: feeds.xmcloud.buzz' "$RELEASE_TIME" "$SHORT_SHA")"
+          curl -sS -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TG_CHAT_ID}" \
+            --data-urlencode "text=${MSG}" >/dev/null
+
+  bot:
+    needs:
+      - changes
+      - journal
+    if: >-
+      always() &&
+      needs.changes.result == 'success' &&
+      needs.changes.outputs.bot == 'true' &&
+      (needs.journal.result == 'success' || needs.journal.result == 'skipped')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -27,30 +168,30 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate secrets
+      - name: Validate bot secrets
         run: |
           test -n "$SERVER_HOST"
           test -n "$SERVER_USER"
           test -n "$SERVER_PROJECT_DIR"
 
-      - name: Setup SSH agent
+      - name: Setup bot SSH agent
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SERVER_SSH_KEY }}
 
-      - name: Add server to known_hosts
+      - name: Add bot server to known_hosts
         run: |
           PORT="${SERVER_PORT:-22}"
           mkdir -p ~/.ssh
           ssh-keyscan -p "$PORT" -H "$SERVER_HOST" >> ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
-      - name: Ensure project directory exists
+      - name: Ensure bot project directory exists
         run: |
           PORT="${SERVER_PORT:-22}"
           ssh -p "$PORT" "$SERVER_USER@$SERVER_HOST" "mkdir -p '$SERVER_PROJECT_DIR'"
 
-      - name: Sync tracked files
+      - name: Sync tracked bot files
         run: |
           PORT="${SERVER_PORT:-22}"
           ssh -p "$PORT" "$SERVER_USER@$SERVER_HOST" "cd '$SERVER_PROJECT_DIR' && \
@@ -59,7 +200,7 @@ jobs:
             ssh -p "$PORT" "$SERVER_USER@$SERVER_HOST" "tar -xf - -C '$SERVER_PROJECT_DIR'"
           ssh -p "$PORT" "$SERVER_USER@$SERVER_HOST" "printf '%s\n' '$GITHUB_SHA' > '$SERVER_PROJECT_DIR/.deploy-commit'"
 
-      - name: Install dependencies on server
+      - name: Install bot dependencies on server
         run: |
           PORT="${SERVER_PORT:-22}"
           ssh -p "$PORT" "$SERVER_USER@$SERVER_HOST" "
@@ -70,7 +211,7 @@ jobs:
               exit 1
             fi
             if ! command -v pnpm >/dev/null 2>&1; then
-              timeout 180 npm install -g pnpm@10.33.2 --registry=https://registry.npmmirror.com --fetch-retries=1 --fetch-timeout=30000 --loglevel warn
+              timeout 180 npm install -g pnpm@11.9.0 --registry=https://registry.npmmirror.com --fetch-retries=1 --fetch-timeout=30000 --loglevel warn
             fi
             export npm_config_disturl=https://npmmirror.com/mirrors/node
             pnpm install --frozen-lockfile
@@ -81,10 +222,8 @@ jobs:
           PORT="${SERVER_PORT:-22}"
           ssh -p "$PORT" "$SERVER_USER@$SERVER_HOST" "
             set -e
-            # Stop and disable old timer-based service
             systemctl stop notinews.timer || true
             systemctl disable notinews.timer || true
-            # Install new bot service
             cp '$SERVER_PROJECT_DIR/deploy/notinews-bot.service' /etc/systemd/system/notinews-bot.service
             systemctl daemon-reload
             systemctl enable notinews-bot.service
@@ -93,7 +232,7 @@ jobs:
             systemctl status notinews-bot.service --no-pager -l | sed -n '1,20p'
           "
 
-      - name: Notify deploy success to Telegram
+      - name: Notify bot deploy success to Telegram
         run: |
           PORT="${SERVER_PORT:-22}"
           SHORT_SHA="${GITHUB_SHA::7}"
@@ -109,7 +248,7 @@ jobs:
             fi
             RELEASE_TIME=\$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S %Z')
             BOT_STATUS=\$(systemctl is-active notinews-bot.service || echo unknown)
-            MSG=\$(printf '✅ NotiNews Bot 已更新\n发布时间: %s\nCommit: %s\nBot 状态: %s\n\n交互 bot 已切换为常驻模式。' \"\${RELEASE_TIME}\" \"${SHORT_SHA}\" \"\${BOT_STATUS}\")
+            MSG=\$(printf '✅ NotiNews Bot 已更新\n发布时间: %s\nCommit: %s\nBot 状态: %s' \"\${RELEASE_TIME}\" \"${SHORT_SHA}\" \"\${BOT_STATUS}\")
             curl -sS -X POST \"https://api.telegram.org/bot\${TG_TOKEN}/sendMessage\" \
               --data-urlencode \"chat_id=\${TG_CHAT_ID}\" \
               --data-urlencode \"text=\${MSG}\" >/dev/null

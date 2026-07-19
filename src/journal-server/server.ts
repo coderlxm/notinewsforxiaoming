@@ -1,0 +1,79 @@
+import fastifyCookie from '@fastify/cookie';
+import fastifyStatic from '@fastify/static';
+import Fastify, {
+  type FastifyInstance,
+  type FastifyReply,
+  type FastifyRequest,
+} from 'fastify';
+import { ZodError } from 'zod';
+import { JournalAuth } from './auth.js';
+import { openJournalDatabase } from './database.js';
+import { JournalIngestService } from './ingest.js';
+import { JournalRepository } from './repository.js';
+import { registerFeedRoutes } from './routes/feeds.js';
+import { registerInternalRoutes } from './routes/internal.js';
+import { registerMediaRoutes } from './routes/media.js';
+import { registerPrivateEntryRoutes } from './routes/privateEntries.js';
+import { registerPublicFeedRoutes } from './routes/publicFeed.js';
+import { JournalStorage } from './storage.js';
+import { TelegramFileDownloader } from './telegramFiles.js';
+import type { JournalServerConfig } from './types.js';
+
+export async function createJournalServer(config: JournalServerConfig): Promise<FastifyInstance> {
+  const server = Fastify({ logger: true });
+  const database = openJournalDatabase(config.dataDir);
+  const repository = new JournalRepository(database);
+  const auth = new JournalAuth(config.ingestToken, config.adminPassword);
+  const storage = new JournalStorage(config.dataDir);
+  const downloader = new TelegramFileDownloader(config.telegramToken);
+  const ingestService = new JournalIngestService(
+    config.allowedChatId,
+    repository,
+    storage,
+    downloader,
+  );
+
+  await server.register(fastifyCookie, { secret: config.cookieSecret });
+  await server.register(fastifyStatic, {
+    root: config.webRoot,
+    prefix: '/',
+    wildcard: false,
+    index: false,
+  });
+
+  server.setErrorHandler(async (error, request, reply) => {
+    request.log.error(error);
+    const requestError = error as Error & { statusCode?: number };
+    const statusCode = error instanceof ZodError
+      ? 400
+      : typeof requestError.statusCode === 'number'
+        ? requestError.statusCode
+        : 500;
+    await reply.code(statusCode).send({ error: requestError.message });
+  });
+
+  server.get('/api/health', async () => {
+    database.prepare('SELECT 1').get();
+    return { status: 'ok' };
+  });
+
+  await registerInternalRoutes(server, { auth, ingestService, repository });
+  await registerPublicFeedRoutes(server, repository);
+  await registerPrivateEntryRoutes(server, auth, repository);
+  await registerMediaRoutes(server, auth, repository, config.dataDir);
+  await registerFeedRoutes(server, repository, config.publicBaseUrl);
+
+  const sendApplication = async (_request: FastifyRequest, reply: FastifyReply) => {
+    reply.header('Cache-Control', 'no-cache');
+    return reply.sendFile('index.html');
+  };
+  server.get('/', sendApplication);
+  server.get('/p/:publicId', sendApplication);
+  server.get('/me', sendApplication);
+
+  server.addHook('onClose', async () => {
+    database.close();
+  });
+
+  return server;
+}

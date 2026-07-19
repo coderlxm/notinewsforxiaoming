@@ -1,0 +1,32 @@
+services:
+  journal:
+    image: "notinews-journal:${JOURNAL_IMAGE_TAG:?JOURNAL_IMAGE_TAG must be a 40-character commit SHA}"
+    container_name: notinews-journal
+    init: true
+    env_file:
+      - /opt/journal/.env
+    environment:
+      TZ: Asia/Shanghai
+      JOURNAL_WEB_HOST: 0.0.0.0
+      JOURNAL_WEB_PORT: "3100"
+      JOURNAL_DATA_DIR: /data
+      JOURNAL_WEB_ROOT: /app/web/dist
+    volumes:
+      - /opt/journal/data:/data
+    ports:
+      - "127.0.0.1:3100:3100"
+    cpus: 1.0
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD", "node", "/usr/local/bin/journal-healthcheck.mjs"]
+      interval: 30s
+      timeout: 5s
+      retries: 1
+      start_period: 20s
+    networks:
+      - journal-internal
+
+networks:
+  journal-internal:
+    name: journal-internal
+    driver: bridge

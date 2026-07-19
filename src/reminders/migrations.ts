@@ -238,6 +238,19 @@ const MIGRATIONS: DbMigration[] = [
       }
     },
   },
+  {
+    version: 14,
+    up(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS journal_capture_sessions (
+          chat_id TEXT PRIMARY KEY,
+          visibility TEXT NOT NULL CHECK (visibility IN ('private', 'public')),
+          prompt_message_id INTEGER NOT NULL,
+          created_at TEXT NOT NULL
+        );
+      `);
+    },
+  },
 ];
 
 export function runDbMigrations(db: Database.Database): void {

@@ -1,0 +1,16 @@
+[Unit]
+Description=Journal Google Drive backup
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+ConditionPathExists=/opt/journal/.deploy-commit
+ConditionPathExists=/opt/journal/data/journal.sqlite
+
+[Service]
+Type=oneshot
+User=root
+UMask=0077
+Environment=RCLONE_CONFIG=/root/.config/rclone/rclone.conf
+ExecStartPre=/usr/bin/docker stop notinews-journal
+ExecStart=/usr/local/sbin/journal-backup
+ExecStopPost=/usr/bin/docker start notinews-journal

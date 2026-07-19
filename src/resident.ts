@@ -1,11 +1,24 @@
 import { createBot } from './bot/createBot.js';
 import { registerInteractiveHandlers } from './bot/interactive.js';
+import { config } from './config/index.js';
+import { registerJournalBotHandlers } from './journal-bot/index.js';
+import { getDb } from './reminders/db.js';
 import { schedulePendingReminders, schedulePendingRecurringRules } from './reminders/scheduler.js';
 import { registerFixedJobs, restoreStartggPolling } from './scheduled/jobs.js';
 import { restoreVitaminLoop } from './services/vitaminReminder.js';
 
 async function main() {
+  if (!config.journalApiBaseUrl || !config.journalIngestToken || !config.journalPublicBaseUrl) {
+    throw new Error('Journal bot configuration is incomplete.');
+  }
   const bot = createBot();
+  registerJournalBotHandlers(bot, {
+    apiBaseUrl: config.journalApiBaseUrl,
+    ingestToken: config.journalIngestToken,
+    publicBaseUrl: config.journalPublicBaseUrl,
+    allowedChatId: config.tgChatId,
+    database: getDb(),
+  });
   registerInteractiveHandlers(bot);
   schedulePendingReminders(bot);
   schedulePendingRecurringRules(bot);

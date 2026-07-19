@@ -1,0 +1,1 @@
+journal-deploy ALL=(root) NOPASSWD: /usr/local/sbin/journal-deploy-release *
