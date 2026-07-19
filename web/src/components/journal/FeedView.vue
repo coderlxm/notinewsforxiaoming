@@ -81,7 +81,7 @@ function editArticle(id: number): void {
 }
 
 function openArticle(entry: JournalEntry): void {
-  if (mode === 'private') {
+  if (props.mode === 'private') {
     editArticle(entry.id);
     return;
   }
