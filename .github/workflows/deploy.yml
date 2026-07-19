@@ -211,7 +211,7 @@ jobs:
               exit 1
             fi
             if ! command -v pnpm >/dev/null 2>&1; then
-              timeout 180 npm install -g pnpm@11.9.0 --registry=https://registry.npmmirror.com --fetch-retries=1 --fetch-timeout=30000 --loglevel warn
+              timeout 180 npm install -g pnpm@11.15.0 --registry=https://registry.npmmirror.com --fetch-retries=1 --fetch-timeout=30000 --loglevel warn
             fi
             export npm_config_disturl=https://npmmirror.com/mirrors/node
             pnpm install --frozen-lockfile

@@ -7,11 +7,11 @@ ENV PATH=${PNPM_HOME}:${PATH}
 ENV HUSKY=0
 
 RUN corepack enable \
-  && corepack prepare pnpm@11.9.0 --activate
+  && corepack prepare pnpm@11.15.0 --activate
 
 WORKDIR /app
 
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 
 FROM dependencies AS web-builder
