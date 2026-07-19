@@ -1,9 +1,11 @@
 import type { Telegraf } from 'telegraf';
 import {
-  formatStartggFinalPhaseSetResult,
-  formatStartggFinalPhaseStarted,
-  formatStartggFinalStandings,
-  formatStartggStatusChangedMessage,
+  buildStartggEventSummaryMessages,
+  type StartggEventSummaryInput,
+  type StartggFinalPhaseSetResultItem,
+  type StartggFinalPhaseStartedItem,
+  type StartggFinalStandingsItem,
+  type StartggPlayerUpdateItem,
 } from '../../formatters/startggFormatter.js';
 import { sendTelegramMessageWithId } from '../../publishers/telegram.js';
 import {
@@ -421,6 +423,11 @@ function selectSetsToPush(
 interface EventProcessResult {
   changed: number;
   activeSetCount: number;
+  summary: StartggEventSummaryInput | null;
+  pendingInitialMessagePlayerIds: number[];
+  pendingPlayerSetMarks: Array<{ watchPlayerId: number; setId: number }>;
+  pendingEventSetIds: number[];
+  finalPhaseTrackingPending: boolean;
 }
 
 const FINAL_PHASE_STATES = new Set(['READY', 'ACTIVE', 'COMPLETED']);
@@ -446,7 +453,6 @@ function selectFinalPhase(phases: Array<{
 async function processEvent(
   eventRow: StartggWatchEvent,
   players: StartggWatchPlayer[],
-  bot: Telegraf | undefined,
   refreshEntrantMappings: boolean,
   refreshEventMeta: boolean,
 ): Promise<EventProcessResult> {
@@ -477,6 +483,16 @@ async function processEvent(
   if (!tournamentName || !eventDisplayName) {
     throw new Error(`start.gg event missing cached metadata: ${normalizedSlug}`);
   }
+
+  const playerUpdates: StartggPlayerUpdateItem[] = [];
+  const finalPhaseSetResults: StartggFinalPhaseSetResultItem[] = [];
+  const pendingInitialMessagePlayerIds: number[] = [];
+  const pendingPlayerSetMarks: Array<{ watchPlayerId: number; setId: number }> = [];
+  const pendingPlayerSetIds = new Set<number>();
+  const pendingEventSetIds: number[] = [];
+  let finalPhaseStarted: StartggFinalPhaseStartedItem | null = null;
+  let finalStandings: StartggFinalStandingsItem | null = null;
+  let finalPhaseTrackingPending = false;
 
   const entrantMappings = await ensureEventEntrantMappings(
     normalizedSlug,
@@ -534,10 +550,7 @@ async function processEvent(
       }
 
       changed += 1;
-      const message = formatStartggStatusChangedMessage({
-        tournamentName,
-        eventName: eventDisplayName,
-        eventSlug: resolvedEventSlug,
+      playerUpdates.push({
         playerName: eventPlayerName,
         status: snapshot.status,
         placement: snapshot.placement,
@@ -545,9 +558,7 @@ async function processEvent(
         scoreText: snapshot.lastSetScoreText,
         setPageUrl: snapshot.setPageUrl,
       });
-      const messageId = await sendTelegramMessageWithId(message, bot);
-      recordStartggSentMessage(messageId);
-      markStartggInitialMessageSent(player.id, eventRow.id);
+      pendingInitialMessagePlayerIds.push(player.id);
       continue;
     }
 
@@ -556,10 +567,7 @@ async function processEvent(
 
     if (setsToPush.length === 0) {
       changed += 1;
-      const message = formatStartggStatusChangedMessage({
-        tournamentName,
-        eventName: eventDisplayName,
-        eventSlug: resolvedEventSlug,
+      playerUpdates.push({
         playerName: eventPlayerName,
         status: snapshot.status,
         placement: snapshot.placement,
@@ -567,18 +575,13 @@ async function processEvent(
         scoreText: snapshot.lastSetScoreText,
         setPageUrl: snapshot.setPageUrl,
       });
-      const messageId = await sendTelegramMessageWithId(message, bot);
-      recordStartggSentMessage(messageId);
       continue;
     }
 
     for (const set of setsToPush) {
       changed += 1;
       const setPageUrl = `https://www.start.gg/${normalizedSlug}/set/${set.id}`;
-      const message = formatStartggStatusChangedMessage({
-        tournamentName,
-        eventName: eventDisplayName,
-        eventSlug: resolvedEventSlug,
+      playerUpdates.push({
         playerName: eventPlayerName,
         status: snapshot.status,
         placement: snapshot.placement,
@@ -586,9 +589,8 @@ async function processEvent(
         scoreText: buildSetScoreText(set.displayScore),
         setPageUrl,
       });
-      const messageId = await sendTelegramMessageWithId(message, bot);
-      recordStartggSentMessage(messageId);
-      markStartggPushedSet(player.id, eventRow.id, set.id);
+      pendingPlayerSetMarks.push({ watchPlayerId: player.id, setId: set.id });
+      pendingPlayerSetIds.add(set.id);
     }
   }
 
@@ -631,14 +633,10 @@ async function processEvent(
         .sort((a, b) => a.seedNum - b.seedNum)
         .map((seed) => ({ seedNum: seed.seedNum, name: seed.entrant.name }));
       if (eventState !== 'COMPLETED') {
-        const messageId = await sendTelegramMessageWithId(formatStartggFinalPhaseStarted({
-          tournamentName,
-          eventName: eventDisplayName,
-          eventSlug: resolvedEventSlug,
+        finalPhaseStarted = {
           phaseName: discoveredPhase.name,
           entrants,
-        }), bot);
-        recordStartggSentMessage(messageId);
+        };
         changed += 1;
       }
     }
@@ -649,8 +647,8 @@ async function processEvent(
     eventState = phaseTracking.eventState;
     const phaseSets = phaseTracking.sets;
     const activePhaseSetCount = phaseSets.filter((set) => set.startedAt !== null && set.completedAt === null).length;
-    const finalPhaseStarted = phaseSets.some((set) => set.startedAt !== null);
-    if (finalPhaseStarted && eventState !== 'COMPLETED') {
+    const phaseStartedFlag = phaseSets.some((set) => set.startedAt !== null);
+    if (phaseStartedFlag && eventState !== 'COMPLETED') {
       activeSetCount += Math.max(1, activePhaseSetCount);
     }
 
@@ -659,7 +657,9 @@ async function processEvent(
       .sort(compareSetChronology);
     for (const set of completedSets) {
       if (hasStartggEventPushedSet(eventRow.id, set.id)) continue;
-      if (!hasAnyStartggPlayerPushedSet(eventRow.id, set.id)) {
+      const playerSetAlreadyPushed = hasAnyStartggPlayerPushedSet(eventRow.id, set.id)
+        || pendingPlayerSetIds.has(set.id);
+      if (!playerSetAlreadyPushed) {
         const entrants = set.slots
           .map((slot) => slot.entrant)
           .filter((entrant): entrant is { id: number; name: string } => Boolean(entrant?.name));
@@ -667,20 +667,21 @@ async function processEvent(
         if (!winner) {
           throw new Error(`start.gg completed final phase set missing winner entrant: ${set.id}`);
         }
-        const messageId = await sendTelegramMessageWithId(formatStartggFinalPhaseSetResult({
-          tournamentName,
-          eventName: eventDisplayName,
+        finalPhaseSetResults.push({
           phaseName: finalPhaseName,
           roundLabel: set.fullRoundText,
           entrantNames: entrants.map((entrant) => entrant.name),
           scoreText: buildSetScoreText(set.displayScore),
           winnerName: winner.name,
           setUrl: `https://www.start.gg/${normalizedSlug}/set/${set.id}`,
-        }), bot);
-        recordStartggSentMessage(messageId);
+        });
         changed += 1;
       }
-      markStartggEventPushedSet(eventRow.id, set.id);
+      if (pendingPlayerSetIds.has(set.id) || !playerSetAlreadyPushed) {
+        pendingEventSetIds.push(set.id);
+      } else {
+        markStartggEventPushedSet(eventRow.id, set.id);
+      }
     }
 
     if (eventState === 'COMPLETED' && eventRow.final_phase_tracking_completed === 0) {
@@ -693,18 +694,59 @@ async function processEvent(
       if (standings.length === 0) {
         throw new Error(`start.gg completed event missing final standings: ${normalizedSlug}`);
       }
-      const messageId = await sendTelegramMessageWithId(formatStartggFinalStandings({
-        tournamentName,
-        eventName: eventDisplayName,
-        standings,
-      }), bot);
-      recordStartggSentMessage(messageId);
-      markStartggFinalPhaseTrackingCompleted(eventRow.id);
+      finalStandings = { standings };
+      finalPhaseTrackingPending = true;
       changed += 1;
     }
   }
 
-  return { changed, activeSetCount };
+  const summary: StartggEventSummaryInput | null
+    = playerUpdates.length > 0 || finalPhaseStarted !== null || finalPhaseSetResults.length > 0 || finalStandings !== null
+      ? {
+          tournamentName,
+          eventName: eventDisplayName,
+          eventSlug: resolvedEventSlug,
+          playerUpdates,
+          finalPhaseStarted,
+          finalPhaseSetResults,
+          finalStandings,
+        }
+      : null;
+
+  return {
+    changed,
+    activeSetCount,
+    summary,
+    pendingInitialMessagePlayerIds,
+    pendingPlayerSetMarks,
+    pendingEventSetIds,
+    finalPhaseTrackingPending,
+  };
+}
+
+async function sendStartggEventSummary(
+  bot: Telegraf | undefined,
+  eventRowId: number,
+  result: EventProcessResult,
+): Promise<void> {
+  if (!result.summary) return;
+  const messages = buildStartggEventSummaryMessages(result.summary);
+  for (const message of messages) {
+    const messageId = await sendTelegramMessageWithId(message, bot);
+    recordStartggSentMessage(messageId);
+  }
+  for (const playerId of result.pendingInitialMessagePlayerIds) {
+    markStartggInitialMessageSent(playerId, eventRowId);
+  }
+  for (const mark of result.pendingPlayerSetMarks) {
+    markStartggPushedSet(mark.watchPlayerId, eventRowId, mark.setId);
+  }
+  for (const setId of result.pendingEventSetIds) {
+    markStartggEventPushedSet(eventRowId, setId);
+  }
+  if (result.finalPhaseTrackingPending) {
+    markStartggFinalPhaseTrackingCompleted(eventRowId);
+  }
 }
 
 export async function runStartggWatchOnce(bot?: Telegraf, options?: RunStartggWatchOptions): Promise<StartggWatchSummary> {
@@ -721,19 +763,30 @@ export async function runStartggWatchOnce(bot?: Telegraf, options?: RunStartggWa
     targetEvents.map((eventRow) => processEvent(
       eventRow,
       players,
-      bot,
       options?.refreshEntrantMappings !== false,
       options?.refreshEventMeta !== false,
     )),
   );
 
+  let changed = 0;
+  let activeSetCount = 0;
+  const activeEventSlugs: string[] = [];
+  for (const [index, result] of results.entries()) {
+    changed += result.changed;
+    activeSetCount += result.activeSetCount;
+    if (result.activeSetCount > 0) {
+      activeEventSlugs.push(normalizeEventSlug(targetEvents[index]!.event_slug));
+    }
+    if (result.summary) {
+      await sendStartggEventSummary(bot, targetEvents[index]!.id, result);
+    }
+  }
+
   return {
     checkedPlayers: players.length,
     checkedEvents: targetEvents.length,
-    changed: results.reduce((sum, r) => sum + r.changed, 0),
-    activeSetCount: results.reduce((sum, r) => sum + r.activeSetCount, 0),
-    activeEventSlugs: targetEvents
-      .filter((_, index) => results[index]!.activeSetCount > 0)
-      .map((event) => normalizeEventSlug(event.event_slug)),
+    changed,
+    activeSetCount,
+    activeEventSlugs,
   };
 }

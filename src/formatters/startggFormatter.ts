@@ -228,6 +228,165 @@ function compactNames(names: string[], limit: number): string {
   return `${names.slice(0, limit).join(' / ')} / +${names.length - limit}`;
 }
 
+export interface StartggPlayerUpdateItem {
+  playerName: string;
+  status: StartggWatchStatus;
+  placement: number | null;
+  roundLabel: string | null;
+  scoreText: string | null;
+  setPageUrl: string | null;
+}
+
+export interface StartggFinalPhaseStartedItem {
+  phaseName: string;
+  entrants: Array<{ seedNum: number; name: string }>;
+}
+
+export interface StartggFinalPhaseSetResultItem {
+  phaseName: string;
+  roundLabel: string | null;
+  entrantNames: string[];
+  scoreText: string | null;
+  winnerName: string;
+  setUrl: string;
+}
+
+export interface StartggFinalStandingsItem {
+  standings: Array<{ placement: number; entrantName: string }>;
+}
+
+export interface StartggEventSummaryInput {
+  tournamentName: string;
+  eventName: string;
+  eventSlug: string;
+  playerUpdates: StartggPlayerUpdateItem[];
+  finalPhaseStarted: StartggFinalPhaseStartedItem | null;
+  finalPhaseSetResults: StartggFinalPhaseSetResultItem[];
+  finalStandings: StartggFinalStandingsItem | null;
+}
+
+const TELEGRAM_MESSAGE_LIMIT = 4096;
+
+function startggSummaryHeader(tournamentName: string, eventName: string): string[] {
+  return [
+    '🥊 <b>start.gg 赛事更新</b>',
+    '──────────────────',
+    `🏆 <b>赛事</b>：${escapeHtml(tournamentName)}`,
+    `🎮 <b>项目</b>：${escapeHtml(eventName)}`,
+    '──────────────────',
+  ];
+}
+
+function startggSummaryFooter(eventSlug: string): string[] {
+  return [
+    '──────────────────',
+    `🔗 <a href="${escapeHtml(normalizeUrl(`https://www.start.gg/${eventSlug}`))}">查看项目页</a>`,
+  ];
+}
+
+function renderStartggPlayerSection(items: StartggPlayerUpdateItem[]): string[] {
+  if (items.length === 0) return [];
+  const lines: string[] = [`👤 <b>关注选手更新（${items.length} 条）</b>`];
+  for (const item of items) {
+    lines.push(`• ${escapeHtml(item.playerName)}：${statusLabel(item.status)}`);
+    const segments: string[] = [];
+    if (item.placement) segments.push(`名次 ${item.placement}`);
+    if (item.roundLabel) segments.push(escapeHtml(item.roundLabel));
+    if (item.scoreText) segments.push(`比分 ${escapeHtml(item.scoreText)}`);
+    if (segments.length > 0) {
+      lines.push(`  ${segments.join(' · ')}`);
+    }
+    if (item.setPageUrl) {
+      lines.push(`  🔎 <a href="${escapeHtml(normalizeUrl(item.setPageUrl))}">查看对局</a>`);
+    }
+  }
+  return lines;
+}
+
+function renderStartggFinalPhaseSection(input: {
+  started: StartggFinalPhaseStartedItem | null;
+  setResults: StartggFinalPhaseSetResultItem[];
+  finalStandings: StartggFinalStandingsItem | null;
+}): string[] {
+  const { started, setResults, finalStandings } = input;
+  if (!started && setResults.length === 0 && !finalStandings) return [];
+
+  const phaseName = started?.phaseName ?? setResults[0]?.phaseName ?? null;
+  const lines: string[] = [phaseName
+    ? `🏁 <b>${escapeHtml(phaseName)}赛况</b>`
+    : '🏁 <b>决赛阶段赛果</b>'];
+  let appended = false;
+
+  if (started) {
+    if (appended) lines.push('');
+    lines.push(`<b>${escapeHtml(started.phaseName)} 已开始</b>`);
+    for (const entrant of started.entrants) {
+      lines.push(`${entrant.seedNum}. ${escapeHtml(entrant.name)}`);
+    }
+    appended = true;
+  }
+
+  if (setResults.length > 0) {
+    if (appended) lines.push('');
+    lines.push(`<b>赛果（${setResults.length} 场）</b>`);
+    for (const set of setResults) {
+      const roundText = set.roundLabel ? `${escapeHtml(set.roundLabel)}：` : '';
+      const score = set.scoreText ? escapeHtml(set.scoreText) : set.entrantNames.map(escapeHtml).join(' vs ');
+      lines.push(`• ${roundText}${score} · 胜者 ${escapeHtml(set.winnerName)}`);
+      lines.push(`  🔎 <a href="${escapeHtml(normalizeUrl(set.setUrl))}">查看对局</a>`);
+    }
+    appended = true;
+  }
+
+  if (finalStandings) {
+    if (appended) lines.push('');
+    lines.push('<b>最终排名</b>');
+    for (const standing of finalStandings.standings) {
+      const medal = standing.placement === 1
+        ? '🥇'
+        : standing.placement === 2
+          ? '🥈'
+          : standing.placement === 3
+            ? '🥉'
+            : `${standing.placement}.`;
+      lines.push(`${medal} ${escapeHtml(standing.entrantName)}`);
+    }
+  }
+
+  return lines;
+}
+
+export function buildStartggEventSummaryMessages(input: StartggEventSummaryInput): string[] {
+  const playerLines = renderStartggPlayerSection(input.playerUpdates);
+  const finalLines = renderStartggFinalPhaseSection({
+    started: input.finalPhaseStarted,
+    setResults: input.finalPhaseSetResults,
+    finalStandings: input.finalStandings,
+  });
+
+  if (playerLines.length === 0 && finalLines.length === 0) return [];
+
+  const header = startggSummaryHeader(input.tournamentName, input.eventName);
+  const footer = startggSummaryFooter(input.eventSlug);
+  const gap = playerLines.length > 0 && finalLines.length > 0
+    ? ['', '──────────────────', '']
+    : [];
+
+  const combined = [...header, '', ...playerLines, ...gap, ...finalLines, '', ...footer].join('\n');
+  if (combined.length <= TELEGRAM_MESSAGE_LIMIT) {
+    return [combined];
+  }
+
+  const messages: string[] = [];
+  if (playerLines.length > 0) {
+    messages.push([...header, '', ...playerLines, '', ...footer].join('\n'));
+  }
+  if (finalLines.length > 0) {
+    messages.push([...header, '', ...finalLines, '', ...footer].join('\n'));
+  }
+  return messages;
+}
+
 export function formatStartggRuntimeStatus(input: {
   pollingEnabled: boolean;
   nextPollAt: Date | null;

@@ -317,18 +317,20 @@ sets 和 standings 是并行查询的。sets 会自动处理分页；standing �
 
 ### 5.6 后续状态变化
 
-首条状态发送完成后，后续每轮检查按两类变化推送：
+首条状态发送完成后，后续每轮检查按两类变化收集通知：
 
-1. 发现新的 set：按每个新 set 推送一条消息。
+1. 发现新的 set：为每个新 set 保留一条更新项。
 2. 没有新 set，但以下快照字段变化：
    - status
    - placement
    - last set id
    - last score
 
-第二类会发送一条状态变化消息。
+第二类保留一条状态变化更新项。
 
 如果上述字段都没有变化，则不推送。
+
+一次 `runStartggWatchOnce()` 是一个通知批次。批次内先按 event 收集更新，再按“关注选手更新”和“决赛阶段赛果”分类，生成一条赛事摘要消息；摘要超过 Telegram 文本长度限制时，按这两个类别拆成两条。20 分钟常规轮询和 2 分钟加速轮询各自形成独立批次，不增加额外等待窗口。
 
 同一 set 的去重键是：
 
@@ -349,8 +351,9 @@ watch_player_id + watch_event_id + set_id
 - 最新比分（如果有）。
 - 项目页链接。
 - 最近对局链接（如果有）。
+- 同一轮次内的关注选手更新和决赛阶段赛果分类。
 
-每次 start.gg 推送成功后都会记录 Telegram 返回的 `message_id`，供 `/startgg deleteall` 使用。
+每条摘要成功发送后都会记录 Telegram 返回的 `message_id`，供 `/startgg deleteall` 使用。本轮新增通知对应的 Set 去重状态在摘要发送成功后写入；历史基线仍按首次状态和决赛Phase发现时的既有规则建立。因此摘要发送失败时，下一轮仍可重新生成对应更新。
 
 ## 6. 轮询和调度
 
@@ -400,8 +403,8 @@ state 为 READY、ACTIVE 或 COMPLETED
 
 1. 保存Phase id、名称和numSeeds。
 2. 将该Phase已完成sets建立为赛事级已读基线。
-3. 使用Phase seeds推送决赛阶段名单。
-4. 后续推送该Phase全部新完成set。
+3. 将Phase seeds名单加入当前轮次的决赛阶段摘要。
+4. 将该Phase全部新完成set加入当前轮次的决赛阶段摘要。
 5. 与选手维度已推送set去重，同一set只发送一次。
 
 目标Phase第一场set出现`startedAt`后会加入2分钟连续轮询，直到`Event.state=COMPLETED`。两场串行比赛之间即使暂时没有进行中的set，也不会退出加速轮询。加速轮询使用一个GraphQL请求同时读取已保存Phase的sets和Event状态，不重新发现Phase，也不查询整个event的历史对局。
