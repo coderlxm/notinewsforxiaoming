@@ -36,6 +36,7 @@ const contentTypes = [
   { value: 'game', label: '游戏' },
   { value: 'story', label: 'Story 引用' },
   { value: 'paid_media', label: '付费媒体元数据' },
+  { value: 'article', label: '文章' },
 ];
 
 watch(

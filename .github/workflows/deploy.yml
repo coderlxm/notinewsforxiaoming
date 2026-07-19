@@ -46,7 +46,7 @@ jobs:
           filters: |
             journal:
               - 'src/journal-server/**'
-              - 'src/shared/journalProtocol.ts'
+              - 'src/shared/**'
               - 'web/**'
               - 'deploy/journal/**'
               - 'scripts/journal-backup'

@@ -95,4 +95,30 @@ export class JournalStorage {
       await fs.promises.rm(directory, { recursive: true });
     }
   }
+
+  async writeArticleAsset(
+    publicId: string,
+    sourceCreatedAt: string,
+    data: Buffer,
+  ): Promise<string> {
+    const sourceDate = new Date(sourceCreatedAt);
+    const year = String(sourceDate.getUTCFullYear());
+    const month = String(sourceDate.getUTCMonth() + 1).padStart(2, '0');
+    const relativeDir = path.posix.join('assets', year, month, publicId);
+    const absoluteDir = path.join(this.assetsDir, year, month, publicId);
+    await fs.promises.mkdir(absoluteDir, { recursive: true });
+    const filename = randomUUID();
+    const absolutePath = path.join(absoluteDir, filename);
+    await fs.promises.writeFile(absolutePath, data, { flag: 'wx' });
+    return path.posix.join(relativeDir, filename);
+  }
+
+  async deleteAsset(relativePath: string): Promise<void> {
+    const absolutePath = path.resolve(this.dataDir, relativePath);
+    const assetsRoot = path.resolve(this.assetsDir);
+    if (!absolutePath.startsWith(`${assetsRoot}${path.sep}`)) {
+      throw new Error(`Asset ${relativePath} is outside the assets root.`);
+    }
+    await fs.promises.rm(absolutePath);
+  }
 }

@@ -1,4 +1,5 @@
 import fastifyCookie from '@fastify/cookie';
+import fastifyMultipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
 import Fastify, {
   type FastifyInstance,
@@ -6,11 +7,13 @@ import Fastify, {
   type FastifyRequest,
 } from 'fastify';
 import { ZodError } from 'zod';
+import { JournalArticleService } from './articleService.js';
 import { JournalAuth } from './auth.js';
 import { openJournalDatabase } from './database.js';
 import { JournalDeletionService } from './deletion.js';
 import { JournalIngestService } from './ingest.js';
 import { JournalRepository } from './repository.js';
+import { registerArticleRoutes } from './routes/articles.js';
 import { registerFeedRoutes } from './routes/feeds.js';
 import { registerInternalRoutes } from './routes/internal.js';
 import { registerMediaRoutes } from './routes/media.js';
@@ -26,6 +29,7 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
   const repository = new JournalRepository(database);
   const auth = new JournalAuth(config.ingestToken, config.adminPassword);
   const storage = new JournalStorage(config.dataDir);
+  const articleService = new JournalArticleService(repository, storage);
   const deletionService = new JournalDeletionService(repository, storage);
   const downloader = new TelegramFileDownloader(config.telegramToken);
   const ingestService = new JournalIngestService(
@@ -36,6 +40,9 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
   );
 
   await server.register(fastifyCookie, { secret: config.cookieSecret });
+  await server.register(fastifyMultipart, {
+    limits: { fileSize: 20 * 1024 * 1024 },
+  });
   await server.register(fastifyStatic, {
     root: config.webRoot,
     prefix: '/',
@@ -62,6 +69,7 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
   await registerInternalRoutes(server, { auth, deletionService, ingestService, repository });
   await registerPublicFeedRoutes(server, repository);
   await registerPrivateEntryRoutes(server, auth, repository, deletionService);
+  await registerArticleRoutes(server, auth, articleService);
   await registerMediaRoutes(server, auth, repository, config.dataDir);
   await registerFeedRoutes(server, repository, config.publicBaseUrl);
 
@@ -72,6 +80,8 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
   server.get('/', sendApplication);
   server.get('/p/:publicId', sendApplication);
   server.get('/me', sendApplication);
+  server.get('/me/articles/new', sendApplication);
+  server.get('/me/articles/:id/edit', sendApplication);
 
   server.addHook('onClose', async () => {
     database.close();

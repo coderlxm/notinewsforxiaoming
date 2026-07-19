@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { JournalEntry, JournalVisibility } from '../../types';
+import ArticleCardContent from '../article/ArticleCardContent.vue';
 import EntryCard from './EntryCard.vue';
 
 defineProps<{
@@ -9,6 +10,7 @@ defineProps<{
 
 const emit = defineEmits<{
   viewDetail: [publicId: string];
+  editArticle: [id: number];
   selectTag: [tag: string];
   saveContent: [entry: JournalEntry, contentText: string];
   setVisibility: [entry: JournalEntry, visibility: JournalVisibility];
@@ -40,19 +42,32 @@ function forwardDelete(entry: JournalEntry): void {
       <h2 id="memory-title" class="memory__title">时间留下来的这一天</h2>
     </header>
     <div class="memory__entries">
-      <EntryCard
-        v-for="entry in entries"
-        :key="entry.id"
-        :entry="entry"
-        editable
-        :busy="mutationEntryId === entry.id"
-        @view-detail="emit('viewDetail', $event)"
-        @select-tag="emit('selectTag', $event)"
-        @save-content="forwardSaveContent"
-        @set-visibility="forwardVisibility"
-        @set-pinned="forwardPinned"
-        @delete-entry="forwardDelete"
-      />
+      <template v-for="entry in entries" :key="entry.id">
+        <ArticleCardContent
+          v-if="entry.bodyFormat === 'rich'"
+          :entry="entry"
+          editable
+          :busy="mutationEntryId === entry.id"
+          @open="emit('editArticle', entry.id)"
+          @edit="emit('editArticle', $event)"
+          @select-tag="emit('selectTag', $event)"
+          @set-visibility="forwardVisibility"
+          @set-pinned="forwardPinned"
+          @delete-entry="forwardDelete"
+        />
+        <EntryCard
+          v-else
+          :entry="entry"
+          editable
+          :busy="mutationEntryId === entry.id"
+          @view-detail="emit('viewDetail', $event)"
+          @select-tag="emit('selectTag', $event)"
+          @save-content="forwardSaveContent"
+          @set-visibility="forwardVisibility"
+          @set-pinned="forwardPinned"
+          @delete-entry="forwardDelete"
+        />
+      </template>
     </div>
   </section>
 </template>

@@ -1,9 +1,11 @@
 import type {
   FeedFilters,
   JournalApiError,
+  JournalArticleAssetResponse,
   JournalDeletionResult,
   JournalEntry,
   JournalFeed,
+  JournalRichDocument,
   JournalVisibility,
   OnThisDayResponse,
 } from './types';
@@ -18,6 +20,10 @@ export class JournalRequestError extends Error {
   }
 }
 
+async function readError(response: Response): Promise<JournalApiError> {
+  return await response.json() as JournalApiError;
+}
+
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
     credentials: 'same-origin',
@@ -25,7 +31,7 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   });
 
   if (!response.ok) {
-    const body = await response.json() as JournalApiError;
+    const body = await readError(response);
     throw new JournalRequestError(response.status, body.error);
   }
 
@@ -39,7 +45,7 @@ async function requestWithoutResponse(path: string, init?: RequestInit): Promise
   });
 
   if (!response.ok) {
-    const body = await response.json() as JournalApiError;
+    const body = await readError(response);
     throw new JournalRequestError(response.status, body.error);
   }
 }
@@ -116,4 +122,45 @@ export function updateEntryPinned(id: number, pinned: boolean): Promise<JournalE
 
 export function deleteEntry(id: number): Promise<JournalDeletionResult> {
   return requestJson<JournalDeletionResult>(`/api/me/entries/${id}`, { method: 'DELETE' });
+}
+
+export function fetchArticle(id: number): Promise<JournalEntry> {
+  return requestJson<JournalEntry>(`/api/me/articles/${id}`);
+}
+
+export function createArticle(input: {
+  title: string;
+  richBody: JournalRichDocument;
+  tags: string[];
+}): Promise<JournalEntry> {
+  return requestJson<JournalEntry>('/api/me/articles', jsonRequest('POST', input));
+}
+
+export function updateArticle(id: number, input: {
+  title: string;
+  richBody: JournalRichDocument;
+  tags: string[];
+}): Promise<JournalEntry> {
+  return requestJson<JournalEntry>(
+    `/api/me/articles/${id}`,
+    jsonRequest('PATCH', input),
+  );
+}
+
+export function uploadArticleAsset(
+  id: number,
+  file: File,
+  role: 'cover' | 'inline',
+): Promise<JournalArticleAssetResponse> {
+  const form = new FormData();
+  form.append('role', role);
+  form.append('file', file);
+  return requestJson<JournalArticleAssetResponse>(
+    `/api/me/articles/${id}/assets`,
+    { method: 'POST', body: form },
+  );
+}
+
+export function deleteArticleAsset(id: number, assetId: number): Promise<void> {
+  return requestWithoutResponse(`/api/me/articles/${id}/assets/${assetId}`, { method: 'DELETE' });
 }

@@ -1,11 +1,18 @@
+import { randomUUID } from 'node:crypto';
 import type Database from 'better-sqlite3';
 import { z } from 'zod';
 import type {
+  JournalAssetRole,
+  JournalAssetSourceKind,
+  JournalBodyFormat,
   JournalDeletionResult,
   JournalEntry,
   JournalFeed,
+  JournalRichDocument,
+  JournalSourceKind,
   JournalVisibility,
 } from '../shared/journalProtocol.js';
+import { journalRichDocumentSchema } from '../shared/journalProtocol.js';
 import type {
   CreateJournalEntryInput,
   JournalAssetAccess,
@@ -16,14 +23,19 @@ import type {
 interface EntryRow {
   id: number;
   public_id: string;
-  chat_id: string;
-  source_message_id: number;
+  source_kind: JournalSourceKind;
+  chat_id: string | null;
+  source_message_id: number | null;
   media_group_id: string | null;
   content_type: string;
+  title: string | null;
+  body_format: JournalBodyFormat;
   content_text: string;
+  rich_body_json: string | null;
   visibility: JournalVisibility;
   tags_json: string;
   structured_content_json: string | null;
+  telegram_message_json: string | null;
   pinned: 0 | 1;
   source_created_at: string;
   captured_at: string;
@@ -32,6 +44,8 @@ interface EntryRow {
 
 interface AssetRow {
   id: number;
+  source_kind: JournalAssetSourceKind;
+  role: JournalAssetRole;
   kind: string;
   original_name: string | null;
   mime_type: string | null;
@@ -39,6 +53,31 @@ interface AssetRow {
   width: number | null;
   height: number | null;
   duration: number | null;
+  relative_path: string;
+}
+
+export interface CreateArticleInput {
+  title: string;
+  richBodyJson: string;
+  tags: string[];
+  contentText: string;
+}
+
+export interface UpdateArticleInput {
+  title: string;
+  richBodyJson: string;
+  tags: string[];
+  contentText: string;
+}
+
+export interface InlineAssetRecord {
+  id: number;
+  relativePath: string;
+}
+
+export interface CoverAssetRecord {
+  id: number;
+  relativePath: string;
 }
 
 const cursorSchema = z.object({
@@ -84,10 +123,11 @@ export class JournalRepository {
     const insert = this.database.transaction((entry: CreateJournalEntryInput) => {
       const result = this.database.prepare(`
         INSERT INTO journal_entries (
-          public_id, chat_id, source_message_id, media_group_id, content_type,
-          content_text, visibility, tags_json, structured_content_json,
+          public_id, source_kind, chat_id, source_message_id, media_group_id, content_type,
+          title, body_format, rich_body_json, content_text,
+          visibility, tags_json, structured_content_json,
           telegram_message_json, source_created_at, captured_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, 'telegram', ?, ?, ?, ?, NULL, 'plain', NULL, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         entry.publicId,
         entry.chatId,
@@ -108,9 +148,9 @@ export class JournalRepository {
       const entryId = Number(result.lastInsertRowid);
       const insertAsset = this.database.prepare(`
         INSERT INTO journal_assets (
-          entry_id, kind, telegram_file_id, telegram_file_unique_id, original_name,
+          entry_id, source_kind, role, kind, telegram_file_id, telegram_file_unique_id, original_name,
           mime_type, byte_size, relative_path, width, height, duration, sort_order
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, 'telegram', 'attachment', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
       for (const asset of entry.assets) {
         insertAsset.run(
@@ -133,6 +173,150 @@ export class JournalRepository {
 
     const entryId = insert(input);
     return this.getById(entryId);
+  }
+
+  createArticle(input: CreateArticleInput): JournalEntry {
+    const publicId = randomUUID();
+    const now = new Date().toISOString();
+    const insert = this.database.transaction(() => {
+      const result = this.database.prepare(`
+        INSERT INTO journal_entries (
+          public_id, source_kind, chat_id, source_message_id, media_group_id, content_type,
+          title, body_format, rich_body_json, content_text,
+          visibility, tags_json, structured_content_json, telegram_message_json,
+          source_created_at, captured_at, updated_at
+        ) VALUES (?, 'web', NULL, NULL, NULL, 'article', ?, 'rich', ?, ?, 'private', ?, NULL, NULL, ?, ?, ?)
+      `).run(
+        publicId,
+        input.title,
+        input.richBodyJson,
+        input.contentText,
+        JSON.stringify(input.tags),
+        now,
+        now,
+        now,
+      );
+      return Number(result.lastInsertRowid);
+    });
+    const entryId = insert();
+    return this.getById(entryId);
+  }
+
+  updateArticle(id: number, input: UpdateArticleInput, removedAssetIds: number[]): JournalEntry {
+    const update = this.database.transaction(() => {
+      const result = this.database.prepare(`
+        UPDATE journal_entries
+        SET title = ?, rich_body_json = ?, content_text = ?, tags_json = ?, updated_at = ?
+        WHERE id = ? AND source_kind = 'web' AND body_format = 'rich'
+      `).run(
+        input.title,
+        input.richBodyJson,
+        input.contentText,
+        JSON.stringify(input.tags),
+        new Date().toISOString(),
+        id,
+      );
+      if (result.changes === 0) {
+        throw new Error(`Article ${id} was not found or is not a rich web entry.`);
+      }
+      this.deleteAssets(removedAssetIds);
+    });
+    update();
+    return this.getById(id);
+  }
+
+  getArticleForEditing(id: number): JournalEntry | null {
+    const row = this.database.prepare(`
+      SELECT * FROM journal_entries
+      WHERE id = ? AND source_kind = 'web' AND body_format = 'rich'
+    `).get(id) as EntryRow | undefined;
+    return row ? this.toEntry(row) : null;
+  }
+
+  listInlineAssets(id: number): InlineAssetRecord[] {
+    const rows = this.database.prepare(`
+      SELECT id, relative_path
+      FROM journal_assets
+      WHERE entry_id = ? AND source_kind = 'web' AND role = 'inline'
+      ORDER BY sort_order, id
+    `).all(id) as Array<{ id: number; relative_path: string }>;
+    return rows.map((row) => ({ id: row.id, relativePath: row.relative_path }));
+  }
+
+  findCover(id: number): CoverAssetRecord | null {
+    const row = this.database.prepare(`
+      SELECT id, relative_path
+      FROM journal_assets
+      WHERE entry_id = ? AND source_kind = 'web' AND role = 'cover'
+    `).get(id) as { id: number; relative_path: string } | undefined;
+    return row ? { id: row.id, relativePath: row.relative_path } : null;
+  }
+
+  insertWebAsset(
+    input: {
+      entryId: number;
+      role: JournalAssetRole;
+      relativePath: string;
+      kind: string;
+      mimeType: string | null;
+      originalName: string | null;
+      byteSize: number;
+      width?: number | null;
+      height?: number | null;
+      duration?: number | null;
+      sortOrder: number;
+    },
+  ): number {
+    const insert = this.database.transaction(() => {
+      if (input.role === 'cover') {
+        this.database.prepare(`
+          DELETE FROM journal_assets
+          WHERE entry_id = ? AND role = 'cover'
+        `).run(input.entryId);
+      }
+      const result = this.database.prepare(`
+        INSERT INTO journal_assets (
+          entry_id, source_kind, role, kind, telegram_file_id, telegram_file_unique_id,
+          original_name, mime_type, byte_size, relative_path,
+          width, height, duration, sort_order
+        ) VALUES (?, 'web', ?, ?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        input.entryId,
+        input.role,
+        input.kind,
+        input.originalName,
+        input.mimeType,
+        input.byteSize,
+        input.relativePath,
+        input.width ?? null,
+        input.height ?? null,
+        input.duration ?? null,
+        input.sortOrder,
+      );
+      return Number(result.lastInsertRowid);
+    });
+    return insert();
+  }
+
+  findWebAsset(id: number, assetId: number): AssetRow | null {
+    const row = this.database.prepare(`
+      SELECT a.*
+      FROM journal_assets a
+      JOIN journal_entries e ON e.id = a.entry_id
+      WHERE a.id = ?
+        AND a.entry_id = ?
+        AND a.source_kind = 'web'
+        AND e.source_kind = 'web'
+        AND e.body_format = 'rich'
+    `).get(assetId, id) as AssetRow | undefined;
+    return row ?? null;
+  }
+
+  deleteAssets(assetIds: number[]): void {
+    if (assetIds.length === 0) return;
+    const placeholders = assetIds.map(() => '?').join(', ');
+    this.database.prepare(`DELETE FROM journal_assets WHERE id IN (${placeholders})`)
+      .run(...assetIds);
   }
 
   updateVisibilityByPublicId(publicId: string, visibility: JournalVisibility): JournalEntry | null {
@@ -158,7 +342,7 @@ export class JournalRepository {
     const result = this.database.prepare(`
       UPDATE journal_entries
       SET content_text = ?, tags_json = ?, updated_at = ?
-      WHERE id = ?
+      WHERE id = ? AND body_format = 'plain'
     `).run(contentText, JSON.stringify(tags), new Date().toISOString(), id);
     return result.changes === 0 ? null : this.getById(id);
   }
@@ -232,8 +416,9 @@ export class JournalRepository {
       parameters.push(filters.tag);
     }
     if (filters.query) {
-      conditions.push('e.content_text LIKE ?');
-      parameters.push(`%${filters.query}%`);
+      conditions.push('(e.title LIKE ? OR e.content_text LIKE ?)');
+      const like = `%${filters.query}%`;
+      parameters.push(like, like);
     }
     if (filters.contentType) {
       conditions.push('e.content_type = ?');
@@ -379,10 +564,17 @@ export class JournalRepository {
 
   private toEntry(row: EntryRow): JournalEntry {
     const assets = this.assetsFor(row);
+    const richBody = row.rich_body_json === null
+      ? null
+      : journalRichDocumentSchema.parse(JSON.parse(row.rich_body_json)) as JournalRichDocument;
     return {
       id: row.id,
       publicId: row.public_id,
+      sourceKind: row.source_kind,
       contentType: row.content_type,
+      title: row.title,
+      bodyFormat: row.body_format,
+      richBody,
       contentText: row.content_text,
       visibility: row.visibility,
       tags: z.array(z.string()).parse(JSON.parse(row.tags_json)),
@@ -393,6 +585,8 @@ export class JournalRepository {
       updatedAt: row.updated_at,
       assets: assets.map((asset) => ({
         id: asset.id,
+        sourceKind: asset.source_kind,
+        role: asset.role,
         kind: asset.kind,
         url: `/media/${asset.id}`,
         originalName: asset.original_name,
@@ -408,15 +602,16 @@ export class JournalRepository {
   private assetsFor(row: EntryRow): AssetRow[] {
     if (row.media_group_id === null) {
       return this.database.prepare(`
-        SELECT id, kind, original_name, mime_type, byte_size, width, height, duration
+        SELECT id, source_kind, role, kind, original_name, mime_type, byte_size,
+               relative_path, width, height, duration
         FROM journal_assets
         WHERE entry_id = ?
         ORDER BY sort_order, id
       `).all(row.id) as AssetRow[];
     }
     return this.database.prepare(`
-      SELECT a.id, a.kind, a.original_name, a.mime_type, a.byte_size,
-             a.width, a.height, a.duration
+      SELECT a.id, a.source_kind, a.role, a.kind, a.original_name, a.mime_type, a.byte_size,
+             a.relative_path, a.width, a.height, a.duration
       FROM journal_assets a
       JOIN journal_entries e ON e.id = a.entry_id
       WHERE e.chat_id = ? AND e.media_group_id = ?

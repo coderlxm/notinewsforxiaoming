@@ -2,10 +2,27 @@ import type { FastifyInstance } from 'fastify';
 import { Feed } from 'feed';
 import type { JournalEntry } from '../../shared/journalProtocol.js';
 import type { JournalRepository } from '../repository.js';
+import { generateArticleHtml } from '../richText.js';
 
 function itemTitle(entry: JournalEntry): string {
+  if (entry.title) return entry.title;
   const compact = entry.contentText.replace(/\s+/g, ' ').trim();
   return compact === '' ? `${entry.contentType} 记录` : compact.slice(0, 80);
+}
+
+function itemContent(entry: JournalEntry, publicBaseUrl: string): string {
+  if (entry.bodyFormat === 'rich' && entry.richBody) {
+    return generateArticleHtml(entry.richBody, publicBaseUrl);
+  }
+  return entry.contentText;
+}
+
+function itemDescription(entry: JournalEntry): string {
+  if (entry.title) {
+    const summary = entry.contentText.replace(/\s+/g, ' ').trim();
+    return summary === '' ? entry.title : summary;
+  }
+  return entry.contentText;
 }
 
 function buildFeed(repository: JournalRepository, publicBaseUrl: string): Feed {
@@ -26,7 +43,7 @@ function buildFeed(repository: JournalRepository, publicBaseUrl: string): Feed {
 
   for (const entry of entries) {
     const link = `${publicBaseUrl}/p/${entry.publicId}`;
-    const firstAsset = entry.assets[0];
+    const firstAsset = entry.assets.find((asset) => asset.role === 'cover') ?? entry.assets[0];
     const enclosure = firstAsset
       ? {
           url: `${publicBaseUrl}${firstAsset.url}`,
@@ -39,8 +56,8 @@ function buildFeed(repository: JournalRepository, publicBaseUrl: string): Feed {
       id: link,
       link,
       date: new Date(entry.sourceCreatedAt),
-      description: entry.contentText,
-      content: entry.contentText,
+      description: itemDescription(entry),
+      content: itemContent(entry, publicBaseUrl),
       category: entry.tags.map((tag) => ({ name: tag })),
       ...(enclosure ? { enclosure } : {}),
     });

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive } from 'vue';
+import ArticleCardContent from '../article/ArticleCardContent.vue';
 import { useJournalApi } from '../../composables/useJournalApi';
 import { emptyFeedFilters, type FeedFilters, type JournalEntry, type JournalVisibility } from '../../types';
 import EntryCard from './EntryCard.vue';
@@ -75,6 +76,22 @@ function viewDetail(publicId: string): void {
   emit('navigate', `/p/${encodeURIComponent(publicId)}`);
 }
 
+function editArticle(id: number): void {
+  emit('navigate', `/me/articles/${id}/edit`);
+}
+
+function openArticle(entry: JournalEntry): void {
+  if (mode === 'private') {
+    editArticle(entry.id);
+    return;
+  }
+  viewDetail(entry.publicId);
+}
+
+function isArticleEntry(entry: JournalEntry): boolean {
+  return entry.bodyFormat === 'rich';
+}
+
 async function saveContent(entry: JournalEntry, contentText: string): Promise<void> {
   await journal.saveContent(entry, contentText);
   if (journal.error.value === null) await journal.loadPrivate(filters);
@@ -108,15 +125,25 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
           <span class="feed__eyebrow">PERSONAL ARCHIVE</span>
           <h1 class="feed__title">{{ listTitle }}</h1>
         </div>
-        <button
-          v-if="journal.authenticationState.value === 'authenticated'"
-          class="button button--quiet"
-          type="button"
-          :disabled="journal.loading.value"
-          @click="journal.logout"
-        >
-          退出登录
-        </button>
+        <div class="feed__private-actions">
+          <button
+            v-if="journal.authenticationState.value === 'authenticated'"
+            class="button button--quiet"
+            type="button"
+            @click="emit('navigate', '/me/articles/new')"
+          >
+            写文章
+          </button>
+          <button
+            v-if="journal.authenticationState.value === 'authenticated'"
+            class="button button--quiet"
+            type="button"
+            :disabled="journal.loading.value"
+            @click="journal.logout"
+          >
+            退出登录
+          </button>
+        </div>
       </div>
     </template>
 
@@ -148,6 +175,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
       <OnThisDay
         :entries="journal.onThisDayEntries.value"
         :mutation-entry-id="journal.mutationEntryId.value"
+        @edit-article="editArticle"
         @view-detail="viewDetail"
         @select-tag="selectTag"
         @save-content="saveContent"
@@ -159,6 +187,13 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
 
     <div v-if="journal.loading.value" class="feed__loading" role="status">正在读取记录…</div>
 
+    <ArticleCardContent
+      v-else-if="isDetail && journal.detail.value && isArticleEntry(journal.detail.value)"
+      :entry="journal.detail.value"
+      :linkable="false"
+      display="full"
+      @select-tag="selectTag"
+    />
     <EntryCard
       v-else-if="isDetail && journal.detail.value"
       :entry="journal.detail.value"
@@ -175,19 +210,32 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
       v-else-if="!isDetail && (mode === 'public' || journal.authenticationState.value === 'authenticated')"
       class="feed__entries"
     >
-      <EntryCard
-        v-for="entry in journal.entries.value"
-        :key="entry.id"
-        :entry="entry"
-        :editable="mode === 'private'"
-        :busy="journal.mutationEntryId.value === entry.id"
-        @view-detail="viewDetail"
-        @select-tag="selectTag"
-        @save-content="saveContent"
-        @set-visibility="setVisibility"
-        @set-pinned="setPinned"
-        @delete-entry="deleteEntry"
-      />
+      <template v-for="entry in journal.entries.value" :key="entry.id">
+        <ArticleCardContent
+          v-if="isArticleEntry(entry)"
+          :entry="entry"
+          :editable="mode === 'private'"
+          :busy="journal.mutationEntryId.value === entry.id"
+          @open="openArticle"
+          @select-tag="selectTag"
+          @edit="editArticle"
+          @set-visibility="setVisibility"
+          @set-pinned="setPinned"
+          @delete-entry="deleteEntry"
+        />
+        <EntryCard
+          v-else
+          :entry="entry"
+          :editable="mode === 'private'"
+          :busy="journal.mutationEntryId.value === entry.id"
+          @view-detail="viewDetail"
+          @select-tag="selectTag"
+          @save-content="saveContent"
+          @set-visibility="setVisibility"
+          @set-pinned="setPinned"
+          @delete-entry="deleteEntry"
+        />
+      </template>
 
       <p v-if="!journal.entries.value.length && !journal.error.value" class="feed__empty">
         {{ mode === 'private' ? '没有符合当前筛选条件的记录。' : '这里还没有公开记录。' }}
@@ -227,6 +275,13 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
   align-items: end;
   justify-content: space-between;
   min-height: 3.5rem;
+}
+
+.feed__private-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
 }
 
 .feed__detail-heading {

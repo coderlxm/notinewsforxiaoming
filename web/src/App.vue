@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, shallowRef } from 'vue';
+import ArticleEditorView from './components/article/ArticleEditorView.vue';
 import FeedView from './components/journal/FeedView.vue';
 
 type AppRoute =
   | { name: 'public'; key: string; tag: string }
   | { name: 'detail'; key: string; publicId: string }
   | { name: 'private'; key: string }
+  | { name: 'article-new'; key: string }
+  | { name: 'article-edit'; key: string; articleId: number }
   | { name: 'not-found'; key: string };
 
 const locationKey = shallowRef(`${window.location.pathname}${window.location.search}`);
@@ -17,6 +20,14 @@ const route = computed<AppRoute>(() => {
     return { name: 'public', key: `public:${tag}`, tag };
   }
   if (url.pathname === '/me') return { name: 'private', key: 'private' };
+  if (url.pathname === '/me/articles/new') {
+    return { name: 'article-new', key: 'article-new' };
+  }
+  const editMatch = url.pathname.match(/^\/me\/articles\/(\d+)\/edit$/);
+  if (editMatch) {
+    const articleId = Number(editMatch[1]);
+    return { name: 'article-edit', key: `article-edit:${articleId}`, articleId };
+  }
   if (url.pathname.startsWith('/p/')) {
     const publicId = decodeURIComponent(url.pathname.slice(3));
     return { name: 'detail', key: `detail:${publicId}`, publicId };
@@ -59,7 +70,7 @@ onUnmounted(() => window.removeEventListener('popstate', synchronizeLocation));
         </button>
         <button
           class="profile__nav-link"
-          :class="{ 'profile__nav-link--active': route.name === 'private' }"
+          :class="{ 'profile__nav-link--active': route.name === 'private' || route.name === 'article-new' || route.name === 'article-edit' }"
           type="button"
           @click="navigate('/me')"
         >
@@ -86,6 +97,17 @@ onUnmounted(() => window.removeEventListener('popstate', synchronizeLocation));
       v-else-if="route.name === 'private'"
       :key="route.key"
       mode="private"
+      @navigate="navigate"
+    />
+    <ArticleEditorView
+      v-else-if="route.name === 'article-new'"
+      :key="route.key"
+      @navigate="navigate"
+    />
+    <ArticleEditorView
+      v-else-if="route.name === 'article-edit'"
+      :key="route.key"
+      :article-id="route.articleId"
       @navigate="navigate"
     />
     <main v-else class="not-found">
