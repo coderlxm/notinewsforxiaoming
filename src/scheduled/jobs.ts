@@ -7,6 +7,11 @@ import { isChinaWorkday } from '../calendar/chinaWorkday.js';
 import { runStartggWatchNow } from '../services/startggPresetSync.js';
 import { runStartggWatchOnce } from '../services/startgg/index.js';
 import { runSteamPriceWatchOnce } from '../services/steamPriceTracker.js';
+import { buildSummary } from '../services/masturbationTracker.js';
+import {
+  buildMasturbationStatusButtons,
+  formatMasturbationReminderCard,
+} from '../formatters/masturbationFormatter.js';
 import {
   isStartggPollingPersistedEnabled,
   listActiveStartggWatchEvents,
@@ -234,6 +239,15 @@ export function registerFixedJobs(bot: Telegraf): void {
   });
   schedule.scheduleJob({ hour: 20, minute: 15, tz: 'Asia/Shanghai' }, async () => {
     await runSteamPriceWatchOnce(bot);
+  });
+
+  // masturbation: 22:00, only when no record exists for today
+  schedule.scheduleJob({ hour: 22, minute: 0, tz: 'Asia/Shanghai' }, async () => {
+    if (buildSummary().todayCount > 0) return;
+    await bot.telegram.sendMessage(config.tgChatId, formatMasturbationReminderCard(), {
+      parse_mode: 'HTML',
+      ...buildMasturbationStatusButtons(),
+    });
   });
 
   console.log('Fixed jobs registered.');

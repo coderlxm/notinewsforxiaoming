@@ -30,6 +30,15 @@ export function formatMasturbationStatusCard(summary: MasturbationSummary, now: 
   ].join('\n');
 }
 
+export function formatMasturbationReminderCard(): string {
+  return [
+    '📝 撸了吗',
+    '',
+    '今天还没有记录。',
+    '如果只是忘了，点下方“记一次”；不需要记录可忽略。',
+  ].join('\n');
+}
+
 export function formatMasturbationConfirmCard(record: MasturbationRecord, todayCount: number): string {
   return [
     '✅ 已记录',
