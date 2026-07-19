@@ -1,4 +1,5 @@
-import { generateHTML, generateText } from '@tiptap/html';
+import { generateText } from '@tiptap/core';
+import { generateHTML } from '@tiptap/html/server';
 import { load } from 'cheerio';
 import sanitizeHtml from 'sanitize-html';
 import type { JournalRichDocument, JournalRichNode } from '../shared/journalProtocol.js';
