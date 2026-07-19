@@ -1,14 +1,21 @@
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import {
   journalIngestRequestSchema,
   journalVisibilityRequestSchema,
 } from '../../shared/journalProtocol.js';
 import type { JournalAuth } from '../auth.js';
+import type { JournalDeletionService } from '../deletion.js';
 import type { JournalIngestService } from '../ingest.js';
 import type { JournalRepository } from '../repository.js';
 
+const publicIdParamsSchema = z.object({
+  publicId: z.string().uuid(),
+});
+
 interface InternalRoutesOptions {
   auth: JournalAuth;
+  deletionService: JournalDeletionService;
   ingestService: JournalIngestService;
   repository: JournalRepository;
 }
@@ -32,5 +39,14 @@ export async function registerInternalRoutes(
     const entry = options.repository.updateVisibilityByPublicId(publicId, input.visibility);
     if (!entry) return reply.code(404).send({ error: 'Journal entry was not found.' });
     return entry;
+  });
+
+  server.delete('/api/internal/telegram-entries/:publicId', {
+    preHandler: options.auth.requireInternal,
+  }, async (request, reply) => {
+    const { publicId } = publicIdParamsSchema.parse(request.params);
+    const result = await options.deletionService.deleteByPublicId(publicId);
+    if (!result) return reply.code(404).send({ error: 'Journal entry was not found.' });
+    return result;
   });
 }

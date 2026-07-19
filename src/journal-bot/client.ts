@@ -1,9 +1,12 @@
 import axios from 'axios';
+import type { ZodType } from 'zod';
 import {
   journalApiErrorSchema,
+  journalDeletionResultSchema,
   journalEntrySchema,
   journalIngestRequestSchema,
   journalVisibilityRequestSchema,
+  type JournalDeletionResult,
   type JournalEntry,
   type JournalIngestRequest,
   type JournalVisibility,
@@ -28,27 +31,39 @@ export class JournalApiClient {
 
   async ingest(input: JournalIngestRequest): Promise<JournalEntry> {
     const request = journalIngestRequestSchema.parse(input);
-    return this.requestEntry(
+    return this.request(
       `${this.baseUrl}/api/internal/telegram-entries`,
       'post',
       request,
+      journalEntrySchema,
     );
   }
 
   async updateVisibility(publicId: string, visibility: JournalVisibility): Promise<JournalEntry> {
     const request = journalVisibilityRequestSchema.parse({ visibility });
-    return this.requestEntry(
+    return this.request(
       `${this.baseUrl}/api/internal/telegram-entries/${encodeURIComponent(publicId)}/visibility`,
       'patch',
       request,
+      journalEntrySchema,
     );
   }
 
-  private async requestEntry(
+  async delete(publicId: string): Promise<JournalDeletionResult> {
+    return this.request(
+      `${this.baseUrl}/api/internal/telegram-entries/${encodeURIComponent(publicId)}`,
+      'delete',
+      undefined,
+      journalDeletionResultSchema,
+    );
+  }
+
+  private async request<T>(
     url: string,
-    method: 'post' | 'patch',
+    method: 'delete' | 'patch' | 'post',
     data: unknown,
-  ): Promise<JournalEntry> {
+    responseSchema: ZodType<T>,
+  ): Promise<T> {
     try {
       const response = await axios.request({
         url,
@@ -59,7 +74,7 @@ export class JournalApiClient {
           'Content-Type': 'application/json',
         },
       });
-      const parsed = journalEntrySchema.safeParse(response.data);
+      const parsed = responseSchema.safeParse(response.data);
       if (!parsed.success) {
         throw new JournalClientError('Journal 服务返回了不符合约定的数据。');
       }

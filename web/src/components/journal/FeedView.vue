@@ -89,6 +89,10 @@ async function setPinned(entry: JournalEntry, pinned: boolean): Promise<void> {
   await journal.setPinned(entry, pinned);
   if (journal.error.value === null) await journal.loadPrivate(filters);
 }
+
+async function deleteEntry(entry: JournalEntry): Promise<void> {
+  await journal.deleteEntry(entry);
+}
 </script>
 
 <template>
@@ -149,6 +153,7 @@ async function setPinned(entry: JournalEntry, pinned: boolean): Promise<void> {
         @save-content="saveContent"
         @set-visibility="setVisibility"
         @set-pinned="setPinned"
+        @delete-entry="deleteEntry"
       />
     </template>
 
@@ -163,6 +168,7 @@ async function setPinned(entry: JournalEntry, pinned: boolean): Promise<void> {
       @save-content="saveContent"
       @set-visibility="setVisibility"
       @set-pinned="setPinned"
+      @delete-entry="deleteEntry"
     />
 
     <div
@@ -180,6 +186,7 @@ async function setPinned(entry: JournalEntry, pinned: boolean): Promise<void> {
         @save-content="saveContent"
         @set-visibility="setVisibility"
         @set-pinned="setPinned"
+        @delete-entry="deleteEntry"
       />
 
       <p v-if="!journal.entries.value.length && !journal.error.value" class="feed__empty">

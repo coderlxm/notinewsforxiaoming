@@ -1,6 +1,7 @@
 import type Database from 'better-sqlite3';
 import { z } from 'zod';
 import type {
+  JournalDeletionResult,
   JournalEntry,
   JournalFeed,
   JournalVisibility,
@@ -8,6 +9,7 @@ import type {
 import type {
   CreateJournalEntryInput,
   JournalAssetAccess,
+  JournalDeletionTarget,
   JournalListFilters,
 } from './types.js';
 
@@ -181,6 +183,42 @@ export class JournalRepository {
     return row ? this.toEntry(row) : null;
   }
 
+  findDeletionTargetById(id: number): JournalDeletionTarget | null {
+    const row = this.findRowById(id);
+    return row ? this.deletionTarget(row) : null;
+  }
+
+  findDeletionTargetByPublicId(publicId: string): JournalDeletionTarget | null {
+    const row = this.findRowByPublicId(publicId);
+    return row ? this.deletionTarget(row) : null;
+  }
+
+  deleteTarget(target: JournalDeletionTarget): JournalDeletionResult {
+    const entryIds = target.entries.map((entry) => entry.id);
+    const placeholders = entryIds.map(() => '?').join(', ');
+    const remove = this.database.transaction(() => {
+      const assets = this.database.prepare(`
+        DELETE FROM journal_assets WHERE entry_id IN (${placeholders})
+      `).run(...entryIds);
+      if (assets.changes !== target.assetCount) {
+        throw new Error('Journal asset rows changed before deletion completed.');
+      }
+
+      const entries = this.database.prepare(`
+        DELETE FROM journal_entries WHERE id IN (${placeholders})
+      `).run(...entryIds);
+      if (entries.changes !== entryIds.length) {
+        throw new Error('Journal entry rows changed before deletion completed.');
+      }
+
+      return {
+        deletedEntryCount: entries.changes,
+        deletedAssetCount: assets.changes,
+      };
+    });
+    return remove();
+  }
+
   list(filters: JournalListFilters): JournalFeed {
     const conditions = [this.groupRepresentativeCondition('e')];
     const parameters: unknown[] = [];
@@ -308,6 +346,35 @@ export class JournalRepository {
       UPDATE journal_entries SET ${assignments}
       WHERE chat_id = ? AND media_group_id = ?
     `).run(...parameters, row.chat_id, row.media_group_id);
+  }
+
+  private deletionTarget(row: EntryRow): JournalDeletionTarget {
+    const entries = row.media_group_id === null
+      ? [row]
+      : this.database.prepare(`
+          SELECT * FROM journal_entries
+          WHERE chat_id = ? AND media_group_id = ?
+          ORDER BY source_message_id, id
+        `).all(row.chat_id, row.media_group_id) as EntryRow[];
+    const entryIds = entries.map((entry) => entry.id);
+    const placeholders = entryIds.map(() => '?').join(', ');
+    const assets = this.database.prepare(`
+      SELECT entry_id, relative_path
+      FROM journal_assets
+      WHERE entry_id IN (${placeholders})
+      ORDER BY entry_id, sort_order, id
+    `).all(...entryIds) as Array<{ entry_id: number; relative_path: string }>;
+
+    return {
+      entries: entries.map((entry) => ({
+        id: entry.id,
+        publicId: entry.public_id,
+        assetRelativePaths: assets
+          .filter((asset) => asset.entry_id === entry.id)
+          .map((asset) => asset.relative_path),
+      })),
+      assetCount: assets.length,
+    };
   }
 
   private toEntry(row: EntryRow): JournalEntry {

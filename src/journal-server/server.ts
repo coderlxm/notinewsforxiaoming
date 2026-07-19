@@ -8,6 +8,7 @@ import Fastify, {
 import { ZodError } from 'zod';
 import { JournalAuth } from './auth.js';
 import { openJournalDatabase } from './database.js';
+import { JournalDeletionService } from './deletion.js';
 import { JournalIngestService } from './ingest.js';
 import { JournalRepository } from './repository.js';
 import { registerFeedRoutes } from './routes/feeds.js';
@@ -25,6 +26,7 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
   const repository = new JournalRepository(database);
   const auth = new JournalAuth(config.ingestToken, config.adminPassword);
   const storage = new JournalStorage(config.dataDir);
+  const deletionService = new JournalDeletionService(repository, storage);
   const downloader = new TelegramFileDownloader(config.telegramToken);
   const ingestService = new JournalIngestService(
     config.allowedChatId,
@@ -57,9 +59,9 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
     return { status: 'ok' };
   });
 
-  await registerInternalRoutes(server, { auth, ingestService, repository });
+  await registerInternalRoutes(server, { auth, deletionService, ingestService, repository });
   await registerPublicFeedRoutes(server, repository);
-  await registerPrivateEntryRoutes(server, auth, repository);
+  await registerPrivateEntryRoutes(server, auth, repository, deletionService);
   await registerMediaRoutes(server, auth, repository, config.dataDir);
   await registerFeedRoutes(server, repository, config.publicBaseUrl);
 

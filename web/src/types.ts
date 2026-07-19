@@ -36,6 +36,11 @@ export interface OnThisDayResponse {
   entries: JournalEntry[];
 }
 
+export interface JournalDeletionResult {
+  deletedEntryCount: number;
+  deletedAssetCount: number;
+}
+
 export interface JournalApiError {
   error: string;
 }

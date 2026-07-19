@@ -73,3 +73,14 @@ export interface JournalAssetAccess {
   byteSize: number | null;
   visibility: JournalVisibility;
 }
+
+export interface JournalDeletionTargetEntry {
+  id: number;
+  publicId: string;
+  assetRelativePaths: string[];
+}
+
+export interface JournalDeletionTarget {
+  entries: JournalDeletionTargetEntry[];
+  assetCount: number;
+}

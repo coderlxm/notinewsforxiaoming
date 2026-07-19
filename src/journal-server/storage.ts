@@ -1,6 +1,7 @@
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
+import type { JournalDeletionTargetEntry } from './types.js';
 
 export interface EntryStorageSession {
   tempDir: string;
@@ -54,5 +55,44 @@ export class JournalStorage {
 
   async discardFinal(session: EntryStorageSession): Promise<void> {
     await fs.promises.rm(session.finalDir, { recursive: true });
+  }
+
+  async deleteEntryAssets(entries: JournalDeletionTargetEntry[]): Promise<void> {
+    const directories: string[] = [];
+
+    for (const entry of entries) {
+      if (entry.assetRelativePaths.length === 0) continue;
+      const relativeDirectories = new Set(
+        entry.assetRelativePaths.map((relativePath) => path.posix.dirname(relativePath)),
+      );
+      if (relativeDirectories.size !== 1) {
+        throw new Error(`Journal entry ${entry.id} assets do not share one directory.`);
+      }
+
+      const relativeDirectory = [...relativeDirectories][0] as string;
+      const segments = relativeDirectory.split('/');
+      const [root, year, month, publicId] = segments;
+      if (
+        segments.length !== 4
+        || root !== 'assets'
+        || !year
+        || !month
+        || !/^\d{4}$/.test(year)
+        || !/^(?:0[1-9]|1[0-2])$/.test(month)
+        || publicId !== entry.publicId
+      ) {
+        throw new Error(`Journal entry ${entry.id} asset directory is invalid.`);
+      }
+      const absoluteDirectory = path.resolve(this.dataDir, ...segments);
+      const assetsRoot = path.resolve(this.assetsDir);
+      if (!absoluteDirectory.startsWith(`${assetsRoot}${path.sep}`)) {
+        throw new Error(`Journal entry ${entry.id} asset directory is outside the assets root.`);
+      }
+      directories.push(absoluteDirectory);
+    }
+
+    for (const directory of directories) {
+      await fs.promises.rm(directory, { recursive: true });
+    }
   }
 }

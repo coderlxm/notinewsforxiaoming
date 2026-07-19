@@ -1,6 +1,7 @@
 import type {
   FeedFilters,
   JournalApiError,
+  JournalDeletionResult,
   JournalEntry,
   JournalFeed,
   JournalVisibility,
@@ -111,4 +112,8 @@ export function updateEntryPinned(id: number, pinned: boolean): Promise<JournalE
     `/api/me/entries/${id}/pinned`,
     jsonRequest('PATCH', { pinned }),
   );
+}
+
+export function deleteEntry(id: number): Promise<JournalDeletionResult> {
+  return requestJson<JournalDeletionResult>(`/api/me/entries/${id}`, { method: 'DELETE' });
 }

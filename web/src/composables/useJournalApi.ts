@@ -1,5 +1,6 @@
 import { readonly, ref, shallowReadonly, shallowRef } from 'vue';
 import {
+  deleteEntry as deleteEntryRequest,
   fetchOnThisDay,
   fetchPrivateFeed,
   fetchPublicEntry,
@@ -220,6 +221,26 @@ export function useJournalApi() {
     }
   }
 
+  async function deleteEntry(entry: JournalEntry): Promise<void> {
+    mutationEntryId.value = entry.id;
+    error.value = null;
+    try {
+      await deleteEntryRequest(entry.id);
+      entries.value = entries.value.filter(item => item.id !== entry.id);
+      onThisDayEntries.value = onThisDayEntries.value.filter(item => item.id !== entry.id);
+      if (detail.value?.id === entry.id) detail.value = null;
+    }
+    catch (reason) {
+      if (reason instanceof JournalRequestError && reason.status === 401) {
+        authenticationState.value = 'anonymous';
+      }
+      exposeError(reason);
+    }
+    finally {
+      mutationEntryId.value = null;
+    }
+  }
+
   return {
     entries: shallowReadonly(entries),
     detail: shallowReadonly(detail),
@@ -240,5 +261,6 @@ export function useJournalApi() {
     saveContent,
     setVisibility,
     setPinned,
+    deleteEntry,
   };
 }

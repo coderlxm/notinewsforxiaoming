@@ -21,9 +21,11 @@ const emit = defineEmits<{
   saveContent: [entry: JournalEntry, contentText: string];
   setVisibility: [entry: JournalEntry, visibility: JournalVisibility];
   setPinned: [entry: JournalEntry, pinned: boolean];
+  deleteEntry: [entry: JournalEntry];
 }>();
 
 const editing = shallowRef(false);
+const confirmingDeletion = shallowRef(false);
 const draft = shallowRef(props.entry.contentText);
 const hiddenStructuredKeys = new Set(['entities', 'caption_entities']);
 
@@ -34,6 +36,11 @@ const canSave = computed(() => draft.value !== props.entry.contentText && !props
 const nextVisibility = computed<JournalVisibility>(() =>
   props.entry.visibility === 'public' ? 'private' : 'public',
 );
+const deletionMessage = computed(() => {
+  if (props.entry.assets.length === 0) return '永久删除这条记录？此操作无法撤销。';
+  if (props.entry.assets.length === 1) return '永久删除这条记录及其附件？此操作无法撤销。';
+  return `永久删除这条记录及其 ${props.entry.assets.length} 个附件？此操作无法撤销。`;
+});
 
 watch(() => props.entry.contentText, (contentText) => {
   draft.value = contentText;
@@ -43,6 +50,11 @@ watch(() => props.entry.contentText, (contentText) => {
 function cancelEditing(): void {
   draft.value = props.entry.contentText;
   editing.value = false;
+}
+
+function startDeletion(): void {
+  editing.value = false;
+  confirmingDeletion.value = true;
 }
 </script>
 
@@ -116,24 +128,59 @@ function cancelEditing(): void {
       </button>
     </div>
 
-    <footer v-if="editable" class="entry__actions">
-      <button class="entry__action" type="button" :disabled="busy" @click="editing = true">编辑</button>
-      <button
-        class="entry__action"
-        type="button"
-        :disabled="busy"
-        @click="emit('setPinned', entry, !entry.pinned)"
-      >
-        {{ entry.pinned ? '取消置顶' : '置顶' }}
-      </button>
-      <button
-        class="entry__action"
-        type="button"
-        :disabled="busy"
-        @click="emit('setVisibility', entry, nextVisibility)"
-      >
-        {{ nextVisibility === 'public' ? '设为公开' : '转为私有' }}
-      </button>
+    <footer
+      v-if="editable"
+      class="entry__actions"
+      :class="{ 'entry__actions--confirming': confirmingDeletion }"
+    >
+      <template v-if="!confirmingDeletion">
+        <button class="entry__action" type="button" :disabled="busy" @click="editing = true">编辑</button>
+        <button
+          class="entry__action"
+          type="button"
+          :disabled="busy"
+          @click="emit('setPinned', entry, !entry.pinned)"
+        >
+          {{ entry.pinned ? '取消置顶' : '置顶' }}
+        </button>
+        <button
+          class="entry__action"
+          type="button"
+          :disabled="busy"
+          @click="emit('setVisibility', entry, nextVisibility)"
+        >
+          {{ nextVisibility === 'public' ? '设为公开' : '转为私有' }}
+        </button>
+        <button
+          class="entry__action entry__action--danger"
+          type="button"
+          :disabled="busy"
+          @click="startDeletion"
+        >
+          删除
+        </button>
+      </template>
+      <div v-else class="entry__delete-confirmation" role="alert">
+        <p class="entry__delete-message">{{ deletionMessage }}</p>
+        <div class="entry__delete-actions">
+          <button
+            class="button button--quiet"
+            type="button"
+            :disabled="busy"
+            @click="confirmingDeletion = false"
+          >
+            取消
+          </button>
+          <button
+            class="button entry__delete-button"
+            type="button"
+            :disabled="busy"
+            @click="emit('deleteEntry', entry)"
+          >
+            {{ busy ? '删除中…' : '确认删除' }}
+          </button>
+        </div>
+      </div>
     </footer>
   </article>
 </template>
@@ -298,6 +345,42 @@ function cancelEditing(): void {
 .entry__action:disabled {
   cursor: wait;
   opacity: 0.5;
+}
+
+.entry__action--danger {
+  color: var(--danger);
+}
+
+.entry__actions--confirming {
+  display: block;
+}
+
+.entry__delete-confirmation {
+  display: grid;
+  gap: 0.65rem;
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--danger) 32%, transparent);
+  border-radius: 0.8rem;
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.entry__delete-message {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.entry__delete-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.55rem;
+}
+
+.entry__delete-button {
+  background: var(--danger);
+  color: #fff;
 }
 
 .entry__editor {

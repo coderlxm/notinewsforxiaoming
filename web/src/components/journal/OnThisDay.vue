@@ -13,6 +13,7 @@ const emit = defineEmits<{
   saveContent: [entry: JournalEntry, contentText: string];
   setVisibility: [entry: JournalEntry, visibility: JournalVisibility];
   setPinned: [entry: JournalEntry, pinned: boolean];
+  deleteEntry: [entry: JournalEntry];
 }>();
 
 function forwardSaveContent(entry: JournalEntry, contentText: string): void {
@@ -25,6 +26,10 @@ function forwardVisibility(entry: JournalEntry, visibility: JournalVisibility): 
 
 function forwardPinned(entry: JournalEntry, pinned: boolean): void {
   emit('setPinned', entry, pinned);
+}
+
+function forwardDelete(entry: JournalEntry): void {
+  emit('deleteEntry', entry);
 }
 </script>
 
@@ -46,6 +51,7 @@ function forwardPinned(entry: JournalEntry, pinned: boolean): void {
         @save-content="forwardSaveContent"
         @set-visibility="forwardVisibility"
         @set-pinned="forwardPinned"
+        @delete-entry="forwardDelete"
       />
     </div>
   </section>

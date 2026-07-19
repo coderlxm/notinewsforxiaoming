@@ -27,7 +27,7 @@ export async function registerMediaRoutes(
     reply.header('Content-Disposition', contentDisposition(filename, { type: dispositionType }));
     reply.header(
       'Cache-Control',
-      asset.visibility === 'public' ? 'public, max-age=86400' : 'private, no-store',
+      asset.visibility === 'public' ? 'public, no-cache' : 'private, no-store',
     );
     if (asset.mimeType) reply.type(asset.mimeType);
 

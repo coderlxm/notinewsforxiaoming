@@ -66,6 +66,12 @@ export const journalPinnedUpdateRequestSchema = z.object({
 });
 export type JournalPinnedUpdateRequest = z.infer<typeof journalPinnedUpdateRequestSchema>;
 
+export const journalDeletionResultSchema = z.object({
+  deletedEntryCount: z.number().int().positive(),
+  deletedAssetCount: z.number().int().nonnegative(),
+});
+export type JournalDeletionResult = z.infer<typeof journalDeletionResultSchema>;
+
 export const journalApiErrorSchema = z.object({
   error: z.string().min(1),
 });

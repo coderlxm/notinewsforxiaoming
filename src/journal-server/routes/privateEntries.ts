@@ -7,6 +7,7 @@ import {
   journalVisibilityRequestSchema,
 } from '../../shared/journalProtocol.js';
 import type { JournalAuth } from '../auth.js';
+import type { JournalDeletionService } from '../deletion.js';
 import type { JournalRepository } from '../repository.js';
 
 const privateEntriesQuerySchema = z.object({
@@ -51,6 +52,7 @@ export async function registerPrivateEntryRoutes(
   server: FastifyInstance,
   auth: JournalAuth,
   repository: JournalRepository,
+  deletionService: JournalDeletionService,
 ): Promise<void> {
   server.post('/api/auth/login', async (request, reply) => {
     const { password } = journalLoginRequestSchema.parse(request.body);
@@ -113,5 +115,14 @@ export async function registerPrivateEntryRoutes(
     const entry = repository.updatePinned(id, pinned);
     if (!entry) return reply.code(404).send({ error: 'Journal entry was not found.' });
     return entry;
+  });
+
+  server.delete('/api/me/entries/:id', {
+    preHandler: auth.requireAdmin,
+  }, async (request, reply) => {
+    const { id } = idParamsSchema.parse(request.params);
+    const result = await deletionService.deleteById(id);
+    if (!result) return reply.code(404).send({ error: 'Journal entry was not found.' });
+    return result;
   });
 }

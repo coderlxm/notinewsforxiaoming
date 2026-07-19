@@ -11,6 +11,7 @@ import type { RegisterJournalBotHandlersOptions } from './types.js';
 
 const JOURNAL_COMMAND_PATTERN = /^\/(?:note|post)(?:@[A-Za-z0-9_]+)?(?:\s+([\s\S]*))?$/i;
 const JOURNAL_VISIBILITY_CALLBACK_PATTERN = /^journal:visibility:([0-9a-f-]{36}):(private|public)$/;
+const JOURNAL_DELETE_CALLBACK_PATTERN = /^jd:(ask|confirm|cancel):([0-9a-f-]{36}):(p|r)$/;
 
 const CAPTURABLE_MESSAGE_FIELDS = new Set([
   'text',
@@ -97,27 +98,45 @@ function formatVisibility(visibility: JournalVisibility): string {
   return visibility === 'public' ? '公开动态' : '私有笔记';
 }
 
-function formatResult(entry: JournalEntry, sourceMessageCount = 1): string {
+function formatResult(entry: Pick<JournalEntry, 'visibility'>, sourceMessageCount = 1): string {
   if (sourceMessageCount > 1) {
     return `已将相册中的 ${sourceMessageCount} 项保存为${formatVisibility(entry.visibility)}。`;
   }
   return `已保存为${formatVisibility(entry.visibility)}。`;
 }
 
-function buildResultButtons(entry: JournalEntry, publicBaseUrl: string) {
+function buildResultButtons(
+  entry: Pick<JournalEntry, 'publicId' | 'visibility'>,
+  publicBaseUrl: string,
+) {
   const targetVisibility: JournalVisibility = entry.visibility === 'public' ? 'private' : 'public';
   const visibilityLabel = targetVisibility === 'public' ? '🌐 设为公开' : '🔒 转为私有';
+  const visibilityMarker = entry.visibility === 'public' ? 'p' : 'r';
   const siteUrl = entry.visibility === 'public'
     ? `${publicBaseUrl}/p/${entry.publicId}`
     : `${publicBaseUrl}/me`;
 
   return Markup.inlineKeyboard([
-    Markup.button.callback(
-      visibilityLabel,
-      `journal:visibility:${entry.publicId}:${targetVisibility}`,
-    ),
-    Markup.button.url('🌍 打开网站', siteUrl),
+    [
+      Markup.button.callback(
+        visibilityLabel,
+        `journal:visibility:${entry.publicId}:${targetVisibility}`,
+      ),
+      Markup.button.url('🌍 打开网站', siteUrl),
+    ],
+    [Markup.button.callback('🗑 删除', `jd:ask:${entry.publicId}:${visibilityMarker}`)],
   ]);
+}
+
+function deleteConfirmationButtons(publicId: string, visibilityMarker: 'p' | 'r') {
+  return Markup.inlineKeyboard([[
+    Markup.button.callback('确认删除', `jd:confirm:${publicId}:${visibilityMarker}`),
+    Markup.button.callback('取消', `jd:cancel:${publicId}:${visibilityMarker}`),
+  ]]);
+}
+
+function visibilityFromMarker(marker: 'p' | 'r'): JournalVisibility {
+  return marker === 'p' ? 'public' : 'private';
 }
 
 export function registerJournalBotHandlers(
@@ -305,6 +324,42 @@ export function registerJournalBotHandlers(
     } catch (error) {
       if (!(error instanceof JournalClientError)) throw error;
       await ctx.answerCbQuery(`Journal 操作失败：${error.message}`, { show_alert: true });
+    }
+  });
+
+  bot.action(JOURNAL_DELETE_CALLBACK_PATTERN, async (ctx) => {
+    if (!isAuthorized(ctx, options.allowedChatId)) return;
+    const match = JOURNAL_DELETE_CALLBACK_PATTERN.exec(ctx.match[0]);
+    if (!match?.[1] || !match[2] || (match[3] !== 'p' && match[3] !== 'r')) return;
+    const action = match[1];
+    const publicId = match[2];
+    const visibility = visibilityFromMarker(match[3]);
+
+    if (action === 'ask') {
+      await ctx.answerCbQuery();
+      await ctx.editMessageText(
+        '确认永久删除这条 Journal 记录及其附件？\n原始 Telegram 消息不会被删除。',
+        deleteConfirmationButtons(publicId, match[3]),
+      );
+      return;
+    }
+
+    if (action === 'cancel') {
+      await ctx.answerCbQuery('已取消删除');
+      await ctx.editMessageText(
+        formatResult({ visibility }),
+        buildResultButtons({ publicId, visibility }, publicBaseUrl),
+      );
+      return;
+    }
+
+    try {
+      await api.delete(publicId);
+      await ctx.answerCbQuery('已删除 Journal 记录');
+      await ctx.editMessageText('已删除此 Journal 记录。');
+    } catch (error) {
+      if (!(error instanceof JournalClientError)) throw error;
+      await ctx.answerCbQuery(`Journal 删除失败：${error.message}`, { show_alert: true });
     }
   });
 }
