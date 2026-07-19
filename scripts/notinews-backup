@@ -27,6 +27,6 @@ tar -czf "${ARCHIVE_PATH}" \
   -C "${BACKUP_WORK_DIR}" \
   backup-manifest.txt
 
-rclone copyto "${ARCHIVE_PATH}" "notinews-drive:NotiNewsBackups/${BACKUP_NAME}"
+rclone copyto "${ARCHIVE_PATH}" "notinews-drive:NotiNewsBackups-LongTerm/${BACKUP_NAME}"
 rm "${ARCHIVE_PATH}" "${MANIFEST_PATH}"
-rclone delete "notinews-drive:NotiNewsBackups" --min-age 30d
+rclone delete "notinews-drive:NotiNewsBackups-LongTerm" --min-age 30d

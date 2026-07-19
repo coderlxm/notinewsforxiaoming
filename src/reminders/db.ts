@@ -13,6 +13,7 @@ export function getDb(): Database.Database {
     const dbPath = path.resolve(__dirname, '../../data/notinews.sqlite');
     db = new Database(dbPath);
     db.pragma('journal_mode = WAL');
+    db.pragma('foreign_keys = ON');
     db.exec(`
       CREATE TABLE IF NOT EXISTS reminders (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
