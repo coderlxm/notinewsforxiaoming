@@ -78,11 +78,12 @@ const fullDateTime = computed(() => new Intl.DateTimeFormat('zh-CN', {
 }
 
 .date-spine__date {
-  display: grid;
-  width: 2.7rem;
-  min-height: 2.7rem;
+  display: flex;
+  min-height: 2.25rem;
   flex: none;
-  padding: 0.3rem 0.35rem 0.28rem;
+  align-items: center;
+  gap: 0.28rem;
+  padding: 0.35rem 0.55rem;
   border: 0;
   border-left: 3px solid var(--accent);
   background: var(--surface-muted);
@@ -113,7 +114,6 @@ const fullDateTime = computed(() => new Intl.DateTimeFormat('zh-CN', {
 }
 
 .date-spine__day {
-  margin-top: 0.14rem;
   font-size: 1.05rem;
   font-weight: 800;
 }
@@ -142,11 +142,6 @@ const fullDateTime = computed(() => new Intl.DateTimeFormat('zh-CN', {
 @media (max-width: 599px) {
   .date-spine {
     gap: 0.42rem;
-  }
-
-  .date-spine__date {
-    width: 2.5rem;
-    min-height: 2.5rem;
   }
 
   .date-spine__meta {

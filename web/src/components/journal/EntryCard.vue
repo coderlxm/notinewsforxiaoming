@@ -56,6 +56,7 @@ const cardVisualLimit = computed(() => !props.editable
   && props.entry.visibility === 'public'
   ? 5
   : undefined);
+const cardLinkable = computed(() => props.linkable && props.entry.visibility === 'public');
 const canSave = computed(() => draft.value !== props.entry.contentText && !props.busy);
 const deletionMessage = computed(() => {
   if (props.entry.assets.length === 0) return '永久删除这条记录？此操作无法撤销。';
@@ -82,6 +83,16 @@ function startDeletion(): void {
   editing.value = false;
   confirmingDeletion.value = true;
 }
+
+function openEntry(): void {
+  if (cardLinkable.value) emit('viewDetail', props.entry.publicId);
+}
+
+function handleCardClick(event: MouseEvent): void {
+  if (editing.value || confirmingDeletion.value) return;
+  if ((event.target as Element).closest('button, a, input, textarea, select, audio, video')) return;
+  openEntry();
+}
 </script>
 
 <template>
@@ -91,7 +102,9 @@ function startDeletion(): void {
       'entry--pinned': entry.pinned,
       'entry--detail': isDetail,
       'entry--short': isShortText,
+      'entry--linkable': cardLinkable && !editing && !confirmingDeletion,
     }"
+    @click="handleCardClick"
   >
     <header class="entry__header">
       <CardDateSpine
@@ -99,8 +112,8 @@ function startDeletion(): void {
         :pinned="entry.pinned"
         :visibility="entry.visibility"
         :show-status="editable"
-        :linkable="linkable && entry.visibility === 'public'"
-        @open="emit('viewDetail', entry.publicId)"
+        :linkable="cardLinkable"
+        @open="openEntry"
       />
       <CardActionMenu
         v-if="editable && !confirmingDeletion"
@@ -119,7 +132,7 @@ function startDeletion(): void {
       :assets="entry.assets"
       :display="isDetail ? 'detail' : 'card'"
       :max-visuals="cardVisualLimit"
-      @open="emit('viewDetail', entry.publicId)"
+      @open="openEntry"
     />
 
     <div v-if="editing" class="entry__editor">
@@ -198,9 +211,13 @@ function startDeletion(): void {
   transition: border-color 180ms ease, transform 180ms ease;
 }
 
-.entry:not(.entry--detail):hover {
+.entry--linkable:hover {
   border-color: var(--border-strong);
   transform: translateY(-2px);
+}
+
+.entry--linkable {
+  cursor: pointer;
 }
 
 .entry--pinned {
@@ -384,7 +401,7 @@ function startDeletion(): void {
     transition: none;
   }
 
-  .entry:not(.entry--detail):hover {
+  .entry--linkable:hover {
     transform: none;
   }
 }

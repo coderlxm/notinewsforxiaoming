@@ -37,6 +37,7 @@ const summary = computed(() => {
   if (text.length <= 72) return text;
   return `${text.slice(0, 72)}…`;
 });
+const cardLinkable = computed(() => props.linkable && props.display === 'summary');
 const deletionMessage = computed(() => {
   if (props.entry.assets.length === 0) return '永久删除这篇文章？此操作无法撤销。';
   if (props.entry.assets.length === 1) return '永久删除这篇文章及其附件？此操作无法撤销。';
@@ -48,7 +49,13 @@ function startDeletion(): void {
 }
 
 function openEntry(): void {
-  if (props.linkable) emit('open', props.entry);
+  if (cardLinkable.value) emit('open', props.entry);
+}
+
+function handleCardClick(event: MouseEvent): void {
+  if (confirmingDeletion.value) return;
+  if ((event.target as Element).closest('button, a, input, textarea, select, audio, video')) return;
+  openEntry();
 }
 </script>
 
@@ -59,7 +66,9 @@ function openEntry(): void {
       'article-card--pinned': entry.pinned,
       'article-card--full': display === 'full',
       'article-card--without-cover': !cover,
+      'article-card--linkable': cardLinkable && !confirmingDeletion,
     }"
+    @click="handleCardClick"
   >
     <header class="article-card__header">
       <CardDateSpine
@@ -67,7 +76,7 @@ function openEntry(): void {
         :pinned="entry.pinned"
         :visibility="entry.visibility"
         :show-status="editable"
-        :linkable="linkable && display === 'summary'"
+        :linkable="cardLinkable"
         @open="openEntry"
       />
       <CardActionMenu
@@ -161,9 +170,13 @@ function openEntry(): void {
   transition: border-color 180ms ease, transform 180ms ease;
 }
 
-.article-card:not(.article-card--full):hover {
+.article-card--linkable:hover {
   border-color: var(--border-strong);
   transform: translateY(-2px);
+}
+
+.article-card--linkable {
+  cursor: pointer;
 }
 
 .article-card--pinned {
@@ -359,7 +372,7 @@ function openEntry(): void {
     transition: none;
   }
 
-  .article-card:not(.article-card--full):hover {
+  .article-card--linkable:hover {
     transform: none;
   }
 }
