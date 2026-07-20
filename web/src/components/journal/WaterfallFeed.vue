@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { MasonryGrid } from '@egjs/grid';
-import { onBeforeUnmount, onMounted, shallowRef, useTemplateRef, watch } from 'vue';
+import { onActivated, onBeforeUnmount, onDeactivated, onMounted, shallowRef, useTemplateRef, watch } from 'vue';
 import ArticleCardContent from '../article/ArticleCardContent.vue';
 import type { JournalEntry, JournalVisibility } from '../../types';
 import EntryCard from './EntryCard.vue';
@@ -28,6 +28,7 @@ const layoutReady = shallowRef(false);
 let masonry: MasonryGrid;
 let stopWatchingEntries: () => void;
 let animateNextMountedBatch = false;
+let needsActivationLayout = false;
 
 function isArticleEntry(entry: JournalEntry): boolean {
   return entry.bodyFormat === 'rich';
@@ -93,6 +94,16 @@ onMounted(() => {
     },
     { flush: 'post' },
   );
+});
+
+onDeactivated(() => {
+  needsActivationLayout = true;
+});
+
+onActivated(() => {
+  if (!needsActivationLayout) return;
+  needsActivationLayout = false;
+  masonry.renderItems({ useResize: true });
 });
 
 onBeforeUnmount(() => {

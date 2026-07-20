@@ -12,6 +12,9 @@ type AppRoute =
   | { name: 'not-found'; key: string };
 
 const locationKey = shallowRef(`${window.location.pathname}${window.location.search}`);
+const publicReturnPath = shallowRef('/');
+const publicScrollPositions = new Map<string, number>();
+let pendingPublicScrollTop: number | null = null;
 
 const route = computed<AppRoute>(() => {
   const url = new URL(locationKey.value, window.location.origin);
@@ -39,10 +42,48 @@ function synchronizeLocation(): void {
   locationKey.value = `${window.location.pathname}${window.location.search}`;
 }
 
+function publicRouteKey(path: string): string | null {
+  const url = new URL(path, window.location.origin);
+  if (url.pathname !== '/') return null;
+  return `public:${url.searchParams.get('tag') ?? ''}`;
+}
+
 function navigate(path: string): void {
+  const currentRoute = route.value;
+  const nextUrl = new URL(path, window.location.origin);
+  const isOpeningDetail = nextUrl.pathname.startsWith('/p/');
+  const nextPublicRouteKey = publicRouteKey(path);
+
+  if (currentRoute.name === 'public') {
+    publicScrollPositions.set(currentRoute.key, window.scrollY);
+  }
+
+  if (isOpeningDetail) {
+    publicReturnPath.value = currentRoute.name === 'public' ? locationKey.value : '/';
+  }
+
+  if (currentRoute.name === 'detail' && nextPublicRouteKey) {
+    pendingPublicScrollTop = publicScrollPositions.get(nextPublicRouteKey) ?? 0;
+  } else {
+    pendingPublicScrollTop = null;
+  }
+
   window.history.pushState(null, '', path);
   synchronizeLocation();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  if (pendingPublicScrollTop === null) {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+}
+
+function restorePublicScroll(): void {
+  if (pendingPublicScrollTop === null) return;
+
+  const scrollTop = pendingPublicScrollTop;
+  pendingPublicScrollTop = null;
+  window.requestAnimationFrame(() => {
+    window.scrollTo({ top: scrollTop, behavior: 'auto' });
+  });
 }
 
 onMounted(() => window.addEventListener('popstate', synchronizeLocation));
@@ -83,18 +124,23 @@ onUnmounted(() => window.removeEventListener('popstate', synchronizeLocation));
       </header>
     </div>
 
+    <KeepAlive :max="3">
+      <FeedView
+        v-if="route.name === 'public'"
+        :key="route.key"
+        mode="public"
+        :initial-tag="route.tag"
+        @activated="restorePublicScroll"
+        @navigate="navigate"
+      />
+    </KeepAlive>
+
     <FeedView
-      v-if="route.name === 'public'"
-      :key="route.key"
-      mode="public"
-      :initial-tag="route.tag"
-      @navigate="navigate"
-    />
-    <FeedView
-      v-else-if="route.name === 'detail'"
+      v-if="route.name === 'detail'"
       :key="route.key"
       mode="public"
       :detail-id="route.publicId"
+      :return-path="publicReturnPath"
       @navigate="navigate"
     />
     <FeedView
@@ -114,7 +160,7 @@ onUnmounted(() => window.removeEventListener('popstate', synchronizeLocation));
       :article-id="route.articleId"
       @navigate="navigate"
     />
-    <main v-else class="not-found">
+    <main v-else-if="route.name === 'not-found'" class="not-found">
       <span class="not-found__code">404</span>
       <h1>这条路没有记录</h1>
       <button class="button button--primary" type="button" @click="navigate('/')">返回首页</button>

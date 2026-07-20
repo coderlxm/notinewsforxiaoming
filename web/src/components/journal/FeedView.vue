@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive } from 'vue';
+import { computed, onActivated, onMounted, reactive } from 'vue';
 import ArticleCardContent from '../article/ArticleCardContent.vue';
 import { useJournalApi } from '../../composables/useJournalApi';
 import { emptyFeedFilters, type FeedFilters, type JournalEntry, type JournalVisibility } from '../../types';
@@ -13,12 +13,15 @@ const props = withDefaults(defineProps<{
   mode: 'public' | 'private';
   detailId?: string;
   initialTag?: string;
+  returnPath?: string;
 }>(), {
   detailId: undefined,
   initialTag: '',
+  returnPath: '/',
 });
 
 const emit = defineEmits<{
+  activated: [];
   navigate: [path: string];
 }>();
 
@@ -45,6 +48,10 @@ onMounted(async () => {
     return;
   }
   await journal.loadPrivate(filters);
+});
+
+onActivated(() => {
+  emit('activated');
 });
 
 async function applyFilters(nextFilters: FeedFilters): Promise<void> {
@@ -116,7 +123,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
 <template>
   <main class="feed" :class="{ 'feed--detail': isDetail }">
     <div v-if="isDetail" class="feed__detail-heading">
-      <button class="text-button" type="button" @click="emit('navigate', '/')">← 返回信息流</button>
+      <button class="text-button" type="button" @click="emit('navigate', returnPath)">← 返回信息流</button>
       <span>永久记录</span>
     </div>
 
