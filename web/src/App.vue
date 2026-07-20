@@ -51,35 +51,37 @@ onUnmounted(() => window.removeEventListener('popstate', synchronizeLocation));
 
 <template>
   <div class="app-shell">
-    <header class="profile">
-      <button class="profile__home" type="button" aria-label="返回公开首页" @click="navigate('/')">
-        <img class="profile__avatar" src="/avatar-ming.png" alt="小明同学">
-      </button>
-      <div class="profile__copy">
-        <button class="profile__name" type="button" @click="navigate('/')">小明同学</button>
-        <p class="profile__bio">姚黄魏紫开次第，不觉成恨俱零凋</p>
-      </div>
-      <nav class="profile__nav" aria-label="主导航">
-        <button
-          class="profile__nav-link"
-          :class="{ 'profile__nav-link--active': route.name === 'public' || route.name === 'detail' }"
-          type="button"
-          :aria-current="route.name === 'public' || route.name === 'detail' ? 'page' : undefined"
-          @click="navigate('/')"
-        >
-          公开记录
+    <div class="profile-bar">
+      <header class="profile">
+        <button class="profile__home" type="button" aria-label="返回公开首页" @click="navigate('/')">
+          <img class="profile__avatar" src="/avatar-ming.png" alt="小明同学">
         </button>
-        <button
-          class="profile__nav-link"
-          :class="{ 'profile__nav-link--active': route.name === 'private' || route.name === 'article-new' || route.name === 'article-edit' }"
-          type="button"
-          :aria-current="route.name === 'private' || route.name === 'article-new' || route.name === 'article-edit' ? 'page' : undefined"
-          @click="navigate('/me')"
-        >
-          我的资产
-        </button>
-      </nav>
-    </header>
+        <div class="profile__copy">
+          <button class="profile__name" type="button" @click="navigate('/')">小明同学</button>
+          <p class="profile__bio">姚黄魏紫开次第，不觉成恨俱零凋</p>
+        </div>
+        <nav class="profile__nav" aria-label="主导航">
+          <button
+            class="profile__nav-link"
+            :class="{ 'profile__nav-link--active': route.name === 'public' || route.name === 'detail' }"
+            type="button"
+            :aria-current="route.name === 'public' || route.name === 'detail' ? 'page' : undefined"
+            @click="navigate('/')"
+          >
+            公开记录
+          </button>
+          <button
+            class="profile__nav-link"
+            :class="{ 'profile__nav-link--active': route.name === 'private' || route.name === 'article-new' || route.name === 'article-edit' }"
+            type="button"
+            :aria-current="route.name === 'private' || route.name === 'article-new' || route.name === 'article-edit' ? 'page' : undefined"
+            @click="navigate('/me')"
+          >
+            我的资产
+          </button>
+        </nav>
+      </header>
+    </div>
 
     <FeedView
       v-if="route.name === 'public'"
@@ -132,6 +134,14 @@ onUnmounted(() => window.removeEventListener('popstate', synchronizeLocation));
   min-height: 100vh;
 }
 
+.profile-bar {
+  position: sticky;
+  z-index: 20;
+  top: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-page);
+}
+
 .profile {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -140,7 +150,6 @@ onUnmounted(() => window.removeEventListener('popstate', synchronizeLocation));
   width: min(calc(100% - (var(--page-gutter) * 2)), var(--canvas-width));
   margin: 0 auto;
   padding: 1.15rem 0 1rem;
-  border-bottom: 1px solid var(--border-subtle);
 }
 
 .profile__home,
