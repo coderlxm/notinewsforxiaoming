@@ -12,10 +12,10 @@ type AppRoute =
   | { name: 'not-found'; key: string };
 
 const locationKey = shallowRef(`${window.location.pathname}${window.location.search}`);
-const publicReturnPath = shallowRef('/');
+const feedReturnPath = shallowRef('/');
 const contentScroll = useTemplateRef<HTMLDivElement>('contentScroll');
-const publicScrollPositions = new Map<string, number>();
-let pendingPublicScrollTop: number | null = null;
+const feedScrollPositions = new Map<string, number>();
+let pendingFeedScrollTop: number | null = null;
 
 const route = computed<AppRoute>(() => {
   const url = new URL(locationKey.value, window.location.origin);
@@ -43,36 +43,37 @@ function synchronizeLocation(): void {
   locationKey.value = `${window.location.pathname}${window.location.search}`;
 }
 
-function publicRouteKey(path: string): string | null {
+function feedRouteKey(path: string): string | null {
   const url = new URL(path, window.location.origin);
-  if (url.pathname !== '/') return null;
-  return `public:${url.searchParams.get('tag') ?? ''}`;
+  if (url.pathname === '/') return `public:${url.searchParams.get('tag') ?? ''}`;
+  if (url.pathname === '/me') return 'private';
+  return null;
 }
 
 function navigate(path: string): void {
   const currentRoute = route.value;
   const nextUrl = new URL(path, window.location.origin);
   const isOpeningDetail = nextUrl.pathname.startsWith('/p/');
-  const nextPublicRouteKey = publicRouteKey(path);
+  const nextFeedRouteKey = feedRouteKey(path);
 
-  if (currentRoute.name === 'public') {
-    publicScrollPositions.set(currentRoute.key, contentScroll.value!.scrollTop);
+  if (currentRoute.name === 'public' || currentRoute.name === 'private') {
+    feedScrollPositions.set(currentRoute.key, contentScroll.value!.scrollTop);
   }
 
   if (isOpeningDetail) {
-    publicReturnPath.value = currentRoute.name === 'public' ? locationKey.value : '/';
+    feedReturnPath.value = currentRoute.name === 'public' || currentRoute.name === 'private'
+      ? locationKey.value
+      : '/';
   }
 
-  if (currentRoute.name === 'detail' && nextPublicRouteKey) {
-    pendingPublicScrollTop = publicScrollPositions.get(nextPublicRouteKey) ?? 0;
-  } else {
-    pendingPublicScrollTop = null;
-  }
+  pendingFeedScrollTop = nextFeedRouteKey && nextFeedRouteKey !== currentRoute.key
+    ? feedScrollPositions.get(nextFeedRouteKey) ?? 0
+    : null;
 
   window.history.pushState(null, '', path);
   synchronizeLocation();
 
-  if (pendingPublicScrollTop === null) {
+  if (pendingFeedScrollTop === null) {
     contentScroll.value!.scrollTo({ top: 0, behavior: 'smooth' });
   }
 }
@@ -80,27 +81,27 @@ function navigate(path: string): void {
 function handlePopState(): void {
   const currentRoute = route.value;
   const nextPath = `${window.location.pathname}${window.location.search}`;
-  const nextPublicRouteKey = publicRouteKey(nextPath);
+  const nextFeedRouteKey = feedRouteKey(nextPath);
 
-  if (currentRoute.name === 'public') {
-    publicScrollPositions.set(currentRoute.key, contentScroll.value!.scrollTop);
+  if (currentRoute.name === 'public' || currentRoute.name === 'private') {
+    feedScrollPositions.set(currentRoute.key, contentScroll.value!.scrollTop);
   }
 
-  pendingPublicScrollTop = nextPublicRouteKey
-    ? publicScrollPositions.get(nextPublicRouteKey) ?? 0
+  pendingFeedScrollTop = nextFeedRouteKey && nextFeedRouteKey !== currentRoute.key
+    ? feedScrollPositions.get(nextFeedRouteKey) ?? 0
     : null;
   synchronizeLocation();
 
-  if (pendingPublicScrollTop === null) {
+  if (pendingFeedScrollTop === null) {
     contentScroll.value!.scrollTo({ top: 0, behavior: 'auto' });
   }
 }
 
-function restorePublicScroll(): void {
-  if (pendingPublicScrollTop === null) return;
+function restoreFeedScroll(): void {
+  if (pendingFeedScrollTop === null) return;
 
-  const scrollTop = pendingPublicScrollTop;
-  pendingPublicScrollTop = null;
+  const scrollTop = pendingFeedScrollTop;
+  pendingFeedScrollTop = null;
   window.requestAnimationFrame(() => {
     contentScroll.value!.scrollTo({ top: scrollTop, behavior: 'auto' });
   });
@@ -151,7 +152,14 @@ onUnmounted(() => window.removeEventListener('popstate', handlePopState));
           :key="route.key"
           mode="public"
           :initial-tag="route.tag"
-          @activated="restorePublicScroll"
+          @activated="restoreFeedScroll"
+          @navigate="navigate"
+        />
+        <FeedView
+          v-else-if="route.name === 'private'"
+          :key="route.key"
+          mode="private"
+          @activated="restoreFeedScroll"
           @navigate="navigate"
         />
       </KeepAlive>
@@ -161,13 +169,7 @@ onUnmounted(() => window.removeEventListener('popstate', handlePopState));
         :key="route.key"
         mode="public"
         :detail-id="route.publicId"
-        :return-path="publicReturnPath"
-        @navigate="navigate"
-      />
-      <FeedView
-        v-else-if="route.name === 'private'"
-        :key="route.key"
-        mode="private"
+        :return-path="feedReturnPath"
         @navigate="navigate"
       />
       <ArticleEditorView
