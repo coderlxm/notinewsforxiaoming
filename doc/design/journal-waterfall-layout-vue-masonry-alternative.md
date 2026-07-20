@@ -6,13 +6,14 @@
 - Review 日期：2026-07-20
 - 方案性质：`journal-waterfall-layout-redesign.md` 的备用实现
 - Review 结论：不再采用 `@yeger/vue-masonry-wall`，改用 `@egjs/grid` 的 `MasonryGrid`
-- 唯一实现差异：由成熟布局库完成瀑布流定位；其余视觉、交互、组件边界和页面范围继续沿用主方案
+- 唯一实现差异：由成熟布局库完成瀑布流定位与布局位移动画，并为分页新增卡片提供入场动画；其余视觉、交互、组件边界和页面范围继续沿用主方案
 
 这里的“最佳选择”指最适合当前 Journal 混合内容流的方案，不以依赖最小或功能最多单独决定。当前列表同时包含图片、视频、音频、富文本摘要和私有管理交互，布局引擎必须满足：
 
 - Vue 继续按 `entries` 顺序渲染卡片，不把条目重组为按列 DOM；
 - 图片加载、正文编辑和删除确认造成高度变化后，布局能按主路径重新计算；
 - 分页、筛选和条目更新后仍保留稳定业务 key 与组件实例；
+- 分页追加时新卡片有轻量错峰入场，已有卡片按新位置平滑让位；
 - 接入逻辑集中在 `WaterfallFeed.vue`，不扩散到卡片和数据请求层。
 
 ## 2. 与主方案的关系
@@ -42,6 +43,8 @@
 - 按输入顺序逐项放入当前较短列的 `MasonryGrid`；
 - `useResizeObserver` 与 `observeChildren`，可观察容器和卡片本身的尺寸变化；
 - `syncElements()`，在 Vue 完成新增、删除或替换 DOM 后同步布局条目；
+- `useTransform`，用可动画的 `transform` 替代 `left / top` 写入布局位置；
+- `renderComplete` 事件及其 `mounted` 列表，可准确识别本次首次参与布局的卡片；
 - `column`、`columnSize`、`gap`、`align` 等布局参数；
 - 保留容器直属子元素的 DOM 顺序，只通过定位样式完成排布。
 
@@ -50,6 +53,7 @@
 - [GitHub README](https://github.com/naver/egjs-grid)
 - [MasonryGrid API 与源码](https://github.com/naver/egjs-grid/blob/main/src/grids/MasonryGrid.ts)
 - [Grid 的尺寸观察与 `syncElements()` 实现](https://github.com/naver/egjs-grid/blob/main/src/Grid.ts)
+- [Grid API：`useTransform`、`syncElements()` 与 `renderComplete`](https://naver.github.io/egjs-grid/release/latest/doc/Grid.html)
 - [npm package](https://www.npmjs.com/package/@egjs/grid)
 
 实施时使用当时最新 stable 版本，不在方案中长期锁死具体版本号；实际版本由项目的 `package.json` 与 `pnpm-lock.yaml` 记录。
@@ -89,7 +93,7 @@
 
 `@egjs/vue-grid` 与 core 同源，但当前封装同时兼容 Vue 2 和 Vue 3，peer 范围为 `vue >= 2`，内部包含 Vue 3 VNode 兼容处理，并没有提供本项目需要的 `items` 数据契约。
 
-直接在 `WaterfallFeed.vue` 中管理 `MasonryGrid` 实例，只需要挂载、同步元素和销毁三个生命周期动作。布局测量、短列分配、尺寸观察和定位仍全部由成熟库负责，不在项目中手写 masonry 算法；同时可以继续使用 Vue 3 Composition API、typed props 和稳定 `:key`。
+直接在 `WaterfallFeed.vue` 中管理 `MasonryGrid` 实例，只需要挂载、同步元素、响应布局完成事件和销毁四个动作。布局测量、短列分配、尺寸观察和定位仍全部由成熟库负责，不在项目中手写 masonry 算法；组件只在 `renderComplete` 后编排新增卡片的入场动画，同时继续使用 Vue 3 Composition API、typed props 和稳定 `:key`。
 
 ### 4.4 为什么暂不使用 CSS Grid Lanes
 
@@ -119,19 +123,52 @@ const props = defineProps<{
 
 const gridElement = useTemplateRef<HTMLDivElement>('grid')
 let masonry: MasonryGrid
+let animateNextMountedBatch = false
 
 onMounted(() => {
   masonry = new MasonryGrid(gridElement.value!, {
     align: 'start',
     gap: 0,
+    useTransform: true,
     useResizeObserver: true,
     observeChildren: true,
   })
+
+  masonry.on('renderComplete', ({ mounted }) => {
+    if (!animateNextMountedBatch) return
+    animateNextMountedBatch = false
+
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+
+    mounted.forEach((item, index) => {
+      const card = item.element!.firstElementChild as HTMLElement
+
+      card.animate(
+        [
+          { opacity: 0, transform: 'translateY(14px) scale(0.98)' },
+          { opacity: 1, transform: 'translateY(0) scale(1)' },
+        ],
+        {
+          duration: 260,
+          delay: Math.min(index, 6) * 35,
+          easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+          fill: 'backwards',
+        },
+      )
+    })
+  })
+
   masonry.renderItems()
 
   watch(
     () => props.entries,
-    () => masonry.syncElements(),
+    (entries, previousEntries) => {
+      animateNextMountedBatch =
+        entries.length > previousEntries.length &&
+        previousEntries.every((entry, index) => entry.id === entries[index]?.id)
+
+      masonry.syncElements({ direction: 'end' })
+    },
     { flush: 'post' },
   )
 })
@@ -142,13 +179,17 @@ onBeforeUnmount(() => masonry.destroy())
 <template>
   <div ref="grid" class="waterfall">
     <div v-for="entry in entries" :key="entry.id" class="waterfall__item">
-      <!-- 按 bodyFormat 分发到普通记录卡片或文章卡片 -->
+      <div class="waterfall__card">
+        <!-- 按 bodyFormat 分发到普通记录卡片或文章卡片 -->
+      </div>
     </div>
   </div>
 </template>
 ```
 
-示例只表达布局生命周期和 DOM 契约，不重复卡片模板与事件转发。实际组件继续通过 typed props 和 emits 向上交互。
+示例表达布局生命周期、分页追加识别、动画和 DOM 契约，不重复卡片模板与事件转发。实际组件继续通过 typed props 和 emits 向上交互。
+
+`animateNextMountedBatch` 只在新数组完整保留旧数组前缀且长度增加时开启，因此筛选、删除、排序和普通编辑不会误触发“加载更多”入场动画。这个判断依赖现有数据层始终替换 `entries` 数组引用，不增加新的分页状态来源。
 
 ### 5.2 响应式列数与间距
 
@@ -173,6 +214,11 @@ onBeforeUnmount(() => masonry.destroy())
   box-sizing: border-box;
   width: 25%;
   padding: 0 calc(var(--waterfall-gap) / 2) var(--waterfall-gap);
+  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.waterfall__card {
+  width: 100%;
 }
 
 @media (max-width: 1359px) {
@@ -200,11 +246,43 @@ onBeforeUnmount(() => masonry.destroy())
     --waterfall-gap: 8px;
   }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .waterfall__item {
+    transition: none;
+  }
+}
 ```
 
 布局库的 `gap` 固定为 `0`，避免 CSS 与 JavaScript 分别保存同一份间距值。
 
-### 5.3 DOM、阅读与视觉顺序
+### 5.3 布局位移与分页入场动画
+
+动画分成两个互不覆盖的层级：
+
+| DOM 层级 | transform 所有者 | 动画职责 |
+| --- | --- | --- |
+| `.waterfall__item` | `MasonryGrid` | 根据布局结果写入 `translate(x, y)`，CSS transition 平滑移动到新位置 |
+| `.waterfall__card` | 页面入场动画 | 新增批次从轻微下移、缩小和透明状态进入 |
+
+`useTransform: true` 是必要配置。它让布局库以 `transform: translate(...)` 写入位置，已有卡片在分页追加、媒体高度变化或响应式重排时即可通过 `.waterfall__item` 的 transform transition 平滑让位。
+
+新卡片不能在 `.waterfall__item` 上执行 `translateY()` 或 `scale()`，否则会覆盖布局库写入的定位 transform。因此模板固定保留 `.waterfall__item > .waterfall__card` 两层结构，入场动画只作用于内层。
+
+分页动画参数固定为：
+
+- 时长 `260ms`；
+- easing `cubic-bezier(0.22, 1, 0.36, 1)`；
+- 起始状态 `opacity: 0`、`translateY(14px)`、`scale(0.98)`；
+- 同批卡片每张错开 `35ms`，最多累计 `210ms`，避免大批分页产生过长等待；
+- 首屏、筛选、删除、排序和普通编辑不执行新增批次动画；
+- 用户启用 `prefers-reduced-motion: reduce` 时不调用 Web Animations API，同时由 media query 关闭外层 transition，布局立即完成。
+
+`renderComplete.mounted` 是动画目标的唯一来源，不重新查询整个容器，也不自行比较 DOM 节点。它只包含本次首次参与 Grid 渲染的 item；`animateNextMountedBatch` 再把触发范围限制为数组尾部追加。外层位移仍由库和 CSS 完成，内层入场使用浏览器原生 `Element.animate()`，不引入 GSAP、Motion 或第二个动画系统。
+
+不使用 Vue `<TransitionGroup>`。它同样会尝试用 transform 做列表位移动画，与 `MasonryGrid` 对直属 item 的 transform 所有权重叠；本方案由 Grid 负责位置，由内层 Web Animation 负责新卡片视觉进入，职责只有一套。
+
+### 5.4 DOM、阅读与视觉顺序
 
 Vue 的直属子元素始终按 `entries` 顺序存在：
 
@@ -264,7 +342,7 @@ DOM / 数据 / Tab：1 → 2 → 3 → 4 → 5 → 6
 | 组件 | 本方案职责 |
 | --- | --- |
 | `FeedView.vue` | 请求数据、管理筛选和导航，向下传递 entries |
-| `WaterfallFeed.vue` | 渲染稳定 keyed 子节点，管理 `MasonryGrid` 的挂载、同步和销毁 |
+| `WaterfallFeed.vue` | 渲染稳定 keyed 子节点，管理 `MasonryGrid` 的挂载、同步、布局完成事件、动画触发和销毁 |
 | `EntryCard.vue` | 普通记录内容与管理交互，不测量自身位置 |
 | `ArticleCardContent.vue` | 文章摘要或详情呈现，不操作 masonry |
 | `MediaGallery.vue` | 提供媒体卡片与详情展示，保留真实尺寸语义 |
@@ -275,11 +353,13 @@ DOM / 数据 / Tab：1 → 2 → 3 → 4 → 5 → 6
 
 ### 8.1 分页追加
 
-点击“加载更早记录”后，Vue 按稳定 key 追加直属子节点；`syncElements()` 识别新增节点并重新排布。加载按钮仍位于整个 masonry 容器之后。
+点击“加载更早记录”后，Vue 按稳定 key 追加直属子节点；组件先确认本次更新是保留旧数组前缀的尾部追加，再由 `syncElements()` 识别新增节点并重新排布。
+
+重排过程中，如果已有卡片的位置发生变化，则通过外层 item 的 transform transition 平滑移动；`renderComplete.mounted` 返回的新卡片通过内层 card 执行淡入、上浮和轻微缩放，并按批次索引做最多 210ms 的短错峰。加载按钮仍位于整个 masonry 容器之后。
 
 ### 8.2 筛选
 
-筛选结果替换完整数组。Vue 先完成节点增删，布局库再同步当前直属子元素。筛选器本身不进入 masonry 容器。
+筛选结果替换完整数组。Vue 先完成节点增删，布局库再同步当前直属子元素；已有卡片可以平滑移动，但不把筛选结果误判成分页批次，不执行新增卡片入场动画。筛选器本身不进入 masonry 容器。
 
 ### 8.3 条目交互
 
@@ -301,7 +381,9 @@ DOM / 数据 / Tab：1 → 2 → 3 → 4 → 5 → 6
 @egjs/grid
 ```
 
-该包当前包含 `@egjs/children-differ`、`@egjs/component` 和 `@egjs/imready` 三个直接运行时依赖。它比 `@yeger/vue-masonry-wall` 更重，但这些依赖直接服务元素同步、事件与媒体就绪测量，不把无关的无限滚动、虚拟列表、懒加载 UI 或动画系统带入项目。
+该包当前包含 `@egjs/children-differ`、`@egjs/component` 和 `@egjs/imready` 三个直接运行时依赖。它比 `@yeger/vue-masonry-wall` 更重，但这些依赖直接服务元素同步、事件与媒体就绪测量，不把无关的无限滚动、虚拟列表或懒加载 UI 带入项目。
+
+动画不增加生产依赖：已有卡片的位置变化由 CSS transition 完成，新增卡片入场使用浏览器原生 `Element.animate()`。`@egjs/grid` 只提供可动画的 transform 位置和本次 mounted item 列表，不将其描述为独立动画框架。
 
 项目不同时安装 `@egjs/vue-grid`，不保留 CSS Multi-column 作为运行时 fallback，也不增加布局切换开关。
 
@@ -314,8 +396,9 @@ DOM / 数据 / Tab：1 → 2 → 3 → 4 → 5 → 6
 | DOM / 数据顺序 | 保持 `entries` 顺序 | 保持 `entries` 顺序 |
 | 动态高度 | 浏览器自然布局 | `ResizeObserver` 触发重排 |
 | 列表更新 | 浏览器自然重排 | Vue 更新后调用 `syncElements()` |
+| 分页追加动画 | 新卡片可做入场，列重排由浏览器立即完成 | 新卡片错峰入场，发生位置变化的已有卡片通过 transform 平滑移动 |
 | 卡片本地状态 | 保留 | 保留 |
-| 组件复杂度 | 更低 | `WaterfallFeed.vue` 管理一个布局实例 |
+| 组件复杂度 | 更低 | `WaterfallFeed.vue` 管理布局实例和动画触发 |
 | 视觉结果 | 纵向列式阅读 | 更接近逐项、由左到右分发 |
 
 ## 11. 实施拆分差异
@@ -327,7 +410,9 @@ DOM / 数据 / Tab：1 → 2 → 3 → 4 → 5 → 6
 3. 使用直属 `.waterfall__item` 和稳定 `JournalEntry.id` key 渲染卡片。
 4. 用 CSS media query 定义 4 / 3 / 2 / 2 列宽与间距，布局库不保存第二份断点配置。
 5. 在 `entries` 引用变化后的 post-flush watcher 中调用 `syncElements()`。
-6. 启用容器与子元素尺寸观察，让媒体和卡片交互的真实高度进入主布局计算。
+6. 启用 `useTransform`，在 `.waterfall__item` 上定义布局位移 transition。
+7. 仅在数组尾部追加时开启动画标记，并在 `renderComplete.mounted` 中对内层 `.waterfall__card` 执行原生入场动画。
+8. 启用容器与子元素尺寸观察，让媒体和卡片交互的真实高度进入主布局计算。
 
 后续卡片重构、私有资产体验、详情页和编辑页工作与主方案完全相同。
 
@@ -336,10 +421,10 @@ DOM / 数据 / Tab：1 → 2 → 3 → 4 → 5 → 6
 该备用方案只需额外确认两个技术取舍：
 
 1. 是否明确要求卡片按数据顺序逐项进入较短列；若不要求，继续使用更短的 CSS Multi-column 主方案。
-2. 若要求，是否接受 `@egjs/grid` 更高的依赖和实例生命周期成本，以换取稳定 DOM 顺序、动态高度重排和卡片状态保留。
+2. 若要求，是否接受 `@egjs/grid` 更高的依赖和实例生命周期成本，以换取稳定 DOM 顺序、动态高度重排、分页追加动画和卡片状态保留。
 
 ## 13. 推荐结论
 
 默认继续推荐 CSS Multi-column 主方案，因为它最符合个人工具的短主路径。
 
-如果 Review 明确要求瀑布流按 `entries` 顺序逐项进入当前较短列，则采用本备用方案，并选择 `@egjs/grid`，不再选择 `@yeger/vue-masonry-wall`。后者更轻、更贴近纯 Vue 组件写法，但其按列重组 DOM、首次高度约束和数组更新时整墙重建，与当前可交互混合卡片流的实际需求不匹配。
+如果 Review 明确要求瀑布流按 `entries` 顺序逐项进入当前较短列，并要求分页追加时已有卡片平滑让位、新卡片错峰入场，则采用本备用方案，并选择 `@egjs/grid`，不再选择 `@yeger/vue-masonry-wall`。后者更轻、更贴近纯 Vue 组件写法，但其按列重组 DOM、首次高度约束和数组更新时整墙重建，与当前可交互混合卡片流及其动画需求不匹配。
