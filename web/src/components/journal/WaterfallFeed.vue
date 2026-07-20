@@ -102,52 +102,61 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="grid" class="waterfall" :class="{ 'waterfall--ready': layoutReady }">
-    <div v-for="entry in entries" :key="entry.id" class="waterfall__item">
-      <div class="waterfall__card">
-        <ArticleCardContent
-          v-if="isArticleEntry(entry)"
-          :entry="entry"
-          :editable="mode === 'private'"
-          :busy="mutationEntryId === entry.id"
-          @open="emit('openArticle', $event)"
-          @select-tag="emit('selectTag', $event)"
-          @edit="emit('editArticle', $event)"
-          @set-visibility="forwardVisibility"
-          @set-pinned="forwardPinned"
-          @delete-entry="emit('deleteEntry', $event)"
-        />
-        <EntryCard
-          v-else
-          :entry="entry"
-          :editable="mode === 'private'"
-          :busy="mutationEntryId === entry.id"
-          @view-detail="emit('viewDetail', $event)"
-          @select-tag="emit('selectTag', $event)"
-          @save-content="forwardSaveContent"
-          @set-visibility="forwardVisibility"
-          @set-pinned="forwardPinned"
-          @delete-entry="emit('deleteEntry', $event)"
-        />
+  <div class="waterfall-stage">
+    <div v-if="!layoutReady && entries.length" class="waterfall__loading" role="status">正在读取记录…</div>
+
+    <div ref="grid" class="waterfall" :class="{ 'waterfall--ready': layoutReady }">
+      <div v-for="entry in entries" :key="entry.id" class="waterfall__item">
+        <div class="waterfall__card">
+          <ArticleCardContent
+            v-if="isArticleEntry(entry)"
+            :entry="entry"
+            :editable="mode === 'private'"
+            :busy="mutationEntryId === entry.id"
+            @open="emit('openArticle', $event)"
+            @select-tag="emit('selectTag', $event)"
+            @edit="emit('editArticle', $event)"
+            @set-visibility="forwardVisibility"
+            @set-pinned="forwardPinned"
+            @delete-entry="emit('deleteEntry', $event)"
+          />
+          <EntryCard
+            v-else
+            :entry="entry"
+            :editable="mode === 'private'"
+            :busy="mutationEntryId === entry.id"
+            @view-detail="emit('viewDetail', $event)"
+            @select-tag="emit('selectTag', $event)"
+            @save-content="forwardSaveContent"
+            @set-visibility="forwardVisibility"
+            @set-pinned="forwardPinned"
+            @delete-entry="emit('deleteEntry', $event)"
+          />
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
+.waterfall__loading {
+  padding: 3rem 1rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
 .waterfall {
+  position: relative;
   margin-inline: calc(var(--waterfall-gap) / -2);
   visibility: hidden;
-  opacity: 0;
-  transition: opacity 140ms ease-out;
 }
 
 .waterfall--ready {
   visibility: visible;
-  opacity: 1;
 }
 
 .waterfall__item {
+  position: absolute;
   box-sizing: border-box;
   width: 25%;
   padding: 0 calc(var(--waterfall-gap) / 2) var(--waterfall-gap);
@@ -175,7 +184,6 @@ onBeforeUnmount(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .waterfall,
   .waterfall__item {
     transition: none;
   }
