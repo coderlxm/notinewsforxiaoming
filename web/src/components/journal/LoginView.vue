@@ -20,7 +20,7 @@ function submit(): void {
   <section class="login" aria-labelledby="login-title">
     <div class="login__mark" aria-hidden="true">私</div>
     <h1 id="login-title" class="login__title">进入个人资产</h1>
-    <p class="login__copy">这里包含公开动态与随手保存的私有记录。</p>
+    <p id="login-description" class="login__copy">这里包含公开动态与随手保存的私有记录。</p>
     <form class="login__form" @submit.prevent="submit">
       <label class="field">
         <span class="field__label">管理密码</span>
@@ -30,6 +30,7 @@ function submit(): void {
           name="password"
           autocomplete="current-password"
           required
+          aria-describedby="login-description"
           :disabled="busy"
         >
       </label>
@@ -42,27 +43,41 @@ function submit(): void {
 
 <style scoped>
 .login {
+  position: relative;
   display: grid;
-  width: min(100%, 26rem);
-  margin: 3rem auto;
-  padding: 1.6rem;
+  width: min(100%, 27rem);
+  margin: clamp(2rem, 8vh, 5rem) auto;
+  padding: 2rem 2rem 2rem 3.4rem;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-card);
   background: var(--surface-card);
-  box-shadow: var(--shadow-card);
+  overflow: hidden;
   text-align: center;
+}
+
+.login::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2rem;
+  border-right: 1px solid var(--border-subtle);
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0 11px,
+    color-mix(in srgb, var(--graphite) 28%, transparent) 11px 12px
+  );
+  content: '';
 }
 
 .login__mark {
   display: grid;
-  width: 3rem;
-  height: 3rem;
+  width: 2.4rem;
+  height: 3.25rem;
   margin: 0 auto 0.9rem;
-  border-radius: 50%;
-  background: var(--accent-soft);
-  color: var(--accent-strong);
+  border-radius: 5px;
+  background: var(--accent);
+  color: #fff;
   font-family: var(--font-serif);
-  font-size: 1.25rem;
+  font-size: 1.1rem;
   font-weight: 700;
   place-items: center;
 }
@@ -70,11 +85,12 @@ function submit(): void {
 .login__title {
   margin: 0;
   font-family: var(--font-serif);
-  font-size: 1.4rem;
+  font-size: 1.5rem;
+  font-weight: 720;
 }
 
 .login__copy {
-  margin: 0.55rem 0 1.3rem;
+  margin: 0.55rem 0 1.4rem;
   color: var(--text-muted);
   font-size: 0.88rem;
 }
@@ -87,5 +103,15 @@ function submit(): void {
 
 .login__submit {
   width: 100%;
+}
+
+@media (max-width: 599px) {
+  .login {
+    padding: 1.5rem 1.25rem 1.5rem 2.8rem;
+  }
+
+  .login::before {
+    width: 1.65rem;
+  }
 }
 </style>

@@ -7,6 +7,7 @@ import EntryCard from './EntryCard.vue';
 import EntryFilters from './EntryFilters.vue';
 import LoginView from './LoginView.vue';
 import OnThisDay from './OnThisDay.vue';
+import WaterfallFeed from './WaterfallFeed.vue';
 
 const props = withDefaults(defineProps<{
   mode: 'public' | 'private';
@@ -113,7 +114,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
 </script>
 
 <template>
-  <main class="feed">
+  <main class="feed" :class="{ 'feed--detail': isDetail }">
     <div v-if="isDetail" class="feed__detail-heading">
       <button class="text-button" type="button" @click="emit('navigate', '/')">← 返回信息流</button>
       <span>永久记录</span>
@@ -210,32 +211,19 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
       v-else-if="!isDetail && (mode === 'public' || journal.authenticationState.value === 'authenticated')"
       class="feed__entries"
     >
-      <template v-for="entry in journal.entries.value" :key="entry.id">
-        <ArticleCardContent
-          v-if="isArticleEntry(entry)"
-          :entry="entry"
-          :editable="mode === 'private'"
-          :busy="journal.mutationEntryId.value === entry.id"
-          @open="openArticle"
-          @select-tag="selectTag"
-          @edit="editArticle"
-          @set-visibility="setVisibility"
-          @set-pinned="setPinned"
-          @delete-entry="deleteEntry"
-        />
-        <EntryCard
-          v-else
-          :entry="entry"
-          :editable="mode === 'private'"
-          :busy="journal.mutationEntryId.value === entry.id"
-          @view-detail="viewDetail"
-          @select-tag="selectTag"
-          @save-content="saveContent"
-          @set-visibility="setVisibility"
-          @set-pinned="setPinned"
-          @delete-entry="deleteEntry"
-        />
-      </template>
+      <WaterfallFeed
+        :entries="journal.entries.value"
+        :mode="mode"
+        :mutation-entry-id="journal.mutationEntryId.value"
+        @open-article="openArticle"
+        @view-detail="viewDetail"
+        @select-tag="selectTag"
+        @edit-article="editArticle"
+        @save-content="saveContent"
+        @set-visibility="setVisibility"
+        @set-pinned="setPinned"
+        @delete-entry="deleteEntry"
+      />
 
       <p v-if="!journal.entries.value.length && !journal.error.value" class="feed__empty">
         {{ mode === 'private' ? '没有符合当前筛选条件的记录。' : '这里还没有公开记录。' }}
@@ -258,9 +246,13 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
 .feed {
   display: grid;
   gap: 1rem;
-  width: min(100%, var(--content-width));
+  width: min(calc(100% - (var(--page-gutter) * 2)), var(--canvas-width));
   margin: 0 auto;
   padding: 1.3rem 0 4rem;
+}
+
+.feed--detail {
+  width: min(calc(100% - (var(--page-gutter) * 2)), var(--reading-width));
 }
 
 .feed__public-heading,
@@ -329,13 +321,4 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
   margin-top: 0.5rem;
 }
 
-@media (max-width: 720px) {
-  .feed__public-heading,
-  .feed__private-heading,
-  .feed__detail-heading,
-  .notice {
-    margin-right: 1rem;
-    margin-left: 1rem;
-  }
-}
 </style>

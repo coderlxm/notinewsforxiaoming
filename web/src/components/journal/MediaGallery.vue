@@ -3,13 +3,17 @@ import { computed } from 'vue';
 import type { JournalAsset } from '../../types';
 import { formatFileSize } from '../../utils/formatters';
 
-const props = defineProps<{
-  assets: JournalAsset[];
-}>();
+const props = withDefaults(defineProps<{
+  assets: readonly JournalAsset[];
+  display?: 'card' | 'detail';
+}>(), {
+  display: 'detail',
+});
 
 type DisplayAsset = JournalAsset & {
   displayType: 'image' | 'video' | 'audio' | 'file';
   sizeLabel: string | null;
+  aspectRatio: string | null;
 };
 
 const displayAssets = computed<DisplayAsset[]>(() => props.assets.map(asset => {
@@ -31,6 +35,7 @@ const displayAssets = computed<DisplayAsset[]>(() => props.assets.map(asset => {
     ...asset,
     displayType,
     sizeLabel: formatFileSize(asset.byteSize),
+    aspectRatio: asset.width && asset.height ? `${asset.width} / ${asset.height}` : null,
   };
 }));
 
@@ -39,22 +44,41 @@ const visualAssets = computed(() => displayAssets.value.filter(asset =>
 ));
 const audioAssets = computed(() => displayAssets.value.filter(asset => asset.displayType === 'audio'));
 const fileAssets = computed(() => displayAssets.value.filter(asset => asset.displayType === 'file'));
+
+function preserveAssetRatio(asset: DisplayAsset): { aspectRatio: string } | undefined {
+  if (!asset.aspectRatio || (props.display === 'card' && visualAssets.value.length > 1)) return undefined;
+  return { aspectRatio: asset.aspectRatio };
+}
 </script>
 
 <template>
-  <section v-if="displayAssets.length" class="media" aria-label="记录附件">
+  <section
+    v-if="displayAssets.length"
+    class="media"
+    :class="`media--${display}`"
+    aria-label="记录附件"
+  >
     <div
       v-if="visualAssets.length"
       class="media__visuals"
-      :class="{ 'media__visuals--single': visualAssets.length === 1 }"
+      :class="{
+        'media__visuals--single': visualAssets.length === 1,
+        'media__visuals--multiple': visualAssets.length > 1,
+      }"
     >
-      <figure v-for="asset in visualAssets" :key="asset.id" class="media__visual">
+      <figure
+        v-for="asset in visualAssets"
+        :key="asset.id"
+        class="media__visual"
+        :class="{ 'media__visual--natural': display === 'detail' || visualAssets.length === 1 }"
+        :style="preserveAssetRatio(asset)"
+      >
         <img
           v-if="asset.displayType === 'image'"
           class="media__image"
           :class="{ 'media__image--sticker': asset.kind === 'sticker' }"
           :src="asset.url"
-          :alt="asset.originalName ?? asset.kind"
+          :alt="asset.sourceKind === 'telegram' ? '' : (asset.originalName ?? '')"
           loading="lazy"
         >
         <video
@@ -90,7 +114,9 @@ const fileAssets = computed(() => displayAssets.value.filter(asset => asset.disp
         <span class="media__file-icon" aria-hidden="true">↗</span>
         <span class="media__file-copy">
           <strong>{{ asset.originalName ?? asset.kind }}</strong>
-          <small>{{ [asset.mimeType, asset.sizeLabel].filter(Boolean).join(' · ') }}</small>
+          <small v-if="asset.mimeType || asset.sizeLabel">
+            {{ [asset.mimeType, asset.sizeLabel].filter(Boolean).join(' · ') }}
+          </small>
         </span>
       </a>
     </div>
@@ -101,17 +127,12 @@ const fileAssets = computed(() => displayAssets.value.filter(asset => asset.disp
 .media {
   display: grid;
   gap: 0.75rem;
-  margin-top: 0.9rem;
 }
 
 .media__visuals {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.25rem;
-  overflow: hidden;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-media);
-  background: var(--surface-muted);
+  gap: 0.3rem;
 }
 
 .media__visuals--single {
@@ -120,10 +141,12 @@ const fileAssets = computed(() => displayAssets.value.filter(asset => asset.disp
 
 .media__visual {
   display: grid;
-  min-height: 9rem;
+  min-width: 0;
   margin: 0;
   place-items: center;
   overflow: hidden;
+  border-radius: var(--radius-media);
+  background: var(--surface-muted);
 }
 
 .media__image,
@@ -131,9 +154,31 @@ const fileAssets = computed(() => displayAssets.value.filter(asset => asset.disp
   display: block;
   width: 100%;
   height: 100%;
-  max-height: 34rem;
   object-fit: cover;
   background: var(--surface-muted);
+}
+
+.media__visual--natural:not([style]) .media__image,
+.media__visual--natural:not([style]) .media__video {
+  height: auto;
+}
+
+.media--card .media__visuals--multiple .media__visual {
+  aspect-ratio: 1;
+}
+
+.media--card .media__visuals--multiple .media__visual:first-child {
+  grid-column: 1 / -1;
+  aspect-ratio: 4 / 3;
+}
+
+.media--detail .media__visuals {
+  grid-template-columns: 1fr;
+  gap: 0.8rem;
+}
+
+.media--detail .media__visual {
+  max-height: none;
 }
 
 .media__image--sticker {
@@ -164,6 +209,11 @@ const fileAssets = computed(() => displayAssets.value.filter(asset => asset.disp
   background: linear-gradient(120deg, var(--accent-soft), var(--surface-muted));
 }
 
+.media--card .media__audio-row {
+  gap: 0.45rem;
+  padding: 0.65rem;
+}
+
 .media__audio-copy {
   display: flex;
   align-items: baseline;
@@ -186,6 +236,7 @@ const fileAssets = computed(() => displayAssets.value.filter(asset => asset.disp
 }
 
 .media__audio {
+  min-width: 0;
   width: 100%;
   height: 2.5rem;
 }
@@ -200,6 +251,12 @@ const fileAssets = computed(() => displayAssets.value.filter(asset => asset.disp
   color: var(--text-primary);
   text-decoration: none;
   transition: border-color 160ms ease, background-color 160ms ease;
+}
+
+.media--card .media__file {
+  gap: 0.55rem;
+  min-height: 2.5rem;
+  padding: 0.55rem;
 }
 
 .media__file:hover {
@@ -236,11 +293,28 @@ const fileAssets = computed(() => displayAssets.value.filter(asset => asset.disp
   color: var(--text-muted);
 }
 
-@media (max-width: 520px) {
+@media (max-width: 599px) {
+  .media {
+    gap: 0.55rem;
+  }
+
   .media__visuals {
-    border-right: 0;
-    border-left: 0;
-    border-radius: 0;
+    gap: 0.2rem;
+  }
+
+  .media--card .media__audio-row,
+  .media--card .media__file {
+    padding: 0.45rem;
+  }
+
+  .media--card .media__file-icon {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .media__file {
+    transition: none;
   }
 }
 </style>

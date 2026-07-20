@@ -180,7 +180,7 @@ function viewArticle(entry: JournalEntry): void {
 .editor-view {
   display: grid;
   gap: 1rem;
-  width: min(100%, var(--content-width));
+  width: min(calc(100% - (var(--page-gutter) * 2)), var(--editor-width));
   margin: 0 auto;
   padding: 1.3rem 0 4rem;
 }
@@ -213,11 +213,4 @@ function viewArticle(entry: JournalEntry): void {
   padding: 0 0.15rem;
 }
 
-@media (max-width: 720px) {
-  .editor-view__heading,
-  .notice {
-    margin-right: 1rem;
-    margin-left: 1rem;
-  }
-}
 </style>

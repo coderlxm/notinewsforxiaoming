@@ -64,6 +64,7 @@ onUnmounted(() => window.removeEventListener('popstate', synchronizeLocation));
           class="profile__nav-link"
           :class="{ 'profile__nav-link--active': route.name === 'public' || route.name === 'detail' }"
           type="button"
+          :aria-current="route.name === 'public' || route.name === 'detail' ? 'page' : undefined"
           @click="navigate('/')"
         >
           公开记录
@@ -72,6 +73,7 @@ onUnmounted(() => window.removeEventListener('popstate', synchronizeLocation));
           class="profile__nav-link"
           :class="{ 'profile__nav-link--active': route.name === 'private' || route.name === 'article-new' || route.name === 'article-edit' }"
           type="button"
+          :aria-current="route.name === 'private' || route.name === 'article-new' || route.name === 'article-edit' ? 'page' : undefined"
           @click="navigate('/me')"
         >
           我的资产
@@ -134,10 +136,10 @@ onUnmounted(() => window.removeEventListener('popstate', synchronizeLocation));
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 0.85rem;
-  width: min(calc(100% - 2rem), var(--content-width));
+  gap: 0.9rem;
+  width: min(calc(100% - (var(--page-gutter) * 2)), var(--canvas-width));
   margin: 0 auto;
-  padding: 1.2rem 0 1rem;
+  padding: 1.15rem 0 1rem;
   border-bottom: 1px solid var(--border-subtle);
 }
 
@@ -157,10 +159,10 @@ onUnmounted(() => window.removeEventListener('popstate', synchronizeLocation));
 
 .profile__avatar {
   display: block;
-  width: 3.35rem;
-  height: 3.35rem;
+  width: 3rem;
+  height: 3rem;
   border-radius: 50%;
-  box-shadow: 0 0 0 3px var(--surface-page), 0 0 0 4px var(--border-strong);
+  box-shadow: 0 0 0 1px var(--border-strong);
 }
 
 .profile__copy {
@@ -170,39 +172,40 @@ onUnmounted(() => window.removeEventListener('popstate', synchronizeLocation));
 .profile__name {
   padding: 0;
   font-family: var(--font-serif);
-  font-size: 1.1rem;
+  font-size: 1.05rem;
   font-weight: 750;
+  letter-spacing: 0.02em;
 }
 
 .profile__bio {
-  margin: 0.2rem 0 0;
+  margin: 0.14rem 0 0;
   overflow: hidden;
   color: var(--text-muted);
   font-family: var(--font-serif);
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .profile__nav {
   display: flex;
-  gap: 0.15rem;
-  padding: 0.2rem;
-  border-radius: 999px;
-  background: var(--surface-muted);
+  align-self: stretch;
+  align-items: center;
+  gap: 1rem;
 }
 
 .profile__nav-link {
-  padding: 0.48rem 0.7rem;
-  border-radius: 999px;
+  min-height: 2.5rem;
+  padding: 0.25rem 0;
+  border-bottom: 2px solid transparent;
   color: var(--text-muted);
-  font-size: 0.76rem;
+  font-size: 0.78rem;
+  transition: border-color 140ms ease, color 140ms ease;
 }
 
 .profile__nav-link--active {
-  background: var(--surface-card);
   color: var(--text-primary);
-  box-shadow: 0 1px 4px rgb(40 29 25 / 8%);
+  border-bottom-color: var(--accent);
 }
 
 .not-found {
@@ -231,7 +234,7 @@ onUnmounted(() => window.removeEventListener('popstate', synchronizeLocation));
   align-items: center;
   justify-content: center;
   gap: 0.55rem;
-  padding: 1.8rem 1rem 2.6rem;
+  padding: 1.8rem var(--page-gutter) 2.6rem;
   color: var(--text-muted);
   font-size: 0.72rem;
 }
@@ -240,18 +243,33 @@ onUnmounted(() => window.removeEventListener('popstate', synchronizeLocation));
   color: inherit;
 }
 
-@media (max-width: 620px) {
+@media (max-width: 599px) {
   .profile {
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 0.6rem;
+    padding: 0.8rem 0 0.72rem;
+  }
+
+  .profile__avatar {
+    width: 2.35rem;
+    height: 2.35rem;
+  }
+
+  .profile__bio {
+    display: none;
+  }
+
+  .profile__name {
+    font-size: 0.92rem;
   }
 
   .profile__nav {
-    grid-column: 1 / -1;
-    justify-content: stretch;
+    gap: 0.65rem;
   }
 
   .profile__nav-link {
-    flex: 1;
+    min-height: 2.25rem;
+    font-size: 0.72rem;
   }
 }
 </style>

@@ -41,8 +41,8 @@ function forwardDelete(entry: JournalEntry): void {
       <span class="memory__eyebrow">往年今日</span>
       <h2 id="memory-title" class="memory__title">时间留下来的这一天</h2>
     </header>
-    <div class="memory__entries">
-      <template v-for="entry in entries" :key="entry.id">
+    <div class="memory__entries" tabindex="0" aria-label="往年今日记录，横向滚动">
+      <div v-for="entry in entries" :key="entry.id" class="memory__item">
         <ArticleCardContent
           v-if="entry.bodyFormat === 'rich'"
           :entry="entry"
@@ -67,7 +67,7 @@ function forwardDelete(entry: JournalEntry): void {
           @set-pinned="forwardPinned"
           @delete-entry="forwardDelete"
         />
-      </template>
+      </div>
     </div>
   </section>
 </template>
@@ -75,11 +75,16 @@ function forwardDelete(entry: JournalEntry): void {
 <style scoped>
 .memory {
   display: grid;
-  gap: 0.8rem;
-  padding: 1rem 0 0.2rem;
+  gap: 0.75rem;
+  padding: 1.15rem 0 0.35rem;
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .memory__header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.7rem;
   padding: 0 0.15rem;
 }
 
@@ -91,19 +96,43 @@ function forwardDelete(entry: JournalEntry): void {
 }
 
 .memory__title {
-  margin: 0.25rem 0 0;
+  margin: 0;
   font-family: var(--font-serif);
-  font-size: 1.15rem;
+  font-size: 1.05rem;
+  font-weight: 680;
 }
 
 .memory__entries {
   display: grid;
-  gap: 0.7rem;
+  grid-auto-columns: clamp(17rem, 28vw, 22rem);
+  grid-auto-flow: column;
+  gap: 0.8rem;
+  padding: 0 0.15rem 0.55rem;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scroll-snap-type: inline proximity;
+  scrollbar-color: var(--border-strong) transparent;
+  scrollbar-width: thin;
 }
 
-@media (max-width: 520px) {
+.memory__item {
+  min-width: 0;
+  scroll-snap-align: start;
+}
+
+@media (max-width: 599px) {
+  .memory {
+    padding-top: 0.9rem;
+  }
+
   .memory__header {
-    padding: 0 1rem;
+    display: grid;
+    gap: 0.15rem;
+  }
+
+  .memory__entries {
+    grid-auto-columns: min(82vw, 19rem);
+    gap: 0.6rem;
   }
 }
 </style>

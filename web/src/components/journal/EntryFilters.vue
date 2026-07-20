@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, watch } from 'vue';
+import { computed, reactive, shallowRef, watch } from 'vue';
 import { emptyFeedFilters, type FeedFilters } from '../../types';
 
 const props = defineProps<{
@@ -11,6 +11,7 @@ const emit = defineEmits<{
 }>();
 
 const draft = reactive<FeedFilters>({ ...props.filters });
+const expanded = shallowRef(false);
 
 const visibilityOptions = [
   { value: 'all', label: '全部' },
@@ -39,6 +40,29 @@ const contentTypes = [
   { value: 'article', label: '文章' },
 ];
 
+const appliedFilterLabels = computed(() => {
+  const labels: string[] = [];
+  const visibility = visibilityOptions.find((option) => option.value === props.filters.visibility);
+  const contentType = contentTypes.find((option) => option.value === props.filters.contentType);
+
+  if (props.filters.visibility !== 'all' && visibility) labels.push(visibility.label);
+  if (props.filters.query) labels.push(`“${props.filters.query}”`);
+  if (props.filters.tag) labels.push(`#${props.filters.tag}`);
+  if (props.filters.contentType && contentType) labels.push(contentType.label);
+  if (props.filters.from || props.filters.to) {
+    labels.push(`${props.filters.from || '最早'} — ${props.filters.to || '今天'}`);
+  }
+
+  return labels;
+});
+
+const filterSummary = computed(() => {
+  if (appliedFilterLabels.value.length === 0) return '全部记录';
+  const visibleLabels = appliedFilterLabels.value.slice(0, 2).join(' · ');
+  const remainingCount = appliedFilterLabels.value.length - 2;
+  return remainingCount > 0 ? `${visibleLabels} 等 ${appliedFilterLabels.value.length} 项` : visibleLabels;
+});
+
 watch(
   () => [
     props.filters.visibility,
@@ -55,6 +79,7 @@ watch(
 
 function apply(): void {
   emit('apply', { ...draft });
+  expanded.value = false;
 }
 
 function reset(): void {
@@ -64,58 +89,118 @@ function reset(): void {
 </script>
 
 <template>
-  <form class="filters" @submit.prevent="apply">
-    <div class="filters__visibility" aria-label="可见性筛选">
-      <label v-for="option in visibilityOptions" :key="option.value" class="filters__choice">
-        <input v-model="draft.visibility" type="radio" name="visibility" :value="option.value">
-        <span>{{ option.label }}</span>
-      </label>
-    </div>
+  <section class="filters" aria-label="记录筛选器">
+    <button
+      class="filters__toolbar"
+      type="button"
+      aria-controls="journal-filter-panel"
+      :aria-expanded="expanded"
+      @click="expanded = !expanded"
+    >
+      <span class="filters__toolbar-label">筛选</span>
+      <span class="filters__summary">{{ filterSummary }}</span>
+      <span class="filters__toggle" aria-hidden="true">{{ expanded ? '收起' : '展开' }}</span>
+    </button>
 
-    <div class="filters__search-row">
-      <label class="field filters__query">
-        <span class="field__label">正文关键词</span>
-        <input v-model.trim="draft.query" type="search" placeholder="搜索记录">
-      </label>
-      <label class="field filters__tag">
-        <span class="field__label">标签</span>
-        <input v-model.trim="draft.tag" type="text" placeholder="例如：旅行">
-      </label>
-      <label class="field filters__type">
-        <span class="field__label">格式</span>
-        <select v-model="draft.contentType">
-          <option v-for="contentType in contentTypes" :key="contentType.value" :value="contentType.value">
-            {{ contentType.label }}
-          </option>
-        </select>
-      </label>
-    </div>
-
-    <div class="filters__date-row">
-      <label class="field">
-        <span class="field__label">从</span>
-        <input v-model="draft.from" type="date">
-      </label>
-      <label class="field">
-        <span class="field__label">到</span>
-        <input v-model="draft.to" type="date">
-      </label>
-      <div class="filters__actions">
-        <button class="button button--quiet" type="button" @click="reset">清空</button>
-        <button class="button button--primary" type="submit">筛选</button>
+    <form
+      v-show="expanded"
+      id="journal-filter-panel"
+      class="filters__panel"
+      @submit.prevent="apply"
+    >
+      <div class="filters__visibility" aria-label="可见性筛选">
+        <label v-for="option in visibilityOptions" :key="option.value" class="filters__choice">
+          <input v-model="draft.visibility" type="radio" name="visibility" :value="option.value">
+          <span>{{ option.label }}</span>
+        </label>
       </div>
-    </div>
-  </form>
+
+      <div class="filters__search-row">
+        <label class="field filters__query">
+          <span class="field__label">正文关键词</span>
+          <input v-model.trim="draft.query" type="search" placeholder="搜索记录">
+        </label>
+        <label class="field filters__tag">
+          <span class="field__label">标签</span>
+          <input v-model.trim="draft.tag" type="text" placeholder="例如：旅行">
+        </label>
+        <label class="field filters__type">
+          <span class="field__label">格式</span>
+          <select v-model="draft.contentType">
+            <option v-for="contentType in contentTypes" :key="contentType.value" :value="contentType.value">
+              {{ contentType.label }}
+            </option>
+          </select>
+        </label>
+      </div>
+
+      <div class="filters__date-row">
+        <label class="field">
+          <span class="field__label">从</span>
+          <input v-model="draft.from" type="date">
+        </label>
+        <label class="field">
+          <span class="field__label">到</span>
+          <input v-model="draft.to" type="date">
+        </label>
+        <div class="filters__actions">
+          <button class="button button--quiet" type="button" @click="reset">清空</button>
+          <button class="button button--primary" type="submit">筛选</button>
+        </div>
+      </div>
+    </form>
+  </section>
 </template>
 
 <style scoped>
 .filters {
-  display: grid;
-  gap: 0.9rem;
-  padding: 1rem;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-card);
   background: var(--surface-card);
+  overflow: hidden;
+}
+
+.filters__toolbar {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  width: 100%;
+  min-height: 3.25rem;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.filters__toolbar-label {
+  color: var(--accent-strong);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.filters__summary {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filters__toggle {
+  color: var(--text-muted);
+  font-size: 0.74rem;
+}
+
+.filters__panel {
+  display: grid;
+  gap: 0.9rem;
+  padding: 1rem;
+  border-top: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--surface-muted) 34%, var(--surface-card));
 }
 
 .filters__visibility {
@@ -139,6 +224,7 @@ function reset(): void {
   padding: 0.42rem 0.75rem;
   border: 1px solid var(--border-subtle);
   border-radius: 999px;
+  background: var(--surface-card);
   color: var(--text-muted);
   font-size: 0.8rem;
 }
@@ -177,8 +263,14 @@ function reset(): void {
 }
 
 @media (max-width: 620px) {
-  .filters {
-    margin: 0 1rem;
+  .filters__toolbar {
+    min-height: 3rem;
+    gap: 0.55rem;
+    padding: 0.6rem 0.7rem;
+  }
+
+  .filters__panel {
+    padding: 0.8rem;
   }
 
   .filters__search-row,

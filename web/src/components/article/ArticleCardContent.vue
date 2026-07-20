@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, shallowRef } from 'vue';
 import type { JournalEntry, JournalVisibility } from '../../types';
-import { formatEntryTime } from '../../utils/formatters';
+import CardActionMenu from '../journal/CardActionMenu.vue';
+import CardDateSpine from '../journal/CardDateSpine.vue';
 import RichArticleRenderer from './RichArticleRenderer.vue';
 
 const props = withDefaults(defineProps<{
@@ -28,16 +29,13 @@ const emit = defineEmits<{
 
 const confirmingDeletion = shallowRef(false);
 
-const cover = computed(() => props.entry.assets.find((asset) => asset.sourceKind === 'web' && asset.role === 'cover') ?? null);
-const formattedTime = computed(() => formatEntryTime(props.entry.sourceCreatedAt));
+const cover = computed(() => props.entry.assets.find((asset) =>
+  asset.sourceKind === 'web' && asset.role === 'cover') ?? null);
 const summary = computed(() => {
   const text = props.entry.contentText.replace(/\s+/g, ' ').trim();
-  if (text.length <= 160) return text;
-  return `${text.slice(0, 160)}…`;
+  if (text.length <= 72) return text;
+  return `${text.slice(0, 72)}…`;
 });
-const nextVisibility = computed<JournalVisibility>(() =>
-  props.entry.visibility === 'public' ? 'private' : 'public',
-);
 const deletionMessage = computed(() => {
   if (props.entry.assets.length === 0) return '永久删除这篇文章？此操作无法撤销。';
   if (props.entry.assets.length === 1) return '永久删除这篇文章及其附件？此操作无法撤销。';
@@ -54,7 +52,35 @@ function openEntry(): void {
 </script>
 
 <template>
-  <article class="article-card" :class="{ 'article-card--pinned': entry.pinned, 'article-card--full': display === 'full' }">
+  <article
+    class="article-card"
+    :class="{
+      'article-card--pinned': entry.pinned,
+      'article-card--full': display === 'full',
+      'article-card--without-cover': !cover,
+    }"
+  >
+    <header class="article-card__header">
+      <CardDateSpine
+        :source-created-at="entry.sourceCreatedAt"
+        :pinned="entry.pinned"
+        :visibility="entry.visibility"
+        :show-status="editable"
+        :linkable="linkable && display === 'summary'"
+        @open="openEntry"
+      />
+      <CardActionMenu
+        v-if="editable && !confirmingDeletion"
+        :busy="busy"
+        :pinned="entry.pinned"
+        :visibility="entry.visibility"
+        @edit="emit('edit', entry.id)"
+        @set-pinned="emit('setPinned', entry, $event)"
+        @set-visibility="emit('setVisibility', entry, $event)"
+        @request-delete="startDeletion"
+      />
+    </header>
+
     <figure v-if="cover && display === 'summary'" class="article-card__cover">
       <button v-if="linkable" class="article-card__cover-button" type="button" @click="openEntry">
         <img :src="cover.url" :alt="entry.title ?? '文章封面'">
@@ -62,45 +88,27 @@ function openEntry(): void {
       <img v-else :src="cover.url" :alt="entry.title ?? '文章封面'">
     </figure>
 
-    <header class="article-card__header">
-      <div class="article-card__identity">
-        <img class="article-card__avatar" src="/avatar-ming.png" alt="">
-        <div class="article-card__identity-copy">
-          <strong>小明同学</strong>
-          <button
-            v-if="linkable && entry.visibility === 'public'"
-            class="article-card__time article-card__time--link"
-            type="button"
-            @click="openEntry"
-          >
-            {{ formattedTime }}
-          </button>
-          <time v-else class="article-card__time" :datetime="entry.sourceCreatedAt">{{ formattedTime }}</time>
-        </div>
-      </div>
-      <div class="article-card__badges">
-        <span v-if="entry.pinned" class="article-card__badge" title="已置顶">📌 置顶</span>
-        <span class="article-card__badge" :title="entry.visibility === 'public' ? '公开文章' : '私有文章'">
-          {{ entry.visibility === 'public' ? '🌐 公开' : '🔒 私有' }}
-        </span>
-      </div>
-    </header>
-
-    <button
-      v-if="linkable && display === 'summary'"
-      type="button"
-      class="article-card__title-button"
-      @click="openEntry"
-    >
-      <h2 class="article-card__title">{{ entry.title }}</h2>
-    </button>
+    <h2 v-if="display === 'summary' && entry.title" class="article-card__title">
+      <button v-if="linkable" type="button" class="article-card__title-button" @click="openEntry">
+        {{ entry.title }}
+      </button>
+      <template v-else>{{ entry.title }}</template>
+    </h2>
     <h1 v-else-if="entry.title" class="article-card__title article-card__title--detail">{{ entry.title }}</h1>
 
     <figure v-if="cover && display === 'full'" class="article-card__cover article-card__cover--full">
       <img :src="cover.url" :alt="entry.title ?? '文章封面'">
     </figure>
 
-    <p v-if="display === 'summary' && summary" class="article-card__summary" @click="linkable ? openEntry() : null">{{ summary }}</p>
+    <button
+      v-if="display === 'summary' && summary && linkable"
+      type="button"
+      class="article-card__summary-button"
+      @click="openEntry"
+    >
+      {{ summary }}
+    </button>
+    <p v-else-if="display === 'summary' && summary" class="article-card__summary">{{ summary }}</p>
 
     <RichArticleRenderer
       v-else-if="display === 'full'"
@@ -120,46 +128,15 @@ function openEntry(): void {
       </button>
     </div>
 
-    <footer
-      v-if="editable"
-      class="article-card__actions"
-      :class="{ 'article-card__actions--confirming': confirmingDeletion }"
-    >
-      <template v-if="!confirmingDeletion">
-        <button class="article-card__action" type="button" :disabled="busy" @click="emit('edit', entry.id)">编辑</button>
-        <button
-          class="article-card__action"
-          type="button"
-          :disabled="busy"
-          @click="emit('setPinned', entry, !entry.pinned)"
-        >
-          {{ entry.pinned ? '取消置顶' : '置顶' }}
+    <footer v-if="editable && confirmingDeletion" class="article-card__delete-confirmation" role="alert">
+      <p class="article-card__delete-message">{{ deletionMessage }}</p>
+      <div class="article-card__delete-actions">
+        <button class="button button--quiet" type="button" :disabled="busy" @click="confirmingDeletion = false">
+          取消
         </button>
-        <button
-          class="article-card__action"
-          type="button"
-          :disabled="busy"
-          @click="emit('setVisibility', entry, nextVisibility)"
-        >
-          {{ nextVisibility === 'public' ? '设为公开' : '转为私有' }}
+        <button class="button article-card__delete-button" type="button" :disabled="busy" @click="emit('deleteEntry', entry)">
+          {{ busy ? '删除中…' : '确认删除' }}
         </button>
-        <button
-          class="article-card__action article-card__action--danger"
-          type="button"
-          :disabled="busy"
-          @click="startDeletion"
-        >
-          删除
-        </button>
-      </template>
-      <div v-else class="article-card__delete-confirmation" role="alert">
-        <p class="article-card__delete-message">{{ deletionMessage }}</p>
-        <div class="article-card__delete-actions">
-          <button class="button button--quiet" type="button" :disabled="busy" @click="confirmingDeletion = false">取消</button>
-          <button class="button article-card__delete-button" type="button" :disabled="busy" @click="emit('deleteEntry', entry)">
-            {{ busy ? '删除中…' : '确认删除' }}
-          </button>
-        </div>
       </div>
     </footer>
   </article>
@@ -168,209 +145,165 @@ function openEntry(): void {
 <style scoped>
 .article-card {
   display: grid;
-  gap: 0.85rem;
-  padding: 1.15rem 1.2rem;
+  gap: 0.8rem;
+  padding: 0.9rem;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-card);
   background: var(--surface-card);
-  box-shadow: var(--shadow-card);
+  transition: border-color 180ms ease, transform 180ms ease;
+}
+
+.article-card:not(.article-card--full):hover {
+  border-color: var(--border-strong);
+  transform: translateY(-2px);
 }
 
 .article-card--pinned {
   border-color: color-mix(in srgb, var(--accent) 50%, var(--border-subtle));
 }
 
+.article-card--without-cover:not(.article-card--full) {
+  background: color-mix(in srgb, var(--surface-muted) 42%, var(--surface-card));
+}
+
 .article-card--full {
-  padding: 1.6rem 1.8rem;
   gap: 1rem;
+  padding: 1.5rem;
+}
+
+.article-card__header,
+.article-card__tags,
+.article-card__delete-actions {
+  display: flex;
+  align-items: center;
+}
+
+.article-card__header {
+  min-width: 0;
+  justify-content: space-between;
+  gap: 0.5rem;
 }
 
 .article-card__cover {
   margin: 0;
-  border-radius: 0.8rem;
   overflow: hidden;
-}
-
-.article-card__cover--full {
-  margin: 0.5rem 0 0.2rem;
+  border-radius: var(--radius-media);
+  background: var(--surface-muted);
 }
 
 .article-card__cover img,
 .article-card__cover-button {
   display: block;
   width: 100%;
-  max-height: 20rem;
-  object-fit: cover;
+}
+
+.article-card__cover img {
+  height: auto;
 }
 
 .article-card__cover-button {
-  margin: 0;
+  min-height: 2.5rem;
   padding: 0;
   border: 0;
   background: transparent;
   cursor: pointer;
 }
 
-.article-card__header,
-.article-card__identity,
-.article-card__badges,
-.article-card__actions,
-.article-card__tags {
-  display: flex;
-  align-items: center;
+.article-card__cover-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -3px;
 }
 
-.article-card__header {
-  justify-content: space-between;
-  gap: 0.75rem;
+.article-card__cover--full {
+  margin-top: 0.25rem;
 }
 
-.article-card__identity {
-  min-width: 0;
-  gap: 0.65rem;
-}
-
-.article-card__avatar {
-  width: 2.45rem;
-  height: 2.45rem;
-  flex: none;
-  border-radius: 50%;
-}
-
-.article-card__identity-copy {
-  display: grid;
-  min-width: 0;
-  gap: 0.08rem;
-}
-
-.article-card__identity-copy strong {
-  font-size: 0.92rem;
-}
-
-.article-card__time {
-  color: var(--text-muted);
-  font: inherit;
-  font-size: 0.76rem;
-}
-
-.article-card__time--link {
+.article-card__title-button,
+.article-card__summary-button {
+  width: 100%;
+  min-height: 2.5rem;
   padding: 0;
   border: 0;
   background: transparent;
+  color: inherit;
   cursor: pointer;
   text-align: left;
-}
-
-.article-card__time--link:hover {
-  color: var(--accent-strong);
-  text-decoration: underline;
-}
-
-.article-card__badges {
-  justify-content: flex-end;
-  gap: 0.35rem;
-  flex-wrap: wrap;
-}
-
-.article-card__badge {
-  padding: 0.28rem 0.48rem;
-  border-radius: 999px;
-  background: var(--surface-muted);
-  color: var(--text-muted);
-  font-size: 0.7rem;
-  white-space: nowrap;
-}
-
-.article-card__title-button {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  text-align: left;
-  cursor: pointer;
 }
 
 .article-card__title {
   margin: 0;
   font-family: var(--font-serif);
-  font-size: 1.3rem;
+  font-size: clamp(1.15rem, 1.4vw, 1.35rem);
   font-weight: 750;
-  line-height: 1.3;
+  line-height: 1.35;
   overflow-wrap: anywhere;
+}
+
+.article-card--without-cover:not(.article-card--full) .article-card__title {
+  font-size: clamp(1.3rem, 1.8vw, 1.65rem);
+  line-height: 1.38;
 }
 
 .article-card__title--detail {
-  font-size: clamp(1.6rem, 5vw, 2.1rem);
+  font-size: clamp(1.75rem, 5vw, 2.35rem);
   font-weight: 800;
+  line-height: 1.3;
 }
 
-.article-card__summary {
+.article-card__summary,
+.article-card__summary-button {
+  display: -webkit-box;
   margin: 0;
   color: var(--text-primary);
-  font-size: 0.98rem;
-  line-height: 1.7;
+  font-size: 0.92rem;
+  line-height: 1.65;
   overflow-wrap: anywhere;
-  cursor: pointer;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.article-card__summary-button:hover {
+  color: var(--accent-strong);
+}
+
+.article-card__summary-button:focus-visible,
+.article-card__title-button:focus-visible,
+.article-card__tag:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .article-card__body {
-  margin: 0.4rem 0;
+  margin: 0.35rem 0;
 }
 
 .article-card__tags {
-  gap: 0.35rem;
+  gap: 0.15rem;
   flex-wrap: wrap;
 }
 
-.article-card__tag,
-.article-card__action {
+.article-card__tag {
+  min-height: 2.5rem;
+  padding: 0.45rem 0.35rem;
   border: 0;
   background: transparent;
   color: var(--accent-strong);
   cursor: pointer;
-}
-
-.article-card__tag {
-  padding: 0.2rem 0.15rem;
-  font-size: 0.84rem;
-}
-
-.article-card__tag:hover,
-.article-card__action:hover:not(:disabled) {
-  text-decoration: underline;
-}
-
-.article-card__actions {
-  gap: 1rem;
-  margin-top: 0.5rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--border-subtle);
-}
-
-.article-card__action {
-  padding: 0;
+  font: inherit;
   font-size: 0.8rem;
 }
 
-.article-card__action:disabled {
-  cursor: wait;
-  opacity: 0.5;
-}
-
-.article-card__action--danger {
-  color: var(--danger);
-}
-
-.article-card__actions--confirming {
-  display: block;
+.article-card__tag:hover {
+  text-decoration: underline;
 }
 
 .article-card__delete-confirmation {
   display: grid;
   gap: 0.65rem;
-  width: 100%;
   padding: 0.75rem;
   border: 1px solid color-mix(in srgb, var(--danger) 32%, transparent);
-  border-radius: 0.8rem;
+  border-radius: 0.75rem;
   background: var(--danger-soft);
   color: var(--danger);
 }
@@ -382,9 +315,12 @@ function openEntry(): void {
 }
 
 .article-card__delete-actions {
-  display: flex;
   justify-content: flex-end;
   gap: 0.55rem;
+}
+
+.article-card__delete-actions .button {
+  min-height: 2.5rem;
 }
 
 .article-card__delete-button {
@@ -392,29 +328,31 @@ function openEntry(): void {
   color: #fff;
 }
 
-@media (max-width: 520px) {
+@media (max-width: 599px) {
   .article-card {
-    padding: 1rem 0;
-    border-right: 0;
-    border-left: 0;
-    border-radius: 0;
-    box-shadow: none;
+    gap: 0.65rem;
+    padding: 0.65rem;
+    border-radius: 0.65rem;
   }
 
   .article-card--full {
-    padding: 0;
-    border: 0;
+    gap: 0.9rem;
+    padding: 1rem;
+    border-radius: var(--radius-card);
   }
 
-  .article-card__cover,
-  .article-card__header,
-  .article-card__summary,
-  .article-card__tags,
-  .article-card__actions,
-  .article-card__title,
-  .article-card__body {
-    margin-right: 1rem;
-    margin-left: 1rem;
+  .article-card__tags {
+    gap: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .article-card {
+    transition: none;
+  }
+
+  .article-card:not(.article-card--full):hover {
+    transform: none;
   }
 }
 </style>
