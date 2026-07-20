@@ -139,6 +139,15 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.waterfall-stage {
+  display: grid;
+}
+
+.waterfall,
+.waterfall__loading {
+  grid-area: 1 / 1;
+}
+
 .waterfall__loading {
   padding: 3rem 1rem;
   color: var(--text-muted);
