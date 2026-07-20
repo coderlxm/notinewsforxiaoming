@@ -50,6 +50,11 @@ const structuredRows = computed(() => Object.entries(props.entry.structuredConte
 const displayedStructuredRows = computed(() => isDetail.value
   ? structuredRows.value
   : structuredRows.value.slice(0, 3));
+const cardVisualLimit = computed(() => !props.editable
+  && props.linkable
+  && props.entry.visibility === 'public'
+  ? 5
+  : undefined);
 const canSave = computed(() => draft.value !== props.entry.contentText && !props.busy);
 const deletionMessage = computed(() => {
   if (props.entry.assets.length === 0) return '永久删除这条记录？此操作无法撤销。';
@@ -112,6 +117,8 @@ function startDeletion(): void {
       v-if="entry.assets.length"
       :assets="entry.assets"
       :display="isDetail ? 'detail' : 'card'"
+      :max-visuals="cardVisualLimit"
+      @open="emit('viewDetail', entry.publicId)"
     />
 
     <div v-if="editing" class="entry__editor">

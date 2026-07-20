@@ -6,9 +6,14 @@ import { formatFileSize } from '../../utils/formatters';
 const props = withDefaults(defineProps<{
   assets: readonly JournalAsset[];
   display?: 'card' | 'detail';
+  maxVisuals?: number;
 }>(), {
   display: 'detail',
 });
+
+const emit = defineEmits<{
+  open: [];
+}>();
 
 type DisplayAsset = JournalAsset & {
   displayType: 'image' | 'video' | 'audio' | 'file';
@@ -42,6 +47,10 @@ const displayAssets = computed<DisplayAsset[]>(() => props.assets.map(asset => {
 const visualAssets = computed(() => displayAssets.value.filter(asset =>
   asset.displayType === 'image' || asset.displayType === 'video',
 ));
+const renderedVisualAssets = computed(() => props.maxVisuals === undefined
+  ? visualAssets.value
+  : visualAssets.value.slice(0, props.maxVisuals));
+const hiddenVisualCount = computed(() => visualAssets.value.length - renderedVisualAssets.value.length);
 const audioAssets = computed(() => displayAssets.value.filter(asset => asset.displayType === 'audio'));
 const fileAssets = computed(() => displayAssets.value.filter(asset => asset.displayType === 'file'));
 
@@ -67,7 +76,7 @@ function preserveAssetRatio(asset: DisplayAsset): { aspectRatio: string } | unde
       }"
     >
       <figure
-        v-for="asset in visualAssets"
+        v-for="(asset, index) in renderedVisualAssets"
         :key="asset.id"
         class="media__visual"
         :class="{ 'media__visual--natural': display === 'detail' || visualAssets.length === 1 }"
@@ -89,6 +98,15 @@ function preserveAssetRatio(asset: DisplayAsset): { aspectRatio: string } | unde
           controls
           preload="metadata"
         />
+        <button
+          v-if="hiddenVisualCount > 0 && index === renderedVisualAssets.length - 1"
+          class="media__more"
+          type="button"
+          :aria-label="`还有 ${hiddenVisualCount} 张媒体，查看完整记录`"
+          @click="emit('open')"
+        >
+          +{{ hiddenVisualCount }}
+        </button>
       </figure>
     </div>
 
@@ -140,6 +158,7 @@ function preserveAssetRatio(asset: DisplayAsset): { aspectRatio: string } | unde
 }
 
 .media__visual {
+  position: relative;
   display: grid;
   min-width: 0;
   margin: 0;
@@ -147,6 +166,24 @@ function preserveAssetRatio(asset: DisplayAsset): { aspectRatio: string } | unde
   overflow: hidden;
   border-radius: var(--radius-media);
   background: var(--surface-muted);
+}
+
+.media__more {
+  position: absolute;
+  display: grid;
+  border: 0;
+  background: rgb(0 0 0 / 58%);
+  color: #fff;
+  cursor: pointer;
+  font-size: 1.4rem;
+  font-weight: 800;
+  inset: 0;
+  place-items: center;
+  transition: background-color 140ms ease;
+}
+
+.media__more:hover {
+  background: rgb(0 0 0 / 68%);
 }
 
 .media__image,
