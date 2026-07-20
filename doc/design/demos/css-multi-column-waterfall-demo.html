@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CSS Multi-column 瀑布流最小示例</title>
+  <style>
+    :root {
+      --gap: 16px;
+      font-family: system-ui, sans-serif;
+      color: #182033;
+      background: #edf1f6;
+    }
+
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+
+    main {
+      width: min(1400px, calc(100% - 32px));
+      margin: 32px auto;
+    }
+
+    h1 { margin: 0 0 8px; }
+
+    .intro {
+      margin: 0 0 24px;
+      color: #657086;
+      line-height: 1.6;
+    }
+
+    .page {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 320px;
+      gap: 20px;
+      align-items: start;
+    }
+
+    .demo,
+    .explain {
+      padding: 16px;
+      border: 1px solid #d5dce7;
+      border-radius: 12px;
+      background: white;
+    }
+
+    .direction {
+      margin: 0 0 12px;
+      color: #c22f4a;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    /* Multi-column 核心实现 */
+    .waterfall {
+      column-count: 4;
+      column-gap: var(--gap);
+    }
+
+    .card {
+      break-inside: avoid;
+      min-height: var(--height);
+      margin-bottom: var(--gap);
+      padding: 12px;
+      border-radius: 8px;
+      background: var(--color);
+      color: white;
+    }
+
+    .card b {
+      display: grid;
+      width: 32px;
+      height: 32px;
+      margin-bottom: 12px;
+      place-items: center;
+      border-radius: 50%;
+      background: #182033;
+      font-size: 13px;
+    }
+
+    .card span {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    .explain h2 {
+      margin: 0 0 12px;
+      font-size: 16px;
+    }
+
+    pre {
+      margin: 0;
+      padding: 14px;
+      overflow-x: auto;
+      border-radius: 8px;
+      background: #182033;
+      color: #f4f7fb;
+      font: 12px/1.7 ui-monospace, monospace;
+    }
+
+    .note {
+      margin: 14px 0 0;
+      color: #657086;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    @media (max-width: 1180px) {
+      .waterfall { column-count: 3; }
+    }
+
+    @media (max-width: 900px) {
+      .page { grid-template-columns: 1fr; }
+      .waterfall { column-count: 3; }
+    }
+
+    @media (max-width: 620px) {
+      :root { --gap: 8px; }
+      main { width: calc(100% - 20px); margin: 20px auto; }
+      .waterfall { column-count: 2; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>CSS Multi-column 瀑布流</h1>
+    <p class="intro">
+      色块编号就是 DOM 顺序。它会先从上到下填满一列，再进入右侧下一列，而不是从左到右逐行排列。
+      <a href="./css-multi-column-waterfall-notes.md">配套学习笔记</a>
+    </p>
+
+    <div class="page">
+      <section class="demo" aria-label="Multi-column 效果">
+        <p class="direction">阅读顺序：↓ 纵向填充，再向右 →</p>
+
+        <div class="waterfall">
+          <article class="card" style="--height: 110px; --color: #315bc7;"><b>01</b><span>短文字</span></article>
+          <article class="card" style="--height: 230px; --color: #e75835;"><b>02</b><span>纵向图片</span></article>
+          <article class="card" style="--height: 155px; --color: #16846d;"><b>03</b><span>文章摘要</span></article>
+          <article class="card" style="--height: 100px; --color: #8a52b2;"><b>04</b><span>横向图片</span></article>
+          <article class="card" style="--height: 78px; --color: #c89618;"><b>05</b><span>音频</span></article>
+          <article class="card" style="--height: 190px; --color: #287fa5;"><b>06</b><span>多图相册</span></article>
+          <article class="card" style="--height: 86px; --color: #c93f75;"><b>07</b><span>一句话</span></article>
+          <article class="card" style="--height: 175px; --color: #556a80;"><b>08</b><span>富文本</span></article>
+          <article class="card" style="--height: 125px; --color: #667b29;"><b>09</b><span>视频</span></article>
+          <article class="card" style="--height: 96px; --color: #b94a39;"><b>10</b><span>普通记录</span></article>
+        </div>
+      </section>
+
+      <aside class="explain">
+        <h2>真正决定布局的 CSS</h2>
+        <pre><code>.waterfall {
+  column-count: 4;
+  column-gap: 16px;
+}
+
+.card {
+  break-inside: avoid;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 620px) {
+  .waterfall { column-count: 2; }
+}</code></pre>
+        <p class="note">
+          <code>break-inside: avoid</code> 保证卡片不会被截成上下两段。浏览器负责分列和平衡列高，不需要 JavaScript 计算位置。
+        </p>
+      </aside>
+    </div>
+  </main>
+</body>
+</html>
