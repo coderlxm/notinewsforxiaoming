@@ -194,11 +194,10 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
     </template>
 
     <div v-else class="feed__public-heading">
-      <span class="feed__eyebrow">PUBLIC NOTES</span>
-      <div class="feed__title-row">
-        <h1 class="feed__title">{{ listTitle }}</h1>
+      <h1 class="feed__eyebrow">PUBLIC NOTES</h1>
+      <div v-if="initialTag" class="feed__title-row">
+        <h2 class="feed__title">{{ listTitle }}</h2>
         <button
-          v-if="initialTag"
           class="text-button"
           type="button"
           @click="emit('navigate', '/')"
@@ -321,12 +320,18 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
   padding: 0 0.15rem;
 }
 
-.feed__public-heading,
 .feed__private-heading {
   display: flex;
   align-items: end;
   justify-content: space-between;
   min-height: 3.5rem;
+}
+
+.feed__public-heading {
+  display: flex;
+  min-height: 1.5rem;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .feed__private-actions {
@@ -345,6 +350,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
 }
 
 .feed__eyebrow {
+  margin: 0;
   color: var(--accent-strong);
   font-size: 0.68rem;
   font-weight: 800;
