@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, shallowRef } from 'vue';
+import JournalLoading from '../ui/JournalLoading.vue';
 import { formatFileSize } from '../../utils/formatters';
 import type { JournalAsset } from '../../types';
 
 const props = defineProps<{
   assets: readonly JournalAsset[];
   busy: boolean;
+  busyLabel: string | null;
 }>();
 
 const emit = defineEmits<{
@@ -32,10 +34,13 @@ function onCoverChange(event: Event): void {
 </script>
 
 <template>
-  <section class="media-panel">
+  <section class="media-panel" :aria-busy="busy">
     <header class="media-panel__header">
-      <h2 class="media-panel__title">封面与文中图片</h2>
-      <p class="media-panel__hint">JPEG / PNG / WebP / GIF，单文件上限 20 MB。</p>
+      <div>
+        <h2 class="media-panel__title">封面与文中图片</h2>
+        <p class="media-panel__hint">JPEG / PNG / WebP / GIF，单文件上限 20 MB。</p>
+      </div>
+      <JournalLoading v-if="busyLabel" variant="inline" :label="busyLabel" />
     </header>
 
     <div class="media-panel__cover">
@@ -83,6 +88,14 @@ function onCoverChange(event: Event): void {
   margin: 0;
   font-family: var(--font-serif);
   font-size: 1.1rem;
+}
+
+.media-panel__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
 }
 
 .media-panel__hint {

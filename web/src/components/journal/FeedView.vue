@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { computed, onActivated, onMounted, reactive } from 'vue';
+import { computed, onActivated, onMounted, reactive, shallowRef } from 'vue';
 import ArticleCardContent from '../article/ArticleCardContent.vue';
+import JournalLoading from '../ui/JournalLoading.vue';
+import { useDeferredLoading } from '../../composables/useDeferredLoading';
 import { useJournalApi } from '../../composables/useJournalApi';
 import { emptyFeedFilters, type FeedFilters, type JournalEntry, type JournalVisibility } from '../../types';
 import EntryCard from './EntryCard.vue';
@@ -30,8 +32,18 @@ const filters = reactive<FeedFilters>({
   tag: props.initialTag,
 });
 const journal = useJournalApi();
+const initialLoadPending = shallowRef(true);
+const listReplacing = shallowRef(false);
+const loggingOut = shallowRef(false);
 
 const isDetail = computed(() => props.mode === 'public' && props.detailId !== undefined);
+const detailPreparing = computed(() => isDetail.value && initialLoadPending.value);
+const deferredDetailLoading = useDeferredLoading(detailPreparing);
+const listLoadingLabel = computed(() =>
+  props.mode === 'private' && initialLoadPending.value
+    ? '正在打开个人档案…'
+    : '正在整理记录…',
+);
 const listTitle = computed(() => {
   if (props.mode === 'private') return '我的全部记录';
   if (props.initialTag) return `#${props.initialTag}`;
@@ -39,15 +51,19 @@ const listTitle = computed(() => {
 });
 
 onMounted(async () => {
-  if (isDetail.value) {
-    await journal.loadPublicDetail(props.detailId as string);
-    return;
+  try {
+    if (isDetail.value) {
+      await journal.loadPublicDetail(props.detailId as string);
+      return;
+    }
+    if (props.mode === 'public') {
+      await journal.loadPublic({ tag: props.initialTag });
+      return;
+    }
+    await journal.loadPrivate(filters);
+  } finally {
+    initialLoadPending.value = false;
   }
-  if (props.mode === 'public') {
-    await journal.loadPublic({ tag: props.initialTag });
-    return;
-  }
-  await journal.loadPrivate(filters);
 });
 
 onActivated(() => {
@@ -56,7 +72,12 @@ onActivated(() => {
 
 async function applyFilters(nextFilters: FeedFilters): Promise<void> {
   Object.assign(filters, nextFilters);
-  await journal.loadPrivate(filters);
+  listReplacing.value = true;
+  try {
+    await journal.loadPrivate(filters);
+  } finally {
+    listReplacing.value = false;
+  }
 }
 
 async function loadMore(): Promise<void> {
@@ -68,7 +89,12 @@ async function loadMore(): Promise<void> {
 }
 
 async function authenticate(password: string): Promise<void> {
-  await journal.authenticate(password, filters);
+  listReplacing.value = true;
+  try {
+    await journal.authenticate(password, filters);
+  } finally {
+    listReplacing.value = false;
+  }
 }
 
 async function selectTag(tag: string): Promise<void> {
@@ -77,7 +103,21 @@ async function selectTag(tag: string): Promise<void> {
     return;
   }
   filters.tag = tag;
-  await journal.loadPrivate(filters);
+  listReplacing.value = true;
+  try {
+    await journal.loadPrivate(filters);
+  } finally {
+    listReplacing.value = false;
+  }
+}
+
+async function logout(): Promise<void> {
+  loggingOut.value = true;
+  try {
+    await journal.logout();
+  } finally {
+    loggingOut.value = false;
+  }
 }
 
 function viewDetail(publicId: string): void {
@@ -147,9 +187,11 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
             class="button button--quiet"
             type="button"
             :disabled="journal.loading.value"
-            @click="journal.logout"
+            :aria-busy="loggingOut"
+            @click="logout"
           >
-            退出登录
+            <JournalLoading v-if="loggingOut" variant="inline" label="退出中…" />
+            <template v-else>退出登录</template>
           </button>
         </div>
       </div>
@@ -170,7 +212,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
       </div>
     </div>
 
-    <p v-if="journal.error.value" class="notice notice--error" role="alert">{{ journal.error.value }}</p>
+    <p v-if="!isDetail && journal.error.value" class="notice notice--error" role="alert">{{ journal.error.value }}</p>
 
     <LoginView
       v-if="mode === 'private' && journal.authenticationState.value === 'anonymous'"
@@ -193,33 +235,42 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
       />
     </template>
 
-    <div v-if="journal.loading.value" class="feed__loading" role="status">正在读取记录…</div>
-
+    <div v-if="isDetail" class="feed__reading-stage" :aria-busy="detailPreparing">
+      <Transition name="feed-stage" mode="out-in">
+        <JournalLoading v-if="deferredDetailLoading.visible.value && !journal.error.value" key="loading" variant="reading" label="正在展开记录…" />
+        <p v-else-if="journal.error.value" key="error" class="notice notice--error" role="alert">{{ journal.error.value }}</p>
     <ArticleCardContent
-      v-else-if="isDetail && journal.detail.value && isArticleEntry(journal.detail.value)"
-      :entry="journal.detail.value"
-      :linkable="false"
-      display="full"
-      @select-tag="selectTag"
-    />
+      v-else-if="journal.detail.value && isArticleEntry(journal.detail.value)"
+      key="article-detail"
+          :entry="journal.detail.value"
+          :linkable="false"
+          display="full"
+          @select-tag="selectTag"
+        />
     <EntryCard
-      v-else-if="isDetail && journal.detail.value"
-      :entry="journal.detail.value"
-      :linkable="false"
-      @select-tag="selectTag"
-      @view-detail="viewDetail"
-      @save-content="saveContent"
-      @set-visibility="setVisibility"
-      @set-pinned="setPinned"
-      @delete-entry="deleteEntry"
-    />
+      v-else-if="journal.detail.value"
+      key="entry-detail"
+          :entry="journal.detail.value"
+          :linkable="false"
+          @select-tag="selectTag"
+          @view-detail="viewDetail"
+          @save-content="saveContent"
+          @set-visibility="setVisibility"
+          @set-pinned="setPinned"
+          @delete-entry="deleteEntry"
+        />
+        <div v-else key="reserve" class="feed__reading-reserve" aria-hidden="true"></div>
+      </Transition>
+    </div>
 
     <div
-      v-else-if="!isDetail && (mode === 'public' || journal.authenticationState.value === 'authenticated')"
+      v-else-if="mode === 'public' || journal.authenticationState.value !== 'anonymous'"
       class="feed__entries"
     >
       <WaterfallFeed
         :entries="journal.entries.value"
+        :loading="initialLoadPending || listReplacing"
+        :loading-label="listLoadingLabel"
         :mode="mode"
         :mutation-entry-id="journal.mutationEntryId.value"
         @open-article="openArticle"
@@ -232,7 +283,10 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
         @delete-entry="deleteEntry"
       />
 
-      <p v-if="!journal.entries.value.length && !journal.error.value" class="feed__empty">
+      <p
+        v-if="!initialLoadPending && !listReplacing && !journal.entries.value.length && !journal.error.value"
+        class="feed__empty"
+      >
         {{ mode === 'private' ? '没有符合当前筛选条件的记录。' : '这里还没有公开记录。' }}
       </p>
 
@@ -241,9 +295,11 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
         class="button button--more"
         type="button"
         :disabled="journal.loadingMore.value"
+        :aria-busy="journal.loadingMore.value"
         @click="loadMore"
       >
-        {{ journal.loadingMore.value ? '读取中…' : '加载更早记录' }}
+        <JournalLoading v-if="journal.loadingMore.value" variant="inline" label="读取中…" />
+        <template v-else>加载更早记录</template>
       </button>
     </div>
   </main>
@@ -316,11 +372,36 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
   gap: 0.75rem;
 }
 
-.feed__loading,
+.feed__reading-stage,
+.feed__reading-reserve {
+  min-height: clamp(20rem, 48vh, 34rem);
+}
+
+.feed__reading-stage {
+  display: grid;
+}
+
 .feed__empty {
   padding: 3rem 1rem;
   color: var(--text-muted);
   text-align: center;
+}
+
+.feed-stage-enter-active {
+  transition: opacity var(--dur-content-enter) var(--ease-card), transform var(--dur-content-enter) var(--ease-card);
+}
+
+.feed-stage-leave-active {
+  transition: opacity var(--dur-loading-exit) var(--ease-card);
+}
+
+.feed-stage-enter-from {
+  opacity: 0;
+  transform: translateY(6px);
+}
+
+.feed-stage-leave-to {
+  opacity: 0;
 }
 
 .button--more {

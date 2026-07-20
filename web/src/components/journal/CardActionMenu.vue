@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { nextTick, shallowRef, useTemplateRef } from 'vue';
+import { nextTick, shallowRef, useTemplateRef, watch } from 'vue';
+import JournalLoading from '../ui/JournalLoading.vue';
 import type { JournalVisibility } from '../../types';
 
 const props = defineProps<{
@@ -16,8 +17,13 @@ const emit = defineEmits<{
 }>();
 
 const open = shallowRef(false);
+const pendingLabel = shallowRef<string | null>(null);
 const trigger = useTemplateRef<HTMLButtonElement>('trigger');
 const firstAction = useTemplateRef<HTMLButtonElement>('firstAction');
+
+watch(() => props.busy, (busy) => {
+  if (!busy) pendingLabel.value = null;
+});
 
 async function setOpen(value: boolean, focusFirst = false): Promise<void> {
   open.value = value;
@@ -49,11 +55,38 @@ function run(action: () => void): void {
   open.value = false;
   action();
 }
+
+function runMutation(label: string, action: () => void): void {
+  pendingLabel.value = label;
+  run(action);
+}
+
+function changePinned(): void {
+  runMutation(
+    props.pinned ? '正在取消置顶…' : '正在置顶…',
+    () => emit('setPinned', !props.pinned),
+  );
+}
+
+function changeVisibility(): void {
+  const visibility = props.visibility === 'public' ? 'private' : 'public';
+  runMutation(
+    visibility === 'public' ? '正在设为公开…' : '正在转为私有…',
+    () => emit('setVisibility', visibility),
+  );
+}
 </script>
 
 <template>
-  <div class="action-menu" @focusout="handleFocusOut" @keydown.esc.stop="closeAndFocusTrigger">
+  <div class="action-menu" :aria-busy="busy" @focusout="handleFocusOut" @keydown.esc.stop="closeAndFocusTrigger">
+    <JournalLoading
+      v-if="busy && pendingLabel"
+      class="action-menu__loading"
+      variant="inline"
+      :label="pendingLabel"
+    />
     <button
+      v-else
       ref="trigger"
       class="action-menu__trigger"
       type="button"
@@ -78,7 +111,13 @@ function run(action: () => void): void {
       <button ref="firstAction" class="action-menu__item" type="button" role="menuitem" :disabled="busy" @click="run(() => emit('edit'))">
         编辑
       </button>
-      <button class="action-menu__item" type="button" role="menuitem" :disabled="busy" @click="run(() => emit('setPinned', !pinned))">
+      <button
+        class="action-menu__item"
+        type="button"
+        role="menuitem"
+        :disabled="busy"
+        @click="changePinned"
+      >
         {{ pinned ? '取消置顶' : '置顶' }}
       </button>
       <button
@@ -86,7 +125,7 @@ function run(action: () => void): void {
         type="button"
         role="menuitem"
         :disabled="busy"
-        @click="run(() => emit('setVisibility', visibility === 'public' ? 'private' : 'public'))"
+        @click="changeVisibility"
       >
         {{ visibility === 'public' ? '转为私有' : '设为公开' }}
       </button>
@@ -134,6 +173,12 @@ function run(action: () => void): void {
 .action-menu__trigger:disabled {
   cursor: wait;
   opacity: 0.5;
+}
+
+.action-menu__loading {
+  min-height: 2.5rem;
+  color: var(--text-muted);
+  font-size: 0.72rem;
 }
 
 .action-menu__panel {

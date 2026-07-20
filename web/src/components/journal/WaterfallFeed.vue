@@ -1,12 +1,16 @@
 <script setup lang="ts">
 import { MasonryGrid } from '@egjs/grid';
-import { onActivated, onBeforeUnmount, onDeactivated, onMounted, shallowRef, useTemplateRef, watch } from 'vue';
+import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, shallowRef, useTemplateRef, watch } from 'vue';
 import ArticleCardContent from '../article/ArticleCardContent.vue';
+import JournalLoading from '../ui/JournalLoading.vue';
+import { useDeferredLoading } from '../../composables/useDeferredLoading';
 import type { JournalEntry, JournalVisibility } from '../../types';
 import EntryCard from './EntryCard.vue';
 
 const props = defineProps<{
   entries: readonly JournalEntry[];
+  loading: boolean;
+  loadingLabel: string;
   mode: 'public' | 'private';
   mutationEntryId: number | null;
 }>();
@@ -24,6 +28,9 @@ const emit = defineEmits<{
 
 const gridElement = useTemplateRef<HTMLDivElement>('grid');
 const layoutReady = shallowRef(false);
+
+const preparing = computed(() => props.loading || (!layoutReady.value && props.entries.length > 0));
+const deferredLoading = useDeferredLoading(preparing);
 
 let masonry: MasonryGrid;
 let stopWatchingEntries: () => void;
@@ -85,14 +92,18 @@ onMounted(() => {
 
   stopWatchingEntries = watch(
     () => props.entries,
-    (entries, previousEntries) => {
+    async (entries, previousEntries) => {
+      if (previousEntries.length === 0 && entries.length > 0) {
+        layoutReady.value = false;
+      }
+
       animateNextMountedBatch =
         entries.length > previousEntries.length
         && previousEntries.every((entry, index) => entry.id === entries[index]?.id);
 
+      await nextTick();
       masonry.syncElements({ direction: 'end' });
     },
-    { flush: 'post' },
   );
 });
 
@@ -113,10 +124,16 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="waterfall-stage">
-    <div v-if="!layoutReady && entries.length" class="waterfall__loading" role="status">正在读取记录…</div>
+  <div class="waterfall-stage" :class="{ 'waterfall-stage--preparing': preparing }" :aria-busy="preparing">
+    <Transition name="waterfall-loading">
+      <JournalLoading
+        v-if="deferredLoading.visible.value"
+        variant="canvas"
+        :label="loadingLabel"
+      />
+    </Transition>
 
-    <div ref="grid" class="waterfall" :class="{ 'waterfall--ready': layoutReady }">
+    <div ref="grid" class="waterfall" :class="{ 'waterfall--ready': !preparing }">
       <div v-for="entry in entries" :key="entry.id" class="waterfall__item">
         <div class="waterfall__card">
           <ArticleCardContent
@@ -154,25 +171,43 @@ onBeforeUnmount(() => {
   display: grid;
 }
 
-.waterfall,
-.waterfall__loading {
-  grid-area: 1 / 1;
+.waterfall-stage--preparing {
+  min-height: clamp(18rem, 42vh, 30rem);
 }
 
-.waterfall__loading {
-  padding: 3rem 1rem;
-  color: var(--text-muted);
-  text-align: center;
+.waterfall-stage > :deep(.journal-loading--canvas),
+.waterfall {
+  grid-area: 1 / 1;
 }
 
 .waterfall {
   position: relative;
   margin-inline: calc(var(--waterfall-gap) / -2);
+  opacity: 0;
   visibility: hidden;
+  transition: opacity var(--dur-content-enter) var(--ease-card);
 }
 
 .waterfall--ready {
+  opacity: 1;
   visibility: visible;
+}
+
+.waterfall-loading-enter-active {
+  transition: opacity var(--dur-loading-enter) var(--ease-card), transform var(--dur-loading-enter) var(--ease-card);
+}
+
+.waterfall-loading-leave-active {
+  transition: opacity var(--dur-loading-exit) var(--ease-card);
+}
+
+.waterfall-loading-enter-from {
+  opacity: 0;
+  transform: translateY(4px);
+}
+
+.waterfall-loading-leave-to {
+  opacity: 0;
 }
 
 .waterfall__item {

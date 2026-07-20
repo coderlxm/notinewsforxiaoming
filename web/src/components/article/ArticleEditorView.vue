@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, shallowRef, watch } from 'vue';
+import JournalLoading from '../ui/JournalLoading.vue';
+import { useDeferredLoading } from '../../composables/useDeferredLoading';
 import { useArticleEditor } from '../../composables/useArticleEditor';
 import type { JournalAsset, JournalEntry, JournalRichDocument, JournalVisibility } from '../../types';
 import ArticleMediaPanel from './ArticleMediaPanel.vue';
@@ -27,9 +29,21 @@ const richBody = shallowRef<JournalRichDocument>({
 });
 const previewing = shallowRef(false);
 const initializedArticleId = shallowRef<number | null>(null);
+const savingAction = shallowRef<'content' | 'publish' | 'privatize' | null>(null);
+const mediaAction = shallowRef<'cover-upload' | 'inline-upload' | 'delete' | null>(null);
 
 const isEditing = computed(() => props.articleId !== undefined);
 const article = computed(() => editor.article.value);
+const awaitingArticle = computed(() =>
+  isEditing.value && article.value === null && editor.error.value === null,
+);
+const deferredLoading = useDeferredLoading(awaitingArticle);
+const formAvailable = computed(() => !isEditing.value || article.value !== null);
+const mediaPanelBusyLabel = computed(() => {
+  if (mediaAction.value === 'cover-upload') return '上传中…';
+  if (mediaAction.value === 'delete') return '删除中…';
+  return null;
+});
 const assets = computed<JournalAsset[]>(() => article.value?.assets ?? []);
 const previewEntry = computed<JournalEntry | null>(() => article.value === null
   ? null
@@ -59,6 +73,9 @@ const canSave = computed(() => {
 const nextVisibility = computed<JournalVisibility>(() =>
   article.value?.visibility === 'public' ? 'private' : 'public',
 );
+const visibilityLoadingLabel = computed(() =>
+  savingAction.value === 'publish' ? '正在设为公开…' : '正在转为私有…',
+);
 
 watch(article, (entry) => {
   if (!entry) return;
@@ -75,34 +92,60 @@ onMounted(() => {
 
 async function save(): Promise<void> {
   if (isEditing.value && article.value === null) return;
-  const input = {
-    title: title.value.trim(),
-    richBody: richBody.value,
-    tags: tags.value,
-  };
-  if (article.value === null) {
-    const created = await editor.create(input);
-    if (created) emit('navigate', `/me/articles/${created.id}/edit`);
-    return;
+  savingAction.value = 'content';
+  try {
+    const input = {
+      title: title.value.trim(),
+      richBody: richBody.value,
+      tags: tags.value,
+    };
+    if (article.value === null) {
+      const created = await editor.create(input);
+      if (created) emit('navigate', `/me/articles/${created.id}/edit`);
+      return;
+    }
+    await editor.save(input);
+  } finally {
+    savingAction.value = null;
   }
-  await editor.save(input);
 }
 
 async function uploadCover(file: File): Promise<void> {
-  await editor.uploadAsset(file, 'cover');
+  mediaAction.value = 'cover-upload';
+  try {
+    await editor.uploadAsset(file, 'cover');
+  } finally {
+    mediaAction.value = null;
+  }
 }
 
 async function uploadInline(file: File): Promise<{ id: number; url: string } | null> {
-  return editor.uploadAsset(file, 'inline');
+  mediaAction.value = 'inline-upload';
+  try {
+    return await editor.uploadAsset(file, 'inline');
+  } finally {
+    mediaAction.value = null;
+  }
 }
 
 async function removeAsset(asset: JournalAsset): Promise<void> {
-  await editor.removeAsset(asset.id);
+  mediaAction.value = 'delete';
+  try {
+    await editor.removeAsset(asset.id);
+  } finally {
+    mediaAction.value = null;
+  }
 }
 
 async function changeVisibility(): Promise<void> {
   if (!article.value) return;
-  await editor.setVisibility(nextVisibility.value);
+  const visibility = nextVisibility.value;
+  savingAction.value = visibility === 'public' ? 'publish' : 'privatize';
+  try {
+    await editor.setVisibility(visibility);
+  } finally {
+    savingAction.value = null;
+  }
 }
 
 function viewArticle(entry: JournalEntry): void {
@@ -121,51 +164,66 @@ function viewArticle(entry: JournalEntry): void {
       <span>{{ isEditing ? '编辑文章' : '写文章' }}</span>
     </div>
 
-    <p v-if="editor.error.value" class="notice notice--error" role="alert">{{ editor.error.value }}</p>
-    <p v-if="editor.loading.value" class="notice" role="status">正在读取文章…</p>
+    <p v-if="editor.error.value && formAvailable" class="notice notice--error" role="alert">{{ editor.error.value }}</p>
 
-    <form class="editor-view__form" @submit.prevent="save">
-      <ArticleMetaForm v-model:title="title" v-model:tags="tags" />
-      <RichTextEditor
-        v-model="richBody"
-        :assets="assets"
-        :disabled="editor.saving.value || editor.uploading.value"
-        :images-enabled="article !== null"
-        :upload-image="uploadInline"
-      />
-      <div class="editor-view__actions">
-        <button
-          class="button button--primary"
-          type="submit"
-          :disabled="!canSave"
-        >
-          {{ editor.saving.value ? '保存中…' : (isEditing ? '保存修改' : '保存文章') }}
-        </button>
-        <button
-          v-if="article"
-          class="button button--quiet"
-          type="button"
-          :disabled="editor.saving.value || editor.uploading.value"
-          @click="article && viewArticle(article)"
-        >
-          {{ article.visibility === 'public' ? '查看文章' : (previewing ? '收起预览' : '预览文章') }}
-        </button>
-        <button
-          v-if="article"
-          class="button button--quiet"
-          type="button"
-          :disabled="editor.saving.value || editor.uploading.value"
-          @click="changeVisibility"
-        >
-          {{ nextVisibility === 'public' ? '设为公开' : '转为私有' }}
-        </button>
-      </div>
-    </form>
+    <div class="editor-view__stage" :class="{ 'editor-view__stage--reading': !formAvailable }" :aria-busy="awaitingArticle">
+      <Transition name="editor-stage" mode="out-in">
+        <JournalLoading v-if="deferredLoading.visible.value" key="loading" variant="reading" label="正在打开文章…" />
+        <p v-else-if="editor.error.value && !formAvailable" key="error" class="notice notice--error" role="alert">{{ editor.error.value }}</p>
+        <form v-else-if="formAvailable" key="form" class="editor-view__form" @submit.prevent="save">
+          <ArticleMetaForm v-model:title="title" v-model:tags="tags" />
+          <RichTextEditor
+            v-model="richBody"
+            :assets="assets"
+            :disabled="editor.saving.value || editor.uploading.value"
+            :images-enabled="article !== null"
+            :upload-image="uploadInline"
+          />
+          <div class="editor-view__actions">
+            <button
+              class="button button--primary"
+              type="submit"
+              :disabled="!canSave"
+              :aria-busy="savingAction === 'content'"
+            >
+              <JournalLoading v-if="savingAction === 'content'" variant="inline" label="保存中…" />
+              <template v-else>{{ isEditing ? '保存修改' : '保存文章' }}</template>
+            </button>
+            <button
+              v-if="article"
+              class="button button--quiet"
+              type="button"
+              :disabled="editor.saving.value || editor.uploading.value"
+              @click="article && viewArticle(article)"
+            >
+              {{ article.visibility === 'public' ? '查看文章' : (previewing ? '收起预览' : '预览文章') }}
+            </button>
+            <button
+              v-if="article"
+              class="button button--quiet"
+              type="button"
+              :disabled="editor.saving.value || editor.uploading.value"
+              :aria-busy="savingAction === 'publish' || savingAction === 'privatize'"
+              @click="changeVisibility"
+            >
+              <JournalLoading
+                v-if="savingAction === 'publish' || savingAction === 'privatize'"
+                variant="inline"
+                :label="visibilityLoadingLabel"
+              />
+              <template v-else>{{ nextVisibility === 'public' ? '设为公开' : '转为私有' }}</template>
+            </button>
+          </div>
+        </form>
+        <div v-else key="reserve" class="editor-view__reading-reserve" aria-hidden="true"></div>
+      </Transition>
+    </div>
 
     <ArticleMediaPanel
       v-if="article"
       :assets="assets"
       :busy="editor.uploading.value"
+      :busy-label="mediaPanelBusyLabel"
       @upload-cover="uploadCover"
       @remove-asset="removeAsset"
     />
@@ -199,6 +257,15 @@ function viewArticle(entry: JournalEntry): void {
   gap: 1rem;
 }
 
+.editor-view__stage {
+  display: grid;
+}
+
+.editor-view__stage--reading,
+.editor-view__reading-reserve {
+  min-height: clamp(20rem, 48vh, 34rem);
+}
+
 .editor-view__actions {
   display: flex;
   flex-wrap: wrap;
@@ -207,6 +274,23 @@ function viewArticle(entry: JournalEntry): void {
 
 .editor-view__preview {
   margin-top: 0.5rem;
+}
+
+.editor-stage-enter-active {
+  transition: opacity var(--dur-content-enter) var(--ease-card), transform var(--dur-content-enter) var(--ease-card);
+}
+
+.editor-stage-leave-active {
+  transition: opacity var(--dur-loading-exit) var(--ease-card);
+}
+
+.editor-stage-enter-from {
+  opacity: 0;
+  transform: translateY(6px);
+}
+
+.editor-stage-leave-to {
+  opacity: 0;
 }
 
 .notice {

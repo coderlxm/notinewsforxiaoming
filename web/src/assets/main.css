@@ -1,4 +1,8 @@
 :root {
+  --ease-card: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-loading-enter: 180ms;
+  --dur-loading-exit: 120ms;
+  --dur-content-enter: 240ms;
   color-scheme: light dark;
   --font-sans: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-serif: "Noto Serif SC", "Songti SC", STSong, serif;
@@ -209,5 +213,7 @@ a {
   *::after {
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
   }
 }

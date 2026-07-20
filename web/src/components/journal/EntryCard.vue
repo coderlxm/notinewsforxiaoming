@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, shallowRef, watch } from 'vue';
+import JournalLoading from '../ui/JournalLoading.vue';
 import type { JournalEntry, JournalVisibility } from '../../types';
 import { formatStructuredValue } from '../../utils/formatters';
 import CardActionMenu from './CardActionMenu.vue';
@@ -136,9 +137,11 @@ function startDeletion(): void {
           class="button button--primary"
           type="button"
           :disabled="!canSave"
+          :aria-busy="busy"
           @click="emit('saveContent', entry, draft)"
         >
-          {{ busy ? '保存中…' : '保存正文' }}
+          <JournalLoading v-if="busy" variant="inline" label="保存中…" />
+          <template v-else>保存正文</template>
         </button>
       </div>
     </div>
@@ -169,8 +172,15 @@ function startDeletion(): void {
         <button class="button button--quiet" type="button" :disabled="busy" @click="confirmingDeletion = false">
           取消
         </button>
-        <button class="button entry__delete-button" type="button" :disabled="busy" @click="emit('deleteEntry', entry)">
-          {{ busy ? '删除中…' : '确认删除' }}
+        <button
+          class="button entry__delete-button"
+          type="button"
+          :disabled="busy"
+          :aria-busy="busy"
+          @click="emit('deleteEntry', entry)"
+        >
+          <JournalLoading v-if="busy" variant="inline" label="删除中…" />
+          <template v-else>确认删除</template>
         </button>
       </div>
     </footer>

@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, shallowRef, watch } from 'vue';
 import { Editor, EditorContent, useEditor } from '@tiptap/vue-3';
 import { FileHandler } from '@tiptap/extension-file-handler';
 import Placeholder from '@tiptap/extension-placeholder';
+import JournalLoading from '../ui/JournalLoading.vue';
 import { createJournalRichTextExtensions } from '../../../../src/shared/journalRichText';
 import type { JournalAsset, JournalRichDocument } from '../../types';
 
@@ -203,7 +204,15 @@ onBeforeUnmount(() => {
       <button type="button" :disabled="disabled" @click="run(editor, 'hardBreak')">换行</button>
       <span class="rich-editor__sep" />
       <button type="button" :disabled="disabled" @click="run(editor, 'link')">链接</button>
-      <button type="button" :disabled="disabled || busy || !imagesEnabled" @click="openFilePicker">上传并插入图片</button>
+      <button
+        type="button"
+        :disabled="disabled || busy || !imagesEnabled"
+        :aria-busy="busy"
+        @click="openFilePicker"
+      >
+        <JournalLoading v-if="busy" variant="inline" label="上传中…" />
+        <template v-else>上传并插入图片</template>
+      </button>
       <input
         ref="fileInput"
         type="file"

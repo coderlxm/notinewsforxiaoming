@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, shallowRef } from 'vue';
+import JournalLoading from '../ui/JournalLoading.vue';
 import type { JournalEntry, JournalVisibility } from '../../types';
 import CardActionMenu from '../journal/CardActionMenu.vue';
 import CardDateSpine from '../journal/CardDateSpine.vue';
@@ -134,8 +135,15 @@ function openEntry(): void {
         <button class="button button--quiet" type="button" :disabled="busy" @click="confirmingDeletion = false">
           取消
         </button>
-        <button class="button article-card__delete-button" type="button" :disabled="busy" @click="emit('deleteEntry', entry)">
-          {{ busy ? '删除中…' : '确认删除' }}
+        <button
+          class="button article-card__delete-button"
+          type="button"
+          :disabled="busy"
+          :aria-busy="busy"
+          @click="emit('deleteEntry', entry)"
+        >
+          <JournalLoading v-if="busy" variant="inline" label="删除中…" />
+          <template v-else>确认删除</template>
         </button>
       </div>
     </footer>

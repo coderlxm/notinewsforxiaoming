@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { shallowRef } from 'vue';
+import JournalLoading from '../ui/JournalLoading.vue';
 
 defineProps<{
   busy: boolean;
@@ -34,8 +35,9 @@ function submit(): void {
           :disabled="busy"
         >
       </label>
-      <button class="button button--primary login__submit" type="submit" :disabled="busy">
-        {{ busy ? '登录中…' : '登录' }}
+      <button class="button button--primary login__submit" type="submit" :disabled="busy" :aria-busy="busy">
+        <JournalLoading v-if="busy" variant="inline" label="登录中…" />
+        <template v-else>登录</template>
       </button>
     </form>
   </section>
