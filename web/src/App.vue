@@ -102,9 +102,7 @@ function restoreFeedScroll(): void {
 
   const scrollTop = pendingFeedScrollTop;
   pendingFeedScrollTop = null;
-  window.requestAnimationFrame(() => {
-    contentScroll.value!.scrollTo({ top: scrollTop, behavior: 'auto' });
-  });
+  contentScroll.value!.scrollTo({ top: scrollTop, behavior: 'auto' });
 }
 
 onMounted(() => window.addEventListener('popstate', handlePopState));
@@ -152,14 +150,14 @@ onUnmounted(() => window.removeEventListener('popstate', handlePopState));
           :key="route.key"
           mode="public"
           :initial-tag="route.tag"
-          @activated="restoreFeedScroll"
+          @layout-ready="restoreFeedScroll"
           @navigate="navigate"
         />
         <FeedView
           v-else-if="route.name === 'private'"
           :key="route.key"
           mode="private"
-          @activated="restoreFeedScroll"
+          @layout-ready="restoreFeedScroll"
           @navigate="navigate"
         />
       </KeepAlive>

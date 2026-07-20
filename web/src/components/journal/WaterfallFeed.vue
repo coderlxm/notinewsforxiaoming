@@ -16,6 +16,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+  layoutReady: [];
   openArticle: [entry: JournalEntry];
   viewDetail: [publicId: string];
   selectTag: [tag: string];
@@ -36,6 +37,7 @@ let masonry: MasonryGrid;
 let stopWatchingEntries: () => void;
 let animateNextMountedBatch = false;
 let needsActivationLayout = false;
+let active = true;
 
 function isArticleEntry(entry: JournalEntry): boolean {
   return entry.bodyFormat === 'rich';
@@ -64,6 +66,7 @@ onMounted(() => {
 
   masonry.on('renderComplete', ({ mounted }) => {
     layoutReady.value = true;
+    if (active) emit('layoutReady');
 
     if (!animateNextMountedBatch) return;
     animateNextMountedBatch = false;
@@ -108,10 +111,12 @@ onMounted(() => {
 });
 
 onDeactivated(() => {
+  active = false;
   needsActivationLayout = true;
 });
 
 onActivated(() => {
+  active = true;
   if (!needsActivationLayout) return;
   needsActivationLayout = false;
   masonry.renderItems({ useResize: true });

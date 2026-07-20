@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onActivated, onMounted, reactive, shallowRef } from 'vue';
+import { computed, onMounted, reactive, shallowRef } from 'vue';
 import ArticleCardContent from '../article/ArticleCardContent.vue';
 import JournalLoading from '../ui/JournalLoading.vue';
 import { useDeferredLoading } from '../../composables/useDeferredLoading';
@@ -23,7 +23,7 @@ const props = withDefaults(defineProps<{
 });
 
 const emit = defineEmits<{
-  activated: [];
+  layoutReady: [];
   navigate: [path: string];
 }>();
 
@@ -64,10 +64,6 @@ onMounted(async () => {
   } finally {
     initialLoadPending.value = false;
   }
-});
-
-onActivated(() => {
-  emit('activated');
 });
 
 async function applyFilters(nextFilters: FeedFilters): Promise<void> {
@@ -273,6 +269,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
         :loading-label="listLoadingLabel"
         :mode="mode"
         :mutation-entry-id="journal.mutationEntryId.value"
+        @layout-ready="emit('layoutReady')"
         @open-article="openArticle"
         @view-detail="viewDetail"
         @select-tag="selectTag"
