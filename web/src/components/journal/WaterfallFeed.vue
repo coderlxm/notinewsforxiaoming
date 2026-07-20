@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { MasonryGrid } from '@egjs/grid';
-import { onBeforeUnmount, onMounted, useTemplateRef, watch } from 'vue';
+import { onBeforeUnmount, onMounted, shallowRef, useTemplateRef, watch } from 'vue';
 import ArticleCardContent from '../article/ArticleCardContent.vue';
 import type { JournalEntry, JournalVisibility } from '../../types';
 import EntryCard from './EntryCard.vue';
@@ -23,6 +23,7 @@ const emit = defineEmits<{
 }>();
 
 const gridElement = useTemplateRef<HTMLDivElement>('grid');
+const layoutReady = shallowRef(false);
 
 let masonry: MasonryGrid;
 let stopWatchingEntries: () => void;
@@ -54,6 +55,8 @@ onMounted(() => {
   });
 
   masonry.on('renderComplete', ({ mounted }) => {
+    layoutReady.value = true;
+
     if (!animateNextMountedBatch) return;
     animateNextMountedBatch = false;
 
@@ -99,7 +102,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="grid" class="waterfall">
+  <div ref="grid" class="waterfall" :class="{ 'waterfall--ready': layoutReady }">
     <div v-for="entry in entries" :key="entry.id" class="waterfall__item">
       <div class="waterfall__card">
         <ArticleCardContent
@@ -134,6 +137,14 @@ onBeforeUnmount(() => {
 <style scoped>
 .waterfall {
   margin-inline: calc(var(--waterfall-gap) / -2);
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 140ms ease-out;
+}
+
+.waterfall--ready {
+  visibility: visible;
+  opacity: 1;
 }
 
 .waterfall__item {
@@ -164,6 +175,7 @@ onBeforeUnmount(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .waterfall,
   .waterfall__item {
     transition: none;
   }
