@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, shallowRef } from 'vue';
+import { computed, onMounted, onUnmounted, shallowRef, useTemplateRef } from 'vue';
 import ArticleEditorView from './components/article/ArticleEditorView.vue';
 import FeedView from './components/journal/FeedView.vue';
 
@@ -13,6 +13,7 @@ type AppRoute =
 
 const locationKey = shallowRef(`${window.location.pathname}${window.location.search}`);
 const publicReturnPath = shallowRef('/');
+const contentScroll = useTemplateRef<HTMLDivElement>('contentScroll');
 const publicScrollPositions = new Map<string, number>();
 let pendingPublicScrollTop: number | null = null;
 
@@ -55,7 +56,7 @@ function navigate(path: string): void {
   const nextPublicRouteKey = publicRouteKey(path);
 
   if (currentRoute.name === 'public') {
-    publicScrollPositions.set(currentRoute.key, window.scrollY);
+    publicScrollPositions.set(currentRoute.key, contentScroll.value!.scrollTop);
   }
 
   if (isOpeningDetail) {
@@ -72,7 +73,26 @@ function navigate(path: string): void {
   synchronizeLocation();
 
   if (pendingPublicScrollTop === null) {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    contentScroll.value!.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+}
+
+function handlePopState(): void {
+  const currentRoute = route.value;
+  const nextPath = `${window.location.pathname}${window.location.search}`;
+  const nextPublicRouteKey = publicRouteKey(nextPath);
+
+  if (currentRoute.name === 'public') {
+    publicScrollPositions.set(currentRoute.key, contentScroll.value!.scrollTop);
+  }
+
+  pendingPublicScrollTop = nextPublicRouteKey
+    ? publicScrollPositions.get(nextPublicRouteKey) ?? 0
+    : null;
+  synchronizeLocation();
+
+  if (pendingPublicScrollTop === null) {
+    contentScroll.value!.scrollTo({ top: 0, behavior: 'auto' });
   }
 }
 
@@ -82,12 +102,12 @@ function restorePublicScroll(): void {
   const scrollTop = pendingPublicScrollTop;
   pendingPublicScrollTop = null;
   window.requestAnimationFrame(() => {
-    window.scrollTo({ top: scrollTop, behavior: 'auto' });
+    contentScroll.value!.scrollTo({ top: scrollTop, behavior: 'auto' });
   });
 }
 
-onMounted(() => window.addEventListener('popstate', synchronizeLocation));
-onUnmounted(() => window.removeEventListener('popstate', synchronizeLocation));
+onMounted(() => window.addEventListener('popstate', handlePopState));
+onUnmounted(() => window.removeEventListener('popstate', handlePopState));
 </script>
 
 <template>
@@ -124,68 +144,99 @@ onUnmounted(() => window.removeEventListener('popstate', synchronizeLocation));
       </header>
     </div>
 
-    <KeepAlive :max="3">
+    <div ref="contentScroll" class="app-scroll">
+      <KeepAlive :max="3">
+        <FeedView
+          v-if="route.name === 'public'"
+          :key="route.key"
+          mode="public"
+          :initial-tag="route.tag"
+          @activated="restorePublicScroll"
+          @navigate="navigate"
+        />
+      </KeepAlive>
+
       <FeedView
-        v-if="route.name === 'public'"
+        v-if="route.name === 'detail'"
         :key="route.key"
         mode="public"
-        :initial-tag="route.tag"
-        @activated="restorePublicScroll"
+        :detail-id="route.publicId"
+        :return-path="publicReturnPath"
         @navigate="navigate"
       />
-    </KeepAlive>
+      <FeedView
+        v-else-if="route.name === 'private'"
+        :key="route.key"
+        mode="private"
+        @navigate="navigate"
+      />
+      <ArticleEditorView
+        v-else-if="route.name === 'article-new'"
+        :key="route.key"
+        @navigate="navigate"
+      />
+      <ArticleEditorView
+        v-else-if="route.name === 'article-edit'"
+        :key="route.key"
+        :article-id="route.articleId"
+        @navigate="navigate"
+      />
+      <main v-else-if="route.name === 'not-found'" class="not-found">
+        <span class="not-found__code">404</span>
+        <h1>这条路没有记录</h1>
+        <button class="button button--primary" type="button" @click="navigate('/')">返回首页</button>
+      </main>
 
-    <FeedView
-      v-if="route.name === 'detail'"
-      :key="route.key"
-      mode="public"
-      :detail-id="route.publicId"
-      :return-path="publicReturnPath"
-      @navigate="navigate"
-    />
-    <FeedView
-      v-else-if="route.name === 'private'"
-      :key="route.key"
-      mode="private"
-      @navigate="navigate"
-    />
-    <ArticleEditorView
-      v-else-if="route.name === 'article-new'"
-      :key="route.key"
-      @navigate="navigate"
-    />
-    <ArticleEditorView
-      v-else-if="route.name === 'article-edit'"
-      :key="route.key"
-      :article-id="route.articleId"
-      @navigate="navigate"
-    />
-    <main v-else-if="route.name === 'not-found'" class="not-found">
-      <span class="not-found__code">404</span>
-      <h1>这条路没有记录</h1>
-      <button class="button button--primary" type="button" @click="navigate('/')">返回首页</button>
-    </main>
-
-    <footer class="site-footer">
-      <span>小明同学的生活记录</span>
-      <span aria-hidden="true">·</span>
-      <a href="/rss.xml">RSS</a>
-      <a href="/feed.json">JSON Feed</a>
-    </footer>
+      <footer class="site-footer">
+        <span>小明同学的生活记录</span>
+        <span aria-hidden="true">·</span>
+        <a href="/rss.xml">RSS</a>
+        <a href="/feed.json">JSON Feed</a>
+      </footer>
+    </div>
   </div>
 </template>
 
 <style scoped>
 .app-shell {
-  min-height: 100vh;
+  display: grid;
+  height: 100dvh;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
 }
 
 .profile-bar {
-  position: sticky;
   z-index: 20;
-  top: 0;
   border-bottom: 1px solid var(--border-subtle);
   background: var(--surface-page);
+}
+
+.app-scroll {
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-color: var(--border-strong) transparent;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+}
+
+.app-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.app-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.app-scroll::-webkit-scrollbar-thumb {
+  border: 2px solid var(--surface-page);
+  border-radius: 999px;
+  background: var(--border-strong);
+}
+
+.app-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
 }
 
 .profile {

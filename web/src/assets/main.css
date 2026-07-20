@@ -46,16 +46,22 @@
 
 html {
   min-width: 320px;
-  min-height: 100%;
+  height: 100%;
+  overflow: hidden;
   background: var(--surface-page);
 }
 
 body {
   min-width: 320px;
-  min-height: 100vh;
+  height: 100%;
   margin: 0;
+  overflow: hidden;
   background: var(--surface-page);
   color: var(--text-primary);
+}
+
+#app {
+  height: 100%;
 }
 
 button,
