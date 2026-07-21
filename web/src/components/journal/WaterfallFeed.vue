@@ -96,6 +96,10 @@ onMounted(() => {
   stopWatchingEntries = watch(
     () => props.entries,
     async (entries, previousEntries) => {
+      const hasSameEntrySequence =
+        entries.length === previousEntries.length
+        && entries.every((entry, index) => entry.id === previousEntries[index]?.id);
+
       if (previousEntries.length === 0 && entries.length > 0) {
         layoutReady.value = false;
       }
@@ -106,6 +110,7 @@ onMounted(() => {
 
       await nextTick();
       masonry.syncElements({ direction: 'end' });
+      if (hasSameEntrySequence) masonry.updateItems(masonry.getItems(), { direction: 'end' });
     },
   );
 });

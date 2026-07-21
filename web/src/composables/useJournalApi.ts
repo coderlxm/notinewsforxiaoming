@@ -37,6 +37,13 @@ export function useJournalApi() {
     if (detail.value?.id === updated.id) detail.value = updated;
   }
 
+  async function fetchAndReplacePrivateFeed(filters: FeedFilters): Promise<void> {
+    const feed = await fetchPrivateFeed({ filters });
+    entries.value = feed.entries;
+    nextCursor.value = feed.nextCursor;
+    authenticationState.value = 'authenticated';
+  }
+
   async function loadPublic(options: { tag?: string } = {}): Promise<void> {
     loading.value = true;
     error.value = null;
@@ -72,13 +79,27 @@ export function useJournalApi() {
     loading.value = true;
     error.value = null;
     try {
-      const feed = await fetchPrivateFeed({ filters });
-      entries.value = feed.entries;
-      nextCursor.value = feed.nextCursor;
-      authenticationState.value = 'authenticated';
+      await fetchAndReplacePrivateFeed(filters);
 
       const onThisDay = await fetchOnThisDay();
       onThisDayEntries.value = onThisDay.entries;
+    }
+    catch (reason) {
+      if (reason instanceof JournalRequestError && reason.status === 401) {
+        authenticationState.value = 'anonymous';
+      }
+      exposeError(reason);
+    }
+    finally {
+      loading.value = false;
+    }
+  }
+
+  async function refreshPrivateFeed(filters: FeedFilters): Promise<void> {
+    loading.value = true;
+    error.value = null;
+    try {
+      await fetchAndReplacePrivateFeed(filters);
     }
     catch (reason) {
       if (reason instanceof JournalRequestError && reason.status === 401) {
@@ -254,6 +275,7 @@ export function useJournalApi() {
     loadPublic,
     loadPublicDetail,
     loadPrivate,
+    refreshPrivateFeed,
     loadMorePublic,
     loadMorePrivate,
     authenticate,
