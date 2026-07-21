@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, shallowRef, useTemplateRef } from 'vue';
+import { computed, onBeforeUnmount, shallowRef, useTemplateRef, watch } from 'vue';
+import JournalLoading from '../ui/JournalLoading.vue';
 import type { JournalAsset } from '../../types';
 
 const props = defineProps<{
@@ -11,6 +12,7 @@ type StageAsset = JournalAsset & {
 };
 
 const currentIndex = shallowRef(0);
+const videoReady = shallowRef(false);
 const activeVideo = useTemplateRef<HTMLVideoElement>('activeVideo');
 
 const stageAssets = computed<StageAsset[]>(() => props.assets.map((asset) => ({
@@ -19,6 +21,10 @@ const stageAssets = computed<StageAsset[]>(() => props.assets.map((asset) => ({
 })));
 const currentAsset = computed(() => stageAssets.value[currentIndex.value]);
 const positionLabel = computed(() => `${currentIndex.value + 1} / ${stageAssets.value.length}`);
+
+watch(() => currentAsset.value?.id, () => {
+  videoReady.value = currentAsset.value?.mediaType !== 'video';
+}, { immediate: true });
 
 function isVideoAsset(asset: JournalAsset): boolean {
   return ['video', 'video_note'].includes(asset.kind)
@@ -38,6 +44,10 @@ function previous(): void {
 
 function next(): void {
   goTo(currentIndex.value + 1);
+}
+
+function revealVideo(): void {
+  videoReady.value = true;
 }
 
 function handleKeyboard(event: KeyboardEvent): void {
@@ -82,10 +92,20 @@ onBeforeUnmount(() => activeVideo.value?.pause());
           v-else
           ref="activeVideo"
           class="media-stage__media media-stage__video"
+          :class="{ 'media-stage__video--ready': videoReady }"
           :src="currentAsset.url"
           controls
-          preload="metadata"
+          preload="auto"
+          @loadeddata="revealVideo"
         />
+        <div
+          v-if="currentAsset.mediaType === 'video'"
+          class="media-stage__video-loading"
+          :class="{ 'media-stage__video-loading--hidden': videoReady }"
+          :aria-hidden="videoReady"
+        >
+          <JournalLoading variant="inline" label="正在展开影像…" />
+        </div>
       </div>
     </div>
 
@@ -98,7 +118,9 @@ onBeforeUnmount(() => activeVideo.value?.pause());
           :disabled="currentIndex === 0"
           @click="previous"
         >
-          ‹
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M15 5l-7 7 7 7" />
+          </svg>
         </button>
         <span class="media-stage__position" aria-live="polite">{{ positionLabel }}</span>
         <button
@@ -108,7 +130,9 @@ onBeforeUnmount(() => activeVideo.value?.pause());
           :disabled="currentIndex === stageAssets.length - 1"
           @click="next"
         >
-          ›
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M9 5l7 7-7 7" />
+          </svg>
         </button>
       </div>
 
@@ -161,6 +185,7 @@ onBeforeUnmount(() => activeVideo.value?.pause());
   display: grid;
   min-width: 0;
   min-height: 0;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
   overflow: hidden;
   place-items: center;
   animation: media-stage-enter 160ms ease-out;
@@ -172,7 +197,38 @@ onBeforeUnmount(() => activeVideo.value?.pause());
   height: 100%;
   min-width: 0;
   min-height: 0;
+  grid-area: 1 / 1;
   object-fit: contain;
+}
+
+.media-stage__video {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+
+.media-stage__video--ready {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.media-stage__video-loading {
+  z-index: 1;
+  display: grid;
+  grid-area: 1 / 1;
+  padding: 0.75rem 1rem;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 6%);
+  color: rgb(255 255 255 / 76%);
+  opacity: 1;
+  pointer-events: none;
+  place-items: center;
+  transition: opacity 140ms ease;
+}
+
+.media-stage__video-loading--hidden {
+  opacity: 0;
 }
 
 .media-stage__item--sticker .media-stage__media {
@@ -214,9 +270,18 @@ onBeforeUnmount(() => activeVideo.value?.pause());
   background: rgb(255 255 255 / 8%);
   color: inherit;
   cursor: pointer;
-  font-size: 1.6rem;
-  line-height: 1;
   place-items: center;
+}
+
+.media-stage__arrow svg {
+  display: block;
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.6;
 }
 
 .media-stage__arrow:hover:not(:disabled) {
@@ -321,8 +386,10 @@ onBeforeUnmount(() => activeVideo.value?.pause());
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .media-stage__media {
+  .media-stage__media,
+  .media-stage__video-loading {
     animation: none;
+    transition: none;
   }
 }
 </style>
