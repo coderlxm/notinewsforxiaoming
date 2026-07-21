@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onBeforeUnmount, onMounted, shallowRef, useTemplateRef } from 'vue';
 import type { JournalAsset, JournalEntry, JournalVisibility } from '../../types';
 import JournalDetailContent from './JournalDetailContent.vue';
+import JournalDetailPeek from './JournalDetailPeek.vue';
 import JournalMediaStage from './JournalMediaStage.vue';
 import JournalTextPoster from './JournalTextPoster.vue';
 
@@ -38,6 +39,26 @@ const hasTextPoster = computed(() => !isRich.value
   && props.entry.contentText.trim().length > 0
   && props.entry.assets.length === 0);
 const hasLeadingStage = computed(() => hasMediaStage.value || hasTextPoster.value);
+const layout = useTemplateRef<HTMLElement>('layout');
+const content = useTemplateRef<HTMLElement>('content');
+const contentBelowViewport = shallowRef(false);
+const showContentPeek = computed(() => hasMediaStage.value
+  && props.entry.contentText.trim().length > 0
+  && contentBelowViewport.value);
+let contentObserver: IntersectionObserver;
+
+onMounted(() => {
+  contentObserver = new IntersectionObserver(([entry]) => {
+    contentBelowViewport.value = entry.boundingClientRect.top >= entry.rootBounds!.bottom;
+  }, {
+    root: layout.value!,
+    rootMargin: '0px 0px -128px 0px',
+    threshold: 0,
+  });
+  contentObserver.observe(content.value!);
+});
+
+onBeforeUnmount(() => contentObserver.disconnect());
 
 function forwardSaveContent(entry: JournalEntry, contentText: string): void {
   emit('saveContent', entry, contentText);
@@ -54,6 +75,7 @@ function forwardPinned(entry: JournalEntry, pinned: boolean): void {
 
 <template>
   <div
+    ref="layout"
     class="detail-layout"
     :class="{
       'detail-layout--with-stage': hasLeadingStage,
@@ -63,19 +85,24 @@ function forwardPinned(entry: JournalEntry, pinned: boolean): void {
   >
     <JournalMediaStage v-if="hasMediaStage" :assets="visualAssets" />
     <JournalTextPoster v-else-if="hasTextPoster" :entry="entry" />
-    <JournalDetailContent
-      :entry="entry"
-      :mode="mode"
-      :busy="busy"
-      :has-leading-stage="hasLeadingStage"
-      :supplemental-assets="supplementalAssets"
-      @select-tag="emit('selectTag', $event)"
-      @edit="emit('edit', $event)"
-      @save-content="forwardSaveContent"
-      @set-visibility="forwardVisibility"
-      @set-pinned="forwardPinned"
-      @delete-entry="emit('deleteEntry', $event)"
-    />
+    <div ref="content" class="detail-layout__content">
+      <JournalDetailContent
+        :entry="entry"
+        :mode="mode"
+        :busy="busy"
+        :has-leading-stage="hasLeadingStage"
+        :supplemental-assets="supplementalAssets"
+        @select-tag="emit('selectTag', $event)"
+        @edit="emit('edit', $event)"
+        @save-content="forwardSaveContent"
+        @set-visibility="forwardVisibility"
+        @set-pinned="forwardPinned"
+        @delete-entry="emit('deleteEntry', $event)"
+      />
+    </div>
+    <Transition name="detail-peek">
+      <JournalDetailPeek v-if="showContentPeek" :entry="entry" />
+    </Transition>
   </div>
 </template>
 
@@ -106,6 +133,26 @@ function forwardPinned(entry: JournalEntry, pinned: boolean): void {
   width: min(960px, 100%);
 }
 
+.detail-layout__content {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.detail-peek-enter-active,
+.detail-peek-leave-active {
+  transition:
+    opacity 160ms ease,
+    transform 180ms var(--ease-card);
+}
+
+.detail-peek-enter-from,
+.detail-peek-leave-to {
+  opacity: 0;
+  transform: translateY(18px);
+}
+
 @media (max-width: 959px) {
   .detail-layout,
   .detail-layout--with-stage,
@@ -121,6 +168,21 @@ function forwardPinned(entry: JournalEntry, pinned: boolean): void {
     overscroll-behavior: contain;
     scrollbar-color: var(--border-strong) transparent;
     scrollbar-width: thin;
+  }
+
+  .detail-layout__content {
+    display: block;
+    width: 100%;
+    height: auto;
+    flex: 0 0 auto;
+    overflow: visible;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .detail-peek-enter-active,
+  .detail-peek-leave-active {
+    transition: none;
   }
 }
 </style>
