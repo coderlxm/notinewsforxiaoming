@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, shallowRef, useTemplateRef } from 'vue';
 import ArticleEditorView from './components/article/ArticleEditorView.vue';
 import FeedView from './components/journal/FeedView.vue';
+import { fetchAuthenticationState } from './api';
 import type { JournalEntry } from './types';
 
 type AppRoute =
@@ -22,6 +23,7 @@ interface OverlayContext {
 
 const locationKey = shallowRef(`${window.location.pathname}${window.location.search}`);
 const overlayContext = shallowRef<OverlayContext | null>(null);
+const ownerAuthenticated = shallowRef(false);
 const contentScroll = useTemplateRef<HTMLDivElement>('contentScroll');
 const feedScrollPositions = new Map<string, number>();
 let pendingFeedScrollTop: number | null = null;
@@ -85,6 +87,12 @@ const directPrivateOverlay = computed(() =>
   && route.value.entryId !== null
   && activeOverlayContext.value === null,
 );
+const isPrivateRoute = computed(() =>
+  route.value.name === 'private'
+  || route.value.name === 'article-new'
+  || route.value.name === 'article-edit',
+);
+const showProfileNavigation = computed(() => isPrivateRoute.value || ownerAuthenticated.value);
 
 function synchronizeLocation(): void {
   locationKey.value = `${window.location.pathname}${window.location.search}`;
@@ -222,7 +230,10 @@ function restoreFeedScroll(): void {
   contentScroll.value!.scrollTo({ top: scrollTop, behavior: 'auto' });
 }
 
-onMounted(() => window.addEventListener('popstate', handlePopState));
+onMounted(async () => {
+  window.addEventListener('popstate', handlePopState);
+  ownerAuthenticated.value = (await fetchAuthenticationState()).authenticated;
+});
 onUnmounted(() => window.removeEventListener('popstate', handlePopState));
 </script>
 
@@ -237,8 +248,9 @@ onUnmounted(() => window.removeEventListener('popstate', handlePopState));
           <button class="profile__name" type="button" @click="navigate('/')">小明同学</button>
           <p class="profile__bio">姚黄魏紫开次第，不觉成恨俱零凋</p>
         </div>
-        <nav class="profile__nav" aria-label="主导航">
+        <nav v-if="showProfileNavigation" class="profile__nav" aria-label="主导航">
           <button
+            v-if="isPrivateRoute"
             class="profile__nav-link"
             :class="{ 'profile__nav-link--active': route.name === 'public' || route.name === 'detail' }"
             type="button"
@@ -248,6 +260,7 @@ onUnmounted(() => window.removeEventListener('popstate', handlePopState));
             公开记录
           </button>
           <button
+            v-if="isPrivateRoute || ownerAuthenticated"
             class="profile__nav-link"
             :class="{ 'profile__nav-link--active': route.name === 'private' || route.name === 'article-new' || route.name === 'article-edit' }"
             type="button"
@@ -273,6 +286,7 @@ onUnmounted(() => window.removeEventListener('popstate', handlePopState));
           @open-entry="openEntry"
           @close-overlay="closeOverlay"
           @remove-deleted-overlay="removeDeletedOverlay"
+          @authentication-change="ownerAuthenticated = $event"
           @navigate="navigate"
         />
       </KeepAlive>

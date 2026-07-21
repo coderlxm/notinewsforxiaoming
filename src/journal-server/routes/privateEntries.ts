@@ -54,6 +54,10 @@ export async function registerPrivateEntryRoutes(
   repository: JournalRepository,
   deletionService: JournalDeletionService,
 ): Promise<void> {
+  server.get('/api/auth/session', async (request) => ({
+    authenticated: auth.isAdmin(request),
+  }));
+
   server.post('/api/auth/login', async (request, reply) => {
     const { password } = journalLoginRequestSchema.parse(request.body);
     if (!auth.passwordMatches(password)) {

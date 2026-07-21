@@ -79,6 +79,10 @@ export function fetchPublicEntry(publicId: string): Promise<JournalEntry> {
   return requestJson<JournalEntry>(`/api/entries/${encodeURIComponent(publicId)}`);
 }
 
+export function fetchAuthenticationState(): Promise<{ authenticated: boolean }> {
+  return requestJson<{ authenticated: boolean }>('/api/auth/session');
+}
+
 export function login(password: string): Promise<void> {
   return requestWithoutResponse('/api/auth/login', jsonRequest('POST', { password }));
 }

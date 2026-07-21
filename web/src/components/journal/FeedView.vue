@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, shallowRef } from 'vue';
+import { computed, onMounted, reactive, shallowRef, watch } from 'vue';
 import ArticleCardContent from '../article/ArticleCardContent.vue';
 import JournalLoading from '../ui/JournalLoading.vue';
 import JournalPullRefresh from '../ui/JournalPullRefresh.vue';
@@ -33,6 +33,7 @@ const emit = defineEmits<{
   closeOverlay: [];
   removeDeletedOverlay: [];
   returnToFeed: [];
+  authenticationChange: [authenticated: boolean];
 }>();
 
 const filters = reactive<FeedFilters>({
@@ -81,6 +82,10 @@ const refreshDisabled = computed(() =>
   || loggingOut.value
   || (props.mode === 'private' && journal.authenticationState.value !== 'authenticated'),
 );
+
+watch(() => journal.authenticationState.value, (state) => {
+  if (state !== 'checking') emit('authenticationChange', state === 'authenticated');
+});
 
 onMounted(async () => {
   try {
