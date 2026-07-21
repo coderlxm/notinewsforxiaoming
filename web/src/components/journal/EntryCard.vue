@@ -51,11 +51,7 @@ const structuredRows = computed(() => Object.entries(props.entry.structuredConte
 const displayedStructuredRows = computed(() => isDetail.value
   ? structuredRows.value
   : structuredRows.value.slice(0, 3));
-const cardVisualLimit = computed(() => !props.editable
-  && props.linkable
-  && props.entry.visibility === 'public'
-  ? 5
-  : undefined);
+const cardVisualLimit = computed(() => props.linkable ? 5 : undefined);
 const cardLinkable = computed(() => props.linkable);
 const canSave = computed(() => draft.value !== props.entry.contentText && !props.busy);
 const deletionMessage = computed(() => {
