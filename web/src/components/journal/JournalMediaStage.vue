@@ -393,6 +393,10 @@ onBeforeUnmount(() => activeVideo.value?.pause());
     padding: 0;
   }
 
+  .media-stage__item--full-bleed .media-stage__image {
+    object-fit: contain;
+  }
+
   .media-stage__controls {
     padding-right: max(14px, env(safe-area-inset-right));
     padding-left: max(14px, env(safe-area-inset-left));
