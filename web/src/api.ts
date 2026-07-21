@@ -95,6 +95,10 @@ export function fetchPrivateFeed(options: { cursor?: string; filters: FeedFilter
   return requestJson<JournalFeed>(`/api/me/entries${query}`);
 }
 
+export function fetchPrivateEntry(id: number): Promise<JournalEntry> {
+  return requestJson<JournalEntry>(`/api/me/entries/${id}`);
+}
+
 export function fetchOnThisDay(): Promise<OnThisDayResponse> {
   return requestJson<OnThisDayResponse>('/api/me/on-this-day');
 }

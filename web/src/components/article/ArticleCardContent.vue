@@ -20,7 +20,7 @@ const props = withDefaults(defineProps<{
 });
 
 const emit = defineEmits<{
-  open: [entry: JournalEntry];
+  openEntry: [entry: JournalEntry];
   selectTag: [tag: string];
   edit: [id: number];
   setVisibility: [entry: JournalEntry, visibility: JournalVisibility];
@@ -49,7 +49,7 @@ function startDeletion(): void {
 }
 
 function openEntry(): void {
-  if (cardLinkable.value) emit('open', props.entry);
+  if (cardLinkable.value) emit('openEntry', props.entry);
 }
 
 function handleCardClick(event: MouseEvent): void {

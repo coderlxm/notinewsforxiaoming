@@ -2,17 +2,26 @@
 import { computed, onMounted, onUnmounted, shallowRef, useTemplateRef } from 'vue';
 import ArticleEditorView from './components/article/ArticleEditorView.vue';
 import FeedView from './components/journal/FeedView.vue';
+import type { JournalEntry } from './types';
 
 type AppRoute =
   | { name: 'public'; key: string; tag: string }
   | { name: 'detail'; key: string; publicId: string }
-  | { name: 'private'; key: string }
+  | { name: 'private'; key: string; entryId: number | null }
   | { name: 'article-new'; key: string }
   | { name: 'article-edit'; key: string; articleId: number }
   | { name: 'not-found'; key: string };
 
+type FeedRoute = Extract<AppRoute, { name: 'public' | 'private' }>;
+
+interface OverlayContext {
+  entry: JournalEntry;
+  origin: FeedRoute;
+  originPath: string;
+}
+
 const locationKey = shallowRef(`${window.location.pathname}${window.location.search}`);
-const feedReturnPath = shallowRef('/');
+const overlayContext = shallowRef<OverlayContext | null>(null);
 const contentScroll = useTemplateRef<HTMLDivElement>('contentScroll');
 const feedScrollPositions = new Map<string, number>();
 let pendingFeedScrollTop: number | null = null;
@@ -23,7 +32,11 @@ const route = computed<AppRoute>(() => {
     const tag = url.searchParams.get('tag') ?? '';
     return { name: 'public', key: `public:${tag}`, tag };
   }
-  if (url.pathname === '/me') return { name: 'private', key: 'private' };
+  if (url.pathname === '/me') {
+    const entry = url.searchParams.get('entry');
+    if (entry !== null && !/^[1-9]\d*$/.test(entry)) return { name: 'not-found', key: locationKey.value };
+    return { name: 'private', key: 'private', entryId: entry === null ? null : Number(entry) };
+  }
   if (url.pathname === '/me/articles/new') {
     return { name: 'article-new', key: 'article-new' };
   }
@@ -39,6 +52,40 @@ const route = computed<AppRoute>(() => {
   return { name: 'not-found', key: url.pathname };
 });
 
+const activeOverlayContext = computed(() => {
+  const context = overlayContext.value;
+  if (!context) return null;
+  if (
+    context.origin.name === 'public'
+    && route.value.name === 'detail'
+    && route.value.publicId === context.entry.publicId
+  ) return context;
+  if (
+    context.origin.name === 'private'
+    && route.value.name === 'private'
+    && route.value.entryId === context.entry.id
+  ) return context;
+  return null;
+});
+
+const backgroundFeedRoute = computed<FeedRoute | null>(() => {
+  if (activeOverlayContext.value) return activeOverlayContext.value.origin;
+  if (route.value.name === 'public' || route.value.name === 'private') return route.value;
+  return null;
+});
+
+const overlayEntryId = computed(() => {
+  if (activeOverlayContext.value) return activeOverlayContext.value.entry.id;
+  if (route.value.name === 'private') return route.value.entryId ?? undefined;
+  return undefined;
+});
+
+const directPrivateOverlay = computed(() =>
+  route.value.name === 'private'
+  && route.value.entryId !== null
+  && activeOverlayContext.value === null,
+);
+
 function synchronizeLocation(): void {
   locationKey.value = `${window.location.pathname}${window.location.search}`;
 }
@@ -50,27 +97,43 @@ function feedRouteKey(path: string): string | null {
   return null;
 }
 
+function pathMatchesOverlayContext(path: string, context: OverlayContext): boolean {
+  const url = new URL(path, window.location.origin);
+  if (context.origin.name === 'public') {
+    return url.pathname === `/p/${encodeURIComponent(context.entry.publicId)}`;
+  }
+  return url.pathname === '/me' && url.searchParams.get('entry') === String(context.entry.id);
+}
+
+function isOverlayHistoryTransition(fromPath: string, toPath: string): boolean {
+  const context = overlayContext.value;
+  if (!context) return false;
+  return (
+    pathMatchesOverlayContext(fromPath, context) && toPath === context.originPath
+  ) || (
+    fromPath === context.originPath && pathMatchesOverlayContext(toPath, context)
+  );
+}
+
 function navigate(path: string): void {
-  const currentRoute = route.value;
   const nextUrl = new URL(path, window.location.origin);
   const isOpeningDetail = nextUrl.pathname.startsWith('/p/');
   const nextFeedRouteKey = feedRouteKey(path);
+  const visibleFeed = backgroundFeedRoute.value;
 
-  if (currentRoute.name === 'public' || currentRoute.name === 'private') {
-    feedScrollPositions.set(currentRoute.key, contentScroll.value!.scrollTop);
+  if (visibleFeed) {
+    feedScrollPositions.set(visibleFeed.key, contentScroll.value!.scrollTop);
   }
 
-  if (isOpeningDetail) {
-    feedReturnPath.value = currentRoute.name === 'public' || currentRoute.name === 'private'
-      ? locationKey.value
-      : '/';
-  }
-
-  pendingFeedScrollTop = nextFeedRouteKey && nextFeedRouteKey !== currentRoute.key
+  pendingFeedScrollTop = nextFeedRouteKey && nextFeedRouteKey !== visibleFeed?.key
     ? feedScrollPositions.get(nextFeedRouteKey) ?? 0
     : null;
 
-  window.history.pushState(null, '', path);
+  window.history.pushState(
+    isOpeningDetail && visibleFeed ? { journalDetailFromFeed: true } : null,
+    '',
+    path,
+  );
   synchronizeLocation();
 
   if (pendingFeedScrollTop === null) {
@@ -79,15 +142,25 @@ function navigate(path: string): void {
 }
 
 function handlePopState(): void {
-  const currentRoute = route.value;
+  const currentPath = locationKey.value;
   const nextPath = `${window.location.pathname}${window.location.search}`;
-  const nextFeedRouteKey = feedRouteKey(nextPath);
-
-  if (currentRoute.name === 'public' || currentRoute.name === 'private') {
-    feedScrollPositions.set(currentRoute.key, contentScroll.value!.scrollTop);
+  if (currentPath === nextPath) return;
+  if (isOverlayHistoryTransition(currentPath, nextPath)) {
+    synchronizeLocation();
+    return;
   }
 
-  pendingFeedScrollTop = nextFeedRouteKey && nextFeedRouteKey !== currentRoute.key
+  const visibleFeed = backgroundFeedRoute.value;
+  const context = overlayContext.value;
+  const nextFeedRouteKey = context && pathMatchesOverlayContext(nextPath, context)
+    ? context.origin.key
+    : feedRouteKey(nextPath);
+
+  if (visibleFeed) {
+    feedScrollPositions.set(visibleFeed.key, contentScroll.value!.scrollTop);
+  }
+
+  pendingFeedScrollTop = nextFeedRouteKey && nextFeedRouteKey !== visibleFeed?.key
     ? feedScrollPositions.get(nextFeedRouteKey) ?? 0
     : null;
   synchronizeLocation();
@@ -95,6 +168,50 @@ function handlePopState(): void {
   if (pendingFeedScrollTop === null) {
     contentScroll.value!.scrollTo({ top: 0, behavior: 'auto' });
   }
+}
+
+function openEntry(entry: JournalEntry): void {
+  const origin = backgroundFeedRoute.value;
+  if (!origin) throw new Error('Journal overlay requires a visible feed origin.');
+
+  overlayContext.value = {
+    entry,
+    origin,
+    originPath: locationKey.value,
+  };
+  const path = origin.name === 'public'
+    ? `/p/${encodeURIComponent(entry.publicId)}`
+    : `/me?entry=${entry.id}`;
+  window.history.pushState(null, '', path);
+  synchronizeLocation();
+}
+
+function closeOverlay(): void {
+  if (activeOverlayContext.value) {
+    window.history.back();
+    return;
+  }
+  if (route.value.name !== 'private' || route.value.entryId === null) return;
+  window.history.replaceState(null, '', '/me');
+  synchronizeLocation();
+}
+
+function removeDeletedOverlay(): void {
+  const context = activeOverlayContext.value;
+  const returnPath = context?.originPath ?? '/me';
+  overlayContext.value = null;
+  window.history.replaceState(null, '', returnPath);
+  synchronizeLocation();
+  if (context) window.history.back();
+}
+
+function returnFromDetail(): void {
+  const state = window.history.state as { journalDetailFromFeed?: boolean } | null;
+  if (state?.journalDetailFromFeed === true) {
+    window.history.back();
+    return;
+  }
+  navigate('/');
 }
 
 function restoreFeedScroll(): void {
@@ -146,28 +263,26 @@ onUnmounted(() => window.removeEventListener('popstate', handlePopState));
     <div ref="contentScroll" class="app-scroll">
       <KeepAlive :max="3">
         <FeedView
-          v-if="route.name === 'public'"
-          :key="route.key"
-          mode="public"
-          :initial-tag="route.tag"
+          v-if="backgroundFeedRoute"
+          :key="backgroundFeedRoute.key"
+          :mode="backgroundFeedRoute.name"
+          :initial-tag="backgroundFeedRoute.name === 'public' ? backgroundFeedRoute.tag : ''"
+          :overlay-entry-id="overlayEntryId"
+          :direct-overlay="directPrivateOverlay"
           @layout-ready="restoreFeedScroll"
-          @navigate="navigate"
-        />
-        <FeedView
-          v-else-if="route.name === 'private'"
-          :key="route.key"
-          mode="private"
-          @layout-ready="restoreFeedScroll"
+          @open-entry="openEntry"
+          @close-overlay="closeOverlay"
+          @remove-deleted-overlay="removeDeletedOverlay"
           @navigate="navigate"
         />
       </KeepAlive>
 
       <FeedView
-        v-if="route.name === 'detail'"
+        v-if="route.name === 'detail' && !activeOverlayContext"
         :key="route.key"
         mode="public"
         :detail-id="route.publicId"
-        :return-path="feedReturnPath"
+        @return-to-feed="returnFromDetail"
         @navigate="navigate"
       />
       <ArticleEditorView

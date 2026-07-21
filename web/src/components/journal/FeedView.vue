@@ -8,6 +8,7 @@ import { useJournalApi } from '../../composables/useJournalApi';
 import { emptyFeedFilters, type FeedFilters, type JournalEntry, type JournalVisibility } from '../../types';
 import EntryCard from './EntryCard.vue';
 import EntryFilters from './EntryFilters.vue';
+import JournalDetailOverlay from './JournalDetailOverlay.vue';
 import LoginView from './LoginView.vue';
 import OnThisDay from './OnThisDay.vue';
 import WaterfallFeed from './WaterfallFeed.vue';
@@ -16,16 +17,22 @@ const props = withDefaults(defineProps<{
   mode: 'public' | 'private';
   detailId?: string;
   initialTag?: string;
-  returnPath?: string;
+  overlayEntryId?: number;
+  directOverlay?: boolean;
 }>(), {
   detailId: undefined,
   initialTag: '',
-  returnPath: '/',
+  overlayEntryId: undefined,
+  directOverlay: false,
 });
 
 const emit = defineEmits<{
   layoutReady: [];
   navigate: [path: string];
+  openEntry: [entry: JournalEntry];
+  closeOverlay: [];
+  removeDeletedOverlay: [];
+  returnToFeed: [];
 }>();
 
 const filters = reactive<FeedFilters>({
@@ -40,6 +47,19 @@ const refreshing = shallowRef(false);
 const refreshRequestComplete = shallowRef(false);
 
 const isDetail = computed(() => props.mode === 'public' && props.detailId !== undefined);
+const isOverlay = computed(() => props.overlayEntryId !== undefined);
+const currentOverlayEntry = computed(() => {
+  if (props.overlayEntryId === undefined) return null;
+  if (props.directOverlay) {
+    return journal.detail.value?.id === props.overlayEntryId ? journal.detail.value : null;
+  }
+  return journal.entries.value.find(entry => entry.id === props.overlayEntryId)
+    ?? (journal.detail.value?.id === props.overlayEntryId ? journal.detail.value : null);
+});
+const overlayVisible = computed(() => isOverlay.value && (
+  currentOverlayEntry.value !== null
+  || (props.directOverlay && journal.authenticationState.value === 'authenticated')
+));
 const detailPreparing = computed(() => isDetail.value && initialLoadPending.value);
 const deferredDetailLoading = useDeferredLoading(detailPreparing);
 const listLoadingLabel = computed(() =>
@@ -54,6 +74,7 @@ const listTitle = computed(() => {
 });
 const refreshDisabled = computed(() =>
   isDetail.value
+  || isOverlay.value
   || initialLoadPending.value
   || listReplacing.value
   || journal.loadingMore.value
@@ -72,6 +93,13 @@ onMounted(async () => {
       return;
     }
     await journal.loadPrivate(filters);
+    if (
+      props.directOverlay
+      && props.overlayEntryId !== undefined
+      && journal.authenticationState.value === 'authenticated'
+    ) {
+      await journal.loadPrivateDetail(props.overlayEntryId);
+    }
   } finally {
     initialLoadPending.value = false;
   }
@@ -124,6 +152,13 @@ async function authenticate(password: string): Promise<void> {
   listReplacing.value = true;
   try {
     await journal.authenticate(password, filters);
+    if (
+      props.directOverlay
+      && props.overlayEntryId !== undefined
+      && journal.authenticationState.value === 'authenticated'
+    ) {
+      await journal.loadPrivateDetail(props.overlayEntryId);
+    }
   } finally {
     listReplacing.value = false;
   }
@@ -152,20 +187,17 @@ async function logout(): Promise<void> {
   }
 }
 
-function viewDetail(publicId: string): void {
-  emit('navigate', `/p/${encodeURIComponent(publicId)}`);
-}
-
 function editArticle(id: number): void {
   emit('navigate', `/me/articles/${id}/edit`);
 }
 
-function openArticle(entry: JournalEntry): void {
-  if (props.mode === 'private') {
-    editArticle(entry.id);
+function openEntry(entry: JournalEntry): void {
+  if (props.mode === 'public' && isArticleEntry(entry)) {
+    emit('navigate', `/p/${encodeURIComponent(entry.publicId)}`);
     return;
   }
-  viewDetail(entry.publicId);
+  journal.selectDetail(entry);
+  emit('openEntry', entry);
 }
 
 function isArticleEntry(entry: JournalEntry): boolean {
@@ -189,6 +221,7 @@ async function setPinned(entry: JournalEntry, pinned: boolean): Promise<void> {
 
 async function deleteEntry(entry: JournalEntry): Promise<void> {
   await journal.deleteEntry(entry);
+  if (journal.error.value === null && props.overlayEntryId === entry.id) emit('removeDeletedOverlay');
 }
 </script>
 
@@ -196,7 +229,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
   <JournalPullRefresh v-model="refreshing" :disabled="refreshDisabled" @refresh="refreshFeed">
     <main class="feed" :class="{ 'feed--detail': isDetail }">
       <div v-if="isDetail" class="feed__detail-heading">
-        <button class="text-button" type="button" @click="emit('navigate', returnPath)">← 返回信息流</button>
+        <button class="text-button" type="button" @click="emit('returnToFeed')">← 返回信息流</button>
         <span>永久记录</span>
       </div>
 
@@ -267,7 +300,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
         </button>
       </div>
 
-      <p v-if="!isDetail && journal.error.value" class="notice notice--error" role="alert">{{ journal.error.value }}</p>
+      <p v-if="!isDetail && !overlayVisible && journal.error.value" class="notice notice--error" role="alert">{{ journal.error.value }}</p>
 
       <LoginView
         v-if="mode === 'private' && journal.authenticationState.value === 'anonymous'"
@@ -280,8 +313,8 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
         <OnThisDay
           :entries="journal.onThisDayEntries.value"
           :mutation-entry-id="journal.mutationEntryId.value"
+          @open-entry="openEntry"
           @edit-article="editArticle"
-          @view-detail="viewDetail"
           @select-tag="selectTag"
           @save-content="saveContent"
           @set-visibility="setVisibility"
@@ -308,7 +341,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
             :entry="journal.detail.value"
             :linkable="false"
             @select-tag="selectTag"
-            @view-detail="viewDetail"
+            @open-entry="openEntry"
             @save-content="saveContent"
             @set-visibility="setVisibility"
             @set-pinned="setPinned"
@@ -329,8 +362,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
           :mode="mode"
           :mutation-entry-id="journal.mutationEntryId.value"
           @layout-ready="handleLayoutReady"
-          @open-article="openArticle"
-          @view-detail="viewDetail"
+          @open-entry="openEntry"
           @select-tag="selectTag"
           @edit-article="editArticle"
           @save-content="saveContent"
@@ -360,6 +392,22 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
       </div>
     </main>
   </JournalPullRefresh>
+
+  <JournalDetailOverlay
+    v-if="overlayVisible"
+    :entry="currentOverlayEntry ?? undefined"
+    :mode="mode"
+    :busy="currentOverlayEntry !== null && journal.mutationEntryId.value === currentOverlayEntry.id"
+    :loading="directOverlay && journal.loading.value"
+    :error="journal.error.value"
+    @close="emit('closeOverlay')"
+    @select-tag="selectTag"
+    @edit="editArticle($event.id)"
+    @save-content="saveContent"
+    @set-visibility="setVisibility"
+    @set-pinned="setPinned"
+    @delete-entry="deleteEntry"
+  />
 </template>
 
 <style scoped>

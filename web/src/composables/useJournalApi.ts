@@ -2,6 +2,7 @@ import { readonly, ref, shallowReadonly, shallowRef } from 'vue';
 import {
   deleteEntry as deleteEntryRequest,
   fetchOnThisDay,
+  fetchPrivateEntry,
   fetchPrivateFeed,
   fetchPublicEntry,
   fetchPublicFeed,
@@ -37,6 +38,10 @@ export function useJournalApi() {
     if (detail.value?.id === updated.id) detail.value = updated;
   }
 
+  function selectDetail(entry: JournalEntry): void {
+    detail.value = entry;
+  }
+
   async function fetchAndReplacePrivateFeed(filters: FeedFilters): Promise<void> {
     const feed = await fetchPrivateFeed({ filters });
     entries.value = feed.entries;
@@ -68,6 +73,25 @@ export function useJournalApi() {
       detail.value = await fetchPublicEntry(publicId);
     }
     catch (reason) {
+      exposeError(reason);
+    }
+    finally {
+      loading.value = false;
+    }
+  }
+
+  async function loadPrivateDetail(id: number): Promise<void> {
+    loading.value = true;
+    error.value = null;
+    detail.value = null;
+    try {
+      detail.value = await fetchPrivateEntry(id);
+      authenticationState.value = 'authenticated';
+    }
+    catch (reason) {
+      if (reason instanceof JournalRequestError && reason.status === 401) {
+        authenticationState.value = 'anonymous';
+      }
       exposeError(reason);
     }
     finally {
@@ -274,6 +298,8 @@ export function useJournalApi() {
     authenticationState: readonly(authenticationState),
     loadPublic,
     loadPublicDetail,
+    loadPrivateDetail,
+    selectDetail,
     loadPrivate,
     refreshPrivateFeed,
     loadMorePublic,

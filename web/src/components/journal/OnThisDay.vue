@@ -9,7 +9,7 @@ defineProps<{
 }>();
 
 const emit = defineEmits<{
-  viewDetail: [publicId: string];
+  openEntry: [entry: JournalEntry];
   editArticle: [id: number];
   selectTag: [tag: string];
   saveContent: [entry: JournalEntry, contentText: string];
@@ -48,7 +48,7 @@ function forwardDelete(entry: JournalEntry): void {
           :entry="entry"
           editable
           :busy="mutationEntryId === entry.id"
-          @open="emit('editArticle', entry.id)"
+          @open-entry="emit('openEntry', $event)"
           @edit="emit('editArticle', $event)"
           @select-tag="emit('selectTag', $event)"
           @set-visibility="forwardVisibility"
@@ -60,7 +60,7 @@ function forwardDelete(entry: JournalEntry): void {
           :entry="entry"
           editable
           :busy="mutationEntryId === entry.id"
-          @view-detail="emit('viewDetail', $event)"
+          @open-entry="emit('openEntry', $event)"
           @select-tag="emit('selectTag', $event)"
           @save-content="forwardSaveContent"
           @set-visibility="forwardVisibility"

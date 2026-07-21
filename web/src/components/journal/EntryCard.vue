@@ -19,7 +19,7 @@ const props = withDefaults(defineProps<{
 });
 
 const emit = defineEmits<{
-  viewDetail: [publicId: string];
+  openEntry: [entry: JournalEntry];
   selectTag: [tag: string];
   saveContent: [entry: JournalEntry, contentText: string];
   setVisibility: [entry: JournalEntry, visibility: JournalVisibility];
@@ -56,7 +56,7 @@ const cardVisualLimit = computed(() => !props.editable
   && props.entry.visibility === 'public'
   ? 5
   : undefined);
-const cardLinkable = computed(() => props.linkable && props.entry.visibility === 'public');
+const cardLinkable = computed(() => props.linkable);
 const canSave = computed(() => draft.value !== props.entry.contentText && !props.busy);
 const deletionMessage = computed(() => {
   if (props.entry.assets.length === 0) return '永久删除这条记录？此操作无法撤销。';
@@ -85,7 +85,7 @@ function startDeletion(): void {
 }
 
 function openEntry(): void {
-  if (cardLinkable.value) emit('viewDetail', props.entry.publicId);
+  if (cardLinkable.value) emit('openEntry', props.entry);
 }
 
 function handleCardClick(event: MouseEvent): void {

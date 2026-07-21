@@ -82,6 +82,13 @@ export async function registerPrivateEntryRoutes(
     });
   });
 
+  server.get('/api/me/entries/:id', { preHandler: auth.requireAdmin }, async (request, reply) => {
+    const { id } = idParamsSchema.parse(request.params);
+    const entry = repository.getByIdOrNull(id);
+    if (!entry) return reply.code(404).send({ error: 'Journal entry was not found.' });
+    return entry;
+  });
+
   server.get('/api/me/on-this-day', { preHandler: auth.requireAdmin }, async () => {
     const current = currentShanghaiDate();
     return { entries: repository.listOnThisDay(current.monthDay, current.year) };

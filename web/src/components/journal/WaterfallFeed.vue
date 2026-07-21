@@ -17,8 +17,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   layoutReady: [];
-  openArticle: [entry: JournalEntry];
-  viewDetail: [publicId: string];
+  openEntry: [entry: JournalEntry];
   selectTag: [tag: string];
   editArticle: [id: number];
   saveContent: [entry: JournalEntry, contentText: string];
@@ -151,7 +150,7 @@ onBeforeUnmount(() => {
             :entry="entry"
             :editable="mode === 'private'"
             :busy="mutationEntryId === entry.id"
-            @open="emit('openArticle', $event)"
+            @open-entry="emit('openEntry', $event)"
             @select-tag="emit('selectTag', $event)"
             @edit="emit('editArticle', $event)"
             @set-visibility="forwardVisibility"
@@ -163,7 +162,7 @@ onBeforeUnmount(() => {
             :entry="entry"
             :editable="mode === 'private'"
             :busy="mutationEntryId === entry.id"
-            @view-detail="emit('viewDetail', $event)"
+            @open-entry="emit('openEntry', $event)"
             @select-tag="emit('selectTag', $event)"
             @save-content="forwardSaveContent"
             @set-visibility="forwardVisibility"
