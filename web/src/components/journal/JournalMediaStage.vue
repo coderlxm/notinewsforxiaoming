@@ -21,6 +21,12 @@ const stageAssets = computed<StageAsset[]>(() => props.assets.map((asset) => ({
 })));
 const currentAsset = computed(() => stageAssets.value[currentIndex.value]);
 const positionLabel = computed(() => `${currentIndex.value + 1} / ${stageAssets.value.length}`);
+const currentAssetFullBleed = computed(() => {
+  const asset = currentAsset.value;
+  if (!asset || asset.mediaType !== 'image' || asset.kind === 'sticker' || !asset.width || !asset.height) return false;
+  const ratio = asset.width / asset.height;
+  return ratio >= 0.45 && ratio <= 2.2;
+});
 
 watch(() => currentAsset.value?.id, () => {
   videoReady.value = currentAsset.value?.mediaType !== 'video';
@@ -79,6 +85,8 @@ onBeforeUnmount(() => activeVideo.value?.pause());
         :class="{
           'media-stage__item--sticker': currentAsset.kind === 'sticker',
           'media-stage__item--round': currentAsset.kind === 'video_note',
+          'media-stage__item--full-bleed': currentAssetFullBleed,
+          'media-stage__item--contained': !currentAssetFullBleed,
         }"
       >
         <img
@@ -177,7 +185,6 @@ onBeforeUnmount(() => activeVideo.value?.pause());
   display: grid;
   min-height: 0;
   grid-template: minmax(0, 1fr) / minmax(0, 1fr);
-  padding: clamp(20px, 3vw, 48px);
   overflow: hidden;
 }
 
@@ -199,6 +206,14 @@ onBeforeUnmount(() => activeVideo.value?.pause());
   min-height: 0;
   grid-area: 1 / 1;
   object-fit: contain;
+}
+
+.media-stage__item--contained {
+  padding: clamp(20px, 3vw, 48px);
+}
+
+.media-stage__item--full-bleed .media-stage__media {
+  object-fit: cover;
 }
 
 .media-stage__video {
@@ -236,6 +251,7 @@ onBeforeUnmount(() => activeVideo.value?.pause());
   height: min(72%, 440px);
   max-width: min(72%, 440px);
   max-height: min(72%, 440px);
+  object-fit: contain;
 }
 
 .media-stage__item--round .media-stage__media {
@@ -371,6 +387,10 @@ onBeforeUnmount(() => activeVideo.value?.pause());
 
   .media-stage__viewport {
     padding: max(56px, calc(env(safe-area-inset-top) + 48px)) 16px 16px;
+  }
+
+  .media-stage__item--contained {
+    padding: 0;
   }
 
   .media-stage__controls {

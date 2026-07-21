@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, shallowRef, useTemplateRef } from 'vue';
+import { computed, onBeforeUnmount, onMounted, shallowRef, useTemplateRef } from 'vue';
+import type { CSSProperties } from 'vue';
 import JournalLoading from '../ui/JournalLoading.vue';
-import type { JournalEntry, JournalVisibility } from '../../types';
+import type { JournalAsset, JournalEntry, JournalVisibility } from '../../types';
 import JournalDetailLayout from './JournalDetailLayout.vue';
 
 const props = defineProps<{
@@ -25,15 +26,35 @@ const emit = defineEmits<{
 const dialog = useTemplateRef<HTMLDialogElement>('dialog');
 const panel = useTemplateRef<HTMLElement>('panel');
 const closing = shallowRef(false);
+const viewportWidth = shallowRef(window.innerWidth);
+const viewportHeight = shallowRef(window.innerHeight);
+
+function isVisualAsset(asset: JournalAsset): boolean {
+  if (['photo', 'video', 'video_note', 'animation'].includes(asset.kind)) return true;
+  return asset.kind === 'sticker'
+    && (asset.mimeType?.startsWith('image/') === true || asset.mimeType?.startsWith('video/') === true);
+}
+
+function isVideoAsset(asset: JournalAsset): boolean {
+  return ['video', 'video_note'].includes(asset.kind)
+    || (asset.kind === 'animation' && asset.mimeType?.startsWith('image/') !== true)
+    || (asset.kind === 'sticker' && asset.mimeType?.startsWith('video/') === true);
+}
+
+function isAdaptiveImage(asset: JournalAsset): boolean {
+  if (isVideoAsset(asset) || asset.kind === 'sticker' || !asset.width || !asset.height) return false;
+  const ratio = asset.width / asset.height;
+  return ratio >= 0.45 && ratio <= 2.2;
+}
 
 const titleId = computed(() => `journal-detail-title-${props.entry?.id ?? 'pending'}`);
-const hasVisualMedia = computed(() => {
-  const entry = props.entry;
-  return entry?.bodyFormat === 'plain' && entry.assets.some((asset) => {
-    if (['photo', 'video', 'video_note', 'animation'].includes(asset.kind)) return true;
-    return asset.kind === 'sticker'
-      && (asset.mimeType?.startsWith('image/') === true || asset.mimeType?.startsWith('video/') === true);
-  });
+const visualAssets = computed(() => props.entry?.bodyFormat === 'plain'
+  ? props.entry.assets.filter(isVisualAsset)
+  : []);
+const hasVisualMedia = computed(() => visualAssets.value.length > 0);
+const leadingAdaptiveImage = computed(() => {
+  const asset = visualAssets.value[0];
+  return asset && isAdaptiveImage(asset) ? asset : null;
 });
 const hasTextPoster = computed(() => {
   const entry = props.entry;
@@ -47,10 +68,35 @@ const overlaySizeClass = computed(() => {
     ? 'detail-overlay--media'
     : 'detail-overlay--compact';
 });
+const overlayStyle = computed<CSSProperties>(() => {
+  const image = leadingAdaptiveImage.value;
+  if (!image || viewportWidth.value < 960) return {};
+
+  const maximumWidth = Math.min(1440, viewportWidth.value - 48);
+  const maximumHeight = Math.min(880, viewportHeight.value - 48);
+  const contentWidth = Math.min(440, Math.max(360, maximumWidth * 0.34));
+  const imageRatio = image.width! / image.height!;
+  const stageWidth = Math.min(maximumHeight * imageRatio, maximumWidth - contentWidth);
+  const overlayHeight = stageWidth / imageRatio;
+
+  return {
+    width: `${Math.round(stageWidth + contentWidth)}px`,
+    height: `${Math.round(overlayHeight)}px`,
+    '--detail-stage-width': `${Math.round(stageWidth)}px`,
+    '--detail-content-width': `${Math.round(contentWidth)}px`,
+  };
+});
 
 onMounted(() => {
   dialog.value!.showModal();
+  window.addEventListener('resize', updateViewportSize);
 });
+onBeforeUnmount(() => window.removeEventListener('resize', updateViewportSize));
+
+function updateViewportSize(): void {
+  viewportWidth.value = window.innerWidth;
+  viewportHeight.value = window.innerHeight;
+}
 
 function requestClose(): void {
   if (closing.value) return;
@@ -94,6 +140,7 @@ function forwardPinned(entry: JournalEntry, pinned: boolean): void {
       ref="dialog"
       class="detail-overlay"
       :class="[overlaySizeClass, { 'detail-overlay--closing': closing }]"
+      :style="overlayStyle"
       :aria-labelledby="titleId"
       aria-modal="true"
       @cancel.prevent="requestClose"

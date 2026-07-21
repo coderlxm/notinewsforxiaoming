@@ -89,7 +89,9 @@ function forwardPinned(entry: JournalEntry, pinned: boolean): void {
 
 .detail-layout--with-stage {
   display: grid;
-  grid-template-columns: minmax(0, 62fr) minmax(360px, 38fr);
+  grid-template-columns:
+    minmax(0, var(--detail-stage-width, 62fr))
+    minmax(360px, var(--detail-content-width, 38fr));
   overflow: hidden;
 }
 
