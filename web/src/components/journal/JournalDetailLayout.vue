@@ -3,6 +3,7 @@ import { computed } from 'vue';
 import type { JournalAsset, JournalEntry, JournalVisibility } from '../../types';
 import JournalDetailContent from './JournalDetailContent.vue';
 import JournalMediaStage from './JournalMediaStage.vue';
+import JournalTextPoster from './JournalTextPoster.vue';
 
 const props = defineProps<{
   entry: JournalEntry;
@@ -33,6 +34,10 @@ const supplementalAssets = computed(() => isRich.value
   ? props.entry.assets.filter((asset) => asset.role === 'attachment')
   : props.entry.assets.filter((asset) => !isVisualAsset(asset)));
 const hasMediaStage = computed(() => visualAssets.value.length > 0);
+const hasTextPoster = computed(() => !isRich.value
+  && props.entry.contentText.trim().length > 0
+  && props.entry.assets.length === 0);
+const hasLeadingStage = computed(() => hasMediaStage.value || hasTextPoster.value);
 
 function forwardSaveContent(entry: JournalEntry, contentText: string): void {
   emit('saveContent', entry, contentText);
@@ -51,17 +56,18 @@ function forwardPinned(entry: JournalEntry, pinned: boolean): void {
   <div
     class="detail-layout"
     :class="{
-      'detail-layout--with-media': hasMediaStage,
-      'detail-layout--single': !hasMediaStage,
+      'detail-layout--with-stage': hasLeadingStage,
+      'detail-layout--single': !hasLeadingStage,
       'detail-layout--rich': isRich,
     }"
   >
     <JournalMediaStage v-if="hasMediaStage" :assets="visualAssets" />
+    <JournalTextPoster v-else-if="hasTextPoster" :entry="entry" />
     <JournalDetailContent
       :entry="entry"
       :mode="mode"
       :busy="busy"
-      :has-media-stage="hasMediaStage"
+      :has-leading-stage="hasLeadingStage"
       :supplemental-assets="supplementalAssets"
       @select-tag="emit('selectTag', $event)"
       @edit="emit('edit', $event)"
@@ -81,7 +87,7 @@ function forwardPinned(entry: JournalEntry, pinned: boolean): void {
   background: var(--surface-card);
 }
 
-.detail-layout--with-media {
+.detail-layout--with-stage {
   display: grid;
   grid-template-columns: minmax(0, 62fr) minmax(360px, 38fr);
   overflow: hidden;
@@ -100,7 +106,7 @@ function forwardPinned(entry: JournalEntry, pinned: boolean): void {
 
 @media (max-width: 959px) {
   .detail-layout,
-  .detail-layout--with-media,
+  .detail-layout--with-stage,
   .detail-layout--single,
   .detail-layout--rich {
     display: flex;

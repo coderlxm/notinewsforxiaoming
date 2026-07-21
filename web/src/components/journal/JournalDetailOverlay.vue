@@ -35,9 +35,17 @@ const hasVisualMedia = computed(() => {
       && (asset.mimeType?.startsWith('image/') === true || asset.mimeType?.startsWith('video/') === true);
   });
 });
+const hasTextPoster = computed(() => {
+  const entry = props.entry;
+  return entry?.bodyFormat === 'plain'
+    && entry.contentText.trim().length > 0
+    && entry.assets.length === 0;
+});
 const overlaySizeClass = computed(() => {
   if (props.entry?.bodyFormat === 'rich') return 'detail-overlay--rich';
-  return hasVisualMedia.value ? 'detail-overlay--media' : 'detail-overlay--compact';
+  return hasVisualMedia.value || hasTextPoster.value
+    ? 'detail-overlay--media'
+    : 'detail-overlay--compact';
 });
 
 onMounted(() => {

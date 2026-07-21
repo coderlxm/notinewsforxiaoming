@@ -11,7 +11,7 @@ const props = defineProps<{
   entry: JournalEntry;
   mode: 'public' | 'private';
   busy: boolean;
-  hasMediaStage: boolean;
+  hasLeadingStage: boolean;
   supplementalAssets: readonly JournalAsset[];
 }>();
 
@@ -75,7 +75,7 @@ function requestDeletion(): void {
     class="detail-content"
     :class="{
       'detail-content--rich': isRich,
-      'detail-content--with-media': hasMediaStage,
+      'detail-content--with-stage': hasLeadingStage,
     }"
   >
     <header class="detail-content__header">
@@ -438,7 +438,7 @@ function requestDeletion(): void {
     overflow: visible;
   }
 
-  .detail-content--with-media {
+  .detail-content--with-stage {
     padding-top: 24px;
   }
 
