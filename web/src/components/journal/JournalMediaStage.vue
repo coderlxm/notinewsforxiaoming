@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, shallowRef, useTemplateRef, watch } from 'vue';
+import type { CSSProperties } from 'vue';
 import JournalLoading from '../ui/JournalLoading.vue';
 import type { JournalAsset } from '../../types';
 
@@ -21,6 +22,14 @@ const stageAssets = computed<StageAsset[]>(() => props.assets.map((asset) => ({
 })));
 const currentAsset = computed(() => stageAssets.value[currentIndex.value]);
 const positionLabel = computed(() => `${currentIndex.value + 1} / ${stageAssets.value.length}`);
+const currentImageAspectRatio = computed(() => {
+  const asset = currentAsset.value;
+  if (!asset || asset.mediaType !== 'image' || asset.kind === 'sticker' || !asset.width || !asset.height) return null;
+  return `${asset.width} / ${asset.height}`;
+});
+const stageStyle = computed<CSSProperties>(() => currentImageAspectRatio.value
+  ? { '--media-stage-aspect-ratio': currentImageAspectRatio.value }
+  : {});
 const currentAssetFullBleed = computed(() => {
   const asset = currentAsset.value;
   if (!asset || asset.mediaType !== 'image' || asset.kind === 'sticker' || !asset.width || !asset.height) return false;
@@ -74,6 +83,8 @@ onBeforeUnmount(() => activeVideo.value?.pause());
 <template>
   <section
     class="media-stage"
+    :class="{ 'media-stage--adaptive-image': currentAssetFullBleed }"
+    :style="stageStyle"
     aria-label="视觉媒体"
     tabindex="0"
     @keydown="handleKeyboard"
@@ -389,12 +400,27 @@ onBeforeUnmount(() => activeVideo.value?.pause());
     padding: max(56px, calc(env(safe-area-inset-top) + 48px)) 16px 16px;
   }
 
-  .media-stage__item--contained {
-    padding: 0;
+  .media-stage--adaptive-image {
+    height: auto;
+    min-height: 0;
+    grid-template-rows: auto auto;
   }
 
-  .media-stage__item--full-bleed .media-stage__image {
-    object-fit: contain;
+  .media-stage--adaptive-image .media-stage__viewport {
+    min-height: 0;
+    padding: 0;
+    grid-template-rows: auto;
+  }
+
+  .media-stage--adaptive-image .media-stage__item {
+    width: 100%;
+    height: auto;
+    align-self: center;
+    aspect-ratio: var(--media-stage-aspect-ratio);
+  }
+
+  .media-stage__item--contained {
+    padding: 0;
   }
 
   .media-stage__controls {
