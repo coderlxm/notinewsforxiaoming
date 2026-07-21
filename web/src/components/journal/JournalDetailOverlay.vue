@@ -146,11 +146,9 @@ function forwardPinned(entry: JournalEntry, pinned: boolean): void {
   margin: auto;
   padding: 0;
   overflow: hidden;
-  border: 1px solid var(--border-strong);
-  border-radius: 14px;
+  border: 0;
   background: transparent;
   color: var(--text-primary);
-  box-shadow: 0 30px 80px rgb(17 17 15 / 38%);
   overscroll-behavior: contain;
 }
 
@@ -173,7 +171,10 @@ function forwardPinned(entry: JournalEntry, pinned: boolean): void {
   width: 100%;
   height: 100%;
   overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
   background: var(--surface-card);
+  box-shadow: 0 30px 80px rgb(17 17 15 / 38%);
   opacity: 1;
   transform: translateY(0) scale(1);
   transition:
@@ -269,6 +270,9 @@ function forwardPinned(entry: JournalEntry, pinned: boolean): void {
   .detail-overlay {
     width: 100vw;
     height: 100dvh;
+  }
+
+  .detail-overlay__panel {
     border: 0;
     border-radius: 0;
   }
@@ -286,7 +290,7 @@ function forwardPinned(entry: JournalEntry, pinned: boolean): void {
 }
 
 @media (prefers-color-scheme: dark) {
-  .detail-overlay {
+  .detail-overlay__panel {
     border-color: #4b4a46;
     box-shadow: 0 30px 90px rgb(0 0 0 / 56%);
   }

@@ -63,25 +63,30 @@ onBeforeUnmount(() => activeVideo.value?.pause());
     @keydown="handleKeyboard"
   >
     <div v-if="currentAsset" class="media-stage__viewport">
-      <img
-        v-if="currentAsset.mediaType === 'image'"
+      <div
         :key="currentAsset.id"
-        class="media-stage__media media-stage__image"
-        :class="{ 'media-stage__image--sticker': currentAsset.kind === 'sticker' }"
-        :src="currentAsset.url"
-        alt=""
-        draggable="false"
+        class="media-stage__item"
+        :class="{
+          'media-stage__item--sticker': currentAsset.kind === 'sticker',
+          'media-stage__item--round': currentAsset.kind === 'video_note',
+        }"
       >
-      <video
-        v-else
-        :key="currentAsset.id"
-        ref="activeVideo"
-        class="media-stage__media media-stage__video"
-        :class="{ 'media-stage__video--round': currentAsset.kind === 'video_note' }"
-        :src="currentAsset.url"
-        controls
-        preload="metadata"
-      />
+        <img
+          v-if="currentAsset.mediaType === 'image'"
+          class="media-stage__media media-stage__image"
+          :src="currentAsset.url"
+          alt=""
+          draggable="false"
+        >
+        <video
+          v-else
+          ref="activeVideo"
+          class="media-stage__media media-stage__video"
+          :src="currentAsset.url"
+          controls
+          preload="metadata"
+        />
+      </div>
     </div>
 
     <footer v-if="stageAssets.length > 1" class="media-stage__controls">
@@ -147,33 +152,37 @@ onBeforeUnmount(() => activeVideo.value?.pause());
 .media-stage__viewport {
   display: grid;
   min-height: 0;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
   padding: clamp(20px, 3vw, 48px);
   overflow: hidden;
+}
+
+.media-stage__item {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
   place-items: center;
+  animation: media-stage-enter 160ms ease-out;
 }
 
 .media-stage__media {
   display: block;
-  max-width: 100%;
-  max-height: 100%;
-  animation: media-stage-enter 160ms ease-out;
-}
-
-.media-stage__image,
-.media-stage__video {
   width: 100%;
   height: 100%;
+  min-width: 0;
+  min-height: 0;
   object-fit: contain;
 }
 
-.media-stage__image--sticker {
-  width: auto;
-  height: auto;
+.media-stage__item--sticker .media-stage__media {
+  width: min(72%, 440px);
+  height: min(72%, 440px);
   max-width: min(72%, 440px);
   max-height: min(72%, 440px);
 }
 
-.media-stage__video--round {
+.media-stage__item--round .media-stage__media {
   width: min(72%, 520px);
   height: auto;
   aspect-ratio: 1;
