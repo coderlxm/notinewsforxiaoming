@@ -412,7 +412,7 @@ export class JournalRepository {
       parameters.push(filters.visibility);
     }
     if (filters.tag) {
-      conditions.push('EXISTS (SELECT 1 FROM json_each(e.tags_json) WHERE value = ?)');
+      conditions.push('EXISTS (SELECT 1 FROM json_each(e.tags_json) WHERE instr(value, ?) > 0)');
       parameters.push(filters.tag);
     }
     if (filters.query) {
