@@ -29,6 +29,7 @@ const closing = shallowRef(false);
 const viewportWidth = shallowRef(window.innerWidth);
 const viewportHeight = shallowRef(window.innerHeight);
 const textPosterAspectRatio = 4 / 5;
+const mediaControlsHeight = 130;
 
 function isVisualAsset(asset: JournalAsset): boolean {
   if (['photo', 'video', 'video_note', 'animation'].includes(asset.kind)) return true;
@@ -53,19 +54,19 @@ const visualAssets = computed(() => props.entry?.bodyFormat === 'plain'
   ? props.entry.assets.filter(isVisualAsset)
   : []);
 const hasVisualMedia = computed(() => visualAssets.value.length > 0);
-const leadingAdaptiveImage = computed(() => {
+const initialStageAspectRatio = computed(() => {
   const asset = visualAssets.value[0];
-  return asset && isAdaptiveImage(asset) ? asset : null;
+  return asset && isAdaptiveImage(asset) ? asset.width! / asset.height! : null;
 });
+const activeStageAspectRatio = shallowRef<number | null>(initialStageAspectRatio.value);
 const hasTextPoster = computed(() => {
   const entry = props.entry;
   return entry?.bodyFormat === 'plain'
     && entry.contentText.trim().length > 0
     && entry.assets.length === 0;
 });
-const leadingStageAspectRatio = computed(() => {
-  const image = leadingAdaptiveImage.value;
-  if (image) return image.width! / image.height!;
+const resolvedStageAspectRatio = computed(() => {
+  if (hasVisualMedia.value) return activeStageAspectRatio.value;
   return hasTextPoster.value ? textPosterAspectRatio : null;
 });
 const overlaySizeClass = computed(() => {
@@ -75,14 +76,18 @@ const overlaySizeClass = computed(() => {
     : 'detail-overlay--compact';
 });
 const overlayStyle = computed<CSSProperties>(() => {
-  const stageAspectRatio = leadingStageAspectRatio.value;
+  const stageAspectRatio = resolvedStageAspectRatio.value;
   if (stageAspectRatio === null || viewportWidth.value < 960) return {};
 
   const maximumWidth = Math.min(1440, viewportWidth.value - 48);
   const maximumHeight = Math.min(880, viewportHeight.value - 48);
   const contentWidth = Math.min(440, Math.max(360, maximumWidth * 0.34));
-  const stageWidth = Math.min(maximumHeight * stageAspectRatio, maximumWidth - contentWidth);
-  const overlayHeight = stageWidth / stageAspectRatio;
+  const controlsHeight = visualAssets.value.length > 1 ? mediaControlsHeight : 0;
+  const stageWidth = Math.min(
+    (maximumHeight - controlsHeight) * stageAspectRatio,
+    maximumWidth - contentWidth,
+  );
+  const overlayHeight = stageWidth / stageAspectRatio + controlsHeight;
 
   return {
     width: `${Math.round(stageWidth + contentWidth)}px`,
@@ -101,6 +106,10 @@ onBeforeUnmount(() => window.removeEventListener('resize', updateViewportSize));
 function updateViewportSize(): void {
   viewportWidth.value = window.innerWidth;
   viewportHeight.value = window.innerHeight;
+}
+
+function updateStageAspectRatio(aspectRatio: number | null): void {
+  activeStageAspectRatio.value = aspectRatio;
 }
 
 function requestClose(): void {
@@ -181,6 +190,7 @@ function forwardPinned(entry: JournalEntry, pinned: boolean): void {
           :entry="entry"
           :mode="mode"
           :busy="busy"
+          @stage-aspect-ratio-change="updateStageAspectRatio"
           @select-tag="emit('selectTag', $event)"
           @edit="emit('edit', $event)"
           @save-content="forwardSaveContent"

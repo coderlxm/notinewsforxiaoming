@@ -13,6 +13,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+  stageAspectRatioChange: [aspectRatio: number | null];
   selectTag: [tag: string];
   edit: [entry: JournalEntry];
   saveContent: [entry: JournalEntry, contentText: string];
@@ -83,7 +84,11 @@ function forwardPinned(entry: JournalEntry, pinned: boolean): void {
       'detail-layout--rich': isRich,
     }"
   >
-    <JournalMediaStage v-if="hasMediaStage" :assets="visualAssets" />
+    <JournalMediaStage
+      v-if="hasMediaStage"
+      :assets="visualAssets"
+      @aspect-ratio-change="emit('stageAspectRatioChange', $event)"
+    />
     <JournalTextPoster v-else-if="hasTextPoster" :entry="entry" />
     <div ref="content" class="detail-layout__content">
       <JournalDetailContent

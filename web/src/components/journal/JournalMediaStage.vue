@@ -8,6 +8,10 @@ const props = defineProps<{
   assets: readonly JournalAsset[];
 }>();
 
+const emit = defineEmits<{
+  aspectRatioChange: [aspectRatio: number | null];
+}>();
+
 type StageAsset = JournalAsset & {
   mediaType: 'image' | 'video';
 };
@@ -22,20 +26,20 @@ const stageAssets = computed<StageAsset[]>(() => props.assets.map((asset) => ({
 })));
 const currentAsset = computed(() => stageAssets.value[currentIndex.value]);
 const positionLabel = computed(() => `${currentIndex.value + 1} / ${stageAssets.value.length}`);
-const currentImageAspectRatio = computed(() => {
+const currentAdaptiveAspectRatio = computed(() => {
   const asset = currentAsset.value;
   if (!asset || asset.mediaType !== 'image' || asset.kind === 'sticker' || !asset.width || !asset.height) return null;
-  return `${asset.width} / ${asset.height}`;
-});
-const stageStyle = computed<CSSProperties>(() => currentImageAspectRatio.value
-  ? { '--media-stage-aspect-ratio': currentImageAspectRatio.value }
-  : {});
-const currentAssetFullBleed = computed(() => {
-  const asset = currentAsset.value;
-  if (!asset || asset.mediaType !== 'image' || asset.kind === 'sticker' || !asset.width || !asset.height) return false;
   const ratio = asset.width / asset.height;
-  return ratio >= 0.45 && ratio <= 2.2;
+  return ratio >= 0.45 && ratio <= 2.2 ? ratio : null;
 });
+const stageStyle = computed<CSSProperties>(() => currentAdaptiveAspectRatio.value
+  ? { '--media-stage-aspect-ratio': String(currentAdaptiveAspectRatio.value) }
+  : {});
+const currentAssetFullBleed = computed(() => currentAdaptiveAspectRatio.value !== null);
+
+watch(currentAdaptiveAspectRatio, (aspectRatio) => {
+  emit('aspectRatioChange', aspectRatio);
+}, { immediate: true });
 
 watch(() => currentAsset.value?.id, () => {
   videoReady.value = currentAsset.value?.mediaType !== 'video';
@@ -224,7 +228,7 @@ onBeforeUnmount(() => activeVideo.value?.pause());
 }
 
 .media-stage__item--full-bleed .media-stage__media {
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .media-stage__video {
@@ -275,6 +279,7 @@ onBeforeUnmount(() => activeVideo.value?.pause());
 
 .media-stage__controls {
   display: grid;
+  height: 130px;
   gap: 10px;
   padding: 12px 20px 16px;
   background: linear-gradient(to top, rgb(0 0 0 / 34%), transparent);
