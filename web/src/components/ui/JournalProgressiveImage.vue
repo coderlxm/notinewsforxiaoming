@@ -12,13 +12,27 @@ const props = withDefaults(defineProps<{
 });
 
 const state = shallowRef<'loading' | 'loaded' | 'error'>('loading');
+const previewReady = shallowRef(false);
+const originalReady = shallowRef(false);
 
-watch(() => props.src, () => {
+watch([() => props.src, () => props.previewSrc], () => {
   state.value = 'loading';
+  previewReady.value = false;
+  originalReady.value = false;
 });
 
-function revealImage(): void {
-  state.value = 'loaded';
+function revealWhenReady(): void {
+  if (previewReady.value && originalReady.value) state.value = 'loaded';
+}
+
+function markPreviewReady(): void {
+  previewReady.value = true;
+  revealWhenReady();
+}
+
+function markOriginalReady(): void {
+  originalReady.value = true;
+  revealWhenReady();
 }
 
 function exposeImageError(): void {
@@ -39,13 +53,14 @@ function exposeImageError(): void {
       aria-hidden="true"
       :loading="loading"
       draggable="false"
+      @load="markPreviewReady"
     >
     <img
       class="progressive-image__original"
       :src="src"
       :alt="alt"
       :loading="loading"
-      @load="revealImage"
+      @load="markOriginalReady"
       @error="exposeImageError"
     >
   </span>
@@ -81,28 +96,44 @@ function exposeImageError(): void {
   filter: blur(14px);
   opacity: 1;
   transform: scale(1.06);
-  transition: opacity 220ms ease;
 }
 
 .progressive-image__original {
   opacity: 0;
-  transition: opacity 280ms ease;
 }
 
-.progressive-image--loaded .progressive-image__preview,
+.progressive-image--loaded .progressive-image__preview {
+  opacity: 0;
+  animation: progressive-preview-hide 320ms ease both;
+}
+
+.progressive-image--loaded .progressive-image__original {
+  opacity: 1;
+  animation: progressive-original-reveal 320ms ease both;
+}
+
 .progressive-image--error .progressive-image__preview {
   opacity: 0;
 }
 
-.progressive-image--loaded .progressive-image__original,
 .progressive-image--error .progressive-image__original {
   opacity: 1;
+}
+
+@keyframes progressive-preview-hide {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes progressive-original-reveal {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .progressive-image__preview,
   .progressive-image__original {
-    transition-duration: 0ms;
+    animation: none;
   }
 }
 </style>

@@ -227,6 +227,11 @@ onBeforeUnmount(() => {
   pointer-events: auto;
 }
 
+.waterfall:not(.waterfall--ready) :deep(.progressive-image--loaded .progressive-image__preview),
+.waterfall:not(.waterfall--ready) :deep(.progressive-image--loaded .progressive-image__original) {
+  animation-play-state: paused;
+}
+
 .waterfall-placeholder-leave-active {
   transition: opacity var(--dur-loading-exit) var(--ease-card);
 }
