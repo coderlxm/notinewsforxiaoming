@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, shallowRef, useTemplateRef } from 'vue';
+import { computed, onMounted, onUnmounted, shallowRef, useTemplateRef, watch } from 'vue';
 import ArticleEditorView from './components/article/ArticleEditorView.vue';
 import FeedView from './components/journal/FeedView.vue';
 import { fetchAuthenticationState } from './api';
@@ -23,6 +23,7 @@ interface OverlayContext {
 
 const locationKey = shallowRef(`${window.location.pathname}${window.location.search}`);
 const overlayContext = shallowRef<OverlayContext | null>(null);
+const directPublicEntry = shallowRef<JournalEntry | null>(null);
 const ownerAuthenticated = shallowRef(false);
 const contentScroll = useTemplateRef<HTMLDivElement>('contentScroll');
 const feedScrollPositions = new Map<string, number>();
@@ -70,17 +71,34 @@ const activeOverlayContext = computed(() => {
   return null;
 });
 
+const directPublicOverlayEntry = computed(() => {
+  const currentRoute = route.value;
+  const entry = directPublicEntry.value;
+  if (
+    currentRoute.name !== 'detail'
+    || activeOverlayContext.value
+    || entry?.publicId !== currentRoute.publicId
+    || entry.bodyFormat !== 'plain'
+  ) return null;
+  return entry;
+});
+
 const backgroundFeedRoute = computed<FeedRoute | null>(() => {
   if (activeOverlayContext.value) return activeOverlayContext.value.origin;
+  if (directPublicOverlayEntry.value) return { name: 'public', key: 'public:', tag: '' };
   if (route.value.name === 'public' || route.value.name === 'private') return route.value;
   return null;
 });
 
 const overlayEntryId = computed(() => {
   if (activeOverlayContext.value) return activeOverlayContext.value.entry.id;
+  if (directPublicOverlayEntry.value) return directPublicOverlayEntry.value.id;
   if (route.value.name === 'private') return route.value.entryId ?? undefined;
   return undefined;
 });
+const overlayEntry = computed(() =>
+  activeOverlayContext.value?.entry ?? directPublicOverlayEntry.value ?? undefined,
+);
 
 const directPrivateOverlay = computed(() =>
   route.value.name === 'private'
@@ -93,6 +111,10 @@ const isPrivateRoute = computed(() =>
   || route.value.name === 'article-edit',
 );
 const showProfileNavigation = computed(() => isPrivateRoute.value || ownerAuthenticated.value);
+
+watch(() => route.value.key, () => {
+  directPublicEntry.value = null;
+});
 
 function synchronizeLocation(): void {
   locationKey.value = `${window.location.pathname}${window.location.search}`;
@@ -199,6 +221,10 @@ function closeOverlay(): void {
     window.history.back();
     return;
   }
+  if (directPublicOverlayEntry.value) {
+    navigate('/');
+    return;
+  }
   if (route.value.name !== 'private' || route.value.entryId === null) return;
   window.history.replaceState(null, '', '/me');
   synchronizeLocation();
@@ -220,6 +246,11 @@ function returnFromDetail(): void {
     return;
   }
   navigate('/');
+}
+
+function handlePublicDetailLoaded(entry: JournalEntry): void {
+  if (route.value.name !== 'detail' || route.value.publicId !== entry.publicId) return;
+  directPublicEntry.value = entry;
 }
 
 function restoreFeedScroll(): void {
@@ -281,6 +312,7 @@ onUnmounted(() => window.removeEventListener('popstate', handlePopState));
           :mode="backgroundFeedRoute.name"
           :initial-tag="backgroundFeedRoute.name === 'public' ? backgroundFeedRoute.tag : ''"
           :overlay-entry-id="overlayEntryId"
+          :overlay-entry="overlayEntry"
           :direct-overlay="directPrivateOverlay"
           @layout-ready="restoreFeedScroll"
           @open-entry="openEntry"
@@ -292,10 +324,11 @@ onUnmounted(() => window.removeEventListener('popstate', handlePopState));
       </KeepAlive>
 
       <FeedView
-        v-if="route.name === 'detail' && !activeOverlayContext"
+        v-if="route.name === 'detail' && !activeOverlayContext && !directPublicOverlayEntry"
         :key="route.key"
         mode="public"
         :detail-id="route.publicId"
+        @detail-loaded="handlePublicDetailLoaded"
         @return-to-feed="returnFromDetail"
         @navigate="navigate"
       />

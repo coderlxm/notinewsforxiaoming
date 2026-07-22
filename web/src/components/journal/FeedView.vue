@@ -19,11 +19,13 @@ const props = withDefaults(defineProps<{
   detailId?: string;
   initialTag?: string;
   overlayEntryId?: number;
+  overlayEntry?: JournalEntry;
   directOverlay?: boolean;
 }>(), {
   detailId: undefined,
   initialTag: '',
   overlayEntryId: undefined,
+  overlayEntry: undefined,
   directOverlay: false,
 });
 
@@ -31,6 +33,7 @@ const emit = defineEmits<{
   layoutReady: [];
   navigate: [path: string];
   openEntry: [entry: JournalEntry];
+  detailLoaded: [entry: JournalEntry];
   closeOverlay: [];
   removeDeletedOverlay: [];
   returnToFeed: [];
@@ -54,6 +57,7 @@ const isDetail = computed(() => props.mode === 'public' && props.detailId !== un
 const isOverlay = computed(() => props.overlayEntryId !== undefined);
 const currentOverlayEntry = computed(() => {
   if (props.overlayEntryId === undefined) return null;
+  if (props.overlayEntry?.id === props.overlayEntryId) return props.overlayEntry;
   if (props.directOverlay) {
     return journal.detail.value?.id === props.overlayEntryId ? journal.detail.value : null;
   }
@@ -110,6 +114,7 @@ onMounted(async () => {
   try {
     if (isDetail.value) {
       await journal.loadPublicDetail(props.detailId as string);
+      if (journal.detail.value) emit('detailLoaded', journal.detail.value);
       return;
     }
     if (props.mode === 'public') {
