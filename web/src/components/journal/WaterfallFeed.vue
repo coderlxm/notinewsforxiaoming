@@ -28,6 +28,7 @@ const emit = defineEmits<{
 
 const gridElement = useTemplateRef<HTMLDivElement>('grid');
 const layoutReady = shallowRef(false);
+const pendingEntryIds = shallowRef<ReadonlySet<number>>(new Set());
 
 const preparing = computed(() => props.loading || (!layoutReady.value && props.entries.length > 0));
 const deferredLoading = useDeferredLoading(preparing);
@@ -65,6 +66,7 @@ onMounted(() => {
 
   masonry.on('renderComplete', ({ mounted }) => {
     layoutReady.value = true;
+    if (pendingEntryIds.value.size) pendingEntryIds.value = new Set();
     if (active) emit('layoutReady');
 
     if (!animateNextMountedBatch) return;
@@ -103,9 +105,15 @@ onMounted(() => {
         layoutReady.value = false;
       }
 
-      animateNextMountedBatch =
+      const appended =
         entries.length > previousEntries.length
         && previousEntries.every((entry, index) => entry.id === entries[index]?.id);
+      animateNextMountedBatch = appended;
+      if (appended) {
+        pendingEntryIds.value = new Set(
+          entries.slice(previousEntries.length).map(entry => entry.id),
+        );
+      }
 
       await nextTick();
       masonry.syncElements({ direction: 'end' });
@@ -143,7 +151,12 @@ onBeforeUnmount(() => {
     </Transition>
 
     <div ref="grid" class="waterfall" :class="{ 'waterfall--ready': !preparing }">
-      <div v-for="entry in entries" :key="entry.id" class="waterfall__item">
+      <div
+        v-for="entry in entries"
+        :key="entry.id"
+        class="waterfall__item"
+        :class="{ 'waterfall__item--pending': pendingEntryIds.has(entry.id) }"
+      >
         <div class="waterfall__card">
           <ArticleCardContent
             v-if="isArticleEntry(entry)"
@@ -226,6 +239,10 @@ onBeforeUnmount(() => {
   width: 50%;
   padding: 0 calc(var(--waterfall-gap) / 2) var(--waterfall-gap);
   transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.waterfall__item--pending {
+  visibility: hidden;
 }
 
 .waterfall__item:focus-within {
