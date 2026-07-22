@@ -178,6 +178,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .waterfall-stage {
   display: grid;
+  container-type: inline-size;
 }
 
 .waterfall-stage--preparing {
@@ -222,7 +223,7 @@ onBeforeUnmount(() => {
 .waterfall__item {
   position: absolute;
   box-sizing: border-box;
-  width: 25%;
+  width: 50%;
   padding: 0 calc(var(--waterfall-gap) / 2) var(--waterfall-gap);
   transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -235,15 +236,21 @@ onBeforeUnmount(() => {
   width: 100%;
 }
 
-@media (max-width: 1359px) {
+@container (min-width: 720px) {
   .waterfall__item {
     width: 33.333%;
   }
 }
 
-@media (max-width: 959px) {
+@container (min-width: 980px) {
   .waterfall__item {
-    width: 50%;
+    width: 25%;
+  }
+}
+
+@container (min-width: 1240px) {
+  .waterfall__item {
+    width: 20%;
   }
 }
 
