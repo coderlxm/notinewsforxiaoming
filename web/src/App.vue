@@ -374,6 +374,8 @@ onUnmounted(() => window.removeEventListener('popstate', handlePopState));
 }
 
 .app-scroll {
+  display: flex;
+  flex-direction: column;
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
@@ -399,6 +401,10 @@ onUnmounted(() => window.removeEventListener('popstate', handlePopState));
 
 .app-scroll::-webkit-scrollbar-thumb:hover {
   background: var(--text-muted);
+}
+
+.app-scroll > :not(.site-footer) {
+  flex-shrink: 0;
 }
 
 .profile {
@@ -502,6 +508,7 @@ onUnmounted(() => window.removeEventListener('popstate', handlePopState));
   align-items: center;
   justify-content: center;
   gap: 0.55rem;
+  margin-top: auto;
   padding: 1.8rem var(--page-gutter) 2.6rem;
   color: var(--text-muted);
   font-size: 0.72rem;
