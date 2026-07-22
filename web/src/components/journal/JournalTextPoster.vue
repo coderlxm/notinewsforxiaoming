@@ -183,5 +183,30 @@ const posterDate = computed(() => new Intl.DateTimeFormat('zh-CN', {
   .text-poster {
     background: #171715;
   }
+
+  .text-poster__sheet {
+    background:
+      linear-gradient(145deg, rgb(255 255 255 / 4%), transparent 42%),
+      radial-gradient(circle at 85% 13%, rgb(228 91 102 / 13%), transparent 24%),
+      radial-gradient(circle at 12% 88%, rgb(111 143 142 / 12%), transparent 26%),
+      #1d201e;
+    color: #ebe8df;
+  }
+
+  .text-poster__sheet::before {
+    color: rgb(235 232 223 / 5%);
+  }
+
+  .text-poster__eyebrow {
+    color: var(--accent-strong);
+  }
+
+  .text-poster__rule {
+    background: var(--accent);
+  }
+
+  .text-poster__footer {
+    color: #999a94;
+  }
 }
 </style>
