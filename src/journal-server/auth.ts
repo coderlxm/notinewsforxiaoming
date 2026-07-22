@@ -3,6 +3,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 
 const adminCookieName = 'journal_session';
 const adminCookieValue = 'authenticated';
+const adminCookieMaxAge = 30 * 24 * 60 * 60;
 
 function secretsEqual(actual: string, expected: string): boolean {
   const actualBuffer = Buffer.from(actual);
@@ -53,6 +54,7 @@ export class JournalAuth {
       secure: false,
       sameSite: 'strict',
       signed: true,
+      maxAge: adminCookieMaxAge,
     });
   }
 

@@ -24,6 +24,16 @@ function submit(): void {
     <p id="login-description" class="login__copy">这里包含公开动态与随手保存的私有记录。</p>
     <form class="login__form" @submit.prevent="submit">
       <label class="field">
+        <span class="field__label">账号</span>
+        <input
+          type="text"
+          name="username"
+          value="xiaoming"
+          autocomplete="username"
+          readonly
+        >
+      </label>
+      <label class="field">
         <span class="field__label">管理密码</span>
         <input
           v-model="password"
