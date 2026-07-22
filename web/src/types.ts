@@ -24,6 +24,7 @@ export interface JournalAsset {
   role: JournalAssetRole;
   kind: string;
   url: string;
+  previewUrl: string | null;
   originalName: string | null;
   mimeType: string | null;
   byteSize: number | null;

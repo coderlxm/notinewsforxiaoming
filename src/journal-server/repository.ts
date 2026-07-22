@@ -17,6 +17,7 @@ import type {
   CreateJournalEntryInput,
   JournalAssetAccess,
   JournalDeletionTarget,
+  JournalImagePreviewBackfillAsset,
   JournalListFilters,
 } from './types.js';
 
@@ -54,6 +55,7 @@ interface AssetRow {
   height: number | null;
   duration: number | null;
   relative_path: string;
+  preview_relative_path: string | null;
 }
 
 export interface CreateArticleInput {
@@ -73,11 +75,13 @@ export interface UpdateArticleInput {
 export interface InlineAssetRecord {
   id: number;
   relativePath: string;
+  previewRelativePath: string;
 }
 
 export interface CoverAssetRecord {
   id: number;
   relativePath: string;
+  previewRelativePath: string;
 }
 
 const cursorSchema = z.object({
@@ -149,8 +153,9 @@ export class JournalRepository {
       const insertAsset = this.database.prepare(`
         INSERT INTO journal_assets (
           entry_id, source_kind, role, kind, telegram_file_id, telegram_file_unique_id, original_name,
-          mime_type, byte_size, relative_path, width, height, duration, sort_order
-        ) VALUES (?, 'telegram', 'attachment', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          mime_type, byte_size, relative_path, preview_relative_path,
+          width, height, duration, sort_order
+        ) VALUES (?, 'telegram', 'attachment', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
       for (const asset of entry.assets) {
         insertAsset.run(
@@ -162,6 +167,7 @@ export class JournalRepository {
           asset.mimeType,
           asset.byteSize,
           asset.relativePath,
+          asset.previewRelativePath,
           asset.width,
           asset.height,
           asset.duration,
@@ -235,21 +241,37 @@ export class JournalRepository {
 
   listInlineAssets(id: number): InlineAssetRecord[] {
     const rows = this.database.prepare(`
-      SELECT id, relative_path
+      SELECT id, relative_path, preview_relative_path
       FROM journal_assets
       WHERE entry_id = ? AND source_kind = 'web' AND role = 'inline'
       ORDER BY sort_order, id
-    `).all(id) as Array<{ id: number; relative_path: string }>;
-    return rows.map((row) => ({ id: row.id, relativePath: row.relative_path }));
+    `).all(id) as Array<{
+      id: number;
+      relative_path: string;
+      preview_relative_path: string;
+    }>;
+    return rows.map((row) => ({
+      id: row.id,
+      relativePath: row.relative_path,
+      previewRelativePath: row.preview_relative_path,
+    }));
   }
 
   findCover(id: number): CoverAssetRecord | null {
     const row = this.database.prepare(`
-      SELECT id, relative_path
+      SELECT id, relative_path, preview_relative_path
       FROM journal_assets
       WHERE entry_id = ? AND source_kind = 'web' AND role = 'cover'
-    `).get(id) as { id: number; relative_path: string } | undefined;
-    return row ? { id: row.id, relativePath: row.relative_path } : null;
+    `).get(id) as {
+      id: number;
+      relative_path: string;
+      preview_relative_path: string;
+    } | undefined;
+    return row ? {
+      id: row.id,
+      relativePath: row.relative_path,
+      previewRelativePath: row.preview_relative_path,
+    } : null;
   }
 
   insertWebAsset(
@@ -257,6 +279,7 @@ export class JournalRepository {
       entryId: number;
       role: JournalAssetRole;
       relativePath: string;
+      previewRelativePath: string;
       kind: string;
       mimeType: string | null;
       originalName: string | null;
@@ -277,9 +300,9 @@ export class JournalRepository {
       const result = this.database.prepare(`
         INSERT INTO journal_assets (
           entry_id, source_kind, role, kind, telegram_file_id, telegram_file_unique_id,
-          original_name, mime_type, byte_size, relative_path,
+          original_name, mime_type, byte_size, relative_path, preview_relative_path,
           width, height, duration, sort_order
-        ) VALUES (?, 'web', ?, ?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, 'web', ?, ?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         input.entryId,
         input.role,
@@ -288,6 +311,7 @@ export class JournalRepository {
         input.mimeType,
         input.byteSize,
         input.relativePath,
+        input.previewRelativePath,
         input.width ?? null,
         input.height ?? null,
         input.duration ?? null,
@@ -480,7 +504,8 @@ export class JournalRepository {
   getAssetAccess(assetId: number): JournalAssetAccess | null {
     const row = this.database.prepare(`
       SELECT
-        a.id, a.kind, a.relative_path, a.original_name, a.mime_type, a.byte_size,
+        a.id, a.kind, a.relative_path, a.preview_relative_path,
+        a.original_name, a.mime_type, a.byte_size,
         e.visibility
       FROM journal_assets a
       JOIN journal_entries e ON e.id = a.entry_id
@@ -489,6 +514,7 @@ export class JournalRepository {
       id: number;
       kind: string;
       relative_path: string;
+      preview_relative_path: string | null;
       original_name: string | null;
       mime_type: string | null;
       byte_size: number | null;
@@ -498,11 +524,44 @@ export class JournalRepository {
       id: row.id,
       kind: row.kind,
       relativePath: row.relative_path,
+      previewRelativePath: row.preview_relative_path,
       originalName: row.original_name,
       mimeType: row.mime_type,
       byteSize: row.byte_size,
       visibility: row.visibility,
     } : null;
+  }
+
+  listImageAssetsMissingPreview(): JournalImagePreviewBackfillAsset[] {
+    const rows = this.database.prepare(`
+      SELECT id, relative_path
+      FROM journal_assets
+      WHERE preview_relative_path IS NULL
+        AND (
+          kind = 'photo'
+          OR (kind IN ('sticker', 'animation') AND mime_type LIKE 'image/%')
+        )
+      ORDER BY id
+    `).all() as Array<{ id: number; relative_path: string }>;
+    return rows.map((row) => ({ id: row.id, relativePath: row.relative_path }));
+  }
+
+  completeImagePreviewBackfill(
+    assetId: number,
+    previewRelativePath: string,
+    width: number,
+    height: number,
+  ): void {
+    const result = this.database.prepare(`
+      UPDATE journal_assets
+      SET preview_relative_path = ?,
+          width = COALESCE(width, ?),
+          height = COALESCE(height, ?)
+      WHERE id = ? AND preview_relative_path IS NULL
+    `).run(previewRelativePath, width, height, assetId);
+    if (result.changes !== 1) {
+      throw new Error(`Journal asset ${assetId} preview state changed before backfill completed.`);
+    }
   }
 
   private getById(id: number): JournalEntry {
@@ -589,6 +648,9 @@ export class JournalRepository {
         role: asset.role,
         kind: asset.kind,
         url: `/media/${asset.id}`,
+        previewUrl: asset.preview_relative_path === null
+          ? null
+          : `/media/${asset.id}/preview`,
         originalName: asset.original_name,
         mimeType: asset.mime_type,
         byteSize: asset.byte_size,
@@ -603,7 +665,7 @@ export class JournalRepository {
     if (row.media_group_id === null) {
       return this.database.prepare(`
         SELECT id, source_kind, role, kind, original_name, mime_type, byte_size,
-               relative_path, width, height, duration
+               relative_path, preview_relative_path, width, height, duration
         FROM journal_assets
         WHERE entry_id = ?
         ORDER BY sort_order, id
@@ -611,7 +673,7 @@ export class JournalRepository {
     }
     return this.database.prepare(`
       SELECT a.id, a.source_kind, a.role, a.kind, a.original_name, a.mime_type, a.byte_size,
-             a.relative_path, a.width, a.height, a.duration
+             a.relative_path, a.preview_relative_path, a.width, a.height, a.duration
       FROM journal_assets a
       JOIN journal_entries e ON e.id = a.entry_id
       WHERE e.chat_id = ? AND e.media_group_id = ?

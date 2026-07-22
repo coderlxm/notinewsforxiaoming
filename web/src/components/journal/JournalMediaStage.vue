@@ -170,7 +170,7 @@ onBeforeUnmount(() => activeVideo.value?.pause());
           :aria-current="index === currentIndex ? 'true' : undefined"
           @click="goTo(index)"
         >
-          <img v-if="asset.mediaType === 'image'" :src="asset.url" alt="" loading="lazy">
+          <img v-if="asset.mediaType === 'image'" :src="asset.previewUrl" alt="" loading="lazy">
           <span v-else class="media-stage__video-mark" aria-hidden="true">▶</span>
         </button>
       </div>

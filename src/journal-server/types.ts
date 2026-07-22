@@ -39,6 +39,7 @@ export interface ParsedTelegramContent {
 
 export interface StoredAssetInput extends TelegramAssetSource {
   relativePath: string;
+  previewRelativePath: string | null;
   byteSize: number;
   mimeType: string | null;
 }
@@ -68,6 +69,7 @@ export interface JournalAssetAccess {
   id: number;
   kind: string;
   relativePath: string;
+  previewRelativePath: string | null;
   originalName: string | null;
   mimeType: string | null;
   byteSize: number | null;
@@ -83,4 +85,9 @@ export interface JournalDeletionTargetEntry {
 export interface JournalDeletionTarget {
   entries: JournalDeletionTargetEntry[];
   assetCount: number;
+}
+
+export interface JournalImagePreviewBackfillAsset {
+  id: number;
+  relativePath: string;
 }

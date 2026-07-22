@@ -188,6 +188,19 @@ const migrations: JournalMigration[] = [
       `);
     },
   },
+  {
+    version: 3,
+    up(database) {
+      database.exec(`
+        ALTER TABLE journal_assets
+        ADD COLUMN preview_relative_path TEXT;
+
+        CREATE UNIQUE INDEX idx_journal_assets_preview_relative_path
+        ON journal_assets(preview_relative_path)
+        WHERE preview_relative_path IS NOT NULL;
+      `);
+    },
+  },
 ];
 
 export function runJournalMigrations(database: Database.Database): void {

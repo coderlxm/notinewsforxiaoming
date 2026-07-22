@@ -14,6 +14,29 @@ export async function registerMediaRoutes(
   repository: JournalRepository,
   dataDir: string,
 ): Promise<void> {
+  server.get('/media/:assetId/preview', async (request, reply) => {
+    const { assetId } = assetParamsSchema.parse(request.params);
+    const asset = repository.getAssetAccess(assetId);
+    if (!asset) return reply.code(404).send({ error: 'Journal asset was not found.' });
+    if (asset.visibility === 'private' && !auth.isAdmin(request)) {
+      return reply.code(401).send({ error: 'Journal administrator login is required.' });
+    }
+    if (asset.previewRelativePath === null) {
+      return reply.code(404).send({ error: 'Journal asset preview was not found.' });
+    }
+
+    reply.header(
+      'Cache-Control',
+      asset.visibility === 'public' ? 'public, no-cache' : 'private, no-store',
+    );
+    reply.type('image/webp');
+    return reply.sendFile(asset.previewRelativePath, dataDir, {
+      acceptRanges: true,
+      cacheControl: false,
+      contentType: false,
+    });
+  });
+
   server.get('/media/:assetId', async (request, reply) => {
     const { assetId } = assetParamsSchema.parse(request.params);
     const asset = repository.getAssetAccess(assetId);

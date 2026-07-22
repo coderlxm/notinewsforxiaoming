@@ -70,11 +70,6 @@ const overlayVisible = computed(() => isOverlay.value && (
 ));
 const detailPreparing = computed(() => isDetail.value && initialLoadPending.value);
 const deferredDetailLoading = useDeferredLoading(detailPreparing);
-const listLoadingLabel = computed(() =>
-  props.mode === 'private' && initialLoadPending.value
-    ? '正在打开个人档案…'
-    : '正在整理记录…',
-);
 const listTitle = computed(() => {
   if (props.mode === 'private') return '我的全部记录';
   if (props.initialTag) return `#${props.initialTag}`;
@@ -423,8 +418,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
         >
           <WaterfallFeed
             :entries="journal.entries.value"
-            :loading="initialLoadPending || listReplacing"
-            :loading-label="listLoadingLabel"
+            :loading="initialLoadPending || listReplacing || refreshing"
             :mode="mode"
             :mutation-entry-id="journal.mutationEntryId.value"
             @layout-ready="handleLayoutReady"

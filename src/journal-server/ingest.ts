@@ -5,6 +5,10 @@ import {
   type JournalIngestRequest,
 } from '../shared/journalProtocol.js';
 import { JournalRepository } from './repository.js';
+import {
+  isJournalImageAsset,
+  JournalImagePreviewService,
+} from './imagePreview.js';
 import { JournalStorage, type EntryStorageSession } from './storage.js';
 import { parseTelegramMessage, telegramMessageChatId } from './telegramContent.js';
 import { TelegramFileDownloader } from './telegramFiles.js';
@@ -16,6 +20,7 @@ export class JournalIngestService {
     private readonly repository: JournalRepository,
     private readonly storage: JournalStorage,
     private readonly downloader: TelegramFileDownloader,
+    private readonly previews: JournalImagePreviewService,
   ) {}
 
   async ingest(rawRequest: JournalIngestRequest): Promise<JournalEntry> {
@@ -49,11 +54,17 @@ export class JournalIngestService {
         for (const source of parsed.assets) {
           const target = this.storage.assetTarget(storageSession);
           const downloaded = await this.downloader.download(source, target.absolutePath);
+          const dimensions = isJournalImageAsset(source.kind, downloaded.mimeType)
+            ? await this.previews.generate(target.absolutePath, target.previewAbsolutePath)
+            : null;
           storedAssets.push({
             ...source,
             relativePath: target.relativePath,
+            previewRelativePath: dimensions ? target.previewRelativePath : null,
             byteSize: downloaded.byteSize,
             mimeType: downloaded.mimeType,
+            width: dimensions?.width ?? source.width,
+            height: dimensions?.height ?? source.height,
           });
         }
         await this.storage.finalize(storageSession);

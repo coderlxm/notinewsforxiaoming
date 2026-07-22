@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, shallowRef } from 'vue';
+import type { CSSProperties } from 'vue';
 import JournalLoading from '../ui/JournalLoading.vue';
+import JournalProgressiveImage from '../ui/JournalProgressiveImage.vue';
 import type { JournalEntry, JournalVisibility } from '../../types';
 import CardActionMenu from '../journal/CardActionMenu.vue';
 import CardDateSpine from '../journal/CardDateSpine.vue';
@@ -32,6 +34,10 @@ const confirmingDeletion = shallowRef(false);
 
 const cover = computed(() => props.entry.assets.find((asset) =>
   asset.sourceKind === 'web' && asset.role === 'cover') ?? null);
+const summaryCoverStyle = computed<CSSProperties | undefined>(() => {
+  if (!cover.value?.width || !cover.value.height) return undefined;
+  return { aspectRatio: `${cover.value.width} / ${cover.value.height}` };
+});
 const summary = computed(() => {
   const text = props.entry.contentText.replace(/\s+/g, ' ').trim();
   if (text.length <= 72) return text;
@@ -91,11 +97,30 @@ function handleCardClick(event: MouseEvent): void {
       />
     </header>
 
-    <figure v-if="cover && display === 'summary'" class="article-card__cover">
+    <figure
+      v-if="cover && display === 'summary'"
+      class="article-card__cover article-card__cover--summary"
+      :style="summaryCoverStyle"
+    >
       <button v-if="linkable" class="article-card__cover-button" type="button" @click="openEntry">
-        <img :src="cover.url" :alt="entry.title ?? '文章封面'">
+        <JournalProgressiveImage
+          class="article-card__cover-image"
+          :src="cover.url"
+          :preview-src="cover.previewUrl!"
+          :alt="entry.title ?? '文章封面'"
+          fit="cover"
+          loading="lazy"
+        />
       </button>
-      <img v-else :src="cover.url" :alt="entry.title ?? '文章封面'">
+      <JournalProgressiveImage
+        v-else
+        class="article-card__cover-image"
+        :src="cover.url"
+        :preview-src="cover.previewUrl!"
+        :alt="entry.title ?? '文章封面'"
+        fit="cover"
+        loading="lazy"
+      />
     </figure>
 
     <h2 v-if="display === 'summary' && entry.title" class="article-card__title">
@@ -224,10 +249,16 @@ function handleCardClick(event: MouseEvent): void {
 
 .article-card__cover-button {
   min-height: 2.5rem;
+  height: 100%;
   padding: 0;
   border: 0;
   background: transparent;
   cursor: pointer;
+}
+
+.article-card__cover-image {
+  width: 100%;
+  height: 100%;
 }
 
 .article-card__cover-button:focus-visible {

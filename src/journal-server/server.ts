@@ -12,6 +12,10 @@ import { JournalAuth } from './auth.js';
 import { openJournalDatabase } from './database.js';
 import { JournalDeletionService } from './deletion.js';
 import { JournalIngestService } from './ingest.js';
+import {
+  JournalImagePreviewBackfillService,
+  JournalImagePreviewService,
+} from './imagePreview.js';
 import { JournalRepository } from './repository.js';
 import { registerArticleRoutes } from './routes/articles.js';
 import { registerFeedRoutes } from './routes/feeds.js';
@@ -29,7 +33,8 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
   const repository = new JournalRepository(database);
   const auth = new JournalAuth(config.ingestToken, config.adminPassword);
   const storage = new JournalStorage(config.dataDir);
-  const articleService = new JournalArticleService(repository, storage);
+  const previews = new JournalImagePreviewService();
+  const articleService = new JournalArticleService(repository, storage, previews);
   const deletionService = new JournalDeletionService(repository, storage);
   const downloader = new TelegramFileDownloader(config.telegramToken);
   const ingestService = new JournalIngestService(
@@ -37,7 +42,9 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
     repository,
     storage,
     downloader,
+    previews,
   );
+  await new JournalImagePreviewBackfillService(repository, storage, previews).run();
 
   await server.register(fastifyCookie, { secret: config.cookieSecret });
   await server.register(fastifyMultipart, {

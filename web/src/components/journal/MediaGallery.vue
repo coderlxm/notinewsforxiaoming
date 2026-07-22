@@ -2,6 +2,8 @@
 import { computed } from 'vue';
 import type { JournalAsset } from '../../types';
 import { formatFileSize } from '../../utils/formatters';
+import JournalProgressiveImage from '../ui/JournalProgressiveImage.vue';
+import JournalProgressiveVideo from '../ui/JournalProgressiveVideo.vue';
 
 const props = withDefaults(defineProps<{
   assets: readonly JournalAsset[];
@@ -82,14 +84,31 @@ function preserveAssetRatio(asset: DisplayAsset): { aspectRatio: string } | unde
         :class="{ 'media__visual--natural': display === 'detail' || visualAssets.length === 1 }"
         :style="preserveAssetRatio(asset)"
       >
+        <JournalProgressiveImage
+          v-if="asset.displayType === 'image' && display === 'card'"
+          class="media__image"
+          :class="{ 'media__image--sticker': asset.kind === 'sticker' }"
+          :src="asset.url"
+          :preview-src="asset.previewUrl!"
+          :alt="asset.sourceKind === 'telegram' ? '' : (asset.originalName ?? '')"
+          :fit="asset.kind === 'sticker' ? 'contain' : 'cover'"
+          loading="lazy"
+        />
         <img
-          v-if="asset.displayType === 'image'"
+          v-else-if="asset.displayType === 'image'"
           class="media__image"
           :class="{ 'media__image--sticker': asset.kind === 'sticker' }"
           :src="asset.url"
           :alt="asset.sourceKind === 'telegram' ? '' : (asset.originalName ?? '')"
           loading="lazy"
         >
+        <JournalProgressiveVideo
+          v-else-if="display === 'card'"
+          class="media__video"
+          :class="{ 'media__video--round': asset.kind === 'video_note' }"
+          :src="asset.url"
+          fit="cover"
+        />
         <video
           v-else
           class="media__video"

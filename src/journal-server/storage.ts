@@ -36,12 +36,31 @@ export class JournalStorage {
   assetTarget(session: EntryStorageSession): {
     absolutePath: string;
     relativePath: string;
+    previewAbsolutePath: string;
+    previewRelativePath: string;
   } {
     const filename = randomUUID();
+    const absolutePath = path.join(session.tempDir, filename);
+    const relativePath = path.posix.join(session.relativeDir, filename);
     return {
-      absolutePath: path.join(session.tempDir, filename),
-      relativePath: path.posix.join(session.relativeDir, filename),
+      absolutePath,
+      relativePath,
+      previewAbsolutePath: `${absolutePath}.preview.webp`,
+      previewRelativePath: this.previewRelativePath(relativePath),
     };
+  }
+
+  previewRelativePath(relativePath: string): string {
+    return `${relativePath}.preview.webp`;
+  }
+
+  absoluteAssetPath(relativePath: string): string {
+    const absolutePath = path.resolve(this.dataDir, relativePath);
+    const assetsRoot = path.resolve(this.assetsDir);
+    if (!absolutePath.startsWith(`${assetsRoot}${path.sep}`)) {
+      throw new Error(`Asset ${relativePath} is outside the assets root.`);
+    }
+    return absolutePath;
   }
 
   async finalize(session: EntryStorageSession): Promise<void> {
@@ -114,11 +133,11 @@ export class JournalStorage {
   }
 
   async deleteAsset(relativePath: string): Promise<void> {
-    const absolutePath = path.resolve(this.dataDir, relativePath);
-    const assetsRoot = path.resolve(this.assetsDir);
-    if (!absolutePath.startsWith(`${assetsRoot}${path.sep}`)) {
-      throw new Error(`Asset ${relativePath} is outside the assets root.`);
-    }
-    await fs.promises.rm(absolutePath);
+    await fs.promises.rm(this.absoluteAssetPath(relativePath));
+  }
+
+  async deleteAssetPair(relativePath: string, previewRelativePath: string): Promise<void> {
+    await fs.promises.rm(this.absoluteAssetPath(previewRelativePath));
+    await fs.promises.rm(this.absoluteAssetPath(relativePath));
   }
 }

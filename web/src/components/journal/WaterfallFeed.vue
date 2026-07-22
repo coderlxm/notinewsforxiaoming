@@ -2,15 +2,13 @@
 import { MasonryGrid } from '@egjs/grid';
 import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, shallowRef, useTemplateRef, watch } from 'vue';
 import ArticleCardContent from '../article/ArticleCardContent.vue';
-import JournalLoading from '../ui/JournalLoading.vue';
-import { useDeferredLoading } from '../../composables/useDeferredLoading';
 import type { JournalEntry, JournalVisibility } from '../../types';
 import EntryCard from './EntryCard.vue';
+import JournalWaterfallPlaceholder from './JournalWaterfallPlaceholder.vue';
 
 const props = defineProps<{
   entries: readonly JournalEntry[];
   loading: boolean;
-  loadingLabel: string;
   mode: 'public' | 'private';
   mutationEntryId: number | null;
 }>();
@@ -31,7 +29,6 @@ const layoutReady = shallowRef(false);
 const pendingEntryIds = shallowRef<ReadonlySet<number>>(new Set());
 
 const preparing = computed(() => props.loading || (!layoutReady.value && props.entries.length > 0));
-const deferredLoading = useDeferredLoading(preparing);
 
 let masonry: MasonryGrid;
 let stopWatchingEntries: () => void;
@@ -101,18 +98,22 @@ onMounted(() => {
         entries.length === previousEntries.length
         && entries.every((entry, index) => entry.id === previousEntries[index]?.id);
 
-      if (previousEntries.length === 0 && entries.length > 0) {
-        layoutReady.value = false;
-      }
-
       const appended =
-        entries.length > previousEntries.length
+        previousEntries.length > 0
+        && entries.length > previousEntries.length
         && previousEntries.every((entry, index) => entry.id === entries[index]?.id);
       animateNextMountedBatch = appended;
-      if (appended) {
+      if (hasSameEntrySequence) {
+        pendingEntryIds.value = new Set();
+      }
+      else if (appended) {
         pendingEntryIds.value = new Set(
           entries.slice(previousEntries.length).map(entry => entry.id),
         );
+      }
+      else {
+        layoutReady.value = false;
+        pendingEntryIds.value = new Set();
       }
 
       await nextTick();
@@ -142,15 +143,19 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="waterfall-stage" :class="{ 'waterfall-stage--preparing': preparing }" :aria-busy="preparing">
-    <Transition name="waterfall-loading">
-      <JournalLoading
-        v-if="deferredLoading.visible.value"
-        variant="canvas"
-        :label="loadingLabel"
-      />
+    <Transition name="waterfall-placeholder">
+      <div v-if="preparing" class="waterfall-placeholder-layer">
+        <JournalWaterfallPlaceholder />
+      </div>
     </Transition>
 
-    <div ref="grid" class="waterfall" :class="{ 'waterfall--ready': !preparing }">
+    <div
+      ref="grid"
+      class="waterfall"
+      :class="{ 'waterfall--ready': !preparing }"
+      :aria-hidden="preparing ? 'true' : undefined"
+      :inert="preparing"
+    >
       <div
         v-for="entry in entries"
         :key="entry.id"
@@ -198,38 +203,35 @@ onBeforeUnmount(() => {
   min-height: clamp(18rem, 42vh, 30rem);
 }
 
-.waterfall-stage > :deep(.journal-loading--canvas),
+.waterfall-placeholder-layer,
 .waterfall {
   grid-area: 1 / 1;
+}
+
+.waterfall-placeholder-layer {
+  z-index: 1;
+  opacity: 1;
+  pointer-events: none;
 }
 
 .waterfall {
   position: relative;
   margin-inline: calc(var(--waterfall-gap) / -2);
   opacity: 0;
-  visibility: hidden;
+  pointer-events: none;
   transition: opacity var(--dur-content-enter) var(--ease-card);
 }
 
 .waterfall--ready {
   opacity: 1;
-  visibility: visible;
+  pointer-events: auto;
 }
 
-.waterfall-loading-enter-active {
-  transition: opacity var(--dur-loading-enter) var(--ease-card), transform var(--dur-loading-enter) var(--ease-card);
-}
-
-.waterfall-loading-leave-active {
+.waterfall-placeholder-leave-active {
   transition: opacity var(--dur-loading-exit) var(--ease-card);
 }
 
-.waterfall-loading-enter-from {
-  opacity: 0;
-  transform: translateY(4px);
-}
-
-.waterfall-loading-leave-to {
+.waterfall-placeholder-leave-to {
   opacity: 0;
 }
 
@@ -272,6 +274,11 @@ onBeforeUnmount(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .waterfall,
+  .waterfall-placeholder-leave-active {
+    transition: none;
+  }
+
   .waterfall__item {
     transition: none;
   }

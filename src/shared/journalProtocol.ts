@@ -61,6 +61,7 @@ export const journalAssetSchema = z.object({
   role: journalAssetRoleSchema,
   kind: z.string().min(1),
   url: z.string().min(1),
+  previewUrl: z.string().min(1).nullable(),
   originalName: z.string().nullable(),
   mimeType: z.string().nullable(),
   byteSize: z.number().int().nonnegative().nullable(),
