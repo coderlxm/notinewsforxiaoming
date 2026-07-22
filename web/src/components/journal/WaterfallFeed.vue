@@ -28,7 +28,10 @@ const gridElement = useTemplateRef<HTMLDivElement>('grid');
 const layoutReady = shallowRef(false);
 const pendingEntryIds = shallowRef<ReadonlySet<number>>(new Set());
 
-const preparing = computed(() => props.loading || (!layoutReady.value && props.entries.length > 0));
+const preparing = computed(() =>
+  (props.loading && props.entries.length === 0)
+  || (!layoutReady.value && props.entries.length > 0),
+);
 
 let masonry: MasonryGrid;
 let stopWatchingEntries: () => void;
@@ -161,6 +164,7 @@ onBeforeUnmount(() => {
         :key="entry.id"
         class="waterfall__item"
         :class="{ 'waterfall__item--pending': pendingEntryIds.has(entry.id) }"
+        data-grid-skip="true"
       >
         <div class="waterfall__card">
           <ArticleCardContent

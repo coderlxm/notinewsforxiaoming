@@ -51,7 +51,7 @@ function exposeImageError(): void {
       :src="previewSrc"
       alt=""
       aria-hidden="true"
-      :loading="loading"
+      loading="eager"
       draggable="false"
       @load="markPreviewReady"
     >
