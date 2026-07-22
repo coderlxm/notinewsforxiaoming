@@ -239,11 +239,18 @@ onBeforeUnmount(() => {
 
 .action-menu__panel {
   position: fixed;
-  inset: auto;
+  top: auto;
+  right: auto;
+  bottom: auto;
+  left: auto;
   width: max-content;
+  height: max-content;
   min-width: 8.5rem;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100dvh - 24px);
   margin: 0;
   padding: 0.3rem;
+  overflow-y: auto;
   border: 1px solid var(--border-subtle);
   border-radius: 0.75rem;
   background: var(--surface-card);
@@ -252,7 +259,8 @@ onBeforeUnmount(() => {
 }
 
 .action-menu__panel:popover-open {
-  display: grid;
+  display: flex;
+  flex-direction: column;
 }
 
 .action-menu__item {

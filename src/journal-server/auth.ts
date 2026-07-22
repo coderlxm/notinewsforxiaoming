@@ -50,7 +50,7 @@ export class JournalAuth {
     reply.setCookie(adminCookieName, adminCookieValue, {
       path: '/',
       httpOnly: true,
-      secure: true,
+      secure: false,
       sameSite: 'strict',
       signed: true,
     });
@@ -60,7 +60,7 @@ export class JournalAuth {
     reply.clearCookie(adminCookieName, {
       path: '/',
       httpOnly: true,
-      secure: true,
+      secure: false,
       sameSite: 'strict',
     });
   }
