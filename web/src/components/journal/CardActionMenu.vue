@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { nextTick, shallowRef, useTemplateRef, watch } from 'vue';
+import { nextTick, onBeforeUnmount, shallowRef, useId, useTemplateRef, watch } from 'vue';
+import type { CSSProperties } from 'vue';
 import JournalLoading from '../ui/JournalLoading.vue';
 import type { JournalVisibility } from '../../types';
 
@@ -18,29 +19,74 @@ const emit = defineEmits<{
 
 const open = shallowRef(false);
 const pendingLabel = shallowRef<string | null>(null);
+const panelStyle = shallowRef<CSSProperties>({});
+const menuId = useId();
 const trigger = useTemplateRef<HTMLButtonElement>('trigger');
+const panel = useTemplateRef<HTMLElement>('panel');
 const firstAction = useTemplateRef<HTMLButtonElement>('firstAction');
 
 watch(() => props.busy, (busy) => {
-  if (!busy) pendingLabel.value = null;
+  if (busy) close();
+  else pendingLabel.value = null;
 });
 
 async function setOpen(value: boolean, focusFirst = false): Promise<void> {
-  open.value = value;
-  if (value && focusFirst) {
-    await nextTick();
-    firstAction.value?.focus();
+  const menu = panel.value!;
+  if (!value) {
+    if (menu.matches(':popover-open')) menu.hidePopover();
+    return;
   }
+
+  if (!menu.matches(':popover-open')) menu.showPopover();
+  await nextTick();
+  positionPanel();
+  if (focusFirst) firstAction.value!.focus();
+}
+
+function positionPanel(): void {
+  const triggerRect = trigger.value!.getBoundingClientRect();
+  const panelRect = panel.value!.getBoundingClientRect();
+  const edge = 12;
+  const gap = 6;
+  const left = Math.min(
+    Math.max(edge, triggerRect.right - panelRect.width),
+    window.innerWidth - panelRect.width - edge,
+  );
+  const top = triggerRect.bottom + gap + panelRect.height <= window.innerHeight - edge
+    ? triggerRect.bottom + gap
+    : Math.max(edge, triggerRect.top - panelRect.height - gap);
+
+  panelStyle.value = {
+    left: `${Math.round(left)}px`,
+    top: `${Math.round(top)}px`,
+  };
+}
+
+function close(): void {
+  const menu = panel.value;
+  if (menu?.matches(':popover-open')) menu.hidePopover();
+}
+
+function handleToggle(event: Event): void {
+  const isOpen = (event as ToggleEvent).newState === 'open';
+  open.value = isOpen;
+  if (isOpen) {
+    document.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    return;
+  }
+  document.removeEventListener('scroll', close, true);
+  window.removeEventListener('resize', close);
 }
 
 function closeAndFocusTrigger(): void {
-  open.value = false;
+  close();
   trigger.value?.focus();
 }
 
 function handleFocusOut(event: FocusEvent): void {
   const menu = event.currentTarget as HTMLElement;
-  if (!menu.contains(event.relatedTarget as Node | null)) open.value = false;
+  if (!menu.contains(event.relatedTarget as Node | null)) close();
 }
 
 function focusAdjacent(event: KeyboardEvent, direction: 1 | -1): void {
@@ -52,7 +98,7 @@ function focusAdjacent(event: KeyboardEvent, direction: 1 | -1): void {
 }
 
 function run(action: () => void): void {
-  open.value = false;
+  close();
   action();
 }
 
@@ -75,6 +121,11 @@ function changeVisibility(): void {
     () => emit('setVisibility', visibility),
   );
 }
+
+onBeforeUnmount(() => {
+  document.removeEventListener('scroll', close, true);
+  window.removeEventListener('resize', close);
+});
 </script>
 
 <template>
@@ -92,6 +143,7 @@ function changeVisibility(): void {
       type="button"
       aria-label="打开记录管理菜单"
       aria-haspopup="menu"
+      :aria-controls="menuId"
       :aria-expanded="open"
       :disabled="busy"
       @click="setOpen(!open)"
@@ -101,10 +153,14 @@ function changeVisibility(): void {
     </button>
 
     <div
-      v-if="open"
+      :id="menuId"
+      ref="panel"
       class="action-menu__panel"
+      :style="panelStyle"
+      popover="auto"
       role="menu"
       aria-label="记录管理"
+      @toggle="handleToggle"
       @keydown.down.prevent="focusAdjacent($event, 1)"
       @keydown.up.prevent="focusAdjacent($event, -1)"
     >
@@ -182,19 +238,21 @@ function changeVisibility(): void {
 }
 
 .action-menu__panel {
-  position: absolute;
-  z-index: 20;
-  top: calc(100% + 0.3rem);
-  right: 0;
-  display: grid;
+  position: fixed;
+  inset: auto;
   width: max-content;
   min-width: 8.5rem;
+  margin: 0;
   padding: 0.3rem;
   border: 1px solid var(--border-subtle);
   border-radius: 0.75rem;
   background: var(--surface-card);
   box-shadow: 0 0.75rem 2rem rgb(24 22 20 / 14%);
   animation: menu-enter 140ms ease-out;
+}
+
+.action-menu__panel:popover-open {
+  display: grid;
 }
 
 .action-menu__item {
