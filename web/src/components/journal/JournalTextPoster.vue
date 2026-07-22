@@ -46,7 +46,6 @@ const posterDate = computed(() => new Intl.DateTimeFormat('zh-CN', {
   display: grid;
   min-width: 0;
   min-height: 0;
-  padding: 32px;
   overflow: hidden;
   background: #20201e;
   place-items: center;
@@ -55,7 +54,9 @@ const posterDate = computed(() => new Intl.DateTimeFormat('zh-CN', {
 .text-poster__sheet {
   position: relative;
   display: grid;
-  width: min(76%, 62dvh, 620px);
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
   aspect-ratio: 4 / 5;
   grid-template-rows: auto minmax(0, 1fr) auto;
   padding: clamp(28px, 4vw, 56px);
@@ -123,19 +124,19 @@ const posterDate = computed(() => new Intl.DateTimeFormat('zh-CN', {
 
 .text-poster__text--short {
   font-size: clamp(2.25rem, 4.4vw, 4.8rem);
-  line-height: 1.3;
+  line-height: 1.38;
   -webkit-line-clamp: 6;
 }
 
 .text-poster__text--medium {
   font-size: clamp(1.75rem, 3.3vw, 3.6rem);
-  line-height: 1.4;
+  line-height: 1.48;
   -webkit-line-clamp: 8;
 }
 
 .text-poster__text--long {
   font-size: clamp(1.3rem, 2.35vw, 2.55rem);
-  line-height: 1.52;
+  line-height: 1.6;
   -webkit-line-clamp: 10;
 }
 
@@ -151,17 +152,18 @@ const posterDate = computed(() => new Intl.DateTimeFormat('zh-CN', {
 @media (max-width: 959px) {
   .text-poster {
     width: 100%;
-    padding:
-      max(64px, calc(env(safe-area-inset-top) + 54px))
-      max(16px, env(safe-area-inset-right))
-      24px
-      max(16px, env(safe-area-inset-left));
+    padding: 0;
     flex: 0 0 auto;
   }
 
   .text-poster__sheet {
-    width: min(100%, 30rem);
-    padding: clamp(26px, 8vw, 46px);
+    width: 100%;
+    height: auto;
+    padding:
+      max(clamp(26px, 8vw, 46px), calc(env(safe-area-inset-top) + 16px))
+      max(clamp(26px, 8vw, 46px), calc(env(safe-area-inset-right) + 16px))
+      max(clamp(26px, 8vw, 46px), calc(env(safe-area-inset-bottom) + 16px))
+      max(clamp(26px, 8vw, 46px), calc(env(safe-area-inset-left) + 16px));
   }
 
   .text-poster__text--short {

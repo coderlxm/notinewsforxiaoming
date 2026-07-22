@@ -28,6 +28,7 @@ const panel = useTemplateRef<HTMLElement>('panel');
 const closing = shallowRef(false);
 const viewportWidth = shallowRef(window.innerWidth);
 const viewportHeight = shallowRef(window.innerHeight);
+const textPosterAspectRatio = 4 / 5;
 
 function isVisualAsset(asset: JournalAsset): boolean {
   if (['photo', 'video', 'video_note', 'animation'].includes(asset.kind)) return true;
@@ -62,6 +63,11 @@ const hasTextPoster = computed(() => {
     && entry.contentText.trim().length > 0
     && entry.assets.length === 0;
 });
+const leadingStageAspectRatio = computed(() => {
+  const image = leadingAdaptiveImage.value;
+  if (image) return image.width! / image.height!;
+  return hasTextPoster.value ? textPosterAspectRatio : null;
+});
 const overlaySizeClass = computed(() => {
   if (props.entry?.bodyFormat === 'rich') return 'detail-overlay--rich';
   return hasVisualMedia.value || hasTextPoster.value
@@ -69,15 +75,14 @@ const overlaySizeClass = computed(() => {
     : 'detail-overlay--compact';
 });
 const overlayStyle = computed<CSSProperties>(() => {
-  const image = leadingAdaptiveImage.value;
-  if (!image || viewportWidth.value < 960) return {};
+  const stageAspectRatio = leadingStageAspectRatio.value;
+  if (stageAspectRatio === null || viewportWidth.value < 960) return {};
 
   const maximumWidth = Math.min(1440, viewportWidth.value - 48);
   const maximumHeight = Math.min(880, viewportHeight.value - 48);
   const contentWidth = Math.min(440, Math.max(360, maximumWidth * 0.34));
-  const imageRatio = image.width! / image.height!;
-  const stageWidth = Math.min(maximumHeight * imageRatio, maximumWidth - contentWidth);
-  const overlayHeight = stageWidth / imageRatio;
+  const stageWidth = Math.min(maximumHeight * stageAspectRatio, maximumWidth - contentWidth);
+  const overlayHeight = stageWidth / stageAspectRatio;
 
   return {
     width: `${Math.round(stageWidth + contentWidth)}px`,

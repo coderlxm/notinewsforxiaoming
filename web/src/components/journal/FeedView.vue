@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, shallowRef, watch } from 'vue';
+import { List } from 'vant';
+import { computed, nextTick, onMounted, reactive, shallowRef, watch } from 'vue';
 import ArticleCardContent from '../article/ArticleCardContent.vue';
 import JournalLoading from '../ui/JournalLoading.vue';
 import JournalPullRefresh from '../ui/JournalPullRefresh.vue';
@@ -46,6 +47,8 @@ const listReplacing = shallowRef(false);
 const loggingOut = shallowRef(false);
 const refreshing = shallowRef(false);
 const refreshRequestComplete = shallowRef(false);
+const paginationLayoutPending = shallowRef(false);
+const feedLayoutReady = shallowRef(false);
 
 const isDetail = computed(() => props.mode === 'public' && props.detailId !== undefined);
 const isOverlay = computed(() => props.overlayEntryId !== undefined);
@@ -73,12 +76,28 @@ const listTitle = computed(() => {
   if (props.initialTag) return `#${props.initialTag}`;
   return '最近记录';
 });
+const paginationLoading = computed(() =>
+  journal.loadingMore.value || paginationLayoutPending.value,
+);
+const paginationFailed = computed(() => journal.error.value !== null);
+const infiniteLoading = computed(() => paginationLoading.value);
+const infiniteFinished = computed(() =>
+  journal.nextCursor.value === null || paginationFailed.value,
+);
+const infiniteDisabled = computed(() =>
+  !feedLayoutReady.value
+  || initialLoadPending.value
+  || listReplacing.value
+  || refreshing.value
+  || paginationFailed.value,
+);
 const refreshDisabled = computed(() =>
   isDetail.value
   || isOverlay.value
   || initialLoadPending.value
   || listReplacing.value
   || journal.loadingMore.value
+  || paginationLayoutPending.value
   || loggingOut.value
   || (props.mode === 'private' && journal.authenticationState.value !== 'authenticated'),
 );
@@ -112,6 +131,7 @@ onMounted(async () => {
 
 async function applyFilters(nextFilters: FeedFilters): Promise<void> {
   Object.assign(filters, nextFilters);
+  feedLayoutReady.value = false;
   listReplacing.value = true;
   try {
     await journal.loadPrivate(filters);
@@ -121,11 +141,19 @@ async function applyFilters(nextFilters: FeedFilters): Promise<void> {
 }
 
 async function loadMore(): Promise<void> {
+  const previousEntryCount = journal.entries.value.length;
+  paginationLayoutPending.value = true;
+
   if (props.mode === 'public') {
     await journal.loadMorePublic({ tag: props.initialTag });
-    return;
   }
-  await journal.loadMorePrivate(filters);
+  else {
+    await journal.loadMorePrivate(filters);
+  }
+
+  if (journal.error.value || journal.entries.value.length === previousEntryCount) {
+    paginationLayoutPending.value = false;
+  }
 }
 
 function finishRefresh(): void {
@@ -134,6 +162,7 @@ function finishRefresh(): void {
 }
 
 async function refreshFeed(): Promise<void> {
+  feedLayoutReady.value = false;
   refreshing.value = true;
   refreshRequestComplete.value = false;
 
@@ -148,12 +177,20 @@ async function refreshFeed(): Promise<void> {
   if (journal.error.value || journal.entries.value.length === 0) finishRefresh();
 }
 
-function handleLayoutReady(): void {
+async function handleLayoutReady(): Promise<void> {
   emit('layoutReady');
   if (refreshRequestComplete.value) finishRefresh();
+  if (paginationLayoutPending.value && !journal.loadingMore.value) {
+    paginationLayoutPending.value = false;
+  }
+  if (!feedLayoutReady.value) {
+    await nextTick();
+    feedLayoutReady.value = true;
+  }
 }
 
 async function authenticate(password: string): Promise<void> {
+  feedLayoutReady.value = false;
   listReplacing.value = true;
   try {
     await journal.authenticate(password, filters);
@@ -175,6 +212,7 @@ async function selectTag(tag: string): Promise<void> {
     return;
   }
   filters.tag = tag;
+  feedLayoutReady.value = false;
   listReplacing.value = true;
   try {
     await journal.loadPrivate(filters);
@@ -211,17 +249,26 @@ function isArticleEntry(entry: JournalEntry): boolean {
 
 async function saveContent(entry: JournalEntry, contentText: string): Promise<void> {
   await journal.saveContent(entry, contentText);
-  if (journal.error.value === null) await journal.loadPrivate(filters);
+  if (journal.error.value === null) {
+    feedLayoutReady.value = false;
+    await journal.loadPrivate(filters);
+  }
 }
 
 async function setVisibility(entry: JournalEntry, visibility: JournalVisibility): Promise<void> {
   await journal.setVisibility(entry, visibility);
-  if (journal.error.value === null) await journal.loadPrivate(filters);
+  if (journal.error.value === null) {
+    feedLayoutReady.value = false;
+    await journal.loadPrivate(filters);
+  }
 }
 
 async function setPinned(entry: JournalEntry, pinned: boolean): Promise<void> {
   await journal.setPinned(entry, pinned);
-  if (journal.error.value === null) await journal.loadPrivate(filters);
+  if (journal.error.value === null) {
+    feedLayoutReady.value = false;
+    await journal.loadPrivate(filters);
+  }
 }
 
 async function deleteEntry(entry: JournalEntry): Promise<void> {
@@ -360,40 +407,53 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
         v-else-if="mode === 'public' || journal.authenticationState.value !== 'anonymous'"
         class="feed__entries"
       >
-        <WaterfallFeed
-          :entries="journal.entries.value"
-          :loading="initialLoadPending || listReplacing"
-          :loading-label="listLoadingLabel"
-          :mode="mode"
-          :mutation-entry-id="journal.mutationEntryId.value"
-          @layout-ready="handleLayoutReady"
-          @open-entry="openEntry"
-          @select-tag="selectTag"
-          @edit-article="editArticle"
-          @save-content="saveContent"
-          @set-visibility="setVisibility"
-          @set-pinned="setPinned"
-          @delete-entry="deleteEntry"
-        />
-
-        <p
-          v-if="!initialLoadPending && !listReplacing && !journal.entries.value.length && !journal.error.value"
-          class="feed__empty"
+        <List
+          class="feed__infinite-list"
+          :loading="infiniteLoading"
+          :finished="infiniteFinished"
+          :disabled="infiniteDisabled"
+          :immediate-check="false"
+          :offset="320"
+          @load="loadMore"
         >
-          {{ mode === 'private' ? '没有符合当前筛选条件的记录。' : '这里还没有公开记录。' }}
-        </p>
+          <WaterfallFeed
+            :entries="journal.entries.value"
+            :loading="initialLoadPending || listReplacing"
+            :loading-label="listLoadingLabel"
+            :mode="mode"
+            :mutation-entry-id="journal.mutationEntryId.value"
+            @layout-ready="handleLayoutReady"
+            @open-entry="openEntry"
+            @select-tag="selectTag"
+            @edit-article="editArticle"
+            @save-content="saveContent"
+            @set-visibility="setVisibility"
+            @set-pinned="setPinned"
+            @delete-entry="deleteEntry"
+          />
 
-        <button
-          v-if="journal.nextCursor.value"
-          class="button button--more"
-          type="button"
-          :disabled="journal.loadingMore.value"
-          :aria-busy="journal.loadingMore.value"
-          @click="loadMore"
-        >
-          <JournalLoading v-if="journal.loadingMore.value" variant="inline" label="读取中…" />
-          <template v-else>加载更早记录</template>
-        </button>
+          <p
+            v-if="!initialLoadPending && !listReplacing && !journal.entries.value.length && !journal.error.value"
+            class="feed__empty"
+          >
+            {{ mode === 'private' ? '没有符合当前筛选条件的记录。' : '这里还没有公开记录。' }}
+          </p>
+
+          <template #loading>
+            <div v-if="paginationLoading" class="feed__pagination-loading">
+              <JournalLoading variant="inline" label="正在读取更早记录…" />
+            </div>
+          </template>
+
+          <template #finished>
+            <p
+              v-if="!infiniteLoading && !paginationFailed && journal.entries.value.length"
+              class="feed__pagination-finished"
+            >
+              已经看到全部记录
+            </p>
+          </template>
+        </List>
       </div>
     </main>
   </JournalPullRefresh>
@@ -495,6 +555,11 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
   gap: 0.75rem;
 }
 
+.feed__infinite-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
 .feed__reading-stage,
 .feed__reading-reserve {
   min-height: clamp(20rem, 48vh, 34rem);
@@ -527,9 +592,13 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
   opacity: 0;
 }
 
-.button--more {
-  justify-self: center;
-  margin-top: 0.5rem;
+.feed__pagination-loading,
+.feed__pagination-finished {
+  margin: 0;
+  padding: 0.75rem 1rem 0;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  text-align: center;
 }
 
 </style>
