@@ -468,7 +468,7 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     const arg = text.replace(/^\/startggpoll\s*/, '').trim().toLowerCase();
     if (arg === 'on') {
       const enabled = enableStartggPolling(bot);
-      await ctx.reply(enabled ? 'start.gg 自动轮询已开启：每 20 分钟检查一次。' : 'start.gg 自动轮询已经开启。', { parse_mode: 'HTML' });
+      await ctx.reply(enabled ? 'start.gg 自动轮询已开启：每 15 分钟检查一次。' : 'start.gg 自动轮询已经开启。', { parse_mode: 'HTML' });
       return;
     }
     if (arg === 'off') {

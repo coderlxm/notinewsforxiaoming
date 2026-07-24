@@ -152,7 +152,7 @@ export function formatStartggGuide(playersCount: number, eventsCount: number): s
     lines.push('• <code>/startgg status</code> 查看运行状态');
     lines.push('• <code>/watchlist</code> 查看监控对象和最近状态');
     lines.push('• <code>/fetchstartgg</code> 手动触发一次检查');
-    lines.push('• <code>/startggpoll on</code> 开启每 20 分钟自动检查');
+    lines.push('• <code>/startggpoll on</code> 开启每 15 分钟自动检查');
     lines.push('• <code>/startggpoll off</code> 关闭自动检查');
     lines.push('');
     lines.push('每次检查前都会自动同步固定选手并发现当前进行中的项目。');

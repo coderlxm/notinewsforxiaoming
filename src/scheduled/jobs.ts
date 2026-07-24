@@ -101,7 +101,7 @@ export function enableStartggPolling(bot: Telegraf, resetState = true): boolean 
   if (resetState) {
     resetActiveStartggWatchEventStates();
   }
-  startggPollJob = schedule.scheduleJob({ minute: new schedule.Range(0, 59, 20), tz: 'Asia/Shanghai' }, async () => {
+  startggPollJob = schedule.scheduleJob({ minute: new schedule.Range(0, 59, 15), tz: 'Asia/Shanghai' }, async () => {
     await runScheduledStartggWatch(bot);
   });
   setStartggPollingPersistedEnabled(true);
