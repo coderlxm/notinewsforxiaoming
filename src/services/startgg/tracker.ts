@@ -390,33 +390,12 @@ function compareSetChronology(a: { completedAt: number | null; id: number }, b: 
 
 function selectSetsToPush(
   playerSets: TrackedSetNode[],
-  previous: ReturnType<typeof findStartggWatchSnapshot>,
   watchPlayerId: number,
   watchEventId: number,
 ): TrackedSetNode[] {
-  if (!previous) {
-    for (const set of playerSets) {
-      markStartggPushedSet(watchPlayerId, watchEventId, set.id);
-    }
-    const latestSet = [...playerSets].sort(compareSetRecency)[0];
-    return latestSet ? [latestSet] : [];
-  }
-
-  const sortedSets = [...playerSets].sort(compareSetChronology);
-  if (previous.last_set_id !== null) {
-    const previousSetIndex = sortedSets.findIndex((set) => set.id === previous.last_set_id);
-    if (previousSetIndex < 0) {
-      throw new Error(`start.gg previous set missing from fetched sets: ${previous.last_set_id}`);
-    }
-    for (const set of sortedSets.slice(0, previousSetIndex + 1)) {
-      markStartggPushedSet(watchPlayerId, watchEventId, set.id);
-    }
-    return sortedSets
-      .slice(previousSetIndex + 1)
-      .filter((set) => !hasStartggPushedSet(watchPlayerId, watchEventId, set.id));
-  }
-
-  return sortedSets
+  return [...playerSets]
+    .filter((set) => Number.isInteger(set.id))
+    .sort(compareSetChronology)
     .filter((set) => !hasStartggPushedSet(watchPlayerId, watchEventId, set.id));
 }
 
@@ -528,7 +507,7 @@ async function processEvent(
     }
     const previous = findStartggWatchSnapshot(player.id, eventRow.id);
     const initialMessagePending = !previous || previous.initial_message_sent === 0;
-    const setsToPush = selectSetsToPush(playerSets, previous, player.id, eventRow.id);
+    const setsToPush = selectSetsToPush(playerSets, player.id, eventRow.id);
     upsertStartggWatchSnapshot({
       watch_player_id: player.id,
       watch_event_id: eventRow.id,
