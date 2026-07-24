@@ -2,6 +2,7 @@
 Description=NotiNews Interactive Telegram Bot
 After=network-online.target
 Wants=network-online.target
+OnFailure=notinews-failure-notify@%n.service
 
 [Service]
 Type=simple

@@ -71,6 +71,7 @@ jobs:
               - 'src/shared/**'
               - 'src/utils/**'
               - 'deploy/notinews-bot.service'
+              - 'deploy/notinews-failure-notify@.service'
               - 'scripts/notinews-backup'
               - 'package.json'
               - 'pnpm-lock.yaml'
@@ -237,6 +238,7 @@ jobs:
             systemctl stop notinews.timer || true
             systemctl disable notinews.timer || true
             cp '$SERVER_PROJECT_DIR/deploy/notinews-bot.service' /etc/systemd/system/notinews-bot.service
+            cp '$SERVER_PROJECT_DIR/deploy/notinews-failure-notify@.service' /etc/systemd/system/notinews-failure-notify@.service
             systemctl daemon-reload
             systemctl enable notinews-bot.service
             systemctl restart notinews-bot.service

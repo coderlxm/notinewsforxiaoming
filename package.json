@@ -16,6 +16,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev:journal": "vite --config web/vite.config.ts",
     "build:journal": "vite build --config web/vite.config.ts",
+    "notify:service-failure": "tsx src/serviceFailureNotifier.ts",
     "start": "tsx src/index.ts",
     "start:bot": "tsx src/resident.ts",
     "start:journal": "tsx src/journal-server/index.ts"

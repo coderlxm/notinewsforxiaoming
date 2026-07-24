@@ -1,0 +1,13 @@
+[Unit]
+Description=Notify Telegram when %i fails
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/root/NotiNewsForXiaoming
+EnvironmentFile=/root/NotiNewsForXiaoming/.env
+Environment=NODE_ENV=production
+Environment=NODE_OPTIONS=--dns-result-order=ipv4first
+ExecStart=/usr/local/bin/pnpm notify:service-failure %i
