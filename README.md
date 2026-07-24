@@ -1,231 +1,156 @@
 # NotiNewsForXiaoming
 
-这是我自己的常驻 Telegram 个人 bot 仓库。当前主形态不是早期的“每日新闻脚本”，而是一个长期运行的单体 bot：
+> 小明的个人 Telegram 提醒 Bot 与 Journal。
 
-- 常驻接收 Telegram 消息
-- 管理一次性提醒和循环提醒
-- 按固定时点主动推送内容
-- 跟踪 start.gg 选手状态
-- 跟踪 AV 更新
-- 做服务器巡检、维生素提醒、V2EX 节假日缓冲推送等日常任务
+这是一个面向单个 Telegram 会话的日常信息与记录工具，而不是通用 SaaS。它把提醒、定时推送、订阅追踪和生活记录放在同一套个人工作流中：在 Telegram 里接收通知、下达操作、保存内容；Journal 则将其中的记录整理为可浏览的私有资产与公开动态。
 
-README 以“我自己后续部署维护”为目标，只记录当前代码事实和维护时真正需要知道的东西。
+```text
+Telegram
+   │
+   ├── 常驻 Bot ── 提醒 / 定时推送 / 订阅与状态追踪
+   │       └── SQLite：data/notinews.sqlite
+   │
+   └── Journal 采集 ── 私有笔记 / 公开动态 / 媒体相册
+           │
+           └── Journal 服务 + Vue Web ── SQLite 与附件目录：JOURNAL_DATA_DIR
+```
 
-## 当前能力
+## 现有能力
 
-当前代码里已经落地的主功能有：
+### Telegram 日常助手
 
-- Telegram 交互 bot：`/start`、`/help`、`/remind`、`/watch`、`/watchlist`、`/startgg`、`/startggpoll`、`/fetchav`、`/fetchstartgg`、`/steam`
-- 一次性提醒：支持明确格式和自然语言创建，状态持久化到 SQLite
-- 循环提醒：支持 `every day / week / month` 和自然语言循环提醒
-- 固定时点推送：睡觉提醒、早安、咖啡、新闻、GitHub、V2EX、英语、维生素、服务器巡检、AV 更新、start.gg 监控、Steam 价格监控
-- start.gg 监控：固定选手自动同步、自动发现当前赛事项目、轮询推送状态变化
-- AV 订阅：按 `star` / `label` 跟踪，去重后推送图文
-- 节假日逻辑：中国工作日判断、V2EX 节假日缓存、假期倒计时
+- **提醒管理**：创建一次性提醒和循环提醒；支持明确时间表达式、自然语言解析、列表查看、按时间范围取消，以及完成、稍后提醒、暂停等消息内操作。
+- **日常推送**：按 `Asia/Shanghai` 时区推送天气与游戏新闻、英语内容、GitHub Trending、V2EX 热帖、睡眠/起床/咖啡提醒、维生素提醒与服务器健康状态。
+- **中国日历逻辑**：依照 `data/china-holiday-2026.json` 判断工作日；节假日的 V2EX 内容会缓存，并在下一个工作日推送。
+- **生活状态**：维生素服用状态、自慰记录及统计均可通过 Telegram 按钮和命令维护；健身计划模块保留在代码中，但固定推送目前关闭。
+- **X 点赞视频**：可手动同步 X 点赞视频，并在早安消息中展示同步状态。
 
-说明：
+### 订阅与追踪
 
-- `fitness` 相关代码仍在仓库里，但固定推送当前处于关闭状态。
-- Telegram 交互默认只接受 `.env` 里的 `TG_CHAT_ID`。
+- **start.gg 赛事监控**：同步预置选手、自动发现其正在参加的赛事，也可手动添加选手或赛事；推送对局与状态变化，支持 Top 16 / Top 32 种子关注。普通轮询为 15 分钟，存在进行中对局时切换为 2 分钟快速轮询，赛事结束后自动关闭。
+- **AV 更新订阅**：按演员、系列、片商或标签订阅 JavBus 目标，记录已推送内容并以 Telegram 图文消息通知；支持手动检查与强制重发。
+- **Steam 价格监控**：按 App URL 或 AppID 设置目标价，固定时段检查价格，在达到或跨过目标价时通知。
+- **服务器巡检**：读取 `data/server-health-targets.json` 进行 HTTP、端口或 TLS 证书检查，并将结果推送到 Telegram。
 
-## 运行形态
+### Journal：从 Telegram 到个人网站
 
-代码当前有两个入口：
+Journal 是仓库中的第二个产品模块，由 Telegram 采集、Fastify 服务和 Vue 前端组成。
 
-- [src/resident.ts](/Users/xiaomingli/Code/NotiNewsForXiaoming/src/resident.ts)
-  当前主入口。负责启动 Telegraf long polling、恢复提醒、注册固定任务。
-- [src/index.ts](/Users/xiaomingli/Code/NotiNewsForXiaoming/src/index.ts)
-  一次性入口。保留了按北京时间匹配时段并执行单个模式的能力，适合手动触发或 GitHub Actions 的一次性运行场景。
+- 在 Telegram 用 `/note` 保存私有笔记、用 `/post` 保存公开动态；支持文字、图片、视频、语音、文件、位置、相册等消息内容，也支持回复一条已有消息后保存。
+- 采集结果可在消息内切换公开/私有、打开网站或删除记录；`/cancel` 可退出等待输入的采集状态。
+- Web 端提供公开瀑布流、详情页与标签浏览；公开内容同时生成 RSS 和 JSON Feed。
+- 登录后的“我的资产”支持私有/公开内容筛选、全文搜索、日期和类型筛选、置顶、编辑、删除与“那年今日”。
+- 文章编辑器基于 Tiptap，支持富文本、封面和内嵌图片；Telegram 附件与文章媒体存入 Journal 的数据目录。
 
-对应的 `package.json` 入口脚本是：
+## Telegram 交互入口
 
-- `start` -> `src/index.ts`
-- `start:bot` -> `src/resident.ts`
+| 范畴 | 主要入口 |
+| --- | --- |
+| 基础 | `/start`、`/help` |
+| 提醒 | `/remind`，或直接发送自然语言，如“10 分钟后提醒我收衣服”“每天 22:00 做俯卧撑” |
+| Journal | `/note`、`/post`、`/cancel` |
+| AV | `/fetchav`、`/fetchav force`、`/avsub add \| list \| remove` |
+| start.gg | `/startgg`、`/startgg go [关键词]`、`/startgg status`、`/startgg seeds`、`/startggpoll on \| off`、`/watch`、`/watchlist`、`/fetchstartgg` |
+| Steam | `/steam add \| list \| set \| remove \| check` |
+| 其他 | `/syncx`、`/lu` |
 
-当前代码要求：
+所有 Telegram 交互均以 `TG_CHAT_ID` 限定为单一授权会话。
 
-- Node.js 24.x
-- `type: module`
-- `pnpm@11.9.0`
+## 运行组成
 
-Node 版本硬约束写在 [scripts/ensure-node-lts.mjs](/Users/xiaomingli/Code/NotiNewsForXiaoming/scripts/ensure-node-lts.mjs)。
+| 组成 | 源码入口 | 角色 | 持久化 |
+| --- | --- | --- | --- |
+| 常驻 Bot | `src/resident.ts` | Telegraf long polling、提醒恢复、固定任务、交互命令与 Journal Telegram 采集 | `data/notinews.sqlite` 及 `data/` 下状态文件 |
+| 一次性分发器 | `src/index.ts` | 按当前北京时间选择一项推送模式；保留给手动或 GitHub Actions 场景 | 共用 Bot 数据 |
+| Journal 服务 | `src/journal-server/index.ts` | Fastify API、附件存储、公开 Feed、静态 Web 托管 | `JOURNAL_DATA_DIR/journal.sqlite` 与 `assets/` |
+| Journal 前端 | `web/` | Vue 3 单页应用，提供公开记录、管理后台和文章编辑器 | 构建产物由 Journal 服务托管 |
 
-## 环境变量
+常驻 Bot 启动时会恢复未完成提醒、循环规则、已持久化的 start.gg 轮询和维生素提醒循环。它也会注册固定任务；目前的主要时点如下（均为北京时间）：
 
-环境变量模板在 [.env.example](/Users/xiaomingli/Code/NotiNewsForXiaoming/.env.example)。
+| 时间或规则 | 任务 |
+| --- | --- |
+| 00:10 / 08:30 / 08:58（工作日） | 睡眠、起床、咖啡提醒 |
+| 07:30 / 15:30 / 23:30 | AV 更新检查 |
+| 08:15 / 14:15 / 20:15 / 02:15 | Steam 价格检查 |
+| 08:41（工作日）/ 20:00 | 节假日缓存的 V2EX 推送 / V2EX 热帖 |
+| 09:10 / 09:55 | 服务器巡检 / 天气与游戏新闻 |
+| 10:30 / 13:30 | 英语内容 |
+| 15:00（每两天） | GitHub Trending |
+| 18:30（非工作日）或 20:45–21:00（工作日） | 维生素提醒 |
+| 22:00 | 当天未记录时的自慰状态提醒 |
 
-当前代码实际会读取这些值：
+## 环境与数据
 
-- `TG_TOKEN`
-- `TG_CHAT_ID`
-- `QWEATHER_API_KEY`
-- `QWEATHER_CITY_ID`
-- `DEEPSEEK_API_KEY`
-- `STARTGG_API_TOKEN`
+项目使用 Node.js 24（`>=24 <25`）、TypeScript 与 pnpm 11。根目录的 [.env.example](.env.example) 是常驻 Bot 的配置模板；Journal 部署使用 [deploy/journal/.env.example](deploy/journal/.env.example) 作为服务端模板。
 
-其中：
+| 变量 | 使用模块 | 用途 |
+| --- | --- | --- |
+| `TG_TOKEN`、`TG_CHAT_ID` | Bot 与 Journal | Bot 鉴权、Telegram 收发与 Journal 消息附件下载 |
+| `QWEATHER_API_KEY`、`QWEATHER_CITY_ID` | 日常推送 | 和风天气 |
+| `DEEPSEEK_API_KEY` | AI 内容与提醒 | 新闻、GitHub、V2EX、英语、生活建议与自然语言提醒解析 |
+| `STARTGG_API_TOKEN` | start.gg | 赛事、选手与对局状态查询 |
+| `JOURNAL_API_BASE_URL`、`JOURNAL_INGEST_TOKEN`、`JOURNAL_PUBLIC_BASE_URL` | 常驻 Bot | 将 Telegram Journal 内容写入 Journal 服务，并生成网页链接 |
+| `JOURNAL_ADMIN_PASSWORD`、`JOURNAL_COOKIE_SECRET` | Journal 服务 | 管理端登录与 Cookie 签名 |
+| `JOURNAL_WEB_HOST`、`JOURNAL_WEB_PORT`、`JOURNAL_DATA_DIR`、`JOURNAL_WEB_ROOT` | Journal 服务 | HTTP 监听、数据目录和静态前端目录；均有服务端默认值 |
 
-- Telegram 是所有主动推送和交互的唯一通道
-- DeepSeek 同时用于内容总结和自然语言提醒解析
-- start.gg 相关功能离不开 `STARTGG_API_TOKEN`
+运行数据的边界如下：
 
-## Telegram 常用命令
+- `data/notinews.sqlite`：提醒、循环规则、AV 推送历史、V2EX 缓冲、维生素、Steam、start.gg、Journal 采集会话和生活状态等 Bot 侧数据。
+- `data/startgg_preset_players.json`：start.gg 预置选手配置。
+- `data/server-health-targets.json`：服务器巡检目标。
+- `data/fitness_status.json`：健身模块状态。
+- `JOURNAL_DATA_DIR/journal.sqlite` 与 `JOURNAL_DATA_DIR/assets/`：Journal 条目、附件和图片预览。
 
-日常维护最常用的是这些：
+数据库初始化和迁移分别由 `src/reminders/db.ts`、`src/reminders/migrations.ts` 与 `src/journal-server/migrations.ts` 管理。
 
-- `/help`
-  查看当前 bot 暴露出来的命令入口
-- `/remind`
-  查看待处理提醒清单
-- `/remind <时间> <内容>`
-  创建一次性或循环提醒
-- 直接发送自然语言
-  例如“10 分钟后提醒我收衣服”“每天 22:00 做俯卧撑”
-- `/fetchav`
-  手动触发一次 AV 检查
-- `/fetchav force`
-  强制重发 AV 更新
-- `/startgg`
-  查看 start.gg 引导和当前配置
-- `/startgg go`
-  自动发现固定选手当前参加的赛事、立即检查并开启轮询
-- `/startgg go <关键词>`
-  按赛事关键词筛选自动发现的项目、立即检查并开启轮询
-- `/startgg status`
-  查看 start.gg 运行状态
-- `/startgg deleteall`
-  删除已记录的 start.gg 推送消息，并清空本地赛事、快照和去重状态
-- `/startggpoll on`
-  开启 start.gg 固定轮询
-- `/startggpoll off`
-  关闭 start.gg 固定轮询
-- `/watch <选手名 | user_url | event_url>`
-  添加 start.gg 监控对象
-- `/watchlist`
-  查看当前监控对象和最近状态
-- `/fetchstartgg`
-  立即执行一次 start.gg 检查
-- `/steam`
-  查看 Steam 价格监控引导
-- `/steam add <App URL | AppID> <目标价>`
-  添加 Steam 价格监控
-- `/steam list`
-  列出所有 Steam 价格监控
-- `/steam set <订阅ID> <新目标价>`
-  修改目标价
-- `/steam remove <订阅ID>`
-  删除监控
-- `/steam check`
-  立即执行一次 Steam 价格检查
+## 代码地图
+
+```text
+src/
+├── bot/                 Telegram Bot 创建、鉴权、命令与回调
+├── reminders/           一次性/循环提醒、解析、SQLite 和调度
+├── scheduled/           固定任务与一次性推送模式分发
+├── services/            start.gg、AV、Steam、X、健康检查及生活状态服务
+├── fetchers/            天气、游戏新闻、英语、GitHub、V2EX 数据源
+├── ai/                  DeepSeek 调用
+├── calendar/            中国工作日和倒计时逻辑
+├── publishers/          Telegram 消息发送
+├── formatters/          Telegram HTML 消息格式化
+├── journal-bot/         Telegram Journal 采集和 API 客户端
+├── journal-server/      Fastify、Journal 数据库、媒体和 Feed
+└── shared/              Bot、服务端与前端共用的 Journal 协议
+web/                     Vue 3 + Vite + Pinia + Vue Router Journal 前端
+deploy/                  systemd、Bot 备份与 Journal Docker 部署资产
+data/                    受版本控制的日历、监控目标与预置选手数据
+```
 
 ## 部署现状
 
-当前仓库里的主部署路径是：
+生产环境是两条独立部署链路：
 
-- GitHub push 到 `main`
-- [deploy.yml](/Users/xiaomingli/Code/NotiNewsForXiaoming/.github/workflows/deploy.yml) 通过 SSH 同步服务器代码
-- 服务器安装依赖
-- 安装并重启 [deploy/notinews-bot.service](/Users/xiaomingli/Code/NotiNewsForXiaoming/deploy/notinews-bot.service)
-- 由 systemd 常驻拉起 `start:bot`
+- **Bot**：`systemd` 运行常驻 Bot，进程内由 `node-schedule` 管理固定任务；主数据位于服务器项目目录的 `data/`。仓库中同时保留单容器 Bot 的 `Dockerfile` 与 `docker-compose.yml`。
+- **Journal**：独立 Docker 镜像运行 Fastify 服务和已构建的 Vue 前端，数据挂载到 `/opt/journal/data`，仅将服务端口绑定在本机回环地址，由外部 Web 服务代理访问。
+- **自动发布**：`.github/workflows/deploy.yml` 根据变更范围分别发布 Journal 和 Bot；文档改动不会触发自动发布。`daily-push.yml` 仍保留为手动触发的一次性推送工作流，不是常驻 Bot 的主路径。
+- **Bot 备份**：仓库包含每天 04:50（北京时间）执行的 `notinews-backup.timer` 与相应 systemd service，备份期间会停止并在结束后重新启动 Bot。
 
-也就是说，当前真实主形态是：
-
-- `systemd` 常驻 bot
-- 进程内 `node-schedule`
-- SQLite 本地状态
-
-补充：
-
-- [.github/workflows/daily-push.yml](/Users/xiaomingli/Code/NotiNewsForXiaoming/.github/workflows/daily-push.yml) 还在仓库里，但现在是手动触发的一次性 workflow，不是主部署形态。
-- [Dockerfile](/Users/xiaomingli/Code/NotiNewsForXiaoming/Dockerfile) 和 [docker-compose.yml](/Users/xiaomingli/Code/NotiNewsForXiaoming/docker-compose.yml) 也在仓库里，但当前代码和部署脚本更偏向 systemd 常驻模式。
-
-## 数据与状态文件
-
-维护时最需要关注的本地数据文件：
-
-- `data/notinews.sqlite`
-  主数据库。提醒、循环提醒、AV 推送历史、V2EX 缓冲、维生素状态、start.gg 监控状态都在里面。
-- `data/fitness_status.json`
-  健身状态快照。
-- `data/startgg_preset_players.json`
-  start.gg 固定选手配置。
-- `data/server-health-targets.json`
-  服务器巡检目标。
-- `data/china-holiday-2026.json`
-  中国节假日和调休数据。
-
-SQLite 初始化逻辑在 [src/reminders/db.ts](/Users/xiaomingli/Code/NotiNewsForXiaoming/src/reminders/db.ts)。虽然文件路径在 `reminders/` 下，但它实际上已经是全项目共享数据库入口。
-
-## 代码结构速览
-
-按维护视角看，关键目录是这些：
-
-- [src/bot](/Users/xiaomingli/Code/NotiNewsForXiaoming/src/bot)
-  Telegraf bot 创建、鉴权、交互命令、按钮回调
-- [src/reminders](/Users/xiaomingli/Code/NotiNewsForXiaoming/src/reminders)
-  提醒系统本体：解析、持久化、调度、格式化
-- [src/scheduled](/Users/xiaomingli/Code/NotiNewsForXiaoming/src/scheduled)
-  固定任务注册和模式分发
-- [src/services](/Users/xiaomingli/Code/NotiNewsForXiaoming/src/services)
-  业务子系统：AV、start.gg、服务器巡检、维生素、V2EX 缓冲、健身
-- [src/fetchers](/Users/xiaomingli/Code/NotiNewsForXiaoming/src/fetchers)
-  外部数据抓取
-- [src/ai](/Users/xiaomingli/Code/NotiNewsForXiaoming/src/ai)
-  DeepSeek 调用
-- [src/formatters](/Users/xiaomingli/Code/NotiNewsForXiaoming/src/formatters)
-  Telegram HTML 文案拼装
-- [src/publishers](/Users/xiaomingli/Code/NotiNewsForXiaoming/src/publishers)
-  Telegram 发送
-
-几个关键文件：
-
-- [src/scheduled/runMode.ts](/Users/xiaomingli/Code/NotiNewsForXiaoming/src/scheduled/runMode.ts)
-  主动推送模式总分发
-- [src/scheduled/jobs.ts](/Users/xiaomingli/Code/NotiNewsForXiaoming/src/scheduled/jobs.ts)
-  常驻 bot 的固定时点任务注册
-- [src/bot/interactive.ts](/Users/xiaomingli/Code/NotiNewsForXiaoming/src/bot/interactive.ts)
-  所有主要交互命令入口
-- [src/reminders/parser.ts](/Users/xiaomingli/Code/NotiNewsForXiaoming/src/reminders/parser.ts)
-  提醒解析主入口
-- [src/services/avTracker.ts](/Users/xiaomingli/Code/NotiNewsForXiaoming/src/services/avTracker.ts)
-  AV 更新主链路
-- [src/services/startggPresetSync.ts](/Users/xiaomingli/Code/NotiNewsForXiaoming/src/services/startggPresetSync.ts)
-  start.gg 自动同步与一键启动入口
-- [src/services/startgg/tracker.ts](/Users/xiaomingli/Code/NotiNewsForXiaoming/src/services/startgg/tracker.ts)
-  start.gg 状态计算和变更推送核心
-
-## 调度与时区
-
-这个项目默认以 `Asia/Shanghai` 为准：
-
-- `dayjs` 的时区辅助在 [src/utils/time.ts](/Users/xiaomingli/Code/NotiNewsForXiaoming/src/utils/time.ts)
-- 固定任务时区写在 [src/scheduled/jobs.ts](/Users/xiaomingli/Code/NotiNewsForXiaoming/src/scheduled/jobs.ts)
-- 一次性入口的北京时间匹配逻辑在 [src/index.ts](/Users/xiaomingli/Code/NotiNewsForXiaoming/src/index.ts)
-
-如果后面要改固定推送时点，优先看：
-
-- [src/scheduled/jobs.ts](/Users/xiaomingli/Code/NotiNewsForXiaoming/src/scheduled/jobs.ts)
-- [doc/reference/server-schedule.md](/Users/xiaomingli/Code/NotiNewsForXiaoming/doc/reference/server-schedule.md)
+部署实现和运维细节位于 [deploy/](deploy/)；Journal 的发布顺序说明位于 [doc/deploy/journal-progressive-loading-release-order.md](doc/deploy/journal-progressive-loading-release-order.md)。
 
 ## 技术栈
 
-当前关键依赖：
+- **Bot 与服务端**：TypeScript、Telegraf、Fastify、better-sqlite3、node-schedule、rrule、Zod
+- **外部数据与 AI**：Axios、RSS Parser、GraphQL Request、OpenAI SDK（DeepSeek 兼容接口）
+- **Journal Web**：Vue 3、Vite、Vue Router、Pinia、VueUse、Vant、Tiptap、`@egjs/grid`
+- **内容与媒体**：Feed、Sharp、Cheerio、sanitize-html
 
-- `telegraf`
-- `better-sqlite3`
-- `node-schedule`
-- `rrule`
-- `axios`
-- `rss-parser`
-- `graphql-request`
-- `openai`
-- `dayjs`
-- `zod`
+## 相关文档
 
-核心特点很简单：
+- [Journal 富文本博客设计](doc/design/telegram-journal-rich-blog.md)
+- [start.gg 使用说明](doc/startgg/mvp-usage.md)
+- [Steam 价格监控说明](doc/steam/price-watch-usage.md)
+- [循环提醒验收记录](doc/acceptance/recurring-reminder.md)
+- [服务器定时表](doc/reference/server-schedule.md)
 
-- 单进程
-- 本地 SQLite
-- Telegram 单通道
-- 没有多用户系统
-- 代码优先服务个人日常使用效果
+---
+
+个人工具，优先保持主路径直接、可见、可维护。
+
