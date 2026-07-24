@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import { storeToRefs } from 'pinia';
 import { computed, onMounted, onUnmounted, shallowRef, useTemplateRef, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import ArticleEditorView from './components/article/ArticleEditorView.vue';
 import FeedView from './components/journal/FeedView.vue';
-import { fetchAuthenticationState } from './api';
+import { useSessionStore } from './stores/session';
 import type { JournalEntry } from './types';
 
 type AppRoute =
@@ -21,38 +23,40 @@ interface OverlayContext {
   originPath: string;
 }
 
-const locationKey = shallowRef(`${window.location.pathname}${window.location.search}`);
+const currentRoute = useRoute();
+const router = useRouter();
+const session = useSessionStore();
+const { ownerAuthenticated } = storeToRefs(session);
 const overlayContext = shallowRef<OverlayContext | null>(null);
 const directPublicEntry = shallowRef<JournalEntry | null>(null);
-const ownerAuthenticated = shallowRef(false);
 const contentScroll = useTemplateRef<HTMLDivElement>('contentScroll');
 const feedScrollPositions = new Map<string, number>();
 let pendingFeedScrollTop: number | null = null;
 
 const route = computed<AppRoute>(() => {
-  const url = new URL(locationKey.value, window.location.origin);
-  if (url.pathname === '/') {
-    const tag = url.searchParams.get('tag') ?? '';
+  if (currentRoute.name === 'public') {
+    const tag = typeof currentRoute.query.tag === 'string' ? currentRoute.query.tag : '';
     return { name: 'public', key: `public:${tag}`, tag };
   }
-  if (url.pathname === '/me') {
-    const entry = url.searchParams.get('entry');
-    if (entry !== null && !/^[1-9]\d*$/.test(entry)) return { name: 'not-found', key: locationKey.value };
-    return { name: 'private', key: 'private', entryId: entry === null ? null : Number(entry) };
+  if (currentRoute.name === 'private') {
+    const entry = currentRoute.query.entry;
+    if (entry !== undefined && (typeof entry !== 'string' || !/^[1-9]\d*$/.test(entry))) {
+      return { name: 'not-found', key: currentRoute.fullPath };
+    }
+    return { name: 'private', key: 'private', entryId: entry === undefined ? null : Number(entry) };
   }
-  if (url.pathname === '/me/articles/new') {
+  if (currentRoute.name === 'article-new') {
     return { name: 'article-new', key: 'article-new' };
   }
-  const editMatch = url.pathname.match(/^\/me\/articles\/(\d+)\/edit$/);
-  if (editMatch) {
-    const articleId = Number(editMatch[1]);
+  if (currentRoute.name === 'article-edit') {
+    const articleId = Number(currentRoute.params.articleId);
     return { name: 'article-edit', key: `article-edit:${articleId}`, articleId };
   }
-  if (url.pathname.startsWith('/p/')) {
-    const publicId = decodeURIComponent(url.pathname.slice(3));
+  if (currentRoute.name === 'detail') {
+    const publicId = String(currentRoute.params.publicId);
     return { name: 'detail', key: `detail:${publicId}`, publicId };
   }
-  return { name: 'not-found', key: url.pathname };
+  return { name: 'not-found', key: currentRoute.fullPath };
 });
 
 const activeOverlayContext = computed(() => {
@@ -116,10 +120,6 @@ watch(() => route.value.key, () => {
   directPublicEntry.value = null;
 });
 
-function synchronizeLocation(): void {
-  locationKey.value = `${window.location.pathname}${window.location.search}`;
-}
-
 function feedRouteKey(path: string): string | null {
   const url = new URL(path, window.location.origin);
   if (url.pathname === '/') return `public:${url.searchParams.get('tag') ?? ''}`;
@@ -145,80 +145,58 @@ function isOverlayHistoryTransition(fromPath: string, toPath: string): boolean {
   );
 }
 
-function navigate(path: string): void {
+async function navigate(path: string): Promise<void> {
   const nextUrl = new URL(path, window.location.origin);
-  const isOpeningDetail = nextUrl.pathname.startsWith('/p/');
-  const nextFeedRouteKey = feedRouteKey(path);
-  const visibleFeed = backgroundFeedRoute.value;
-
-  if (visibleFeed) {
-    feedScrollPositions.set(visibleFeed.key, contentScroll.value!.scrollTop);
-  }
-
-  pendingFeedScrollTop = nextFeedRouteKey && nextFeedRouteKey !== visibleFeed?.key
-    ? feedScrollPositions.get(nextFeedRouteKey) ?? 0
-    : null;
-
-  window.history.pushState(
-    isOpeningDetail && visibleFeed ? { journalDetailFromFeed: true } : null,
-    '',
-    path,
-  );
-  synchronizeLocation();
-
-  if (pendingFeedScrollTop === null) {
-    contentScroll.value!.scrollTo({ top: 0, behavior: 'smooth' });
-  }
+  await router.push({
+    path: nextUrl.pathname,
+    query: Object.fromEntries(nextUrl.searchParams),
+  });
 }
 
-function handlePopState(): void {
-  const currentPath = locationKey.value;
-  const nextPath = `${window.location.pathname}${window.location.search}`;
+function handleRouteChange(nextPath: string, currentPath: string): void {
   if (currentPath === nextPath) return;
   if (isOverlayHistoryTransition(currentPath, nextPath)) {
-    synchronizeLocation();
     return;
   }
 
-  const visibleFeed = backgroundFeedRoute.value;
   const context = overlayContext.value;
+  const currentFeedRouteKey = context && pathMatchesOverlayContext(currentPath, context)
+    ? context.origin.key
+    : feedRouteKey(currentPath);
   const nextFeedRouteKey = context && pathMatchesOverlayContext(nextPath, context)
     ? context.origin.key
     : feedRouteKey(nextPath);
 
-  if (visibleFeed) {
-    feedScrollPositions.set(visibleFeed.key, contentScroll.value!.scrollTop);
+  if (currentFeedRouteKey) {
+    feedScrollPositions.set(currentFeedRouteKey, contentScroll.value!.scrollTop);
   }
 
-  pendingFeedScrollTop = nextFeedRouteKey && nextFeedRouteKey !== visibleFeed?.key
+  pendingFeedScrollTop = nextFeedRouteKey && nextFeedRouteKey !== currentFeedRouteKey
     ? feedScrollPositions.get(nextFeedRouteKey) ?? 0
     : null;
-  synchronizeLocation();
-
   if (pendingFeedScrollTop === null) {
     contentScroll.value!.scrollTo({ top: 0, behavior: 'auto' });
   }
 }
 
-function openEntry(entry: JournalEntry): void {
+async function openEntry(entry: JournalEntry): Promise<void> {
   const origin = backgroundFeedRoute.value;
   if (!origin) throw new Error('Journal overlay requires a visible feed origin.');
 
   overlayContext.value = {
     entry,
     origin,
-    originPath: locationKey.value,
+    originPath: currentRoute.fullPath,
   };
   const path = origin.name === 'public'
     ? `/p/${encodeURIComponent(entry.publicId)}`
     : `/me?entry=${entry.id}`;
-  window.history.pushState(null, '', path);
-  synchronizeLocation();
+  await router.push(path);
 }
 
 function closeOverlay(): void {
   if (activeOverlayContext.value) {
-    window.history.back();
+    router.back();
     return;
   }
   if (directPublicOverlayEntry.value) {
@@ -226,23 +204,21 @@ function closeOverlay(): void {
     return;
   }
   if (route.value.name !== 'private' || route.value.entryId === null) return;
-  window.history.replaceState(null, '', '/me');
-  synchronizeLocation();
+  void router.replace('/me');
 }
 
-function removeDeletedOverlay(): void {
+async function removeDeletedOverlay(): Promise<void> {
   const context = activeOverlayContext.value;
   const returnPath = context?.originPath ?? '/me';
   overlayContext.value = null;
-  window.history.replaceState(null, '', returnPath);
-  synchronizeLocation();
-  if (context) window.history.back();
+  await router.replace(returnPath);
+  if (context) router.back();
 }
 
 function returnFromDetail(): void {
-  const state = window.history.state as { journalDetailFromFeed?: boolean } | null;
+  const state = currentRoute.state as { journalDetailFromFeed?: boolean };
   if (state?.journalDetailFromFeed === true) {
-    window.history.back();
+    router.back();
     return;
   }
   navigate('/');
@@ -261,11 +237,12 @@ function restoreFeedScroll(): void {
   contentScroll.value!.scrollTo({ top: scrollTop, behavior: 'auto' });
 }
 
-onMounted(async () => {
-  window.addEventListener('popstate', handlePopState);
-  ownerAuthenticated.value = (await fetchAuthenticationState()).authenticated;
+const removeAfterEach = router.afterEach((to, from) => {
+  if (to.fullPath !== from.fullPath) handleRouteChange(to.fullPath, from.fullPath);
 });
-onUnmounted(() => window.removeEventListener('popstate', handlePopState));
+
+onMounted(() => session.load());
+onUnmounted(removeAfterEach);
 </script>
 
 <template>
@@ -318,8 +295,6 @@ onUnmounted(() => window.removeEventListener('popstate', handlePopState));
           @open-entry="openEntry"
           @close-overlay="closeOverlay"
           @remove-deleted-overlay="removeDeletedOverlay"
-          @authentication-change="ownerAuthenticated = $event"
-          @navigate="navigate"
         />
       </KeepAlive>
 
@@ -330,18 +305,15 @@ onUnmounted(() => window.removeEventListener('popstate', handlePopState));
         :detail-id="route.publicId"
         @detail-loaded="handlePublicDetailLoaded"
         @return-to-feed="returnFromDetail"
-        @navigate="navigate"
       />
       <ArticleEditorView
         v-else-if="route.name === 'article-new'"
         :key="route.key"
-        @navigate="navigate"
       />
       <ArticleEditorView
         v-else-if="route.name === 'article-edit'"
         :key="route.key"
         :article-id="route.articleId"
-        @navigate="navigate"
       />
       <main v-else-if="route.name === 'not-found'" class="not-found">
         <span class="not-found__code">404</span>

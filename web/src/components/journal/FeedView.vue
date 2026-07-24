@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { List } from 'vant';
 import { computed, nextTick, onMounted, reactive, shallowRef, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import ArticleCardContent from '../article/ArticleCardContent.vue';
 import JournalLoading from '../ui/JournalLoading.vue';
 import JournalPullRefresh from '../ui/JournalPullRefresh.vue';
 import { useDeferredLoading } from '../../composables/useDeferredLoading';
 import { useJournalApi } from '../../composables/useJournalApi';
+import { useSessionStore } from '../../stores/session';
 import { emptyFeedFilters, type FeedFilters, type JournalEntry, type JournalVisibility } from '../../types';
 import EntryCard from './EntryCard.vue';
 import EntryFilters from './EntryFilters.vue';
@@ -31,13 +33,11 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   layoutReady: [];
-  navigate: [path: string];
   openEntry: [entry: JournalEntry];
   detailLoaded: [entry: JournalEntry];
   closeOverlay: [];
   removeDeletedOverlay: [];
   returnToFeed: [];
-  authenticationChange: [authenticated: boolean];
 }>();
 
 const filters = reactive<FeedFilters>({
@@ -45,6 +45,8 @@ const filters = reactive<FeedFilters>({
   tag: props.initialTag,
 });
 const journal = useJournalApi();
+const router = useRouter();
+const session = useSessionStore();
 const initialLoadPending = shallowRef(true);
 const listReplacing = shallowRef(false);
 const loggingOut = shallowRef(false);
@@ -102,7 +104,7 @@ const refreshDisabled = computed(() =>
 );
 
 watch(() => journal.authenticationState.value, (state) => {
-  if (state !== 'checking') emit('authenticationChange', state === 'authenticated');
+  if (state !== 'checking') session.setAuthenticated(state === 'authenticated');
 });
 
 onMounted(async () => {
@@ -208,7 +210,7 @@ async function authenticate(password: string): Promise<void> {
 
 async function selectTag(tag: string): Promise<void> {
   if (props.mode === 'public') {
-    emit('navigate', `/?tag=${encodeURIComponent(tag)}`);
+    await router.push({ name: 'public', query: { tag } });
     return;
   }
   filters.tag = tag;
@@ -231,12 +233,16 @@ async function logout(): Promise<void> {
 }
 
 function editArticle(id: number): void {
-  emit('navigate', `/me/articles/${id}/edit`);
+  void router.push({ name: 'article-edit', params: { articleId: id } });
 }
 
 function openEntry(entry: JournalEntry): void {
   if (props.mode === 'public' && isArticleEntry(entry)) {
-    emit('navigate', `/p/${encodeURIComponent(entry.publicId)}`);
+    void router.push({
+      name: 'detail',
+      params: { publicId: entry.publicId },
+      state: { journalDetailFromFeed: true },
+    });
     return;
   }
   journal.selectDetail(entry);
@@ -307,7 +313,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
               v-if="journal.authenticationState.value === 'authenticated'"
               class="button button--quiet"
               type="button"
-              @click="emit('navigate', '/me/articles/new')"
+              @click="router.push({ name: 'article-new' })"
             >
               写文章
             </button>
@@ -334,7 +340,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
             <button
               class="text-button"
               type="button"
-              @click="emit('navigate', '/')"
+              @click="router.push({ name: 'public' })"
             >
               清除标签
             </button>

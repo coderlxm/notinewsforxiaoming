@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, shallowRef, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import JournalLoading from '../ui/JournalLoading.vue';
 import { useDeferredLoading } from '../../composables/useDeferredLoading';
 import { useArticleEditor } from '../../composables/useArticleEditor';
@@ -15,11 +16,8 @@ const props = withDefaults(defineProps<{
   articleId: undefined,
 });
 
-const emit = defineEmits<{
-  navigate: [path: string];
-}>();
-
 const editor = useArticleEditor();
+const router = useRouter();
 
 const title = shallowRef('');
 const tags = shallowRef<string[]>([]);
@@ -101,7 +99,7 @@ async function save(): Promise<void> {
     };
     if (article.value === null) {
       const created = await editor.create(input);
-      if (created) emit('navigate', `/me/articles/${created.id}/edit`);
+      if (created) await router.push({ name: 'article-edit', params: { articleId: created.id } });
       return;
     }
     await editor.save(input);
@@ -150,7 +148,7 @@ async function changeVisibility(): Promise<void> {
 
 function viewArticle(entry: JournalEntry): void {
   if (entry.visibility === 'public') {
-    emit('navigate', `/p/${encodeURIComponent(entry.publicId)}`);
+    void router.push({ name: 'detail', params: { publicId: entry.publicId } });
     return;
   }
   previewing.value = !previewing.value;
@@ -160,7 +158,7 @@ function viewArticle(entry: JournalEntry): void {
 <template>
   <main class="editor-view">
     <div class="editor-view__heading">
-      <button class="text-button" type="button" @click="emit('navigate', '/me')">← 返回我的资产</button>
+      <button class="text-button" type="button" @click="router.push({ name: 'private' })">← 返回我的资产</button>
       <span>{{ isEditing ? '编辑文章' : '写文章' }}</span>
     </div>
 
