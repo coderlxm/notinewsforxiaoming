@@ -41,6 +41,7 @@ import {
   parseVitaminCallbackData,
   parseStartggWatchCallbackData,
   parseMasturbationCallbackData,
+  parseStartggSeedsCallbackData,
 } from './callbacks.js';
 import * as avRepo from '../services/avRepository.js';
 import type { TrackedTarget } from '../services/avRepository.js';
@@ -56,11 +57,16 @@ import {
   formatStartggRuntimeStatus,
   formatStartggWatchCandidates,
   formatStartggWatchList,
+  formatStartggGoStartedCard,
+  buildStartggSeedsButtons,
+  formatStartggSeedsList,
+  buildStartggSeedsListButtons,
 } from '../formatters/startggFormatter.js';
 import {
   fetchEventMeta,
   listEventEntrantPlayers,
   resolveUserToPlayer,
+  runStartggWatchOnce,
 } from '../services/startgg/index.js';
 import {
   createStartggWatchPlayer,
@@ -73,9 +79,15 @@ import {
   replaceActiveStartggWatchEvent,
   clearStartggWatchState,
   updateStartggWatchPlayerIdentity,
+  getFeaturedSeedCount,
+  setFeaturedSeedCount,
+  listEventFeaturedEntrants,
+  listActiveStartggWatchEvents,
+  type StartggFeaturedSeedCount,
 } from '../services/startggRepository.js';
-import { runStartggGo, runStartggWatchNow, syncStartggPresetPlayers } from '../services/startggPresetSync.js';
+import { runStartggGo, runStartggWatchNow, syncStartggPresetPlayers, resyncFeaturedEntrantsForActiveEvents } from '../services/startggPresetSync.js';
 import { escapeHtml } from '../utils/html.js';
+import { bjFormat } from '../utils/time.js';
 import {
   formatXLikedVideoSyncResult,
   isXLikedVideoSyncRunning,
@@ -137,6 +149,68 @@ function isStartggGoNaturalAlias(text: string): boolean {
   return STARTGG_GO_NATURAL_ALIASES.has(text.trim().replace(/\s+/g, ''));
 }
 
+function getStartggSeedCardInput(playerCount: number, seedCount: StartggFeaturedSeedCount): {
+  tournamentName: string;
+  eventName: string;
+  playerCount: number;
+  seedCount: StartggFeaturedSeedCount;
+  syncedCount: number;
+} {
+  const activeEvents = listActiveStartggWatchEvents();
+  const tournamentNames = [...new Set(
+    activeEvents
+      .map((event) => event.tournament_name)
+      .filter((name): name is string => Boolean(name)),
+  )];
+  const eventNames = activeEvents.map((event) => event.event_display_name ?? event.event_name);
+  return {
+    tournamentName: tournamentNames.join(' / ') || '-',
+    eventName: eventNames.join(' / ') || '-',
+    playerCount,
+    seedCount,
+    syncedCount: activeEvents.reduce(
+      (total, event) => total + listEventFeaturedEntrants(event.id).length,
+      0,
+    ),
+  };
+}
+
+function getStartggSeedListInput(seedCount: StartggFeaturedSeedCount): {
+  eventName: string;
+  seedCount: StartggFeaturedSeedCount;
+  entrants: Array<{ seedNum: number; entrantName: string }>;
+  syncedAt: string;
+} | null {
+  const activeEvents = listActiveStartggWatchEvents();
+  if (activeEvents.length === 0) return null;
+
+  const multipleEvents = activeEvents.length > 1;
+  const syncedAt: string[] = [];
+  const entrants = activeEvents.flatMap((event) => {
+    const eventName = event.event_display_name ?? event.event_name;
+    return listEventFeaturedEntrants(event.id).map((entrant) => {
+      syncedAt.push(entrant.updated_at);
+      return {
+        seedNum: entrant.seed_num,
+        entrantName: multipleEvents
+          ? `${eventName} · ${entrant.entrant_name}`
+          : entrant.entrant_name,
+      };
+    });
+  });
+
+  return {
+    eventName: activeEvents
+      .map((event) => event.event_display_name ?? event.event_name)
+      .join(' / '),
+    seedCount,
+    entrants,
+    syncedAt: syncedAt.length > 0
+      ? bjFormat(syncedAt.sort().at(-1)!)
+      : '-',
+  };
+}
+
 function isStartggUrl(raw: string): boolean {
   return raw.startsWith('http://') || raw.startsWith('https://');
 }
@@ -186,6 +260,13 @@ function formatAvSubscriptionList(targets: TrackedTarget[]): string {
 }
 
 export function registerInteractiveHandlers(bot: Telegraf): void {
+  async function applyFeaturedSeedCount(count: StartggFeaturedSeedCount): Promise<void> {
+    await resyncFeaturedEntrantsForActiveEvents(count);
+    setFeaturedSeedCount(count);
+    const summary = await runStartggWatchOnce(bot);
+    updateStartggFastWatch(bot, summary.activeEventSlugs);
+  }
+
   bot.command('start', (ctx) => {
     if (!isAuthorized(ctx)) return;
     ctx.reply(formatStartMessage(), {
@@ -373,29 +454,39 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     try {
       const summary = await runStartggGo(bot, keyword);
       if (summary.status === 'candidates') {
-        await ctx.reply(formatStartggGoTournamentCandidates(summary), { parse_mode: 'HTML' });
+        await ctx.telegram.editMessageText(
+          String(ctx.chat!.id),
+          startMessageResult.message_id,
+          undefined,
+          formatStartggGoTournamentCandidates(summary),
+          { parse_mode: 'HTML' },
+        );
         return;
       }
       updateStartggFastWatch(bot, summary.activeEventSlugs);
-      const enabled = enableStartggPolling(bot, false);
-      await ctx.reply(
-        [
-          'start.gg go 已启动',
-          `固定选手：${summary.syncedPlayers} 位`,
-          `赛事：${summary.tournamentName}`,
-          `自动订阅项目：${summary.discoveredEvents} 个`,
-          `立即检查：项目 ${summary.checkedEvents} 个，选手 ${summary.checkedPlayers} 位，状态变化 ${summary.changed} 条，进行中 ${summary.activeSetCount} 条`,
-          `自动轮询：${enabled ? '已开启' : '已经开启'}`,
-        ].join('\n'),
-        { parse_mode: 'HTML' },
+      enableStartggPolling(bot, false);
+
+      const seedCount = getFeaturedSeedCount();
+      await ctx.telegram.editMessageText(
+        String(ctx.chat!.id),
+        startMessageResult.message_id,
+        undefined,
+        formatStartggGoStartedCard(getStartggSeedCardInput(summary.syncedPlayers, seedCount)),
+        {
+          parse_mode: 'HTML',
+          ...buildStartggSeedsButtons(seedCount),
+          link_preview_options: { is_disabled: true },
+        },
       );
     } catch (e) {
       if (e instanceof Error) {
-        const errorMessage = await ctx.reply(`start.gg go 失败：${e.message}`, { parse_mode: 'HTML' });
-        if (e.message === '没有从固定选手关联或当前活动候选中发现赛事。') {
-          await ctx.telegram.deleteMessage(ctx.chat!.id, startMessageResult.message_id);
-          await ctx.telegram.deleteMessage(ctx.chat!.id, errorMessage.message_id);
-        }
+        await ctx.telegram.editMessageText(
+          String(ctx.chat!.id),
+          startMessageResult.message_id,
+          undefined,
+          `start.gg go 失败：${escapeHtml(e.message)}`,
+          { parse_mode: 'HTML' },
+        );
         return;
       }
       throw e;
@@ -443,6 +534,71 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
         );
         return;
       }
+
+      if (arg === 'seeds' || arg.startsWith('seeds ')) {
+        const seedArg = arg.replace(/^seeds\s*/, '').trim();
+
+        if (seedArg === '16' || seedArg === '32') {
+          const count: StartggFeaturedSeedCount = seedArg === '16' ? 16 : 32;
+          await applyFeaturedSeedCount(count);
+          if (listActiveStartggWatchEvents().length === 0) {
+            await ctx.reply(`种子关注已设置为 Top ${count}，下次点击「比赛了」时自动应用。`);
+            return;
+          }
+          const players = listStartggWatchPlayers().filter((row) => row.enabled === 1);
+
+          await ctx.reply(
+            formatStartggGoStartedCard(getStartggSeedCardInput(players.length, count)),
+            {
+              parse_mode: 'HTML',
+              ...buildStartggSeedsButtons(count),
+              link_preview_options: { is_disabled: true },
+            },
+          );
+          return;
+        }
+
+        if (seedArg === 'off') {
+          await applyFeaturedSeedCount(0);
+          if (listActiveStartggWatchEvents().length === 0) {
+            await ctx.reply('种子关注已关闭，下次点击「比赛了」时继续保持关闭。');
+            return;
+          }
+          const players = listStartggWatchPlayers().filter((row) => row.enabled === 1);
+
+          await ctx.reply(
+            formatStartggGoStartedCard(getStartggSeedCardInput(players.length, 0)),
+            {
+              parse_mode: 'HTML',
+              ...buildStartggSeedsButtons(0),
+              link_preview_options: { is_disabled: true },
+            },
+          );
+          return;
+        }
+
+        if (seedArg === '') {
+          const seedCount = getFeaturedSeedCount();
+          const listInput = getStartggSeedListInput(seedCount);
+          if (!listInput) {
+            await ctx.reply('当前无活动赛事。种子关注设置：' + (seedCount === 0 ? '关闭' : `Top ${seedCount}`), { parse_mode: 'HTML' });
+            return;
+          }
+
+          await ctx.reply(
+            formatStartggSeedsList(listInput),
+            {
+              parse_mode: 'HTML',
+              ...buildStartggSeedsListButtons(),
+              link_preview_options: { is_disabled: true },
+            },
+          );
+          return;
+        }
+
+        await ctx.reply('用法：/startgg seeds [16|32|off]', { parse_mode: 'HTML' });
+        return;
+      }
       await syncStartggPresetPlayers();
       const players = listStartggWatchPlayers().filter((row) => row.enabled === 1);
       const events = listStartggWatchEvents().filter((row) => row.active === 1);
@@ -454,6 +610,8 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
           ? 'start.gg 消息清理失败'
           : arg === 'go' || arg.startsWith('go ')
             ? 'start.gg go 失败'
+            : arg === 'seeds' || arg.startsWith('seeds ')
+              ? 'start.gg 种子关注操作失败'
             : 'start.gg 状态读取失败';
         await ctx.reply(`${errorPrefix}：${e.message}`, { parse_mode: 'HTML' });
         return;
@@ -1061,6 +1219,83 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
         { parse_mode: 'HTML' },
       );
       return;
+    }
+
+    const seedsAction = parseStartggSeedsCallbackData(cbData);
+    if (seedsAction) {
+      if (seedsAction.type === 'seeds_set') {
+        const currentCount = getFeaturedSeedCount();
+        if (currentCount === seedsAction.count) {
+          await ctx.answerCbQuery(
+            currentCount === 0 ? '种子关注已经关闭' : `当前已经是 Top ${currentCount}`,
+          );
+          return;
+        }
+        await ctx.answerCbQuery();
+        await applyFeaturedSeedCount(seedsAction.count);
+        if (listActiveStartggWatchEvents().length === 0) {
+          await ctx.editMessageText(
+            seedsAction.count === 0
+              ? '种子关注已关闭，下次点击「比赛了」时继续保持关闭。'
+              : `种子关注已设置为 Top ${seedsAction.count}，下次点击「比赛了」时自动应用。`,
+            buildStartggSeedsButtons(seedsAction.count),
+          );
+          return;
+        }
+        const players = listStartggWatchPlayers().filter((row) => row.enabled === 1);
+
+        await ctx.editMessageText(
+          formatStartggGoStartedCard(getStartggSeedCardInput(players.length, seedsAction.count)),
+          {
+            parse_mode: 'HTML',
+            ...buildStartggSeedsButtons(seedsAction.count),
+            link_preview_options: { is_disabled: true },
+          },
+        );
+        return;
+      }
+
+      if (seedsAction.type === 'seeds_list') {
+        await ctx.answerCbQuery();
+        const seedCount = getFeaturedSeedCount();
+        const listInput = getStartggSeedListInput(seedCount);
+        if (!listInput) {
+          await ctx.editMessageText('当前无活动赛事。', { parse_mode: 'HTML' });
+          return;
+        }
+
+        await ctx.editMessageText(
+          formatStartggSeedsList(listInput),
+          {
+            parse_mode: 'HTML',
+            ...buildStartggSeedsListButtons(),
+            link_preview_options: { is_disabled: true },
+          },
+        );
+        return;
+      }
+
+      if (seedsAction.type === 'seeds_status') {
+        await ctx.answerCbQuery();
+        const activeEvents = listActiveStartggWatchEvents();
+        const activeEvent = activeEvents[0] ?? null;
+        if (!activeEvent) {
+          await ctx.editMessageText('当前无活动赛事。', { parse_mode: 'HTML' });
+          return;
+        }
+        const seedCount = getFeaturedSeedCount();
+        const players = listStartggWatchPlayers().filter((row) => row.enabled === 1);
+
+        await ctx.editMessageText(
+          formatStartggGoStartedCard(getStartggSeedCardInput(players.length, seedCount)),
+          {
+            parse_mode: 'HTML',
+            ...buildStartggSeedsButtons(seedCount),
+            link_preview_options: { is_disabled: true },
+          },
+        );
+        return;
+      }
     }
 
     const vitaminAction = parseVitaminCallbackData(cbData);

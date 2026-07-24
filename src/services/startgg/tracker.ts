@@ -6,6 +6,7 @@ import {
   type StartggFinalPhaseStartedItem,
   type StartggFinalStandingsItem,
   type StartggPlayerUpdateItem,
+  type StartggFeaturedSetResultItem,
 } from '../../formatters/startggFormatter.js';
 import { sendTelegramMessageWithId } from '../../publishers/telegram.js';
 import {
@@ -28,6 +29,7 @@ import {
   markStartggEventPushedSet,
   markStartggFinalPhaseTrackingCompleted,
   updateStartggWatchEventFinalPhase,
+  listEventFeaturedEntrants,
 } from '../startggRepository.js';
 import {
   fetchEventHeader,
@@ -481,9 +483,12 @@ async function processEvent(
   );
 
   const mappedEntrantIds = Array.from(entrantMappings.values()).filter((id): id is number => id !== null);
+  const featuredEntrants = listEventFeaturedEntrants(eventRow.id);
+  const featuredEntrantIds = featuredEntrants.map((fe) => fe.entrant_id);
+  const allEntrantIds = [...new Set([...mappedEntrantIds, ...featuredEntrantIds])];
   const [entrantSets, eventStandings] = await Promise.all([
-    mappedEntrantIds.length > 0
-      ? fetchEventSetsByEntrants(normalizedSlug, mappedEntrantIds)
+    allEntrantIds.length > 0
+      ? fetchEventSetsByEntrants(normalizedSlug, allEntrantIds)
       : Promise.resolve([]),
     mappedEntrantIds.length > 0
       ? fetchEntrantStandings(mappedEntrantIds)
@@ -524,7 +529,7 @@ async function processEvent(
     if (initialMessagePending) {
       if (playerSets.length === 0) continue;
 
-      for (const set of playerSets) {
+      for (const set of playerSets.filter((item) => Number.isInteger(item.id))) {
         markStartggPushedSet(player.id, eventRow.id, set.id);
       }
 
@@ -573,6 +578,52 @@ async function processEvent(
     }
   }
 
+  const featuredSetResults: StartggFeaturedSetResultItem[] = [];
+  if (featuredEntrants.length > 0) {
+    const featuredIdSet = new Set(featuredEntrantIds);
+    const mappedIdSet = new Set(mappedEntrantIds);
+
+    const featuredOnlySets = entrantSets.filter((set) =>
+      set.slots.some((slot) => slot.entrant && featuredIdSet.has(slot.entrant.id)) &&
+      !set.slots.some((slot) => slot.entrant && mappedIdSet.has(slot.entrant.id)),
+    );
+
+    const featuredActiveCount = featuredOnlySets.filter((set) =>
+      set.startedAt !== null && set.completedAt === null,
+    ).length;
+    if (featuredActiveCount > 0) {
+      activeSetCount += featuredActiveCount;
+    }
+
+    const featuredCompletedSets = featuredOnlySets
+      .filter((set) => set.completedAt !== null && Number.isInteger(set.id))
+      .sort(compareSetChronology);
+
+    for (const set of featuredCompletedSets) {
+      if (pendingPlayerSetIds.has(set.id)) continue;
+      if (hasAnyStartggPlayerPushedSet(eventRow.id, set.id)) continue;
+      if (hasStartggEventPushedSet(eventRow.id, set.id)) continue;
+
+      const entrants = set.slots
+        .map((slot) => slot.entrant)
+        .filter((entrant): entrant is { id: number; name: string } => Boolean(entrant?.name));
+      const winner = entrants.find((entrant) => entrant.id === set.winnerId);
+      if (!winner) {
+        throw new Error(`start.gg completed featured set missing winner entrant: ${set.id}`);
+      }
+
+      featuredSetResults.push({
+        roundLabel: set.fullRoundText,
+        entrantNames: entrants.map((entrant) => entrant.name),
+        scoreText: buildSetScoreText(set.displayScore),
+        winnerName: winner.name,
+        setUrl: `https://www.start.gg/${normalizedSlug}/set/${set.id}`,
+      });
+      pendingEventSetIds.push(set.id);
+      changed += 1;
+    }
+  }
+
   let finalPhaseId = eventRow.final_phase_id;
   let finalPhaseName = eventRow.final_phase_name;
   let finalPhaseNumSeeds = eventRow.final_phase_num_seeds;
@@ -604,7 +655,9 @@ async function processEvent(
       ]);
       phaseTracking = baselineTracking;
       eventState = baselineTracking.eventState;
-      for (const set of baselineTracking.sets.filter((item) => item.completedAt !== null)) {
+      for (const set of baselineTracking.sets.filter(
+        (item) => item.completedAt !== null && Number.isInteger(item.id),
+      )) {
         markStartggEventPushedSet(eventRow.id, set.id);
       }
       const entrants = seeds
@@ -632,10 +685,11 @@ async function processEvent(
     }
 
     const completedSets = phaseSets
-      .filter((set) => set.completedAt !== null)
+      .filter((set) => set.completedAt !== null && Number.isInteger(set.id))
       .sort(compareSetChronology);
     for (const set of completedSets) {
       if (hasStartggEventPushedSet(eventRow.id, set.id)) continue;
+      if (pendingEventSetIds.includes(set.id)) continue;
       const playerSetAlreadyPushed = hasAnyStartggPlayerPushedSet(eventRow.id, set.id)
         || pendingPlayerSetIds.has(set.id);
       if (!playerSetAlreadyPushed) {
@@ -680,12 +734,13 @@ async function processEvent(
   }
 
   const summary: StartggEventSummaryInput | null
-    = playerUpdates.length > 0 || finalPhaseStarted !== null || finalPhaseSetResults.length > 0 || finalStandings !== null
+    = playerUpdates.length > 0 || featuredSetResults.length > 0 || finalPhaseStarted !== null || finalPhaseSetResults.length > 0 || finalStandings !== null
       ? {
           tournamentName,
           eventName: eventDisplayName,
           eventSlug: resolvedEventSlug,
           playerUpdates,
+          featuredSetResults,
           finalPhaseStarted,
           finalPhaseSetResults,
           finalStandings,

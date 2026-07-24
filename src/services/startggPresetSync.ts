@@ -2,11 +2,18 @@ import {
   createStartggWatchPlayer,
   findStartggWatchPlayerByPlayerId,
   listEnabledStartggWatchPlayers,
+  listActiveStartggWatchEvents,
   replaceActiveStartggWatchEvents,
   syncAutoDiscoveredStartggWatchEvents,
   type StartggWatchEventInput,
   updateStartggWatchPlayerIdentity,
   updateStartggWatchPlayerName,
+  getFeaturedSeedCount,
+  listEventFeaturedEntrants,
+  replaceEventFeaturedEntrants,
+  markStartggEventPushedSet,
+  type StartggFeaturedSeedCount,
+  type StartggWatchEvent,
 } from './startggRepository.js';
 import {
   loadStartggPresetPlayersConfig,
@@ -16,7 +23,14 @@ import {
   discoverStartggActiveEventsForPlayers,
   type StartggDiscoveredEvent,
 } from './startggDiscovery.js';
-import { resolveUserToPlayer, runStartggWatchOnce } from './startgg/index.js';
+import {
+  resolveUserToPlayer,
+  runStartggWatchOnce,
+  normalizeEventSlug,
+  fetchFeaturedSeedPhaseMeta,
+  fetchPhaseSeeds,
+  fetchEventSetsByEntrants,
+} from './startgg/index.js';
 import type { Telegraf } from 'telegraf';
 
 export interface StartggGoTournamentCandidate {
@@ -47,6 +61,87 @@ export type StartggGoResult =
       activeSetCount: number;
       activeEventSlugs: string[];
     };
+
+async function loadFeaturedEntrants(
+  event: StartggWatchEvent,
+  seedCount: Exclude<StartggFeaturedSeedCount, 0>,
+): Promise<{
+  phaseId: number;
+  entrants: Array<{ entrantId: number; entrantName: string; seedNum: number }>;
+  completedSetIds: number[];
+}> {
+  const slug = normalizeEventSlug(event.event_slug);
+  const seedPhase = await fetchFeaturedSeedPhaseMeta(slug);
+  if (!seedPhase) {
+    throw new Error(`start.gg event has no featured seed phase: ${slug}`);
+  }
+
+  const seeds = await fetchPhaseSeeds(seedPhase.phaseId);
+  const entrants = seeds
+    .filter((seed): seed is { seedNum: number; entrant: { id: number; name: string } } =>
+      seed.entrant !== null && seed.seedNum <= seedCount)
+    .sort((a, b) => a.seedNum - b.seedNum)
+    .map((seed) => ({
+      entrantId: seed.entrant.id,
+      entrantName: seed.entrant.name,
+      seedNum: seed.seedNum,
+    }));
+  if (entrants.length === 0) {
+    throw new Error(`start.gg featured seed phase has no entrants: ${slug}`);
+  }
+
+  const sets = await fetchEventSetsByEntrants(slug, entrants.map((entrant) => entrant.entrantId));
+  return {
+    phaseId: seedPhase.phaseId,
+    entrants,
+    completedSetIds: sets
+      .filter((set) => set.completedAt !== null && Number.isInteger(set.id))
+      .map((set) => set.id),
+  };
+}
+
+function saveFeaturedEntrants(
+  eventRowId: number,
+  sync: Awaited<ReturnType<typeof loadFeaturedEntrants>>,
+): void {
+  replaceEventFeaturedEntrants(eventRowId, sync.phaseId, sync.entrants);
+  for (const setId of sync.completedSetIds) {
+    markStartggEventPushedSet(eventRowId, setId);
+  }
+}
+
+export async function syncFeaturedEntrantsForActiveEvents(): Promise<void> {
+  const seedCount = getFeaturedSeedCount();
+  if (seedCount === 0) return;
+
+  const activeEvents = listActiveStartggWatchEvents();
+  const newEvents = activeEvents.filter((event) => listEventFeaturedEntrants(event.id).length === 0);
+  const eventSyncs = await Promise.all(newEvents.map(async (event) => ({
+    event,
+    sync: await loadFeaturedEntrants(event, seedCount),
+  })));
+  for (const { event, sync } of eventSyncs) {
+    saveFeaturedEntrants(event.id, sync);
+  }
+}
+
+export async function resyncFeaturedEntrantsForActiveEvents(seedCount: StartggFeaturedSeedCount): Promise<void> {
+  const activeEvents = listActiveStartggWatchEvents();
+  if (seedCount === 0) {
+    for (const event of activeEvents) {
+      replaceEventFeaturedEntrants(event.id, 0, []);
+    }
+    return;
+  }
+
+  const eventSyncs = await Promise.all(activeEvents.map(async (event) => ({
+    event,
+    sync: await loadFeaturedEntrants(event, seedCount),
+  })));
+  for (const { event, sync } of eventSyncs) {
+    saveFeaturedEntrants(event.id, sync);
+  }
+}
 
 function toWatchEventInput(event: StartggDiscoveredEvent): StartggWatchEventInput {
   return {
@@ -131,6 +226,7 @@ export async function runStartggWatchNow(bot?: Telegraf): Promise<{
   const players = listEnabledStartggWatchPlayers();
   const discoveredEvents = await discoverStartggActiveEventsForPlayers(players);
   syncAutoDiscoveredStartggWatchEvents(discoveredEvents.map(toWatchEventInput));
+  await syncFeaturedEntrantsForActiveEvents();
   const watchSummary = await runStartggWatchOnce(bot);
   return {
     checkedPlayers: watchSummary.checkedPlayers,
@@ -194,6 +290,7 @@ export async function runStartggGo(bot: Telegraf | undefined, keyword: string): 
   const trimmedKeyword = keyword.trim();
   if (!trimmedKeyword) {
     replaceActiveStartggWatchEvents(events.map(toWatchEventInput), 'auto');
+    await syncFeaturedEntrantsForActiveEvents();
     const watchSummary = await runStartggWatchOnce(bot, {
       eventSlugs: events.map((event) => event.eventSlug),
     });
@@ -234,6 +331,7 @@ export async function runStartggGo(bot: Telegraf | undefined, keyword: string): 
 
   const matchedTournament = matchedCandidates[0]!;
   replaceActiveStartggWatchEvents(matchedTournament.events.map(toWatchEventInput), 'manual');
+  await syncFeaturedEntrantsForActiveEvents();
 
   const watchSummary = await runStartggWatchOnce(bot, {
     eventSlugs: matchedTournament.events.map((event) => event.eventSlug),

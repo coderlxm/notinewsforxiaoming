@@ -251,6 +251,39 @@ const MIGRATIONS: DbMigration[] = [
       `);
     },
   },
+  {
+    version: 15,
+    up(db) {
+      if (!tableHasColumn(db, 'startgg_runtime_settings', 'featured_seed_count')) {
+        db.exec(`
+          ALTER TABLE startgg_runtime_settings
+          ADD COLUMN featured_seed_count INTEGER NOT NULL DEFAULT 16
+          CHECK (featured_seed_count IN (0, 16, 32));
+        `);
+      }
+      db.exec(`
+        INSERT OR IGNORE INTO startgg_runtime_settings (
+          id, polling_enabled, featured_seed_count, updated_at
+        )
+        VALUES (1, 0, 16, CURRENT_TIMESTAMP);
+      `);
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS startgg_watch_event_featured_entrants (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          watch_event_id INTEGER NOT NULL,
+          phase_id INTEGER NOT NULL,
+          entrant_id INTEGER NOT NULL,
+          entrant_name TEXT NOT NULL,
+          seed_num INTEGER NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY(watch_event_id) REFERENCES startgg_watch_events(id),
+          UNIQUE(watch_event_id, entrant_id),
+          UNIQUE(watch_event_id, seed_num)
+        );
+      `);
+    },
+  },
 ];
 
 export function runDbMigrations(db: Database.Database): void {

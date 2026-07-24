@@ -253,6 +253,7 @@ query EventSetsByEntrants($slug: String!, $entrantIds: [ID!]!, $page: Int!, $per
         slots {
           entrant {
             id
+            name
           }
         }
       }

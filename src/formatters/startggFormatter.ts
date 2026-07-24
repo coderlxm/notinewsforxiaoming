@@ -1,4 +1,7 @@
-import type { StartggWatchStatus } from '../services/startggRepository.js';
+import type {
+  StartggFeaturedSeedCount,
+  StartggWatchStatus,
+} from '../services/startggRepository.js';
 import { escapeHtml } from '../utils/html.js';
 import { bjFormat } from '../utils/time.js';
 
@@ -251,6 +254,14 @@ export interface StartggFinalPhaseSetResultItem {
   setUrl: string;
 }
 
+export interface StartggFeaturedSetResultItem {
+  roundLabel: string | null;
+  entrantNames: string[];
+  scoreText: string | null;
+  winnerName: string;
+  setUrl: string;
+}
+
 export interface StartggFinalStandingsItem {
   standings: Array<{ placement: number; entrantName: string }>;
 }
@@ -260,6 +271,7 @@ export interface StartggEventSummaryInput {
   eventName: string;
   eventSlug: string;
   playerUpdates: StartggPlayerUpdateItem[];
+  featuredSetResults: StartggFeaturedSetResultItem[];
   finalPhaseStarted: StartggFinalPhaseStartedItem | null;
   finalPhaseSetResults: StartggFinalPhaseSetResultItem[];
   finalStandings: StartggFinalStandingsItem | null;
@@ -356,33 +368,63 @@ function renderStartggFinalPhaseSection(input: {
   return lines;
 }
 
+function renderStartggFeaturedSection(items: StartggFeaturedSetResultItem[]): string[] {
+  if (items.length === 0) return [];
+  const lines: string[] = [`🌟 <b>种子选手赛果（${items.length} 场）</b>`];
+  for (const item of items) {
+    const roundText = item.roundLabel ? `${escapeHtml(item.roundLabel)}：` : '';
+    const score = item.scoreText ? escapeHtml(item.scoreText) : item.entrantNames.map(escapeHtml).join(' vs ');
+    lines.push(`• ${roundText}${score} · 胜者 ${escapeHtml(item.winnerName)}`);
+    lines.push(`  🔎 <a href="${escapeHtml(normalizeUrl(item.setUrl))}">查看对局</a>`);
+  }
+  return lines;
+}
+
 export function buildStartggEventSummaryMessages(input: StartggEventSummaryInput): string[] {
   const playerLines = renderStartggPlayerSection(input.playerUpdates);
+  const featuredLines = renderStartggFeaturedSection(input.featuredSetResults);
   const finalLines = renderStartggFinalPhaseSection({
     started: input.finalPhaseStarted,
     setResults: input.finalPhaseSetResults,
     finalStandings: input.finalStandings,
   });
 
-  if (playerLines.length === 0 && finalLines.length === 0) return [];
+  if (playerLines.length === 0 && featuredLines.length === 0 && finalLines.length === 0) return [];
 
   const header = startggSummaryHeader(input.tournamentName, input.eventName);
   const footer = startggSummaryFooter(input.eventSlug);
-  const gap = playerLines.length > 0 && finalLines.length > 0
-    ? ['', '──────────────────', '']
-    : [];
 
-  const combined = [...header, '', ...playerLines, ...gap, ...finalLines, '', ...footer].join('\n');
+  const sections = [playerLines, featuredLines, finalLines].filter((s) => s.length > 0);
+  const gaps = Array.from({ length: sections.length - 1 }, () => ['', '──────────────────', '']);
+
+  const body: string[] = [];
+  for (let i = 0; i < sections.length; i++) {
+    if (i > 0) body.push(...gaps[i - 1]!);
+    body.push(...sections[i]!);
+  }
+
+  const combined = [...header, '', ...body, '', ...footer].join('\n');
   if (combined.length <= TELEGRAM_MESSAGE_LIMIT) {
     return [combined];
   }
 
   const messages: string[] = [];
-  if (playerLines.length > 0) {
-    messages.push([...header, '', ...playerLines, '', ...footer].join('\n'));
-  }
-  if (finalLines.length > 0) {
-    messages.push([...header, '', ...finalLines, '', ...footer].join('\n'));
+  for (const section of sections) {
+    const sectionTitle = section[0]!;
+    let body = [sectionTitle];
+    for (const line of section.slice(1)) {
+      const candidate = [...header, '', ...body, line, '', ...footer].join('\n');
+      if (candidate.length <= TELEGRAM_MESSAGE_LIMIT) {
+        body.push(line);
+        continue;
+      }
+      messages.push([...header, '', ...body, '', ...footer].join('\n'));
+      body = [sectionTitle, line];
+      if ([...header, '', ...body, '', ...footer].join('\n').length > TELEGRAM_MESSAGE_LIMIT) {
+        throw new Error('start.gg summary line exceeds Telegram message limit.');
+      }
+    }
+    messages.push([...header, '', ...body, '', ...footer].join('\n'));
   }
   return messages;
 }
@@ -508,4 +550,92 @@ export function formatStartggWatchList(
     });
   }
   return lines.join('\n');
+}
+
+function seedCountLabel(count: StartggFeaturedSeedCount): string {
+  if (count === 16) return 'Top 16';
+  if (count === 32) return 'Top 32';
+  return '关闭';
+}
+
+export function formatStartggGoStartedCard(input: {
+  tournamentName: string;
+  eventName: string;
+  playerCount: number;
+  seedCount: StartggFeaturedSeedCount;
+  syncedCount: number;
+}): string {
+  const seedText = input.seedCount === 0
+    ? '关闭'
+    : `Top ${input.seedCount}（已同步 ${input.syncedCount} 位）`;
+
+  return [
+    '🥊 <b>start.gg 监控已启动</b>',
+    '──────────────────',
+    `赛事：${escapeHtml(input.tournamentName)}`,
+    `固定关注：${input.playerCount} 位`,
+    `种子关注：${seedText}`,
+    `项目：${escapeHtml(input.eventName)}`,
+    '固定轮询：15 分钟',
+  ].join('\n');
+}
+
+export function buildStartggSeedsButtons(seedCount: StartggFeaturedSeedCount): { reply_markup: InlineKeyboardMarkup } {
+  const top16Label = seedCount === 16 ? '✅ Top 16' : 'Top 16';
+  const top32Label = seedCount === 32 ? '✅ Top 32' : 'Top 32';
+  const offLabel = seedCount === 0 ? '✅ 已关闭种子关注' : '关闭种子关注';
+
+  return {
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: top16Label, callback_data: 'sgseeds:16' },
+          { text: top32Label, callback_data: 'sgseeds:32' },
+        ],
+        [
+          { text: offLabel, callback_data: 'sgseeds:0' },
+          { text: '查看种子清单', callback_data: 'sgseeds:list' },
+        ],
+      ],
+    },
+  };
+}
+
+export function formatStartggSeedsList(input: {
+  eventName: string;
+  seedCount: StartggFeaturedSeedCount;
+  entrants: Array<{ seedNum: number; entrantName: string }>;
+  syncedAt: string;
+}): string {
+  const lines = [
+    '🌟 <b>种子关注清单</b>',
+    '──────────────────',
+    `赛事：${escapeHtml(input.eventName)}`,
+    `档位：${escapeHtml(seedCountLabel(input.seedCount))}`,
+    `已同步：${input.entrants.length} 位`,
+    '──────────────────',
+  ];
+
+  if (input.entrants.length === 0) {
+    lines.push('（种子关注已关闭或无可用数据）');
+  } else {
+    for (const entrant of input.entrants) {
+      lines.push(`${entrant.seedNum}. ${escapeHtml(entrant.entrantName)}`);
+    }
+  }
+
+  lines.push('──────────────────');
+  lines.push(`最近同步：${escapeHtml(input.syncedAt)}`);
+
+  return lines.join('\n');
+}
+
+export function buildStartggSeedsListButtons(): { reply_markup: InlineKeyboardMarkup } {
+  return {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: '🔙 返回监控状态', callback_data: 'sgseeds:status' }],
+      ],
+    },
+  };
 }

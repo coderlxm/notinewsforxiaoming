@@ -96,6 +96,7 @@ function clearStartggWatchEventState(db: ReturnType<typeof getDb>, eventRowId: n
   db.prepare(`DELETE FROM startgg_watch_event_entrants WHERE watch_event_id = ?`).run(eventRowId);
   db.prepare(`DELETE FROM startgg_pushed_sets WHERE watch_event_id = ?`).run(eventRowId);
   db.prepare(`DELETE FROM startgg_event_pushed_sets WHERE watch_event_id = ?`).run(eventRowId);
+  db.prepare(`DELETE FROM startgg_watch_event_featured_entrants WHERE watch_event_id = ?`).run(eventRowId);
   db.prepare(`
     UPDATE startgg_watch_events
     SET event_state = NULL,
@@ -684,11 +685,78 @@ export function clearStartggWatchState(): void {
     db.prepare('DELETE FROM startgg_sent_messages').run();
     db.prepare('DELETE FROM startgg_pushed_sets').run();
     db.prepare('DELETE FROM startgg_event_pushed_sets').run();
+    db.prepare('DELETE FROM startgg_watch_event_featured_entrants').run();
     db.prepare('DELETE FROM startgg_watch_event_entrants').run();
     db.prepare('DELETE FROM startgg_watch_snapshots').run();
     db.prepare('DELETE FROM startgg_watch_events').run();
   });
   clear();
+}
+
+export interface StartggWatchEventFeaturedEntrant {
+  id: number;
+  watch_event_id: number;
+  phase_id: number;
+  entrant_id: number;
+  entrant_name: string;
+  seed_num: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export type StartggFeaturedSeedCount = 0 | 16 | 32;
+
+export function getFeaturedSeedCount(): StartggFeaturedSeedCount {
+  const row = getDb().prepare(`
+    SELECT featured_seed_count
+    FROM startgg_runtime_settings
+    WHERE id = 1
+  `).get() as { featured_seed_count: number } | undefined;
+  if (!row || (row.featured_seed_count !== 0 && row.featured_seed_count !== 16 && row.featured_seed_count !== 32)) {
+    throw new Error('start.gg featured seed setting is missing or invalid.');
+  }
+  return row.featured_seed_count;
+}
+
+export function setFeaturedSeedCount(count: StartggFeaturedSeedCount): void {
+  getDb().prepare(`
+    INSERT INTO startgg_runtime_settings (id, polling_enabled, featured_seed_count, updated_at)
+    VALUES (1, 0, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      featured_seed_count = excluded.featured_seed_count,
+      updated_at = excluded.updated_at
+  `).run(count, new Date().toISOString());
+}
+
+export function replaceEventFeaturedEntrants(
+  eventRowId: number,
+  phaseId: number,
+  entrants: Array<{ entrantId: number; entrantName: string; seedNum: number }>,
+): void {
+  const db = getDb();
+  const now = new Date().toISOString();
+  const replace = db.transaction(() => {
+    db.prepare(`DELETE FROM startgg_watch_event_featured_entrants WHERE watch_event_id = ?`).run(eventRowId);
+    const insert = db.prepare(`
+      INSERT INTO startgg_watch_event_featured_entrants (
+        watch_event_id, phase_id, entrant_id, entrant_name, seed_num, created_at, updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+    for (const entrant of entrants) {
+      insert.run(eventRowId, phaseId, entrant.entrantId, entrant.entrantName, entrant.seedNum, now, now);
+    }
+  });
+  replace();
+}
+
+export function listEventFeaturedEntrants(eventRowId: number): StartggWatchEventFeaturedEntrant[] {
+  return getDb().prepare(`
+    SELECT *
+    FROM startgg_watch_event_featured_entrants
+    WHERE watch_event_id = ?
+    ORDER BY seed_num ASC
+  `).all(eventRowId) as StartggWatchEventFeaturedEntrant[];
 }
 
 export function listStartggWatchStatusViews(): StartggWatchStatusView[] {

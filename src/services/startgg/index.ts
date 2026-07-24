@@ -1,5 +1,6 @@
 export { queryStartgg } from './client.js';
-export { fetchEventHeader, fetchEventSetsPages, fetchEventEntrantsPages, fetchEventStandings, fetchEventSetsByEntrants, fetchEventEntrantsDetailed, fetchEventBasic, fetchUserPlayer } from './client.js';
+export { fetchEventHeader, fetchEventSetsPages, fetchEventEntrantsPages, fetchEventStandings, fetchEventSetsByEntrants, fetchEventEntrantsDetailed, fetchEventBasic, fetchUserPlayer, fetchFeaturedSeedPhaseMeta, fetchPhaseSeeds } from './client.js';
+export type { FeaturedSeedPhaseMeta } from './client.js';
 export {
   normalizeEventSlug,
   normalizeUserSlug,

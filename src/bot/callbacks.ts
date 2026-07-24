@@ -86,6 +86,23 @@ export function parseStartggWatchCallbackData(data: string | undefined): Startgg
   return { eventRowId, playerId };
 }
 
+export type StartggSeedsCallback =
+  | { type: 'seeds_set'; count: 0 | 16 | 32 }
+  | { type: 'seeds_list' }
+  | { type: 'seeds_status' };
+
+export function parseStartggSeedsCallbackData(data: string | undefined): StartggSeedsCallback | null {
+  if (!data) return null;
+  if (!data.startsWith('sgseeds:')) return null;
+  const payload = data.slice('sgseeds:'.length);
+  if (payload === 'list') return { type: 'seeds_list' };
+  if (payload === 'status') return { type: 'seeds_status' };
+  if (payload === '0') return { type: 'seeds_set', count: 0 };
+  if (payload === '16') return { type: 'seeds_set', count: 16 };
+  if (payload === '32') return { type: 'seeds_set', count: 32 };
+  return null;
+}
+
 export type MasturbationCallback =
   | { type: 'add' }
   | { type: 'stats' }

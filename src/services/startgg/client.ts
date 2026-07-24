@@ -440,6 +440,35 @@ async function fetchTournamentIdentityBatch(
   return identities;
 }
 
+export interface FeaturedSeedPhaseMeta {
+  phaseId: number;
+  phaseName: string;
+  numSeeds: number;
+}
+
+function selectFeaturedSeedPhase(phases: Array<{
+  id: number;
+  name: string;
+  phaseOrder: number;
+  numSeeds: number | null;
+  state: string;
+}>): FeaturedSeedPhaseMeta | null {
+  const best = phases
+    .filter((item) => item.numSeeds !== null && item.numSeeds > 0)
+    .sort((a, b) => {
+      if (b.numSeeds! !== a.numSeeds!) return b.numSeeds! - a.numSeeds!;
+      return a.phaseOrder - b.phaseOrder;
+    })[0];
+  if (!best || best.numSeeds === null) return null;
+  return { phaseId: best.id, phaseName: best.name, numSeeds: best.numSeeds };
+}
+
+export async function fetchFeaturedSeedPhaseMeta(slug: string): Promise<FeaturedSeedPhaseMeta | null> {
+  const data = await queryStartgg<EventFinalPhaseMetaResponse>(EVENT_FINAL_PHASE_META_QUERY, { slug });
+  if (!data.event) return null;
+  return selectFeaturedSeedPhase(data.event.phases);
+}
+
 export async function fetchTournamentCandidateIdentities(
   tournaments: TournamentCandidateNode[],
   players: StartggIdentityQueryPlayer[],
