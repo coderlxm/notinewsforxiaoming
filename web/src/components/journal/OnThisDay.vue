@@ -13,6 +13,7 @@ const emit = defineEmits<{
   editArticle: [id: number];
   selectTag: [tag: string];
   saveContent: [entry: JournalEntry, contentText: string];
+  setPublishedTime: [entry: JournalEntry, sourceCreatedAt: string];
   setVisibility: [entry: JournalEntry, visibility: JournalVisibility];
   setPinned: [entry: JournalEntry, pinned: boolean];
   deleteEntry: [entry: JournalEntry];
@@ -20,6 +21,10 @@ const emit = defineEmits<{
 
 function forwardSaveContent(entry: JournalEntry, contentText: string): void {
   emit('saveContent', entry, contentText);
+}
+
+function forwardPublishedTime(entry: JournalEntry, sourceCreatedAt: string): void {
+  emit('setPublishedTime', entry, sourceCreatedAt);
 }
 
 function forwardVisibility(entry: JournalEntry, visibility: JournalVisibility): void {
@@ -51,6 +56,7 @@ function forwardDelete(entry: JournalEntry): void {
           @open-entry="emit('openEntry', $event)"
           @edit="emit('editArticle', $event)"
           @select-tag="emit('selectTag', $event)"
+          @set-published-time="forwardPublishedTime"
           @set-visibility="forwardVisibility"
           @set-pinned="forwardPinned"
           @delete-entry="forwardDelete"
@@ -63,6 +69,7 @@ function forwardDelete(entry: JournalEntry): void {
           @open-entry="emit('openEntry', $event)"
           @select-tag="emit('selectTag', $event)"
           @save-content="forwardSaveContent"
+          @set-published-time="forwardPublishedTime"
           @set-visibility="forwardVisibility"
           @set-pinned="forwardPinned"
           @delete-entry="forwardDelete"

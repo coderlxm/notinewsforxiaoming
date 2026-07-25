@@ -6,6 +6,7 @@ import type { JournalAsset, JournalEntry, JournalVisibility } from '../../types'
 import { formatEntryTime, formatStructuredValue } from '../../utils/formatters';
 import CardActionMenu from './CardActionMenu.vue';
 import MediaGallery from './MediaGallery.vue';
+import PublishedTimeDialog from './PublishedTimeDialog.vue';
 
 const props = defineProps<{
   entry: JournalEntry;
@@ -19,6 +20,7 @@ const emit = defineEmits<{
   selectTag: [tag: string];
   edit: [entry: JournalEntry];
   saveContent: [entry: JournalEntry, contentText: string];
+  setPublishedTime: [entry: JournalEntry, sourceCreatedAt: string];
   setVisibility: [entry: JournalEntry, visibility: JournalVisibility];
   setPinned: [entry: JournalEntry, pinned: boolean];
   deleteEntry: [entry: JournalEntry];
@@ -26,6 +28,7 @@ const emit = defineEmits<{
 
 const editing = shallowRef(false);
 const confirmingDeletion = shallowRef(false);
+const editingPublishedTime = shallowRef(false);
 const draft = shallowRef(props.entry.contentText);
 const hiddenStructuredKeys = new Set(['entities', 'caption_entities']);
 
@@ -52,6 +55,7 @@ watch(() => props.entry.contentText, (contentText) => {
 
 function requestEdit(): void {
   confirmingDeletion.value = false;
+  editingPublishedTime.value = false;
   if (isRich.value) {
     emit('edit', props.entry);
     return;
@@ -66,7 +70,14 @@ function cancelEditing(): void {
 
 function requestDeletion(): void {
   editing.value = false;
+  editingPublishedTime.value = false;
   confirmingDeletion.value = true;
+}
+
+function requestPublishedTimeEditing(): void {
+  editing.value = false;
+  confirmingDeletion.value = false;
+  editingPublishedTime.value = true;
 }
 </script>
 
@@ -95,9 +106,11 @@ function requestDeletion(): void {
         <CardActionMenu
           v-if="isPrivateMode && !confirmingDeletion"
           :busy="busy"
+          :busy-label="editingPublishedTime ? '正在修改发布时间…' : undefined"
           :pinned="entry.pinned"
           :visibility="entry.visibility"
           @edit="requestEdit"
+          @edit-published-time="requestPublishedTimeEditing"
           @set-pinned="emit('setPinned', entry, $event)"
           @set-visibility="emit('setVisibility', entry, $event)"
           @request-delete="requestDeletion"
@@ -192,6 +205,14 @@ function requestDeletion(): void {
         </button>
       </div>
     </footer>
+
+    <PublishedTimeDialog
+      v-if="editingPublishedTime"
+      :source-created-at="entry.sourceCreatedAt"
+      :busy="busy"
+      @close="editingPublishedTime = false"
+      @save="emit('setPublishedTime', entry, $event)"
+    />
   </article>
 </template>
 

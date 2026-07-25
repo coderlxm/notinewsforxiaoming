@@ -11,6 +11,7 @@ import {
   logout as logoutRequest,
   updateEntryContent,
   updateEntryPinned,
+  updateEntryPublishedTime,
   updateEntryVisibility,
 } from '../api';
 import type { FeedFilters, JournalEntry, JournalVisibility } from '../types';
@@ -249,6 +250,23 @@ export function useJournalApi() {
     }
   }
 
+  async function setPublishedTime(entry: JournalEntry, sourceCreatedAt: string): Promise<void> {
+    mutationEntryId.value = entry.id;
+    error.value = null;
+    try {
+      replaceEntry(await updateEntryPublishedTime(entry.id, sourceCreatedAt));
+    }
+    catch (reason) {
+      if (reason instanceof JournalRequestError && reason.status === 401) {
+        authenticationState.value = 'anonymous';
+      }
+      exposeError(reason);
+    }
+    finally {
+      mutationEntryId.value = null;
+    }
+  }
+
   async function setPinned(entry: JournalEntry, pinned: boolean): Promise<void> {
     mutationEntryId.value = entry.id;
     error.value = null;
@@ -308,6 +326,7 @@ export function useJournalApi() {
     logout,
     saveContent,
     setVisibility,
+    setPublishedTime,
     setPinned,
     deleteEntry,
   };

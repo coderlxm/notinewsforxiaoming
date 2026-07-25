@@ -114,6 +114,13 @@ export function updateEntryContent(id: number, contentText: string): Promise<Jou
   );
 }
 
+export function updateEntryPublishedTime(id: number, sourceCreatedAt: string): Promise<JournalEntry> {
+  return requestJson<JournalEntry>(
+    `/api/me/entries/${id}/published-time`,
+    jsonRequest('PATCH', { sourceCreatedAt }),
+  );
+}
+
 export function updateEntryVisibility(id: number, visibility: JournalVisibility): Promise<JournalEntry> {
   return requestJson<JournalEntry>(
     `/api/me/entries/${id}/visibility`,

@@ -149,6 +149,13 @@ export const journalPinnedUpdateRequestSchema = z.object({
 });
 export type JournalPinnedUpdateRequest = z.infer<typeof journalPinnedUpdateRequestSchema>;
 
+export const journalPublishedTimeUpdateRequestSchema = z.object({
+  sourceCreatedAt: z.string().datetime({ offset: true }),
+});
+export type JournalPublishedTimeUpdateRequest = z.infer<
+  typeof journalPublishedTimeUpdateRequestSchema
+>;
+
 export const journalDeletionResultSchema = z.object({
   deletedEntryCount: z.number().int().positive(),
   deletedAssetCount: z.number().int().nonnegative(),

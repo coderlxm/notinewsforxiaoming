@@ -1,17 +1,19 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, shallowRef, useId, useTemplateRef, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, shallowRef, useId, useTemplateRef, watch } from 'vue';
 import type { CSSProperties } from 'vue';
 import JournalLoading from '../ui/JournalLoading.vue';
 import type { JournalVisibility } from '../../types';
 
 const props = defineProps<{
   busy: boolean;
+  busyLabel?: string;
   pinned: boolean;
   visibility: JournalVisibility;
 }>();
 
 const emit = defineEmits<{
   edit: [];
+  editPublishedTime: [];
   setPinned: [pinned: boolean];
   setVisibility: [visibility: JournalVisibility];
   requestDelete: [];
@@ -24,6 +26,7 @@ const menuId = useId();
 const trigger = useTemplateRef<HTMLButtonElement>('trigger');
 const panel = useTemplateRef<HTMLElement>('panel');
 const firstAction = useTemplateRef<HTMLButtonElement>('firstAction');
+const displayedPendingLabel = computed(() => props.busyLabel ?? pendingLabel.value ?? '');
 
 watch(() => props.busy, (busy) => {
   if (busy) close();
@@ -131,10 +134,10 @@ onBeforeUnmount(() => {
 <template>
   <div class="action-menu" :aria-busy="busy" @focusout="handleFocusOut" @keydown.esc.stop="closeAndFocusTrigger">
     <JournalLoading
-      v-if="busy && pendingLabel"
+      v-if="busy && displayedPendingLabel"
       class="action-menu__loading"
       variant="inline"
-      :label="pendingLabel"
+      :label="displayedPendingLabel"
     />
     <button
       v-else
@@ -166,6 +169,15 @@ onBeforeUnmount(() => {
     >
       <button ref="firstAction" class="action-menu__item" type="button" role="menuitem" :disabled="busy" @click="run(() => emit('edit'))">
         编辑
+      </button>
+      <button
+        class="action-menu__item"
+        type="button"
+        role="menuitem"
+        :disabled="busy"
+        @click="run(() => emit('editPublishedTime'))"
+      >
+        修改发布时间
       </button>
       <button
         class="action-menu__item"

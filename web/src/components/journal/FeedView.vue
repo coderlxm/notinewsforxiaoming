@@ -59,12 +59,11 @@ const isDetail = computed(() => props.mode === 'public' && props.detailId !== un
 const isOverlay = computed(() => props.overlayEntryId !== undefined);
 const currentOverlayEntry = computed(() => {
   if (props.overlayEntryId === undefined) return null;
-  if (props.overlayEntry?.id === props.overlayEntryId) return props.overlayEntry;
-  if (props.directOverlay) {
-    return journal.detail.value?.id === props.overlayEntryId ? journal.detail.value : null;
-  }
-  return journal.entries.value.find(entry => entry.id === props.overlayEntryId)
+  const currentEntry = journal.entries.value.find(entry => entry.id === props.overlayEntryId)
     ?? (journal.detail.value?.id === props.overlayEntryId ? journal.detail.value : null);
+  if (currentEntry) return currentEntry;
+  if (props.overlayEntry?.id === props.overlayEntryId) return props.overlayEntry;
+  return null;
 });
 const overlayVisible = computed(() => isOverlay.value && (
   currentOverlayEntry.value !== null
@@ -261,6 +260,14 @@ async function saveContent(entry: JournalEntry, contentText: string): Promise<vo
   }
 }
 
+async function setPublishedTime(entry: JournalEntry, sourceCreatedAt: string): Promise<void> {
+  await journal.setPublishedTime(entry, sourceCreatedAt);
+  if (journal.error.value === null) {
+    feedLayoutReady.value = false;
+    await journal.loadPrivate(filters);
+  }
+}
+
 async function setVisibility(entry: JournalEntry, visibility: JournalVisibility): Promise<void> {
   await journal.setVisibility(entry, visibility);
   if (journal.error.value === null) {
@@ -375,6 +382,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
           @edit-article="editArticle"
           @select-tag="selectTag"
           @save-content="saveContent"
+          @set-published-time="setPublishedTime"
           @set-visibility="setVisibility"
           @set-pinned="setPinned"
           @delete-entry="deleteEntry"
@@ -401,6 +409,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
             @select-tag="selectTag"
             @open-entry="openEntry"
             @save-content="saveContent"
+            @set-published-time="setPublishedTime"
             @set-visibility="setVisibility"
             @set-pinned="setPinned"
             @delete-entry="deleteEntry"
@@ -432,6 +441,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
             @select-tag="selectTag"
             @edit-article="editArticle"
             @save-content="saveContent"
+            @set-published-time="setPublishedTime"
             @set-visibility="setVisibility"
             @set-pinned="setPinned"
             @delete-entry="deleteEntry"
@@ -474,6 +484,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
     @select-tag="selectTag"
     @edit="editArticle($event.id)"
     @save-content="saveContent"
+    @set-published-time="setPublishedTime"
     @set-visibility="setVisibility"
     @set-pinned="setPinned"
     @delete-entry="deleteEntry"

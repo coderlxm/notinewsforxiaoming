@@ -6,6 +6,7 @@ import JournalProgressiveImage from '../ui/JournalProgressiveImage.vue';
 import type { JournalEntry, JournalVisibility } from '../../types';
 import CardActionMenu from '../journal/CardActionMenu.vue';
 import CardDateSpine from '../journal/CardDateSpine.vue';
+import PublishedTimeDialog from '../journal/PublishedTimeDialog.vue';
 import RichArticleRenderer from './RichArticleRenderer.vue';
 
 const props = withDefaults(defineProps<{
@@ -25,12 +26,14 @@ const emit = defineEmits<{
   openEntry: [entry: JournalEntry];
   selectTag: [tag: string];
   edit: [id: number];
+  setPublishedTime: [entry: JournalEntry, sourceCreatedAt: string];
   setVisibility: [entry: JournalEntry, visibility: JournalVisibility];
   setPinned: [entry: JournalEntry, pinned: boolean];
   deleteEntry: [entry: JournalEntry];
 }>();
 
 const confirmingDeletion = shallowRef(false);
+const editingPublishedTime = shallowRef(false);
 
 const cover = computed(() => props.entry.assets.find((asset) =>
   asset.sourceKind === 'web' && asset.role === 'cover') ?? null);
@@ -51,7 +54,13 @@ const deletionMessage = computed(() => {
 });
 
 function startDeletion(): void {
+  editingPublishedTime.value = false;
   confirmingDeletion.value = true;
+}
+
+function startPublishedTimeEditing(): void {
+  confirmingDeletion.value = false;
+  editingPublishedTime.value = true;
 }
 
 function openEntry(): void {
@@ -88,9 +97,11 @@ function handleCardClick(event: MouseEvent): void {
       <CardActionMenu
         v-if="editable && !confirmingDeletion"
         :busy="busy"
+        :busy-label="editingPublishedTime ? '正在修改发布时间…' : undefined"
         :pinned="entry.pinned"
         :visibility="entry.visibility"
         @edit="emit('edit', entry.id)"
+        @edit-published-time="startPublishedTimeEditing"
         @set-pinned="emit('setPinned', entry, $event)"
         @set-visibility="emit('setVisibility', entry, $event)"
         @request-delete="startDeletion"
@@ -181,6 +192,14 @@ function handleCardClick(event: MouseEvent): void {
         </button>
       </div>
     </footer>
+
+    <PublishedTimeDialog
+      v-if="editingPublishedTime"
+      :source-created-at="entry.sourceCreatedAt"
+      :busy="busy"
+      @close="editingPublishedTime = false"
+      @save="emit('setPublishedTime', entry, $event)"
+    />
   </article>
 </template>
 

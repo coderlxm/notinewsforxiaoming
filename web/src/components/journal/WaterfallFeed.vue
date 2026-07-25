@@ -19,6 +19,7 @@ const emit = defineEmits<{
   selectTag: [tag: string];
   editArticle: [id: number];
   saveContent: [entry: JournalEntry, contentText: string];
+  setPublishedTime: [entry: JournalEntry, sourceCreatedAt: string];
   setVisibility: [entry: JournalEntry, visibility: JournalVisibility];
   setPinned: [entry: JournalEntry, pinned: boolean];
   deleteEntry: [entry: JournalEntry];
@@ -45,6 +46,10 @@ function isArticleEntry(entry: JournalEntry): boolean {
 
 function forwardSaveContent(entry: JournalEntry, contentText: string): void {
   emit('saveContent', entry, contentText);
+}
+
+function forwardPublishedTime(entry: JournalEntry, sourceCreatedAt: string): void {
+  emit('setPublishedTime', entry, sourceCreatedAt);
 }
 
 function forwardVisibility(entry: JournalEntry, visibility: JournalVisibility): void {
@@ -175,6 +180,7 @@ onBeforeUnmount(() => {
             @open-entry="emit('openEntry', $event)"
             @select-tag="emit('selectTag', $event)"
             @edit="emit('editArticle', $event)"
+            @set-published-time="forwardPublishedTime"
             @set-visibility="forwardVisibility"
             @set-pinned="forwardPinned"
             @delete-entry="emit('deleteEntry', $event)"
@@ -187,6 +193,7 @@ onBeforeUnmount(() => {
             @open-entry="emit('openEntry', $event)"
             @select-tag="emit('selectTag', $event)"
             @save-content="forwardSaveContent"
+            @set-published-time="forwardPublishedTime"
             @set-visibility="forwardVisibility"
             @set-pinned="forwardPinned"
             @delete-entry="emit('deleteEntry', $event)"

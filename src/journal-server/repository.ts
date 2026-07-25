@@ -378,6 +378,17 @@ export class JournalRepository {
     return this.getById(row.id);
   }
 
+  updatePublishedTime(id: number, sourceCreatedAt: string): JournalEntry | null {
+    const row = this.findRowById(id);
+    if (!row) return null;
+    this.updateGroup(
+      row,
+      'source_created_at = ?, updated_at = ?',
+      [sourceCreatedAt, new Date().toISOString()],
+    );
+    return this.getById(row.id);
+  }
+
   getPublicByPublicId(publicId: string): JournalEntry | null {
     const row = this.database.prepare(`
       SELECT * FROM journal_entries

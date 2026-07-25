@@ -4,6 +4,7 @@ import {
   journalContentUpdateRequestSchema,
   journalLoginRequestSchema,
   journalPinnedUpdateRequestSchema,
+  journalPublishedTimeUpdateRequestSchema,
   journalVisibilityRequestSchema,
 } from '../../shared/journalProtocol.js';
 import type { JournalAuth } from '../auth.js';
@@ -124,6 +125,16 @@ export async function registerPrivateEntryRoutes(
     const { id } = idParamsSchema.parse(request.params);
     const { pinned } = journalPinnedUpdateRequestSchema.parse(request.body);
     const entry = repository.updatePinned(id, pinned);
+    if (!entry) return reply.code(404).send({ error: 'Journal entry was not found.' });
+    return entry;
+  });
+
+  server.patch('/api/me/entries/:id/published-time', {
+    preHandler: auth.requireAdmin,
+  }, async (request, reply) => {
+    const { id } = idParamsSchema.parse(request.params);
+    const { sourceCreatedAt } = journalPublishedTimeUpdateRequestSchema.parse(request.body);
+    const entry = repository.updatePublishedTime(id, sourceCreatedAt);
     if (!entry) return reply.code(404).send({ error: 'Journal entry was not found.' });
     return entry;
   });
