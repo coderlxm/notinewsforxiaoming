@@ -71,6 +71,8 @@ jobs:
               - 'src/shared/**'
               - 'src/utils/**'
               - 'deploy/notinews-bot.service'
+              - 'deploy/notinews-backup.service'
+              - 'deploy/notinews-backup.timer'
               - 'deploy/notinews-failure-notify@.service'
               - 'scripts/notinews-backup'
               - 'package.json'
@@ -123,6 +125,12 @@ jobs:
             --tag "notinews-journal:$GITHUB_SHA" \
             .
           docker save "notinews-journal:$GITHUB_SHA" > "/tmp/journal-$GITHUB_SHA.tar"
+          tar --create \
+            --file "/tmp/journal-host-$GITHUB_SHA.tar" \
+            scripts/journal-backup \
+            deploy/journal/deploy-release \
+            deploy/journal/journal-backup.service \
+            deploy/journal/journal-backup.timer
 
       - name: Setup Journal SSH agent
         uses: webfactory/ssh-agent@v0.9.0
@@ -138,7 +146,9 @@ jobs:
       - name: Upload Journal image
         run: |
           PORT="${JOURNAL_SERVER_PORT:-22}"
-          tar -C /tmp -cf - "journal-$GITHUB_SHA.tar" | \
+          tar -C /tmp -cf - \
+            "journal-$GITHUB_SHA.tar" \
+            "journal-host-$GITHUB_SHA.tar" | \
             ssh -p "$PORT" "$JOURNAL_SERVER_USER@$JOURNAL_SERVER_HOST" \
               "tar -xf - -C /var/lib/journal-deploy/incoming"
 
@@ -146,7 +156,7 @@ jobs:
         run: |
           PORT="${JOURNAL_SERVER_PORT:-22}"
           ssh -p "$PORT" "$JOURNAL_SERVER_USER@$JOURNAL_SERVER_HOST" \
-            "sudo -n /usr/local/sbin/journal-deploy-release '$GITHUB_SHA'"
+            "sudo -n /usr/local/sbin/journal-deploy-release '$GITHUB_SHA' --install-host-assets"
 
       - name: Notify Journal deploy success to Telegram
         env:
@@ -239,8 +249,12 @@ jobs:
             systemctl disable notinews.timer || true
             cp '$SERVER_PROJECT_DIR/deploy/notinews-bot.service' /etc/systemd/system/notinews-bot.service
             cp '$SERVER_PROJECT_DIR/deploy/notinews-failure-notify@.service' /etc/systemd/system/notinews-failure-notify@.service
+            install -m 755 '$SERVER_PROJECT_DIR/scripts/notinews-backup' /usr/local/sbin/notinews-backup
+            install -m 644 '$SERVER_PROJECT_DIR/deploy/notinews-backup.service' /etc/systemd/system/notinews-backup.service
+            install -m 644 '$SERVER_PROJECT_DIR/deploy/notinews-backup.timer' /etc/systemd/system/notinews-backup.timer
             systemctl daemon-reload
             systemctl enable notinews-bot.service
+            systemctl enable --now notinews-backup.timer
             systemctl restart notinews-bot.service
             sleep 2
             systemctl status notinews-bot.service --no-pager -l | sed -n '1,20p'

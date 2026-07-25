@@ -3,8 +3,6 @@ Description=Journal Google Drive backup
 After=network-online.target docker.service
 Wants=network-online.target
 Requires=docker.service
-ConditionPathExists=/opt/journal/.deploy-commit
-ConditionPathExists=/opt/journal/data/journal.sqlite
 
 [Service]
 Type=oneshot

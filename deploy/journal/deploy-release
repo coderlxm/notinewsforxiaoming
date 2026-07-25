@@ -11,14 +11,30 @@ DEPLOY_COMMIT_FILE=${PROJECT_DIR}/.deploy-commit
 PREVIOUS_COMMIT_FILE=${PROJECT_DIR}/.previous-deploy-commit
 EXPECTED_ARCHIVE_OWNER=journal-deploy
 
-if [[ $# -ne 1 || ! $1 =~ ^[0-9a-f]{40}$ ]]; then
-  echo 'usage: journal-deploy-release <40-character-lowercase-commit-sha>' >&2
+if [[ $# -lt 1 || $# -gt 2 || ! $1 =~ ^[0-9a-f]{40}$ ]]; then
+  echo 'usage: journal-deploy-release <40-character-lowercase-commit-sha> [--install-host-assets]' >&2
   exit 64
 fi
 
 RELEASE_SHA=$1
+INSTALL_HOST_ASSETS=false
+if [[ $# -eq 2 ]]; then
+  if [[ $2 != --install-host-assets ]]; then
+    echo 'second argument must be --install-host-assets' >&2
+    exit 64
+  fi
+  INSTALL_HOST_ASSETS=true
+fi
+
 IMAGE_ARCHIVE=${INCOMING_DIR}/journal-${RELEASE_SHA}.tar
+HOST_ASSETS_ARCHIVE=${INCOMING_DIR}/journal-host-${RELEASE_SHA}.tar
 IMAGE_REFERENCE=${IMAGE_REPOSITORY}:${RELEASE_SHA}
+HOST_ASSETS_ROOT=$(mktemp -d /var/lib/journal-deploy/host-assets.XXXXXX)
+
+cleanup() {
+  rm -rf -- "${HOST_ASSETS_ROOT}"
+}
+trap cleanup EXIT
 
 if [[ ! -f ${IMAGE_ARCHIVE} || -L ${IMAGE_ARCHIVE} ]]; then
   echo "release archive is missing or is not a regular file: ${IMAGE_ARCHIVE}" >&2
@@ -28,6 +44,26 @@ fi
 if [[ $(stat -c '%U' "${IMAGE_ARCHIVE}") != ${EXPECTED_ARCHIVE_OWNER} ]]; then
   echo "release archive must be owned by ${EXPECTED_ARCHIVE_OWNER}" >&2
   exit 77
+fi
+
+if [[ ${INSTALL_HOST_ASSETS} == true ]]; then
+  if [[ ! -f ${HOST_ASSETS_ARCHIVE} || -L ${HOST_ASSETS_ARCHIVE} ]]; then
+    echo "host assets archive is missing or is not a regular file: ${HOST_ASSETS_ARCHIVE}" >&2
+    exit 66
+  fi
+  if [[ $(stat -c '%U' "${HOST_ASSETS_ARCHIVE}") != ${EXPECTED_ARCHIVE_OWNER} ]]; then
+    echo "host assets archive must be owned by ${EXPECTED_ARCHIVE_OWNER}" >&2
+    exit 77
+  fi
+
+  tar -xf "${HOST_ASSETS_ARCHIVE}" -C "${HOST_ASSETS_ROOT}"
+  install -m 755 "${HOST_ASSETS_ROOT}/scripts/journal-backup" /usr/local/sbin/journal-backup
+  install -m 755 "${HOST_ASSETS_ROOT}/deploy/journal/deploy-release" /usr/local/sbin/journal-deploy-release
+  install -m 644 "${HOST_ASSETS_ROOT}/deploy/journal/journal-backup.service" /etc/systemd/system/journal-backup.service
+  install -m 644 "${HOST_ASSETS_ROOT}/deploy/journal/journal-backup.timer" /etc/systemd/system/journal-backup.timer
+  systemctl daemon-reload
+  systemctl enable --now journal-backup.timer
+  rm -- "${HOST_ASSETS_ARCHIVE}"
 fi
 
 docker image load --input "${IMAGE_ARCHIVE}"

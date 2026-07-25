@@ -1,32 +1,70 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+PATH=/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
 PROJECT_DIR=/root/NotiNewsForXiaoming
 BACKUP_WORK_DIR=/var/lib/notinews-backup
+REMOTE_ROOT=notinews-drive:NotiNewsBackups/bot
+DAILY_REMOTE=${REMOTE_ROOT}/daily
+MONTHLY_REMOTE=${REMOTE_ROOT}/monthly
 BACKUP_TIMESTAMP=$(TZ=Asia/Shanghai date +%Y-%m-%d-%H%M%S)
-BACKUP_NAME=notinews-backup-${BACKUP_TIMESTAMP}.tar.gz
-MANIFEST_PATH=${BACKUP_WORK_DIR}/backup-manifest.txt
-ARCHIVE_PATH=${BACKUP_WORK_DIR}/${BACKUP_NAME}
+BACKUP_DAY=$(TZ=Asia/Shanghai date +%d)
 DEPLOY_COMMIT=$(<"${PROJECT_DIR}/.deploy-commit")
-
+BACKUP_NAME=bot-v1-${BACKUP_TIMESTAMP}-${DEPLOY_COMMIT:0:7}.tar.gz
+ARCHIVE_PATH=${BACKUP_WORK_DIR}/${BACKUP_NAME}
+ARCHIVE_CHECKSUM_PATH=${ARCHIVE_PATH}.sha256
 install -d -m 700 "${BACKUP_WORK_DIR}"
+STAGING_ROOT=$(mktemp -d "${BACKUP_WORK_DIR}/staging.XXXXXX")
+BUNDLE_ROOT=${STAGING_ROOT}/notinews-backup-v1
+PAYLOAD_ROOT=${BUNDLE_ROOT}/payload
+RCLONE_ARGS=(--retries 1 --low-level-retries 1)
+
+cleanup() {
+  rm -rf -- "${STAGING_ROOT}"
+  rm -f -- "${ARCHIVE_PATH}" "${ARCHIVE_CHECKSUM_PATH}"
+}
+trap cleanup EXIT
+
+install -d -m 700 "${PAYLOAD_ROOT}/data"
+install -m 600 "${PROJECT_DIR}/.env" "${PAYLOAD_ROOT}/app.env"
+install -m 600 "${PROJECT_DIR}/.deploy-commit" "${PAYLOAD_ROOT}/deploy-commit"
+install -m 600 /etc/systemd/system/notinews-bot.service "${PAYLOAD_ROOT}/notinews-bot.service"
+cp -a "${PROJECT_DIR}/data/." "${PAYLOAD_ROOT}/data/"
 
 {
-  echo "backup_time=${BACKUP_TIMESTAMP}"
+  echo 'format_version=1'
+  echo 'component=bot'
+  echo "created_at=$(TZ=Asia/Shanghai date --iso-8601=seconds)"
   echo "git_commit=${DEPLOY_COMMIT}"
-  echo "hostname=$(hostname)"
-  echo "project_dir=${PROJECT_DIR}"
-} > "${MANIFEST_PATH}"
+  echo "source_hostname=$(hostname)"
+  echo 'data_layout=bot-v1'
+} > "${BUNDLE_ROOT}/manifest.env"
+chmod 600 "${BUNDLE_ROOT}/manifest.env"
 
-tar -czf "${ARCHIVE_PATH}" \
-  -C / \
-  root/NotiNewsForXiaoming/.env \
-  root/NotiNewsForXiaoming/.deploy-commit \
-  root/NotiNewsForXiaoming/data \
-  etc/systemd/system/notinews-bot.service \
-  -C "${BACKUP_WORK_DIR}" \
-  backup-manifest.txt
+(
+  cd "${BUNDLE_ROOT}"
+  while IFS= read -r -d '' payload_file; do
+    sha256sum "${payload_file}"
+  done < <(find payload -type f -print0 | LC_ALL=C sort -z)
+) > "${BUNDLE_ROOT}/payload.sha256"
+chmod 600 "${BUNDLE_ROOT}/payload.sha256"
 
-rclone copyto "${ARCHIVE_PATH}" "notinews-drive:NotiNewsBackups-LongTerm/${BACKUP_NAME}"
-rm "${ARCHIVE_PATH}" "${MANIFEST_PATH}"
-rclone delete "notinews-drive:NotiNewsBackups-LongTerm" --min-age 30d
+tar -czf "${ARCHIVE_PATH}" -C "${STAGING_ROOT}" notinews-backup-v1
+(
+  cd "${BACKUP_WORK_DIR}"
+  sha256sum "${BACKUP_NAME}" > "${BACKUP_NAME}.sha256"
+)
+
+rclone mkdir "${DAILY_REMOTE}" "${RCLONE_ARGS[@]}"
+rclone mkdir "${MONTHLY_REMOTE}" "${RCLONE_ARGS[@]}"
+rclone copyto "${ARCHIVE_PATH}" "${DAILY_REMOTE}/${BACKUP_NAME}" "${RCLONE_ARGS[@]}"
+rclone copyto "${ARCHIVE_CHECKSUM_PATH}" "${DAILY_REMOTE}/${BACKUP_NAME}.sha256" "${RCLONE_ARGS[@]}"
+
+if [[ ${BACKUP_DAY} == 01 ]]; then
+  rclone copyto "${ARCHIVE_PATH}" "${MONTHLY_REMOTE}/${BACKUP_NAME}" "${RCLONE_ARGS[@]}"
+  rclone copyto "${ARCHIVE_CHECKSUM_PATH}" "${MONTHLY_REMOTE}/${BACKUP_NAME}.sha256" "${RCLONE_ARGS[@]}"
+fi
+
+rclone delete "${DAILY_REMOTE}" --min-age 35d "${RCLONE_ARGS[@]}"
+rclone delete "${MONTHLY_REMOTE}" --min-age 730d "${RCLONE_ARGS[@]}"

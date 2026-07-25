@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PATH=/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+PROJECT_DIR=/opt/journal
+OPENRESTY_ROOT=/opt/1panel/apps/openresty/openresty
+OPENRESTY_SITE_CONFIG=${OPENRESTY_ROOT}/conf/conf.d/feeds.xmcloud.buzz.conf
+OPENRESTY_SITE_SSL=${OPENRESTY_ROOT}/www/sites/feeds.xmcloud.buzz/ssl
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+REPOSITORY_DIR=$(dirname "${SCRIPT_DIR}")
+
+if [[ ${EUID} -ne 0 ]]; then
+  echo 'restore-journal must run as root' >&2
+  exit 77
+fi
+
+if [[ $# -ne 1 ]]; then
+  echo 'usage: restore-journal <journal-v1-archive.tar.gz>' >&2
+  exit 64
+fi
+
+ARCHIVE_PATH=$(realpath "$1")
+CHECKSUM_PATH=${ARCHIVE_PATH}.sha256
+ARCHIVE_DIR=$(dirname "${ARCHIVE_PATH}")
+CHECKSUM_NAME=$(basename "${CHECKSUM_PATH}")
+RESTORE_ROOT=$(mktemp -d /var/tmp/journal-restore.XXXXXX)
+BUNDLE_ROOT=${RESTORE_ROOT}/journal-backup-v1
+
+cleanup() {
+  rm -rf -- "${RESTORE_ROOT}"
+}
+trap cleanup EXIT
+
+(
+  cd "${ARCHIVE_DIR}"
+  sha256sum -c "${CHECKSUM_NAME}"
+)
+tar -xzf "${ARCHIVE_PATH}" -C "${RESTORE_ROOT}"
+
+MANIFEST_PATH=${BUNDLE_ROOT}/manifest.env
+PAYLOAD_ROOT=${BUNDLE_ROOT}/payload
+
+manifest_value() {
+  sed -n "s/^$1=//p" "${MANIFEST_PATH}"
+}
+
+FORMAT_VERSION=$(manifest_value format_version)
+COMPONENT=$(manifest_value component)
+GIT_COMMIT=$(manifest_value git_commit)
+
+if [[ ${FORMAT_VERSION} != 1 || ${COMPONENT} != journal ]]; then
+  echo 'archive is not a Journal v1 recovery package' >&2
+  exit 65
+fi
+
+if [[ ! ${GIT_COMMIT} =~ ^[0-9a-f]{40}$ ]]; then
+  echo 'archive contains an invalid git commit' >&2
+  exit 65
+fi
+
+(
+  cd "${BUNDLE_ROOT}"
+  sha256sum -c payload.sha256
+)
+
+if docker container inspect notinews-journal >/dev/null 2>&1; then
+  docker stop notinews-journal
+fi
+
+git -C "${REPOSITORY_DIR}" checkout --detach "${GIT_COMMIT}"
+
+install -d -m 700 "${PROJECT_DIR}"
+rm -rf -- "${PROJECT_DIR}/data"
+install -d -m 700 "${PROJECT_DIR}/data"
+cp -a "${PAYLOAD_ROOT}/data/." "${PROJECT_DIR}/data/"
+install -m 600 "${PAYLOAD_ROOT}/app.env" "${PROJECT_DIR}/.env"
+install -m 600 "${PAYLOAD_ROOT}/deploy-commit" "${PROJECT_DIR}/.deploy-commit"
+install -m 600 "${PAYLOAD_ROOT}/compose.yaml" "${PROJECT_DIR}/compose.yaml"
+
+install -d -m 700 "$(dirname "${OPENRESTY_SITE_CONFIG}")" "${OPENRESTY_SITE_SSL}"
+install -m 600 "${PAYLOAD_ROOT}/proxy/site.conf" "${OPENRESTY_SITE_CONFIG}"
+cp -a "${PAYLOAD_ROOT}/proxy/ssl/." "${OPENRESTY_SITE_SSL}/"
+
+docker build \
+  --file "${REPOSITORY_DIR}/deploy/journal/Dockerfile" \
+  --tag "notinews-journal:${GIT_COMMIT}" \
+  "${REPOSITORY_DIR}"
+
+JOURNAL_IMAGE_TAG=${GIT_COMMIT} docker compose \
+  --project-name journal \
+  --file "${PROJECT_DIR}/compose.yaml" \
+  up --detach --no-deps --wait --wait-timeout 90 journal
+
+install -d -m 700 /var/lib/journal-backup
+install -m 755 "${REPOSITORY_DIR}/scripts/journal-backup" /usr/local/sbin/journal-backup
+install -m 755 "${REPOSITORY_DIR}/deploy/journal/deploy-release" /usr/local/sbin/journal-deploy-release
+install -m 644 "${REPOSITORY_DIR}/deploy/journal/journal-backup.service" /etc/systemd/system/journal-backup.service
+install -m 644 "${REPOSITORY_DIR}/deploy/journal/journal-backup.timer" /etc/systemd/system/journal-backup.timer
+
+systemctl daemon-reload
+systemctl enable --now journal-backup.timer

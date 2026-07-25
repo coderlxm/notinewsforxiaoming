@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PATH=/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+TARGET_DIR=/root/NotiNewsForXiaoming
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+REPOSITORY_DIR=$(dirname "${SCRIPT_DIR}")
+
+if [[ ${EUID} -ne 0 ]]; then
+  echo 'restore-notinews must run as root' >&2
+  exit 77
+fi
+
+if [[ $# -ne 1 ]]; then
+  echo 'usage: restore-notinews <bot-v1-archive.tar.gz>' >&2
+  exit 64
+fi
+
+if [[ ${REPOSITORY_DIR} != ${TARGET_DIR} ]]; then
+  echo "repository must be cloned at ${TARGET_DIR}" >&2
+  exit 64
+fi
+
+ARCHIVE_PATH=$(realpath "$1")
+CHECKSUM_PATH=${ARCHIVE_PATH}.sha256
+ARCHIVE_DIR=$(dirname "${ARCHIVE_PATH}")
+CHECKSUM_NAME=$(basename "${CHECKSUM_PATH}")
+RESTORE_ROOT=$(mktemp -d /var/tmp/notinews-restore.XXXXXX)
+BUNDLE_ROOT=${RESTORE_ROOT}/notinews-backup-v1
+
+cleanup() {
+  rm -rf -- "${RESTORE_ROOT}"
+}
+trap cleanup EXIT
+
+(
+  cd "${ARCHIVE_DIR}"
+  sha256sum -c "${CHECKSUM_NAME}"
+)
+tar -xzf "${ARCHIVE_PATH}" -C "${RESTORE_ROOT}"
+
+MANIFEST_PATH=${BUNDLE_ROOT}/manifest.env
+PAYLOAD_ROOT=${BUNDLE_ROOT}/payload
+
+manifest_value() {
+  sed -n "s/^$1=//p" "${MANIFEST_PATH}"
+}
+
+FORMAT_VERSION=$(manifest_value format_version)
+COMPONENT=$(manifest_value component)
+GIT_COMMIT=$(manifest_value git_commit)
+
+if [[ ${FORMAT_VERSION} != 1 || ${COMPONENT} != bot ]]; then
+  echo 'archive is not a bot v1 recovery package' >&2
+  exit 65
+fi
+
+if [[ ! ${GIT_COMMIT} =~ ^[0-9a-f]{40}$ ]]; then
+  echo 'archive contains an invalid git commit' >&2
+  exit 65
+fi
+
+(
+  cd "${BUNDLE_ROOT}"
+  sha256sum -c payload.sha256
+)
+
+if systemctl cat notinews-bot.service >/dev/null 2>&1; then
+  systemctl stop notinews-bot.service
+fi
+
+git -C "${TARGET_DIR}" checkout --detach "${GIT_COMMIT}"
+
+rm -rf -- "${TARGET_DIR}/data"
+install -d -m 700 "${TARGET_DIR}/data"
+cp -a "${PAYLOAD_ROOT}/data/." "${TARGET_DIR}/data/"
+install -m 600 "${PAYLOAD_ROOT}/app.env" "${TARGET_DIR}/.env"
+install -m 600 "${PAYLOAD_ROOT}/deploy-commit" "${TARGET_DIR}/.deploy-commit"
+
+cd "${TARGET_DIR}"
+pnpm install --frozen-lockfile
+
+install -m 755 "${TARGET_DIR}/scripts/notinews-backup" /usr/local/sbin/notinews-backup
+install -d -m 700 /var/lib/notinews-backup
+install -m 644 "${PAYLOAD_ROOT}/notinews-bot.service" /etc/systemd/system/notinews-bot.service
+install -m 644 "${TARGET_DIR}/deploy/notinews-failure-notify@.service" /etc/systemd/system/notinews-failure-notify@.service
+install -m 644 "${TARGET_DIR}/deploy/notinews-backup.service" /etc/systemd/system/notinews-backup.service
+install -m 644 "${TARGET_DIR}/deploy/notinews-backup.timer" /etc/systemd/system/notinews-backup.timer
+
+systemctl daemon-reload
+systemctl enable notinews-bot.service
+systemctl enable --now notinews-backup.timer
+systemctl start notinews-bot.service
