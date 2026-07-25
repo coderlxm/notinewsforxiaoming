@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { onBeforeUnmount, shallowRef, useTemplateRef, watch } from 'vue';
+import { useDropZone, useFileDialog } from '@vueuse/core';
+import { computed, onBeforeUnmount, shallowRef, useTemplateRef, watch } from 'vue';
 import type { JournalAsset } from '../../types';
 
 interface LocalPreview {
@@ -19,9 +20,30 @@ const emit = defineEmits<{
 const files = defineModel<File[]>({ required: true });
 const previews = shallowRef<LocalPreview[]>([]);
 const selectionError = shallowRef<string | null>(null);
-const fileInput = useTemplateRef<HTMLInputElement>('fileInput');
-const acceptedTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+const dropZone = useTemplateRef<HTMLButtonElement>('dropZone');
+const acceptedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+const acceptedTypes = new Set(acceptedMimeTypes);
+const maximumImageCount = 10;
 const maximumFileSize = 20 * 1024 * 1024;
+const imageCount = computed(() => props.existingAssets.length + files.value.length);
+const imageLimitReached = computed(() => imageCount.value >= maximumImageCount);
+const pickerDisabled = computed(() => props.disabled || imageLimitReached.value);
+
+const { open: openFileDialog, onChange } = useFileDialog({
+  accept: acceptedMimeTypes.join(','),
+  multiple: true,
+  reset: true,
+});
+
+const { isOverDropZone } = useDropZone(dropZone, {
+  multiple: true,
+  onDrop(droppedFiles) {
+    if (pickerDisabled.value || droppedFiles === null) return;
+    addImages(droppedFiles);
+  },
+});
+
+const dropZoneActive = computed(() => isOverDropZone.value && !pickerDisabled.value);
 
 watch(files, (nextFiles) => {
   previews.value.forEach((preview) => {
@@ -33,14 +55,11 @@ watch(files, (nextFiles) => {
   });
 }, { immediate: true });
 
-function selectImages(event: Event): void {
-  const input = event.target as HTMLInputElement;
-  const selected = [...(input.files ?? [])];
-  input.value = '';
+function addImages(selected: File[]): void {
   selectionError.value = null;
   if (selected.length === 0) return;
 
-  if (props.existingAssets.length + files.value.length + selected.length > 10) {
+  if (imageCount.value + selected.length > maximumImageCount) {
     selectionError.value = '每条内容最多选择 10 张图片。';
     return;
   }
@@ -58,6 +77,16 @@ function selectImages(event: Event): void {
   files.value = [...files.value, ...selected];
 }
 
+onChange((selectedFiles) => {
+  if (selectedFiles === null) return;
+  addImages([...selectedFiles]);
+});
+
+function selectImages(): void {
+  if (pickerDisabled.value) return;
+  openFileDialog();
+}
+
 function removeLocal(file: File): void {
   files.value = files.value.filter(candidate => candidate !== file);
 }
@@ -70,28 +99,32 @@ onBeforeUnmount(() => {
 <template>
   <section class="image-picker" aria-labelledby="entry-images-label">
     <div class="image-picker__heading">
-      <div>
-        <h2 id="entry-images-label" class="image-picker__label">图片</h2>
-        <p class="image-picker__hint">支持 JPEG、PNG、WebP、GIF，最多 10 张，每张不超过 20 MB。</p>
-      </div>
-      <button
-        class="button button--quiet"
-        type="button"
-        :disabled="disabled || existingAssets.length + files.length >= 10"
-        @click="fileInput?.click()"
-      >
-        选择图片
-      </button>
-      <input
-        ref="fileInput"
-        class="image-picker__input"
-        type="file"
-        accept="image/jpeg,image/png,image/webp,image/gif"
-        multiple
-        :disabled="disabled"
-        @change="selectImages"
-      >
+      <h2 id="entry-images-label" class="image-picker__label">图片</h2>
+      <p id="entry-images-hint" class="image-picker__hint">支持 JPEG、PNG、WebP、GIF，最多 10 张，每张不超过 20 MB。</p>
     </div>
+
+    <button
+      ref="dropZone"
+      class="image-picker__drop-zone"
+      :class="{
+        'image-picker__drop-zone--over': dropZoneActive,
+        'image-picker__drop-zone--limit': imageLimitReached,
+        'image-picker__drop-zone--disabled': disabled,
+      }"
+      type="button"
+      :disabled="pickerDisabled"
+      aria-describedby="entry-images-hint"
+      @click="selectImages"
+    >
+      <strong v-if="imageLimitReached" class="image-picker__drop-title">已达到 10 张上限</strong>
+      <strong v-else-if="disabled" class="image-picker__drop-title">图片选择暂不可用</strong>
+      <strong v-else-if="dropZoneActive" class="image-picker__drop-title">松开以添加图片</strong>
+      <template v-else>
+        <strong class="image-picker__drop-title image-picker__drop-title--desktop">拖拽图片到这里，或点击选择</strong>
+        <strong class="image-picker__drop-title image-picker__drop-title--mobile">点击选择图片</strong>
+      </template>
+      <span class="image-picker__drop-hint">图片将在保存草稿或发布时上传</span>
+    </button>
 
     <p v-if="selectionError" class="notice notice--error" role="alert">{{ selectionError }}</p>
 
@@ -131,10 +164,8 @@ onBeforeUnmount(() => {
 }
 
 .image-picker__heading {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: 1rem;
+  display: grid;
+  gap: 0.25rem;
 }
 
 .image-picker__label,
@@ -149,14 +180,61 @@ onBeforeUnmount(() => {
 }
 
 .image-picker__hint {
-  margin-top: 0.25rem;
   color: var(--text-muted);
   font-size: 0.74rem;
   line-height: 1.5;
 }
 
-.image-picker__input {
+.image-picker__drop-zone {
+  display: grid;
+  width: 100%;
+  min-height: 8rem;
+  align-content: center;
+  justify-items: center;
+  gap: 0.35rem;
+  padding: 1.25rem;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
+  color: var(--text-primary);
+  cursor: pointer;
+  font: inherit;
+  text-align: center;
+  transition: border-color 140ms ease, background-color 140ms ease;
+}
+
+.image-picker__drop-zone:hover:not(:disabled),
+.image-picker__drop-zone--over {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.image-picker__drop-zone--limit,
+.image-picker__drop-zone--disabled {
+  opacity: 0.55;
+}
+
+.image-picker__drop-zone--limit {
+  cursor: not-allowed;
+}
+
+.image-picker__drop-zone--disabled {
+  cursor: wait;
+}
+
+.image-picker__drop-title {
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.image-picker__drop-title--mobile {
   display: none;
+}
+
+.image-picker__drop-hint {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  line-height: 1.5;
 }
 
 .image-picker__grid {
@@ -197,8 +275,17 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 599px) {
-  .image-picker__heading {
-    align-items: end;
+  .image-picker__drop-zone {
+    min-height: 6.5rem;
+    padding: 1rem;
+  }
+
+  .image-picker__drop-title--desktop {
+    display: none;
+  }
+
+  .image-picker__drop-title--mobile {
+    display: inline;
   }
 
   .image-picker__grid {
