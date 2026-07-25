@@ -16,6 +16,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   layoutReady: [];
   openEntry: [entry: JournalEntry];
+  continueDraft: [entry: JournalEntry];
   selectTag: [tag: string];
   editArticle: [id: number];
   saveContent: [entry: JournalEntry, contentText: string];
@@ -191,6 +192,7 @@ onBeforeUnmount(() => {
             :editable="mode === 'private'"
             :busy="mutationEntryId === entry.id"
             @open-entry="emit('openEntry', $event)"
+            @continue-draft="emit('continueDraft', $event)"
             @select-tag="emit('selectTag', $event)"
             @save-content="forwardSaveContent"
             @set-published-time="forwardPublishedTime"

@@ -235,7 +235,15 @@ function editArticle(id: number): void {
   void router.push({ name: 'article-edit', params: { articleId: id } });
 }
 
+function editDraft(entry: JournalEntry): void {
+  void router.push({ name: 'entry-edit', params: { entryId: entry.id } });
+}
+
 function openEntry(entry: JournalEntry): void {
+  if (props.mode === 'private' && entry.publicationStatus === 'draft') {
+    editDraft(entry);
+    return;
+  }
   if (props.mode === 'public' && isArticleEntry(entry)) {
     void router.push({
       name: 'detail',
@@ -315,6 +323,14 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
             >
               <JournalLoading v-if="refreshing" variant="inline" label="刷新中…" />
               <template v-else>刷新</template>
+            </button>
+            <button
+              v-if="journal.authenticationState.value === 'authenticated'"
+              class="button button--quiet"
+              type="button"
+              @click="router.push({ name: 'entry-new' })"
+            >
+              发布内容
             </button>
             <button
               v-if="journal.authenticationState.value === 'authenticated'"
@@ -408,6 +424,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
             :linkable="false"
             @select-tag="selectTag"
             @open-entry="openEntry"
+            @continue-draft="editDraft"
             @save-content="saveContent"
             @set-published-time="setPublishedTime"
             @set-visibility="setVisibility"
@@ -438,6 +455,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
             :mutation-entry-id="journal.mutationEntryId.value"
             @layout-ready="handleLayoutReady"
             @open-entry="openEntry"
+            @continue-draft="editDraft"
             @select-tag="selectTag"
             @edit-article="editArticle"
             @save-content="saveContent"
@@ -483,6 +501,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
     @close="emit('closeOverlay')"
     @select-tag="selectTag"
     @edit="editArticle($event.id)"
+    @continue-draft="editDraft"
     @save-content="saveContent"
     @set-published-time="setPublishedTime"
     @set-visibility="setVisibility"

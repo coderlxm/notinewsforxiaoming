@@ -103,6 +103,39 @@ export function fetchPrivateEntry(id: number): Promise<JournalEntry> {
   return requestJson<JournalEntry>(`/api/me/entries/${id}`);
 }
 
+export function publishEntry(input: {
+  contentText: string;
+  images: File[];
+  action: 'draft' | 'publish';
+  visibility?: JournalVisibility;
+}): Promise<JournalEntry> {
+  const form = new FormData();
+  form.append('contentText', input.contentText);
+  form.append('action', input.action);
+  if (input.visibility !== undefined) form.append('visibility', input.visibility);
+  input.images.forEach(file => form.append('images', file));
+  return requestJson<JournalEntry>('/api/me/entries', { method: 'POST', body: form });
+}
+
+export function updateDraft(id: number, input: {
+  contentText: string;
+  newImages: File[];
+  removedAssetIds: number[];
+  action: 'draft' | 'publish';
+  visibility?: JournalVisibility;
+}): Promise<JournalEntry> {
+  const form = new FormData();
+  form.append('contentText', input.contentText);
+  form.append('action', input.action);
+  if (input.visibility !== undefined) form.append('visibility', input.visibility);
+  input.newImages.forEach(file => form.append('newImages', file));
+  form.append('removedAssetIds', JSON.stringify(input.removedAssetIds));
+  return requestJson<JournalEntry>(
+    `/api/me/entries/${id}/draft`,
+    { method: 'PATCH', body: form },
+  );
+}
+
 export function fetchOnThisDay(): Promise<OnThisDayResponse> {
   return requestJson<OnThisDayResponse>('/api/me/on-this-day');
 }

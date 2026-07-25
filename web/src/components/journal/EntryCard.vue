@@ -21,6 +21,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   openEntry: [entry: JournalEntry];
+  continueDraft: [entry: JournalEntry];
   selectTag: [tag: string];
   saveContent: [entry: JournalEntry, contentText: string];
   setPublishedTime: [entry: JournalEntry, sourceCreatedAt: string];
@@ -36,6 +37,7 @@ const draft = shallowRef(props.entry.contentText);
 const hiddenStructuredKeys = new Set(['entities', 'caption_entities']);
 
 const isDetail = computed(() => !props.linkable);
+const isDraft = computed(() => props.entry.publicationStatus === 'draft');
 const normalizedContent = computed(() => props.entry.contentText.replace(/\s+/g, ' ').trim());
 const displayedContent = computed(() => {
   if (isDetail.value || normalizedContent.value.length <= 72) return isDetail.value
@@ -74,6 +76,7 @@ function cancelEditing(): void {
 }
 
 function startEditing(): void {
+  if (isDraft.value) return;
   confirmingDeletion.value = false;
   editingPublishedTime.value = false;
   editing.value = true;
@@ -86,6 +89,7 @@ function startDeletion(): void {
 }
 
 function startPublishedTimeEditing(): void {
+  if (isDraft.value) return;
   editing.value = false;
   confirmingDeletion.value = false;
   editingPublishedTime.value = true;
@@ -118,6 +122,7 @@ function handleCardClick(event: MouseEvent): void {
         :source-created-at="entry.sourceCreatedAt"
         :pinned="entry.pinned"
         :visibility="entry.visibility"
+        :publication-status="entry.publicationStatus"
         :show-status="editable"
         :linkable="cardLinkable"
         @open="openEntry"
@@ -127,7 +132,9 @@ function handleCardClick(event: MouseEvent): void {
         :busy="busy"
         :pinned="entry.pinned"
         :visibility="entry.visibility"
+        :publication-status="entry.publicationStatus"
         @edit="startEditing"
+        @continue-edit="emit('continueDraft', entry)"
         @edit-published-time="startPublishedTimeEditing"
         @set-pinned="emit('setPinned', entry, $event)"
         @set-visibility="emit('setVisibility', entry, $event)"
@@ -207,7 +214,7 @@ function handleCardClick(event: MouseEvent): void {
     </footer>
 
     <PublishedTimeDialog
-      v-if="editingPublishedTime"
+      v-if="editingPublishedTime && !isDraft"
       :source-created-at="entry.sourceCreatedAt"
       :busy="busy"
       @close="editingPublishedTime = false"

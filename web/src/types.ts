@@ -1,4 +1,5 @@
 export type JournalVisibility = 'private' | 'public';
+export type JournalPublicationStatus = 'draft' | 'published';
 
 export type JournalSourceKind = 'telegram' | 'web';
 export type JournalBodyFormat = 'plain' | 'rich';
@@ -43,6 +44,7 @@ export interface JournalEntry {
   richBody: JournalRichDocument | null;
   contentText: string;
   visibility: JournalVisibility;
+  publicationStatus: JournalPublicationStatus;
   tags: string[];
   pinned: boolean;
   structuredContent: Record<string, unknown> | null;

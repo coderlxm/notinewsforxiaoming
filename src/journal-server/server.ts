@@ -26,6 +26,7 @@ import { registerPublicFeedRoutes } from './routes/publicFeed.js';
 import { JournalStorage } from './storage.js';
 import { TelegramFileDownloader } from './telegramFiles.js';
 import type { JournalServerConfig } from './types.js';
+import { JournalWebEntryService } from './webEntryService.js';
 
 export async function createJournalServer(config: JournalServerConfig): Promise<FastifyInstance> {
   const server = Fastify({ logger: true });
@@ -35,6 +36,7 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
   const storage = new JournalStorage(config.dataDir);
   const previews = new JournalImagePreviewService();
   const articleService = new JournalArticleService(repository, storage, previews);
+  const webEntryService = new JournalWebEntryService(repository, storage, previews);
   const deletionService = new JournalDeletionService(repository, storage);
   const downloader = new TelegramFileDownloader(config.telegramToken);
   const ingestService = new JournalIngestService(
@@ -75,7 +77,13 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
 
   await registerInternalRoutes(server, { auth, deletionService, ingestService, repository });
   await registerPublicFeedRoutes(server, repository);
-  await registerPrivateEntryRoutes(server, auth, repository, deletionService);
+  await registerPrivateEntryRoutes(
+    server,
+    auth,
+    repository,
+    deletionService,
+    webEntryService,
+  );
   await registerArticleRoutes(server, auth, articleService);
   await registerMediaRoutes(server, auth, repository, config.dataDir);
   await registerFeedRoutes(server, repository, config.publicBaseUrl);
@@ -89,6 +97,8 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
   server.get('/me', sendApplication);
   server.get('/me/articles/new', sendApplication);
   server.get('/me/articles/:id/edit', sendApplication);
+  server.get('/me/entries/new', sendApplication);
+  server.get('/me/entries/:id/edit', sendApplication);
 
   server.addHook('onClose', async () => {
     database.close();

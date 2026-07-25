@@ -9,6 +9,9 @@ export type JournalSourceKind = z.infer<typeof journalSourceKindSchema>;
 export const journalBodyFormatSchema = z.enum(['plain', 'rich']);
 export type JournalBodyFormat = z.infer<typeof journalBodyFormatSchema>;
 
+export const journalPublicationStatusSchema = z.enum(['draft', 'published']);
+export type JournalPublicationStatus = z.infer<typeof journalPublicationStatusSchema>;
+
 export const journalAssetSourceKindSchema = z.enum(['telegram', 'web']);
 export type JournalAssetSourceKind = z.infer<typeof journalAssetSourceKindSchema>;
 
@@ -80,6 +83,7 @@ export const journalEntrySchema = z.object({
   bodyFormat: journalBodyFormatSchema,
   richBody: journalRichDocumentSchema.nullable(),
   contentText: z.string(),
+  publicationStatus: journalPublicationStatusSchema,
   visibility: journalVisibilitySchema,
   tags: z.array(z.string()),
   pinned: z.boolean(),
@@ -114,6 +118,34 @@ export const journalArticleAssetResponseSchema = z.object({
   byteSize: z.number().int().nonnegative().nullable(),
 });
 export type JournalArticleAssetResponse = z.infer<typeof journalArticleAssetResponseSchema>;
+
+const journalWebEntryDraftFieldsSchema = z.object({
+  contentText: z.string(),
+  action: z.literal('draft'),
+  visibility: z.never().optional(),
+});
+
+const journalWebEntryPublishFieldsSchema = z.object({
+  contentText: z.string(),
+  action: z.literal('publish'),
+  visibility: journalVisibilitySchema,
+});
+
+export const journalWebEntryCreateFieldsSchema = z.discriminatedUnion('action', [
+  journalWebEntryDraftFieldsSchema,
+  journalWebEntryPublishFieldsSchema,
+]);
+export type JournalWebEntryCreateFields = z.infer<typeof journalWebEntryCreateFieldsSchema>;
+
+export const journalWebDraftUpdateFieldsSchema = z.discriminatedUnion('action', [
+  journalWebEntryDraftFieldsSchema.extend({
+    removedAssetIds: z.array(z.number().int().positive()),
+  }),
+  journalWebEntryPublishFieldsSchema.extend({
+    removedAssetIds: z.array(z.number().int().positive()),
+  }),
+]);
+export type JournalWebDraftUpdateFields = z.infer<typeof journalWebDraftUpdateFieldsSchema>;
 
 export const journalFeedSchema = z.object({
   entries: z.array(journalEntrySchema),

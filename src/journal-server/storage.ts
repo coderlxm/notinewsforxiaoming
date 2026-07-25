@@ -115,7 +115,7 @@ export class JournalStorage {
     }
   }
 
-  async writeArticleAsset(
+  async writeWebAsset(
     publicId: string,
     sourceCreatedAt: string,
     data: Buffer,

@@ -4,6 +4,7 @@ import { computed, onMounted, onUnmounted, shallowRef, useTemplateRef, watch } f
 import { useRoute, useRouter } from 'vue-router';
 import ArticleEditorView from './components/article/ArticleEditorView.vue';
 import FeedView from './components/journal/FeedView.vue';
+import EntryPublisherView from './components/publisher/EntryPublisherView.vue';
 import { useSessionStore } from './stores/session';
 import type { JournalEntry } from './types';
 
@@ -11,6 +12,8 @@ type AppRoute =
   | { name: 'public'; key: string; tag: string }
   | { name: 'detail'; key: string; publicId: string }
   | { name: 'private'; key: string; entryId: number | null }
+  | { name: 'entry-new'; key: string }
+  | { name: 'entry-edit'; key: string; entryId: number }
   | { name: 'article-new'; key: string }
   | { name: 'article-edit'; key: string; articleId: number }
   | { name: 'not-found'; key: string };
@@ -47,6 +50,13 @@ const route = computed<AppRoute>(() => {
   }
   if (currentRoute.name === 'article-new') {
     return { name: 'article-new', key: 'article-new' };
+  }
+  if (currentRoute.name === 'entry-new') {
+    return { name: 'entry-new', key: 'entry-new' };
+  }
+  if (currentRoute.name === 'entry-edit') {
+    const entryId = Number(currentRoute.params.entryId);
+    return { name: 'entry-edit', key: `entry-edit:${entryId}`, entryId };
   }
   if (currentRoute.name === 'article-edit') {
     const articleId = Number(currentRoute.params.articleId);
@@ -111,6 +121,8 @@ const directPrivateOverlay = computed(() =>
 );
 const isPrivateRoute = computed(() =>
   route.value.name === 'private'
+  || route.value.name === 'entry-new'
+  || route.value.name === 'entry-edit'
   || route.value.name === 'article-new'
   || route.value.name === 'article-edit',
 );
@@ -270,9 +282,9 @@ onUnmounted(removeAfterEach);
           <button
             v-if="isPrivateRoute || ownerAuthenticated"
             class="profile__nav-link"
-            :class="{ 'profile__nav-link--active': route.name === 'private' || route.name === 'article-new' || route.name === 'article-edit' }"
+            :class="{ 'profile__nav-link--active': route.name === 'private' || route.name === 'entry-new' || route.name === 'entry-edit' || route.name === 'article-new' || route.name === 'article-edit' }"
             type="button"
-            :aria-current="route.name === 'private' || route.name === 'article-new' || route.name === 'article-edit' ? 'page' : undefined"
+            :aria-current="route.name === 'private' || route.name === 'entry-new' || route.name === 'entry-edit' || route.name === 'article-new' || route.name === 'article-edit' ? 'page' : undefined"
             @click="navigate('/me')"
           >
             我的资产
@@ -314,6 +326,15 @@ onUnmounted(removeAfterEach);
         v-else-if="route.name === 'article-edit'"
         :key="route.key"
         :article-id="route.articleId"
+      />
+      <EntryPublisherView
+        v-else-if="route.name === 'entry-new'"
+        :key="route.key"
+      />
+      <EntryPublisherView
+        v-else-if="route.name === 'entry-edit'"
+        :key="route.key"
+        :entry-id="route.entryId"
       />
       <main v-else-if="route.name === 'not-found'" class="not-found">
         <span class="not-found__code">404</span>

@@ -19,6 +19,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   selectTag: [tag: string];
   edit: [entry: JournalEntry];
+  continueDraft: [entry: JournalEntry];
   saveContent: [entry: JournalEntry, contentText: string];
   setPublishedTime: [entry: JournalEntry, sourceCreatedAt: string];
   setVisibility: [entry: JournalEntry, visibility: JournalVisibility];
@@ -100,7 +101,7 @@ function requestPublishedTimeEditing(): void {
 
       <div class="detail-content__management">
         <span class="detail-content__status">
-          {{ entry.visibility === 'public' ? '🌐 公开' : '🔒 私有' }}
+          {{ entry.publicationStatus === 'draft' ? '📝 草稿' : (entry.visibility === 'public' ? '🌐 公开' : '🔒 私有') }}
         </span>
         <span v-if="entry.pinned" class="detail-content__status">📌 置顶</span>
         <CardActionMenu
@@ -108,7 +109,9 @@ function requestPublishedTimeEditing(): void {
           :busy="busy"
           :pinned="entry.pinned"
           :visibility="entry.visibility"
+          :publication-status="entry.publicationStatus"
           @edit="requestEdit"
+          @continue-edit="emit('continueDraft', entry)"
           @edit-published-time="requestPublishedTimeEditing"
           @set-pinned="emit('setPinned', entry, $event)"
           @set-visibility="emit('setVisibility', entry, $event)"
@@ -206,7 +209,7 @@ function requestPublishedTimeEditing(): void {
     </footer>
 
     <PublishedTimeDialog
-      v-if="editingPublishedTime"
+      v-if="editingPublishedTime && entry.publicationStatus === 'published'"
       :source-created-at="entry.sourceCreatedAt"
       :busy="busy"
       @close="editingPublishedTime = false"

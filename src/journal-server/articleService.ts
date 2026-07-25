@@ -22,10 +22,12 @@ import {
   extractContentText,
 } from './richText.js';
 import { JournalStorage } from './storage.js';
+import {
+  assertWebImageUpload,
+  webImageKind,
+} from './webImage.js';
 
 const maxRichBodyBytes = 512 * 1024;
-const allowedUploadMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
-const maxUploadBytes = 20 * 1024 * 1024;
 
 export interface ArticleUploadInput {
   buffer: Buffer;
@@ -96,18 +98,13 @@ export class JournalArticleService {
     role: 'cover' | 'inline',
     input: ArticleUploadInput,
   ): Promise<JournalArticleAssetResponse> {
-    if (!allowedUploadMimeTypes.has(input.mimeType)) {
-      throw new Error(`Unsupported article asset MIME type ${input.mimeType}.`);
-    }
-    if (input.buffer.byteLength > maxUploadBytes) {
-      throw new Error('Article asset exceeds the 20 MB upload limit.');
-    }
+    assertWebImageUpload(input);
     const article = this.repository.getArticleForEditing(id);
     if (!article) {
       throw new Error(`Article ${id} was not found.`);
     }
 
-    const relativePath = await this.storage.writeArticleAsset(
+    const relativePath = await this.storage.writeWebAsset(
       article.publicId,
       article.sourceCreatedAt,
       input.buffer,
@@ -128,7 +125,7 @@ export class JournalArticleService {
     if (role === 'cover') {
       previousCover = this.repository.findCover(id);
     }
-    const kind = this.kindFromMime(input.mimeType);
+    const kind = webImageKind(input.mimeType);
     let newAssetId: number;
     try {
       const sortOrder = role === 'cover' ? 0 : this.repository.listInlineAssets(id).length;
@@ -195,11 +192,6 @@ export class JournalArticleService {
     }
     assertRichDocument(document, options);
     return json;
-  }
-
-  private kindFromMime(mimeType: string): string {
-    if (mimeType === 'image/gif') return 'animation';
-    return 'photo';
   }
 
   private assertBodyIsNotEmpty(contentText: string, inlineAssetIds: number[]): void {

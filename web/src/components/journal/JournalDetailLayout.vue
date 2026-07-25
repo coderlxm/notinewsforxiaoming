@@ -16,6 +16,7 @@ const emit = defineEmits<{
   stageAspectRatioChange: [aspectRatio: number | null];
   selectTag: [tag: string];
   edit: [entry: JournalEntry];
+  continueDraft: [entry: JournalEntry];
   saveContent: [entry: JournalEntry, contentText: string];
   setPublishedTime: [entry: JournalEntry, sourceCreatedAt: string];
   setVisibility: [entry: JournalEntry, visibility: JournalVisibility];
@@ -104,6 +105,7 @@ function forwardPinned(entry: JournalEntry, pinned: boolean): void {
         :supplemental-assets="supplementalAssets"
         @select-tag="emit('selectTag', $event)"
         @edit="emit('edit', $event)"
+        @continue-draft="emit('continueDraft', $event)"
         @save-content="forwardSaveContent"
         @set-published-time="forwardPublishedTime"
         @set-visibility="forwardVisibility"

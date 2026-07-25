@@ -2,16 +2,18 @@
 import { nextTick, onBeforeUnmount, shallowRef, useId, useTemplateRef, watch } from 'vue';
 import type { CSSProperties } from 'vue';
 import JournalLoading from '../ui/JournalLoading.vue';
-import type { JournalVisibility } from '../../types';
+import type { JournalPublicationStatus, JournalVisibility } from '../../types';
 
 const props = defineProps<{
   busy: boolean;
   pinned: boolean;
   visibility: JournalVisibility;
+  publicationStatus: JournalPublicationStatus;
 }>();
 
 const emit = defineEmits<{
   edit: [];
+  continueEdit: [];
   editPublishedTime: [];
   setPinned: [pinned: boolean];
   setVisibility: [visibility: JournalVisibility];
@@ -123,6 +125,16 @@ function changeVisibility(): void {
   );
 }
 
+function editEntry(): void {
+  run(() => {
+    if (props.publicationStatus === 'draft') {
+      emit('continueEdit');
+      return;
+    }
+    emit('edit');
+  });
+}
+
 onBeforeUnmount(() => {
   document.removeEventListener('scroll', close, true);
   window.removeEventListener('resize', close);
@@ -165,10 +177,18 @@ onBeforeUnmount(() => {
       @keydown.down.prevent="focusAdjacent($event, 1)"
       @keydown.up.prevent="focusAdjacent($event, -1)"
     >
-      <button ref="firstAction" class="action-menu__item" type="button" role="menuitem" :disabled="busy" @click="run(() => emit('edit'))">
-        编辑
+      <button
+        ref="firstAction"
+        class="action-menu__item"
+        type="button"
+        role="menuitem"
+        :disabled="busy"
+        @click="editEntry"
+      >
+        {{ publicationStatus === 'draft' ? '继续编辑' : '编辑' }}
       </button>
       <button
+        v-if="publicationStatus === 'published'"
         class="action-menu__item"
         type="button"
         role="menuitem"
@@ -178,6 +198,7 @@ onBeforeUnmount(() => {
         修改发布时间
       </button>
       <button
+        v-if="publicationStatus === 'published'"
         class="action-menu__item"
         type="button"
         role="menuitem"
@@ -187,6 +208,7 @@ onBeforeUnmount(() => {
         {{ pinned ? '取消置顶' : '置顶' }}
       </button>
       <button
+        v-if="publicationStatus === 'published'"
         class="action-menu__item"
         type="button"
         role="menuitem"

@@ -1,16 +1,18 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { JournalVisibility } from '../../types';
+import type { JournalPublicationStatus, JournalVisibility } from '../../types';
 
 const props = withDefaults(defineProps<{
   sourceCreatedAt: string;
   pinned?: boolean;
   visibility?: JournalVisibility;
+  publicationStatus?: JournalPublicationStatus;
   showStatus?: boolean;
   linkable?: boolean;
 }>(), {
   pinned: false,
   visibility: 'private',
+  publicationStatus: 'published',
   showStatus: false,
   linkable: false,
 });
@@ -63,7 +65,7 @@ const fullDateTime = computed(() => new Intl.DateTimeFormat('zh-CN', {
       <time :datetime="sourceCreatedAt" :title="fullDateTime">{{ time }}</time>
       <span v-if="pinned" class="date-spine__pin" title="已置顶" aria-label="已置顶">📌</span>
       <span v-if="showStatus" class="date-spine__status">
-        {{ visibility === 'public' ? '公开' : '私有' }}
+        {{ publicationStatus === 'draft' ? '草稿' : (visibility === 'public' ? '公开' : '私有') }}
       </span>
     </div>
   </div>
