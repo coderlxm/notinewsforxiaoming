@@ -246,9 +246,12 @@ function buildSetScoreText(displayScore: string | null): string | null {
   return null;
 }
 
-function compareSetRecency(a: { completedAt: number | null; id: number }, b: { completedAt: number | null; id: number }): number {
-  const aTime = a.completedAt ?? 0;
-  const bTime = b.completedAt ?? 0;
+function compareSetRecency(
+  a: { completedAt: number | null; startedAt: number | null; id: number },
+  b: { completedAt: number | null; startedAt: number | null; id: number },
+): number {
+  const aTime = a.completedAt ?? a.startedAt ?? 0;
+  const bTime = b.completedAt ?? b.startedAt ?? 0;
   if (aTime !== bTime) {
     return bTime - aTime;
   }
@@ -326,8 +329,10 @@ function computePlayerSnapshot(
     };
   }
 
-  playerSets.sort(compareSetRecency);
-  const latestSet = playerSets[0] ?? null;
+  const formalSets = playerSets
+    .filter((set) => Number.isInteger(set.id))
+    .sort(compareSetRecency);
+  const latestSet = formalSets[0] ?? null;
   const latestSetLost = latestSet?.winnerId !== null && latestSet?.winnerId !== undefined && latestSet.winnerId !== entrantId;
   const inLosersSignal = Boolean(
     (latestSet?.round !== null && latestSet?.round !== undefined && latestSet.round < 0)
@@ -396,7 +401,7 @@ function selectSetsToPush(
   watchEventId: number,
 ): TrackedSetNode[] {
   return [...playerSets]
-    .filter((set) => Number.isInteger(set.id))
+    .filter((set) => Number.isInteger(set.id) && set.completedAt !== null)
     .sort(compareSetChronology)
     .filter((set) => !hasStartggPushedSet(watchPlayerId, watchEventId, set.id));
 }
@@ -529,7 +534,9 @@ async function processEvent(
     if (initialMessagePending) {
       if (playerSets.length === 0) continue;
 
-      for (const set of playerSets.filter((item) => Number.isInteger(item.id))) {
+      for (const set of playerSets.filter(
+        (item) => Number.isInteger(item.id) && item.completedAt !== null,
+      )) {
         markStartggPushedSet(player.id, eventRow.id, set.id);
       }
 
