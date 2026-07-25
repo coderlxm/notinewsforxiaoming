@@ -643,4 +643,27 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
   text-align: center;
 }
 
+@media (max-width: 599px) {
+  .feed__private-heading {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+
+  .feed__private-actions {
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.4rem;
+  }
+
+  .feed__private-actions .button {
+    min-width: 0;
+    min-height: 2.5rem;
+    padding: 0.5rem 0.2rem;
+    font-size: clamp(0.72rem, 3.5vw, 0.8rem);
+    white-space: nowrap;
+  }
+}
+
 </style>
