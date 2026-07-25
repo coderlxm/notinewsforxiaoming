@@ -375,17 +375,6 @@ function computePlayerSnapshot(
   };
 }
 
-function hasSnapshotChanged(
-  current: PlayerStatusSnapshot,
-  previous: ReturnType<typeof findStartggWatchSnapshot>,
-): boolean {
-  if (!previous) return true;
-  return current.status !== previous.status
-    || current.placement !== previous.placement
-    || current.lastSetId !== previous.last_set_id
-    || current.lastSetScoreText !== previous.last_set_score_text;
-}
-
 function compareSetChronology(a: { completedAt: number | null; id: number }, b: { completedAt: number | null; id: number }): number {
   const aTime = a.completedAt ?? 0;
   const bTime = b.completedAt ?? 0;
@@ -553,21 +542,7 @@ async function processEvent(
       continue;
     }
 
-    const changedNow = hasSnapshotChanged(snapshot, previous);
-    if (setsToPush.length === 0 && !changedNow) continue;
-
-    if (setsToPush.length === 0) {
-      changed += 1;
-      playerUpdates.push({
-        playerName: eventPlayerName,
-        status: snapshot.status,
-        placement: snapshot.placement,
-        roundLabel: snapshot.lastSetRoundLabel,
-        scoreText: snapshot.lastSetScoreText,
-        setPageUrl: snapshot.setPageUrl,
-      });
-      continue;
-    }
+    if (setsToPush.length === 0) continue;
 
     for (const set of setsToPush) {
       changed += 1;
