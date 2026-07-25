@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useDropZone, useFileDialog } from '@vueuse/core';
+import { useDropZone, useEventListener, useFileDialog } from '@vueuse/core';
 import { computed, onBeforeUnmount, shallowRef, useTemplateRef, watch } from 'vue';
 import type { JournalAsset } from '../../types';
 
@@ -77,6 +77,34 @@ function addImages(selected: File[]): void {
   files.value = [...files.value, ...selected];
 }
 
+function handlePaste(event: ClipboardEvent): void {
+  if (event.clipboardData === null) return;
+
+  const clipboardImages = [...event.clipboardData.items]
+    .filter(item => item.kind === 'file' && item.type.startsWith('image/'));
+
+  if (clipboardImages.length === 0) return;
+
+  event.preventDefault();
+  if (props.disabled) {
+    selectionError.value = '保存或发布期间不能添加图片。';
+    return;
+  }
+
+  const pastedFiles: File[] = [];
+  for (const item of clipboardImages) {
+    const file = item.getAsFile();
+    if (file === null) {
+      selectionError.value = '无法读取剪贴板图片。';
+      return;
+    }
+    pastedFiles.push(file);
+  }
+  addImages(pastedFiles);
+}
+
+useEventListener(document, 'paste', handlePaste);
+
 onChange((selectedFiles) => {
   if (selectedFiles === null) return;
   addImages([...selectedFiles]);
@@ -100,7 +128,7 @@ onBeforeUnmount(() => {
   <section class="image-picker" aria-labelledby="entry-images-label">
     <div class="image-picker__heading">
       <h2 id="entry-images-label" class="image-picker__label">图片</h2>
-      <p id="entry-images-hint" class="image-picker__hint">支持 JPEG、PNG、WebP、GIF，最多 10 张，每张不超过 20 MB。</p>
+      <p id="entry-images-hint" class="image-picker__hint">支持 JPEG、PNG、WebP、GIF，最多 10 张，每张不超过 20 MB；可使用 Ctrl / Command + V 粘贴。</p>
     </div>
 
     <button
@@ -120,7 +148,7 @@ onBeforeUnmount(() => {
       <strong v-else-if="disabled" class="image-picker__drop-title">图片选择暂不可用</strong>
       <strong v-else-if="dropZoneActive" class="image-picker__drop-title">松开以添加图片</strong>
       <template v-else>
-        <strong class="image-picker__drop-title image-picker__drop-title--desktop">拖拽图片到这里，或点击选择</strong>
+        <strong class="image-picker__drop-title image-picker__drop-title--desktop">拖拽图片到这里，点击选择，或直接粘贴</strong>
         <strong class="image-picker__drop-title image-picker__drop-title--mobile">点击选择图片</strong>
       </template>
       <span class="image-picker__drop-hint">图片将在保存草稿或发布时上传</span>
