@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, shallowRef, useId, useTemplateRef, watch } from 'vue';
+import { nextTick, onBeforeUnmount, shallowRef, useId, useTemplateRef, watch } from 'vue';
 import type { CSSProperties } from 'vue';
 import JournalLoading from '../ui/JournalLoading.vue';
 import type { JournalVisibility } from '../../types';
 
 const props = defineProps<{
   busy: boolean;
-  busyLabel?: string;
   pinned: boolean;
   visibility: JournalVisibility;
 }>();
@@ -26,7 +25,6 @@ const menuId = useId();
 const trigger = useTemplateRef<HTMLButtonElement>('trigger');
 const panel = useTemplateRef<HTMLElement>('panel');
 const firstAction = useTemplateRef<HTMLButtonElement>('firstAction');
-const displayedPendingLabel = computed(() => props.busyLabel ?? pendingLabel.value ?? '');
 
 watch(() => props.busy, (busy) => {
   if (busy) close();
@@ -134,10 +132,10 @@ onBeforeUnmount(() => {
 <template>
   <div class="action-menu" :aria-busy="busy" @focusout="handleFocusOut" @keydown.esc.stop="closeAndFocusTrigger">
     <JournalLoading
-      v-if="busy && displayedPendingLabel"
+      v-if="busy && pendingLabel"
       class="action-menu__loading"
       variant="inline"
-      :label="displayedPendingLabel"
+      :label="pendingLabel"
     />
     <button
       v-else

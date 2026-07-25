@@ -97,7 +97,6 @@ function handleCardClick(event: MouseEvent): void {
       <CardActionMenu
         v-if="editable && !confirmingDeletion"
         :busy="busy"
-        :busy-label="editingPublishedTime ? '正在修改发布时间…' : undefined"
         :pinned="entry.pinned"
         :visibility="entry.visibility"
         @edit="emit('edit', entry.id)"
