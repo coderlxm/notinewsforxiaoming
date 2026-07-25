@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { List } from 'vant';
-import { computed, nextTick, onMounted, reactive, shallowRef, watch } from 'vue';
+import { computed, nextTick, onActivated, onMounted, reactive, shallowRef, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import ArticleCardContent from '../article/ArticleCardContent.vue';
 import JournalLoading from '../ui/JournalLoading.vue';
@@ -106,6 +106,15 @@ watch(() => journal.authenticationState.value, (state) => {
   if (state !== 'checking') session.setAuthenticated(state === 'authenticated');
 });
 
+async function loadDirectPrivateDetail(): Promise<void> {
+  if (
+    !props.directOverlay
+    || props.overlayEntryId === undefined
+    || journal.authenticationState.value !== 'authenticated'
+  ) return;
+  await journal.loadPrivateDetail(props.overlayEntryId);
+}
+
 onMounted(async () => {
   try {
     if (isDetail.value) {
@@ -118,16 +127,20 @@ onMounted(async () => {
       return;
     }
     await journal.loadPrivate(filters);
-    if (
-      props.directOverlay
-      && props.overlayEntryId !== undefined
-      && journal.authenticationState.value === 'authenticated'
-    ) {
-      await journal.loadPrivateDetail(props.overlayEntryId);
-    }
+    await loadDirectPrivateDetail();
   } finally {
     initialLoadPending.value = false;
   }
+});
+
+onActivated(async () => {
+  if (
+    initialLoadPending.value
+    || props.mode !== 'private'
+    || journal.authenticationState.value !== 'authenticated'
+  ) return;
+  await journal.refreshPrivateFeed(filters);
+  await loadDirectPrivateDetail();
 });
 
 async function applyFilters(nextFilters: FeedFilters): Promise<void> {
@@ -195,13 +208,7 @@ async function authenticate(password: string): Promise<void> {
   listReplacing.value = true;
   try {
     await journal.authenticate(password, filters);
-    if (
-      props.directOverlay
-      && props.overlayEntryId !== undefined
-      && journal.authenticationState.value === 'authenticated'
-    ) {
-      await journal.loadPrivateDetail(props.overlayEntryId);
-    }
+    await loadDirectPrivateDetail();
   } finally {
     listReplacing.value = false;
   }

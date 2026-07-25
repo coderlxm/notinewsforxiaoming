@@ -83,7 +83,7 @@ async function saveDraft(): Promise<void> {
 async function publish(): Promise<void> {
   const published = await publisher.publish(buildInput());
   if (!published) return;
-  await router.push({ name: 'private', query: { entry: published.id } });
+  await router.push({ name: 'private' });
 }
 </script>
 
