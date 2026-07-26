@@ -14,6 +14,7 @@ import {
   markStartggEventPushedSet,
   type StartggFeaturedSeedCount,
   type StartggWatchEvent,
+  type StartggWatchPlayer,
 } from './startggRepository.js';
 import {
   loadStartggPresetPlayersConfig,
@@ -32,6 +33,22 @@ import {
   fetchEventSetsByEntrants,
 } from './startgg/index.js';
 import type { Telegraf } from 'telegraf';
+import { config } from '../config/index.js';
+import {
+  buildStartggInterestPromptButtons,
+  formatStartggInterestPrompt,
+} from '../formatters/startggFormatter.js';
+import {
+  deactivateStartggWatchEventBySlug,
+  deleteExpiredStartggInterestState,
+  findStartggVideogamePreference,
+  hasStartggEventInterestOverride,
+  listStartggPendingEventsNeedingPrompt,
+  markStartggPendingEventPrompted,
+  setStartggVideogamePreference,
+  updateStartggWatchEventVideogame,
+  upsertStartggPendingEvent,
+} from './startggInterestRepository.js';
 
 export interface StartggGoTournamentCandidate {
   tournamentId: number;
@@ -47,6 +64,11 @@ export type StartggGoResult =
       keyword: string;
       syncedPlayers: number;
       candidates: StartggGoTournamentCandidate[];
+    }
+  | {
+      status: 'interest_pending';
+      syncedPlayers: number;
+      pendingEvents: number;
     }
   | {
       status: 'started';
@@ -151,12 +173,77 @@ function toWatchEventInput(event: StartggDiscoveredEvent): StartggWatchEventInpu
     tournament_end_at: new Date(event.tournamentEndAt * 1000).toISOString(),
     tournament_name: event.tournamentName,
     event_display_name: event.eventDisplayName,
+    videogame_id: event.videogameId,
+    videogame_name: event.videogameName,
     entrant_mappings: event.entrantMappings.map((mapping) => ({
       watch_player_id: mapping.watchPlayerId,
       entrant_id: mapping.entrantId,
       entrant_name: mapping.entrantName,
     })),
   };
+}
+
+async function filterDiscoveredEventsByInterest(
+  bot: Telegraf | undefined,
+  events: StartggDiscoveredEvent[],
+  players: StartggWatchPlayer[],
+): Promise<StartggDiscoveredEvent[]> {
+  deleteExpiredStartggInterestState();
+  const playerNames = new Map(players.map((player) => [player.id, player.player_name]));
+  const allowed: StartggDiscoveredEvent[] = [];
+
+  for (const event of events) {
+    updateStartggWatchEventVideogame(
+      event.eventSlug,
+      event.videogameId,
+      event.videogameName,
+    );
+    const preference = findStartggVideogamePreference(event.videogameId);
+    if (preference === 'follow' || hasStartggEventInterestOverride(event.eventSlug)) {
+      allowed.push(event);
+      continue;
+    }
+    deactivateStartggWatchEventBySlug(event.eventSlug);
+    if (preference === 'ignore') continue;
+
+    upsertStartggPendingEvent({
+      eventSlug: event.eventSlug,
+      eventName: event.eventName,
+      tournamentName: event.tournamentName,
+      tournamentEndAt: new Date(event.tournamentEndAt * 1000).toISOString(),
+      videogameId: event.videogameId,
+      videogameName: event.videogameName,
+      playerNames: event.watchPlayerIds.map((id) => {
+        const name = playerNames.get(id);
+        if (!name) {
+          throw new Error(`start.gg discovered watch player is missing: ${id}`);
+        }
+        return name;
+      }),
+    });
+  }
+
+  const pendingPrompts = listStartggPendingEventsNeedingPrompt();
+  if (pendingPrompts.length > 0 && !bot) {
+    throw new Error('start.gg interest prompt requires Telegram bot.');
+  }
+  for (const pending of pendingPrompts) {
+    const message = await bot!.telegram.sendMessage(
+      config.tgChatId,
+      formatStartggInterestPrompt({
+        playerNames: JSON.parse(pending.player_names) as string[],
+        videogameName: pending.videogame_name,
+        tournamentName: pending.tournament_name,
+      }),
+      {
+        parse_mode: 'HTML',
+        ...buildStartggInterestPromptButtons(pending.id),
+      },
+    );
+    markStartggPendingEventPrompted(pending.id, message.message_id);
+  }
+
+  return allowed;
 }
 
 export async function syncStartggPresetPlayers(): Promise<number> {
@@ -225,7 +312,8 @@ export async function runStartggWatchNow(bot?: Telegraf): Promise<{
   await syncStartggPresetPlayers();
   const players = listEnabledStartggWatchPlayers();
   const discoveredEvents = await discoverStartggActiveEventsForPlayers(players);
-  syncAutoDiscoveredStartggWatchEvents(discoveredEvents.map(toWatchEventInput));
+  const allowedEvents = await filterDiscoveredEventsByInterest(bot, discoveredEvents, players);
+  syncAutoDiscoveredStartggWatchEvents(allowedEvents.map(toWatchEventInput));
   await syncFeaturedEntrantsForActiveEvents();
   const watchSummary = await runStartggWatchOnce(bot);
   return {
@@ -289,10 +377,18 @@ export async function runStartggGo(bot: Telegraf | undefined, keyword: string): 
   const candidates = groupDiscoveredEventsByTournament(events);
   const trimmedKeyword = keyword.trim();
   if (!trimmedKeyword) {
-    replaceActiveStartggWatchEvents(events.map(toWatchEventInput), 'auto');
+    const allowedEvents = await filterDiscoveredEventsByInterest(bot, events, players);
+    if (allowedEvents.length === 0) {
+      return {
+        status: 'interest_pending',
+        syncedPlayers,
+        pendingEvents: events.length,
+      };
+    }
+    replaceActiveStartggWatchEvents(allowedEvents.map(toWatchEventInput), 'auto');
     await syncFeaturedEntrantsForActiveEvents();
     const watchSummary = await runStartggWatchOnce(bot, {
-      eventSlugs: events.map((event) => event.eventSlug),
+      eventSlugs: allowedEvents.map((event) => event.eventSlug),
     });
     return {
       status: 'started',
@@ -300,7 +396,7 @@ export async function runStartggGo(bot: Telegraf | undefined, keyword: string): 
       syncedPlayers,
       tournamentName: '自动发现当前进行中的赛事',
       tournamentSlug: '',
-      discoveredEvents: events.length,
+      discoveredEvents: allowedEvents.length,
       checkedPlayers: watchSummary.checkedPlayers,
       checkedEvents: watchSummary.checkedEvents,
       changed: watchSummary.changed,
@@ -330,6 +426,9 @@ export async function runStartggGo(bot: Telegraf | undefined, keyword: string): 
   }
 
   const matchedTournament = matchedCandidates[0]!;
+  for (const event of matchedTournament.events) {
+    setStartggVideogamePreference(event.videogameId, event.videogameName, 'follow');
+  }
   replaceActiveStartggWatchEvents(matchedTournament.events.map(toWatchEventInput), 'manual');
   await syncFeaturedEntrantsForActiveEvents();
 

@@ -88,6 +88,10 @@ query EventBasic($slug: String!) {
     name
     slug
     startAt
+    videogame {
+      id
+      name
+    }
     tournament {
       id
       name
@@ -160,6 +164,10 @@ query PlayerRecentSets($playerId: ID!, $playerIds: [ID!]!, $updatedAfter: Timest
           name
           slug
           startAt
+          videogame {
+            id
+            name
+          }
           tournament {
             id
             name
@@ -454,6 +462,10 @@ export interface EventBasicResponse {
     name: string;
     slug: string | null;
     startAt: number | null;
+    videogame: {
+      id: number;
+      name: string;
+    } | null;
     tournament: {
       id: number;
       name: string;
@@ -501,6 +513,10 @@ export interface PlayerRecentSetsResponse {
           name: string;
           slug: string | null;
           startAt: number | null;
+          videogame: {
+            id: number;
+            name: string;
+          } | null;
           tournament: {
             id: number;
             name: string;

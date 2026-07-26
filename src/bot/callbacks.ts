@@ -103,6 +103,24 @@ export function parseStartggSeedsCallbackData(data: string | undefined): Startgg
   return null;
 }
 
+export interface StartggInterestCallback {
+  action: 'follow' | 'event' | 'ignore';
+  pendingEventId: number;
+}
+
+export function parseStartggInterestCallbackData(
+  data: string | undefined,
+): StartggInterestCallback | null {
+  if (!data) return null;
+  const parts = data.split(':');
+  if (parts.length !== 3 || parts[0] !== 'sginterest') return null;
+  const action = parts[1];
+  if (action !== 'follow' && action !== 'event' && action !== 'ignore') return null;
+  const pendingEventId = Number(parts[2]);
+  if (!Number.isInteger(pendingEventId) || pendingEventId <= 0) return null;
+  return { action, pendingEventId };
+}
+
 export type MasturbationCallback =
   | { type: 'add' }
   | { type: 'stats' }

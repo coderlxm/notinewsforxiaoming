@@ -24,6 +24,8 @@ export interface StartggWatchEvent {
   tournament_end_at: string | null;
   tournament_name: string | null;
   event_display_name: string | null;
+  videogame_id: number | null;
+  videogame_name: string | null;
   event_state: string | null;
   final_phase_id: number | null;
   final_phase_name: string | null;
@@ -169,6 +171,8 @@ export interface StartggWatchEventInput {
   tournament_end_at: string;
   tournament_name: string;
   event_display_name: string;
+  videogame_id: number;
+  videogame_name: string;
   entrant_mappings: StartggWatchEventEntrantMappingInput[];
 }
 
@@ -195,6 +199,8 @@ export function replaceActiveStartggWatchEvent(
   tournamentName: string,
   eventDisplayName: string,
   tournamentEndAt: string,
+  videogameId: number,
+  videogameName: string,
 ): void {
   const db = getDb();
   const now = new Date().toISOString();
@@ -213,10 +219,12 @@ export function replaceActiveStartggWatchEvent(
         tournament_end_at,
         tournament_name,
         event_display_name,
+        videogame_id,
+        videogame_name,
         created_at,
         updated_at
       )
-      VALUES (?, ?, 1, 'manual', ?, ?, ?, ?, ?)
+      VALUES (?, ?, 1, 'manual', ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(event_slug) DO UPDATE SET
         event_name = excluded.event_name,
         active = 1,
@@ -224,8 +232,20 @@ export function replaceActiveStartggWatchEvent(
         tournament_end_at = excluded.tournament_end_at,
         tournament_name = excluded.tournament_name,
         event_display_name = excluded.event_display_name,
+        videogame_id = excluded.videogame_id,
+        videogame_name = excluded.videogame_name,
         updated_at = excluded.updated_at
-    `).run(eventSlug, eventName, tournamentEndAt, tournamentName, eventDisplayName, now, now);
+    `).run(
+      eventSlug,
+      eventName,
+      tournamentEndAt,
+      tournamentName,
+      eventDisplayName,
+      videogameId,
+      videogameName,
+      now,
+      now,
+    );
     const event = db.prepare(`
       SELECT id
       FROM startgg_watch_events
@@ -271,10 +291,12 @@ export function replaceActiveStartggWatchEvents(
         tournament_end_at,
         tournament_name,
         event_display_name,
+        videogame_id,
+        videogame_name,
         created_at,
         updated_at
       )
-      VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(event_slug) DO UPDATE SET
         event_name = excluded.event_name,
         event_id = excluded.event_id,
@@ -283,11 +305,25 @@ export function replaceActiveStartggWatchEvents(
         tournament_end_at = excluded.tournament_end_at,
         tournament_name = excluded.tournament_name,
         event_display_name = excluded.event_display_name,
+        videogame_id = excluded.videogame_id,
+        videogame_name = excluded.videogame_name,
         updated_at = excluded.updated_at
     `);
 
     for (const event of events) {
-      upsert.run(event.event_slug, event.event_name, event.event_id, source, event.tournament_end_at, event.tournament_name, event.event_display_name, now, now);
+      upsert.run(
+        event.event_slug,
+        event.event_name,
+        event.event_id,
+        source,
+        event.tournament_end_at,
+        event.tournament_name,
+        event.event_display_name,
+        event.videogame_id,
+        event.videogame_name,
+        now,
+        now,
+      );
       const eventRow = db.prepare(`
         SELECT id
         FROM startgg_watch_events
@@ -357,10 +393,12 @@ export function syncAutoDiscoveredStartggWatchEvents(events: StartggWatchEventIn
         tournament_end_at,
         tournament_name,
         event_display_name,
+        videogame_id,
+        videogame_name,
         created_at,
         updated_at
       )
-      VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(event_slug) DO UPDATE SET
         event_name = excluded.event_name,
         event_id = excluded.event_id,
@@ -369,6 +407,8 @@ export function syncAutoDiscoveredStartggWatchEvents(events: StartggWatchEventIn
         tournament_end_at = excluded.tournament_end_at,
         tournament_name = excluded.tournament_name,
         event_display_name = excluded.event_display_name,
+        videogame_id = excluded.videogame_id,
+        videogame_name = excluded.videogame_name,
         updated_at = excluded.updated_at
     `);
 
@@ -377,7 +417,19 @@ export function syncAutoDiscoveredStartggWatchEvents(events: StartggWatchEventIn
       const source = existing?.active === 1 && existing.subscription_source === 'manual'
         ? 'manual'
         : 'auto';
-      upsert.run(event.event_slug, event.event_name, event.event_id, source, event.tournament_end_at, event.tournament_name, event.event_display_name, now, now);
+      upsert.run(
+        event.event_slug,
+        event.event_name,
+        event.event_id,
+        source,
+        event.tournament_end_at,
+        event.tournament_name,
+        event.event_display_name,
+        event.videogame_id,
+        event.videogame_name,
+        now,
+        now,
+      );
       if (existing && existing.active === 0) {
         clearStartggWatchEventState(db, existing.id);
       }

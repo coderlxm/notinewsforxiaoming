@@ -11,6 +11,7 @@ import {
 } from './startggIdentity.js';
 
 const STREET_FIGHTER_6_VIDEOGAME_ID = 43868;
+const STREET_FIGHTER_6_VIDEOGAME_NAME = 'Street Fighter 6';
 const STARTGG_GO_SET_LOOKBACK_SECONDS = 7 * 24 * 60 * 60;
 const STARTGG_ACTIVE_EVENT_LOOKBACK_SECONDS = 2 * 24 * 60 * 60;
 const STARTGG_TOURNAMENT_ACTIVITY_LOOKBACK_SECONDS = 48 * 60 * 60;
@@ -31,6 +32,9 @@ export interface StartggDiscoveredEvent {
   eventSlug: string;
   eventName: string;
   eventDisplayName: string;
+  videogameId: number;
+  videogameName: string;
+  watchPlayerIds: number[];
   entrantMappings: StartggDiscoveredEntrantMapping[];
 }
 
@@ -109,6 +113,9 @@ export async function discoverStartggActiveEventsForPlayers(
       if (!existingMapping) {
         existing.entrantMappings.push(mapping);
       }
+      if (!existing.watchPlayerIds.includes(match.watchPlayerId)) {
+        existing.watchPlayerIds.push(match.watchPlayerId);
+      }
       continue;
     }
     events.set(eventSlug, {
@@ -120,6 +127,9 @@ export async function discoverStartggActiveEventsForPlayers(
       eventSlug,
       eventName: `${tournament.name} / ${match.eventName}`,
       eventDisplayName: match.eventName,
+      videogameId: STREET_FIGHTER_6_VIDEOGAME_ID,
+      videogameName: STREET_FIGHTER_6_VIDEOGAME_NAME,
+      watchPlayerIds: [match.watchPlayerId],
       entrantMappings: [mapping],
     });
   }
@@ -138,6 +148,9 @@ export async function discoverStartggActiveEventsForPlayers(
       if (!event.tournament) {
         throw new Error(`start.gg event missing tournament: ${event.name}`);
       }
+      if (!event.videogame) {
+        throw new Error(`start.gg event missing videogame: ${event.name}`);
+      }
       if (!event.tournament.slug) {
         throw new Error(`start.gg tournament missing slug: ${event.tournament.name}`);
       }
@@ -148,7 +161,13 @@ export async function discoverStartggActiveEventsForPlayers(
       if (!hasRecentEventActivity(nowTimestamp, event.startAt, set.completedAt)) continue;
 
       const eventSlug = normalizeEventSlug(event.slug);
-      if (events.has(eventSlug)) continue;
+      const existing = events.get(eventSlug);
+      if (existing) {
+        if (!existing.watchPlayerIds.includes(player.id)) {
+          existing.watchPlayerIds.push(player.id);
+        }
+        continue;
+      }
       events.set(eventSlug, {
         tournamentId: event.tournament.id,
         tournamentName: event.tournament.name,
@@ -158,12 +177,16 @@ export async function discoverStartggActiveEventsForPlayers(
         eventSlug,
         eventName: `${event.tournament.name} / ${event.name}`,
         eventDisplayName: event.name,
+        videogameId: event.videogame.id,
+        videogameName: event.videogame.name,
+        watchPlayerIds: [player.id],
         entrantMappings: [],
       });
     }
   }
 
   for (const event of events.values()) {
+    event.watchPlayerIds.sort((a, b) => a - b);
     event.entrantMappings.sort((a, b) => a.watchPlayerId - b.watchPlayerId);
   }
   return Array.from(events.values()).sort((a, b) => a.eventName.localeCompare(b.eventName));

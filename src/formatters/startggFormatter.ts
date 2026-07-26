@@ -639,3 +639,35 @@ export function buildStartggSeedsListButtons(): { reply_markup: InlineKeyboardMa
     },
   };
 }
+
+export function formatStartggInterestPrompt(input: {
+  playerNames: string[];
+  videogameName: string;
+  tournamentName: string;
+}): string {
+  return [
+    '🎮 <b>发现关注选手参加新项目</b>',
+    '──────────────────',
+    `选手：${escapeHtml(input.playerNames.join(' / '))}`,
+    `项目：${escapeHtml(input.videogameName)}`,
+    `赛事：${escapeHtml(input.tournamentName)}`,
+    '',
+    '选择前不会推送该项目的赛事消息。',
+  ].join('\n');
+}
+
+export function buildStartggInterestPromptButtons(
+  pendingEventId: number,
+): { reply_markup: InlineKeyboardMarkup } {
+  return {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: '关注这个项目', callback_data: `sginterest:follow:${pendingEventId}` }],
+        [
+          { text: '仅关注本届', callback_data: `sginterest:event:${pendingEventId}` },
+          { text: '忽略这个项目', callback_data: `sginterest:ignore:${pendingEventId}` },
+        ],
+      ],
+    },
+  };
+}

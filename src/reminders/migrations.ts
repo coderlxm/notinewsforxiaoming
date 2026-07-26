@@ -284,6 +284,45 @@ const MIGRATIONS: DbMigration[] = [
       `);
     },
   },
+  {
+    version: 16,
+    up(db) {
+      if (!tableHasColumn(db, 'startgg_watch_events', 'videogame_id')) {
+        db.exec(`ALTER TABLE startgg_watch_events ADD COLUMN videogame_id INTEGER;`);
+      }
+      if (!tableHasColumn(db, 'startgg_watch_events', 'videogame_name')) {
+        db.exec(`ALTER TABLE startgg_watch_events ADD COLUMN videogame_name TEXT;`);
+      }
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS startgg_videogame_preferences (
+          videogame_id INTEGER PRIMARY KEY,
+          videogame_name TEXT NOT NULL,
+          preference TEXT NOT NULL CHECK (preference IN ('follow', 'ignore')),
+          updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS startgg_pending_events (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          event_slug TEXT NOT NULL UNIQUE,
+          event_name TEXT NOT NULL,
+          tournament_name TEXT NOT NULL,
+          tournament_end_at TEXT NOT NULL,
+          videogame_id INTEGER NOT NULL,
+          videogame_name TEXT NOT NULL,
+          player_names TEXT NOT NULL,
+          prompt_message_id INTEGER,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS startgg_event_interest_overrides (
+          event_slug TEXT PRIMARY KEY,
+          tournament_end_at TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
+      `);
+    },
+  },
 ];
 
 export function runDbMigrations(db: Database.Database): void {

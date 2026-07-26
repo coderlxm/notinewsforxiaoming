@@ -103,6 +103,8 @@ export interface StartggEventMeta {
   name: string;
   slug: string;
   tournamentName: string | null;
+  videogameId: number | null;
+  videogameName: string | null;
   eventStartAt: number | null;
   tournamentStartAt: number | null;
   tournamentEndAt: number | null;
@@ -136,6 +138,8 @@ export async function fetchEventMeta(rawEventSlugOrUrl: string): Promise<Startgg
     name: event.name,
     slug: normalizeEventSlug(event.slug),
     tournamentName: event.tournament?.name ?? null,
+    videogameId: event.videogame?.id ?? null,
+    videogameName: event.videogame?.name ?? null,
     eventStartAt: event.startAt ?? null,
     tournamentStartAt: event.tournament?.startAt ?? null,
     tournamentEndAt: event.tournament?.endAt ?? null,

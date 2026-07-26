@@ -162,6 +162,8 @@ export function getDb(): Database.Database {
         tournament_end_at TEXT,
         tournament_name TEXT,
         event_display_name TEXT,
+        videogame_id INTEGER,
+        videogame_name TEXT,
         event_state TEXT,
         final_phase_id INTEGER,
         final_phase_name TEXT,
@@ -233,6 +235,33 @@ export function getDb(): Database.Database {
         id INTEGER PRIMARY KEY CHECK (id = 1),
         polling_enabled INTEGER NOT NULL DEFAULT 0 CHECK (polling_enabled IN (0, 1)),
         updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS startgg_videogame_preferences (
+        videogame_id INTEGER PRIMARY KEY,
+        videogame_name TEXT NOT NULL,
+        preference TEXT NOT NULL CHECK (preference IN ('follow', 'ignore')),
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS startgg_pending_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_slug TEXT NOT NULL UNIQUE,
+        event_name TEXT NOT NULL,
+        tournament_name TEXT NOT NULL,
+        tournament_end_at TEXT NOT NULL,
+        videogame_id INTEGER NOT NULL,
+        videogame_name TEXT NOT NULL,
+        player_names TEXT NOT NULL,
+        prompt_message_id INTEGER,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS startgg_event_interest_overrides (
+        event_slug TEXT PRIMARY KEY,
+        tournament_end_at TEXT NOT NULL,
+        created_at TEXT NOT NULL
       );
 
       CREATE TABLE IF NOT EXISTS masturbation_records (

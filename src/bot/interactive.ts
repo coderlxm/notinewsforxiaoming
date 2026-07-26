@@ -42,6 +42,7 @@ import {
   parseStartggWatchCallbackData,
   parseMasturbationCallbackData,
   parseStartggSeedsCallbackData,
+  parseStartggInterestCallbackData,
 } from './callbacks.js';
 import * as avRepo from '../services/avRepository.js';
 import type { TrackedTarget } from '../services/avRepository.js';
@@ -86,6 +87,14 @@ import {
   type StartggFeaturedSeedCount,
 } from '../services/startggRepository.js';
 import { runStartggGo, runStartggWatchNow, syncStartggPresetPlayers, resyncFeaturedEntrantsForActiveEvents } from '../services/startggPresetSync.js';
+import {
+  addStartggEventInterestOverride,
+  deactivateStartggWatchEventsByVideogame,
+  deleteStartggPendingEvent,
+  deleteStartggPendingEventsByVideogame,
+  findStartggPendingEventById,
+  setStartggVideogamePreference,
+} from '../services/startggInterestRepository.js';
 import { escapeHtml } from '../utils/html.js';
 import { bjFormat } from '../utils/time.js';
 import {
@@ -463,6 +472,16 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
         );
         return;
       }
+      if (summary.status === 'interest_pending') {
+        await ctx.telegram.editMessageText(
+          String(ctx.chat!.id),
+          startMessageResult.message_id,
+          undefined,
+          `发现 ${summary.pendingEvents} 个尚未确认兴趣的赛事。请先在项目确认卡中选择，选择前不会启动赛事推送。`,
+          { parse_mode: 'HTML' },
+        );
+        return;
+      }
       updateStartggFastWatch(bot, summary.activeEventSlugs);
       enableStartggPolling(bot, false);
 
@@ -654,15 +673,27 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
       if (isStartggEventReference(raw)) {
         const event = await fetchEventMeta(raw);
         const eventName = event.tournamentName ? `${event.tournamentName} / ${event.name}` : event.name;
-        if (!event.tournamentName || event.tournamentEndAt === null) {
+        if (
+          !event.tournamentName
+          || event.tournamentEndAt === null
+          || event.videogameId === null
+          || !event.videogameName
+        ) {
           throw new Error(`start.gg 项目缺少 tournament 元数据：${event.slug}`);
         }
+        setStartggVideogamePreference(
+          event.videogameId,
+          event.videogameName,
+          'follow',
+        );
         replaceActiveStartggWatchEvent(
           event.slug,
           eventName,
           event.tournamentName,
           event.name,
           new Date(event.tournamentEndAt * 1000).toISOString(),
+          event.videogameId,
+          event.videogameName,
         );
         const enabledPlayers = listStartggWatchPlayers().filter((row) => row.enabled === 1).length;
         const nextStep = enabledPlayers === 0
@@ -1296,6 +1327,55 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
         );
         return;
       }
+    }
+
+    const interestAction = parseStartggInterestCallbackData(cbData);
+    if (interestAction) {
+      const pending = findStartggPendingEventById(interestAction.pendingEventId);
+      if (!pending) {
+        await ctx.answerCbQuery('该赛事确认项已失效');
+        return;
+      }
+
+      await ctx.answerCbQuery();
+      if (interestAction.action === 'follow') {
+        setStartggVideogamePreference(
+          pending.videogame_id,
+          pending.videogame_name,
+          'follow',
+        );
+        deleteStartggPendingEventsByVideogame(pending.videogame_id);
+        await ctx.editMessageText(
+          `已关注项目：${escapeHtml(pending.videogame_name)}\n本届赛事已开始监控。`,
+          { parse_mode: 'HTML' },
+        );
+      } else if (interestAction.action === 'event') {
+        addStartggEventInterestOverride(pending.event_slug, pending.tournament_end_at);
+        deleteStartggPendingEvent(pending.id);
+        await ctx.editMessageText(
+          `仅关注本届赛事：${escapeHtml(pending.tournament_name)}`,
+          { parse_mode: 'HTML' },
+        );
+      } else {
+        setStartggVideogamePreference(
+          pending.videogame_id,
+          pending.videogame_name,
+          'ignore',
+        );
+        deactivateStartggWatchEventsByVideogame(pending.videogame_id);
+        deleteStartggPendingEventsByVideogame(pending.videogame_id);
+        await ctx.editMessageText(
+          `已忽略项目：${escapeHtml(pending.videogame_name)}\n以后不再询问或推送该项目赛事。`,
+          { parse_mode: 'HTML' },
+        );
+      }
+
+      const summary = await runStartggWatchNow(bot);
+      updateStartggFastWatch(bot, summary.activeEventSlugs);
+      if (interestAction.action !== 'ignore') {
+        enableStartggPolling(bot, false);
+      }
+      return;
     }
 
     const vitaminAction = parseVitaminCallbackData(cbData);
