@@ -1,6 +1,7 @@
 import { computed, onBeforeUnmount, shallowRef } from 'vue';
 import { Upload } from 'tus-js-client';
 import type { ContributionFormPayload } from './useContributionForm';
+import { useScreenWakeLock } from './useScreenWakeLock';
 
 export type ContributionSubmitStatus =
   | 'idle'
@@ -48,6 +49,7 @@ const ERROR_MESSAGES: Record<string, string> = {
 };
 
 const TUS_CHUNK_BYTES = 32 * 1024 * 1024;
+const TUS_RETRY_DELAYS = [0, 3_000, 5_000, 10_000, 20_000];
 
 function errorMessage(error: ContributionErrorResponse['error']): string {
   const message = ERROR_MESSAGES[error.code] ?? error.message;
@@ -74,6 +76,11 @@ export function useContributionSubmit() {
   const result = shallowRef<ContributionSuccessResult | null>(null);
   const activeUpload = shallowRef<Upload | null>(null);
   const activeFetchController = shallowRef<AbortController | null>(null);
+  const {
+    isActive: wakeLockActive,
+    start: holdScreenAwake,
+    stop: releaseScreen,
+  } = useScreenWakeLock();
   let disposed = false;
 
   const isSubmitting = computed(() =>
@@ -140,7 +147,14 @@ export function useContributionSubmit() {
       const upload = new Upload(file, {
         endpoint: '/api/contribution-file-uploads',
         chunkSize: TUS_CHUNK_BYTES,
-        retryDelays: [],
+        retryDelays: TUS_RETRY_DELAYS,
+        onShouldRetry(reason) {
+          const statusCode = reason.originalResponse?.getStatus() ?? 0;
+          return statusCode === 0
+            || statusCode === 409
+            || statusCode === 423
+            || statusCode >= 500;
+        },
         storeFingerprintForResuming: false,
         headers: {
           Authorization: `Bearer ${token}`,
@@ -226,6 +240,7 @@ export function useContributionSubmit() {
     error.value = '';
     result.value = null;
 
+    await holdScreenAwake();
     try {
       const uploadId = await createUpload(token);
       const totalBytes = payload.assets.reduce((total, file) => total + file.size, 0);
@@ -251,6 +266,8 @@ export function useContributionSubmit() {
           ? submissionError.message
           : '投稿没有送达。',
       );
+    } finally {
+      await releaseScreen();
     }
   }
 
@@ -268,6 +285,7 @@ export function useContributionSubmit() {
     error,
     result,
     isSubmitting,
+    wakeLockActive,
     submit,
   };
 }

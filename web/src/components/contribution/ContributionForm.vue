@@ -37,6 +37,7 @@ const {
   error,
   result,
   isSubmitting,
+  wakeLockActive,
   submit,
 } = useContributionSubmit();
 const validationErrorElement = useTemplateRef<HTMLElement>('validationErrorElement');
@@ -181,6 +182,7 @@ onBeforeUnmount(() => {
       :upload-percent="uploadPercent"
       :error-message="error"
       :disabled="!canSubmit"
+      :wake-lock-active="wakeLockActive"
       @submit="handleSubmit"
     />
   </form>

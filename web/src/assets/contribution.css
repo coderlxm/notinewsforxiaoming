@@ -478,6 +478,18 @@ textarea:focus-visible,
   line-height: 1.45;
 }
 
+.contribution-submit-notice {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--contribution-border);
+  border-radius: 8px;
+  background: var(--contribution-card);
+  color: var(--contribution-muted);
+  font-size: 0.7rem;
+  line-height: 1.45;
+  text-align: center;
+}
+
 .contribution-link-state {
   min-height: 150px;
   padding: 24px;

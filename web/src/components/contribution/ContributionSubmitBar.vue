@@ -7,6 +7,7 @@ const props = defineProps<{
   uploadPercent: number;
   errorMessage: string;
   disabled: boolean;
+  wakeLockActive: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -66,6 +67,15 @@ watch(
       tabindex="-1"
     >
       {{ errorMessage }}
+    </p>
+
+    <p
+      v-if="status === 'uploading' || status === 'processing'"
+      class="contribution-submit-notice"
+    >
+      {{ wakeLockActive
+        ? '屏幕常亮已开启，完成前请勿手动锁屏或切走页面。'
+        : '请保持页面打开，完成前不要锁屏或切走。' }}
     </p>
 
     <button
