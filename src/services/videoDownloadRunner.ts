@@ -78,6 +78,7 @@ export async function runLocalVideoDownload(
       `${options.rcloneRemote}:${drivePath}`,
       '--retries', '1',
       '--low-level-retries', '1',
+      '--metadata',
       '--metadata-set', `content-type=${contentType}`,
     ]);
 
