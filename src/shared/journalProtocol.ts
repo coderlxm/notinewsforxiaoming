@@ -207,3 +207,12 @@ export const journalSiteProfileSchema = z.object({
   updatedAt: z.string().datetime(),
 });
 export type JournalSiteProfile = z.infer<typeof journalSiteProfileSchema>;
+
+export const journalCurrentWeatherSchema = z.object({
+  text: z.string().min(1),
+  temperature: z.number(),
+  feelsLike: z.number(),
+  windDirection: z.string().min(1),
+  observedAt: z.string().datetime({ offset: true }),
+});
+export type JournalCurrentWeather = z.infer<typeof journalCurrentWeatherSchema>;

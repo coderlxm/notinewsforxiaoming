@@ -1,5 +1,5 @@
-import axios from 'axios';
 import { config } from '../config/index.js';
+import { fetchQWeatherCurrent } from './qweatherCurrent.js';
 
 export interface WeatherData {
   text: string;
@@ -15,16 +15,16 @@ export async function fetchWeather(): Promise<WeatherData | null> {
   }
 
   try {
-    const url = `https://p66apy3ykq.re.qweatherapi.com/v7/weather/now?location=${config.qweatherCityId}&key=${config.qweatherApiKey}`;
-    const response = await axios.get(url);
-    if (response.data.code === '200') {
-      return {
-        text: response.data.now.text,
-        temp: response.data.now.temp,
-        feelsLike: response.data.now.feelsLike,
-        windDir: response.data.now.windDir
-      };
-    }
+    const weather = await fetchQWeatherCurrent(
+      config.qweatherApiKey,
+      config.qweatherCityId,
+    );
+    return {
+      text: weather.text,
+      temp: String(weather.temperature),
+      feelsLike: String(weather.feelsLike),
+      windDir: weather.windDirection,
+    };
   } catch (error) {
     console.error('Failed to fetch weather:', error);
   }

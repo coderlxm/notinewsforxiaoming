@@ -78,6 +78,14 @@ export interface SiteProfile {
   updatedAt: string;
 }
 
+export interface CurrentWeather {
+  text: string;
+  temperature: number;
+  feelsLike: number;
+  windDirection: string;
+  observedAt: string;
+}
+
 export interface FeedFilters {
   visibility: 'all' | JournalVisibility;
   query: string;

@@ -378,6 +378,9 @@ onUnmounted(removeAfterEach);
         <span aria-hidden="true">·</span>
         <a href="/rss.xml">RSS</a>
         <a href="/feed.json">JSON Feed</a>
+        <a href="https://www.qweather.com/" target="_blank" rel="noopener noreferrer">
+          天气服务：QWeather
+        </a>
       </footer>
     </div>
   </div>
@@ -564,6 +567,7 @@ onUnmounted(removeAfterEach);
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-wrap: wrap;
   gap: 0.55rem;
   margin-top: auto;
   padding: 1.8rem var(--page-gutter) 2.6rem;

@@ -25,17 +25,23 @@ import { registerMediaRoutes } from './routes/media.js';
 import { registerPrivateEntryRoutes } from './routes/privateEntries.js';
 import { registerPublicFeedRoutes } from './routes/publicFeed.js';
 import { registerSiteProfileRoutes } from './routes/siteProfile.js';
+import { registerWeatherRoutes } from './routes/weather.js';
 import { JournalSiteProfileService } from './siteProfileService.js';
 import { JournalStorage } from './storage.js';
 import { TelegramFileDownloader } from './telegramFiles.js';
 import type { JournalServerConfig } from './types.js';
 import { JournalWebEntryService } from './webEntryService.js';
+import { JournalWeatherService } from './weatherService.js';
 
 export async function createJournalServer(config: JournalServerConfig): Promise<FastifyInstance> {
   const server = Fastify({ logger: true });
   const database = openJournalDatabase(config.dataDir);
   const repository = new JournalRepository(database);
   const siteProfileService = new JournalSiteProfileService(repository);
+  const weatherService = new JournalWeatherService(
+    config.qweatherApiKey,
+    config.qweatherCityId,
+  );
   const auth = new JournalAuth(config.ingestToken, config.adminPassword);
   const storage = new JournalStorage(config.dataDir);
   const previews = new JournalImagePreviewService();
@@ -92,6 +98,7 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
   await registerArticleRoutes(server, auth, articleService);
   await registerMediaRoutes(server, auth, repository, config.dataDir);
   await registerSiteProfileRoutes(server, auth, siteProfileService);
+  await registerWeatherRoutes(server, weatherService);
   await registerFeedRoutes(server, repository, siteProfileService, config.publicBaseUrl);
 
   const sendApplication = async (_request: FastifyRequest, reply: FastifyReply) => {

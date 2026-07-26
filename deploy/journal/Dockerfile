@@ -36,6 +36,7 @@ COPY --from=dependencies /app/package.json ./package.json
 COPY --from=web-builder /app/web/dist ./web/dist
 COPY src/journal-server ./src/journal-server
 COPY src/shared ./src/shared
+COPY src/fetchers/qweatherCurrent.ts ./src/fetchers/qweatherCurrent.ts
 
 RUN printf '%s\n' \
   "fetch('http://127.0.0.1:3100/api/health')" \

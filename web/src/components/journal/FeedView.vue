@@ -5,10 +5,17 @@ import { useRouter } from 'vue-router';
 import ArticleCardContent from '../article/ArticleCardContent.vue';
 import JournalLoading from '../ui/JournalLoading.vue';
 import JournalPullRefresh from '../ui/JournalPullRefresh.vue';
+import { useCurrentWeather } from '../../composables/useCurrentWeather';
 import { useDeferredLoading } from '../../composables/useDeferredLoading';
 import { useJournalApi } from '../../composables/useJournalApi';
 import { useSessionStore } from '../../stores/session';
-import { emptyFeedFilters, type FeedFilters, type JournalEntry, type JournalVisibility } from '../../types';
+import {
+  emptyFeedFilters,
+  type FeedFilters,
+  type JournalEntry,
+  type JournalVisibility,
+} from '../../types';
+import CurrentWeather from './CurrentWeather.vue';
 import EntryCard from './EntryCard.vue';
 import EntryFilters from './EntryFilters.vue';
 import JournalDetailOverlay from './JournalDetailOverlay.vue';
@@ -45,6 +52,7 @@ const filters = reactive<FeedFilters>({
   tag: props.initialTag,
 });
 const journal = useJournalApi();
+const currentWeather = useCurrentWeather();
 const router = useRouter();
 const session = useSessionStore();
 const initialLoadPending = shallowRef(true);
@@ -123,7 +131,10 @@ onMounted(async () => {
       return;
     }
     if (props.mode === 'public') {
-      await journal.loadPublic({ tag: props.initialTag });
+      await Promise.all([
+        journal.loadPublic({ tag: props.initialTag }),
+        currentWeather.load(),
+      ]);
       return;
     }
     await journal.loadPrivate(filters);
@@ -181,7 +192,10 @@ async function refreshFeed(): Promise<void> {
   refreshRequestComplete.value = false;
 
   if (props.mode === 'public') {
-    await journal.loadPublic({ tag: props.initialTag });
+    await Promise.all([
+      journal.loadPublic({ tag: props.initialTag }),
+      currentWeather.load(),
+    ]);
   }
   else {
     await journal.refreshPrivateFeed(filters);
@@ -370,30 +384,37 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
         </div>
       </template>
 
-      <div v-else class="feed__public-heading">
-        <div>
-          <h1 class="feed__eyebrow">PUBLIC NOTES</h1>
-          <div v-if="initialTag" class="feed__title-row">
-            <h2 class="feed__title">{{ listTitle }}</h2>
-            <button
-              class="text-button"
-              type="button"
-              @click="router.push({ name: 'public' })"
-            >
-              清除标签
-            </button>
+      <div v-else-if="!isDetail" class="feed__public-intro">
+        <div class="feed__public-heading">
+          <div>
+            <h1 class="feed__eyebrow">PUBLIC NOTES</h1>
+            <div v-if="initialTag" class="feed__title-row">
+              <h2 class="feed__title">{{ listTitle }}</h2>
+              <button
+                class="text-button"
+                type="button"
+                @click="router.push({ name: 'public' })"
+              >
+                清除标签
+              </button>
+            </div>
           </div>
+          <button
+            class="text-button"
+            type="button"
+            :disabled="refreshDisabled || refreshing"
+            :aria-busy="refreshing"
+            @click="refreshFeed"
+          >
+            <JournalLoading v-if="refreshing" variant="inline" label="刷新中…" />
+            <template v-else>刷新</template>
+          </button>
         </div>
-        <button
-          class="text-button"
-          type="button"
-          :disabled="refreshDisabled || refreshing"
-          :aria-busy="refreshing"
-          @click="refreshFeed"
-        >
-          <JournalLoading v-if="refreshing" variant="inline" label="刷新中…" />
-          <template v-else>刷新</template>
-        </button>
+        <CurrentWeather
+          :weather="currentWeather.weather.value"
+          :loading="currentWeather.loading.value"
+          :error="currentWeather.error.value"
+        />
       </div>
 
       <p v-if="!isDetail && !overlayVisible && journal.error.value" class="notice notice--error" role="alert">{{ journal.error.value }}</p>
@@ -556,6 +577,11 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
   min-height: 1.5rem;
   align-items: center;
   justify-content: space-between;
+}
+
+.feed__public-intro {
+  display: grid;
+  gap: 0.55rem;
 }
 
 .feed__private-actions {
