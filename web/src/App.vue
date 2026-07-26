@@ -57,8 +57,11 @@ const { profile, loadError: profileLoadError } = storeToRefs(siteProfile);
 const overlayContext = shallowRef<OverlayContext | null>(null);
 const directPublicEntry = shallowRef<JournalEntry | null>(null);
 const contentScroll = useTemplateRef<HTMLDivElement>('contentScroll');
+const profileBio = useTemplateRef<HTMLParagraphElement>('profileBio');
+const profileBioOverflow = shallowRef(0);
 const feedScrollPositions = new Map<string, number>();
 let pendingFeedScrollTop: number | null = null;
+let profileBioResizeObserver: ResizeObserver | null = null;
 
 const route = computed<AppRoute>(() => {
   if (currentRoute.name === 'public') {
@@ -168,10 +171,36 @@ const isPrivateRoute = computed(() =>
   isAssetRoute.value || isContributionRoute.value,
 );
 const showProfileNavigation = computed(() => isPrivateRoute.value || ownerAuthenticated.value);
+const profileBioStyle = computed(() => {
+  if (profileBioOverflow.value <= 0) return undefined;
+  const duration = Math.max(8, profileBioOverflow.value / 10.8);
+  return {
+    '--profile-bio-distance': `-${profileBioOverflow.value}px`,
+    '--profile-bio-duration': `${duration.toFixed(2)}s`,
+  };
+});
+
+function measureProfileBio(): void {
+  const element = profileBio.value;
+  profileBioOverflow.value = element
+    ? Math.max(0, element.scrollWidth - element.clientWidth)
+    : 0;
+}
 
 watch(() => route.value.key, () => {
   directPublicEntry.value = null;
 });
+
+watch(profileBio, (element, previousElement) => {
+  if (!profileBioResizeObserver) return;
+  if (previousElement) profileBioResizeObserver.unobserve(previousElement);
+  if (element) {
+    profileBioResizeObserver.observe(element);
+    measureProfileBio();
+  }
+}, { flush: 'post' });
+
+watch(() => profile.value?.bio, measureProfileBio, { flush: 'post' });
 
 watch(ownerAuthenticated, (authenticated) => {
   if (authenticated) {
@@ -313,10 +342,18 @@ const removeAfterEach = router.afterEach((to, from) => {
 });
 
 onMounted(() => {
+  profileBioResizeObserver = new ResizeObserver(measureProfileBio);
+  if (profileBio.value) {
+    profileBioResizeObserver.observe(profileBio.value);
+    measureProfileBio();
+  }
   void session.load();
   void siteProfile.load();
 });
-onUnmounted(removeAfterEach);
+onUnmounted(() => {
+  profileBioResizeObserver?.disconnect();
+  removeAfterEach();
+});
 </script>
 
 <template>
@@ -334,7 +371,15 @@ onUnmounted(removeAfterEach);
         </button>
         <div class="profile__copy">
           <button class="profile__name" type="button" @click="navigate('/')">小明同学</button>
-          <p v-if="profile?.bio" class="profile__bio">{{ profile.bio }}</p>
+          <p
+            v-if="profile?.bio"
+            ref="profileBio"
+            class="profile__bio"
+            :class="{ 'profile__bio--scrolling': profileBioOverflow > 0 }"
+            :style="profileBioStyle"
+          >
+            <span class="profile__bio-text">{{ profile.bio }}</span>
+          </p>
           <span
             v-else-if="!profile && !profileLoadError"
             class="profile__bio-skeleton"
@@ -578,6 +623,17 @@ onUnmounted(removeAfterEach);
   white-space: nowrap;
 }
 
+.profile__bio--scrolling {
+  text-overflow: clip;
+  mask-image: linear-gradient(to right, transparent, #000 0.4rem, #000 calc(100% - 0.4rem), transparent);
+}
+
+.profile__bio--scrolling .profile__bio-text {
+  display: block;
+  width: max-content;
+  animation: profile-bio-pan var(--profile-bio-duration) linear infinite;
+}
+
 .profile__bio-skeleton {
   display: block;
   width: 13.5rem;
@@ -684,9 +740,39 @@ onUnmounted(removeAfterEach);
   }
 }
 
+@keyframes profile-bio-pan {
+  0%,
+  15% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+
+  60%,
+  80% {
+    transform: translateX(var(--profile-bio-distance));
+    opacity: 1;
+  }
+
+  84% {
+    transform: translateX(var(--profile-bio-distance));
+    opacity: 0;
+  }
+
+  85% {
+    transform: translateX(0);
+    opacity: 0;
+  }
+
+  90%,
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
 @media (max-width: 599px) {
   .profile {
-    grid-template-columns: auto auto minmax(0, 1fr);
+    grid-template-columns: auto minmax(0, 1fr) auto;
     gap: 0.45rem;
     padding: 0.8rem 0 0.72rem;
   }
@@ -697,10 +783,8 @@ onUnmounted(removeAfterEach);
     height: 2.35rem;
   }
 
-  .profile__bio,
-  .profile__bio-skeleton,
-  .profile__load-error {
-    display: none;
+  .profile__bio-skeleton {
+    width: min(13.5rem, 100%);
   }
 
   .profile__name {
