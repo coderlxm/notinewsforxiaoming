@@ -12,7 +12,7 @@ import type { EntryStorageSession, JournalStorage } from './storage.js';
 const execFileAsync = promisify(execFile);
 const maxImagePixels = 50_000_000;
 const maxImageBytes = 40 * 1024 * 1024;
-const maxVideoBytes = 90 * 1024 * 1024;
+const maxVideoBytes = 500 * 1024 * 1024;
 const maxVideoDuration = 300;
 
 const ffprobeSchema = z.object({
@@ -21,15 +21,14 @@ const ffprobeSchema = z.object({
     duration: z.string().optional(),
   }),
   streams: z.array(z.object({
+    index: z.number().int().nonnegative(),
     codec_type: z.string(),
     codec_name: z.string().optional(),
-    codec_tag_string: z.string().optional(),
     profile: z.string().optional(),
     width: z.number().int().positive().optional(),
     height: z.number().int().positive().optional(),
     duration: z.string().optional(),
     r_frame_rate: z.string().optional(),
-    color_transfer: z.string().optional(),
     disposition: z.object({
       attached_pic: z.number().int(),
     }).optional(),
@@ -211,7 +210,7 @@ export class JournalContributionMediaService {
     if (source.byteSize > maxVideoBytes) {
       throw new JournalContributionError(
         'FILE_TOO_LARGE',
-        `${source.sourceName} 超过 90 MiB。`,
+        `${source.sourceName} 超过 500 MiB。`,
         400,
         source.sourceName,
       );
@@ -221,7 +220,7 @@ export class JournalContributionMediaService {
       const result = await execFileAsync('ffprobe', [
         '-v', 'error',
         '-show_entries',
-        'format=format_name,duration:stream=codec_type,codec_name,codec_tag_string,profile,width,height,duration,r_frame_rate,color_transfer:stream_disposition=attached_pic',
+        'format=format_name,duration:stream=index,codec_type,codec_name,profile,width,height,duration,r_frame_rate:stream_disposition=attached_pic',
         '-of', 'json',
         source.absolutePath,
       ], { maxBuffer: 1024 * 1024 });
@@ -235,17 +234,12 @@ export class JournalContributionMediaService {
       );
     }
 
-    const videoStreams = probe.streams.filter((stream) => stream.codec_type === 'video');
+    const videoStreams = probe.streams.filter(
+      (stream) => stream.codec_type === 'video' && stream.disposition?.attached_pic !== 1,
+    );
     const audioStreams = probe.streams.filter((stream) => stream.codec_type === 'audio');
-    if (
-      videoStreams.length !== 1
-      || audioStreams.length > 1
-      || probe.streams.length !== videoStreams.length + audioStreams.length
-    ) {
-      this.throwVideoFormat(source.sourceName);
-    }
     const video = videoStreams[0];
-    const audio = audioStreams[0];
+    const audio = audioStreams.find((stream) => stream.codec_name === 'aac');
     if (
       !video
       || !video.width
@@ -254,15 +248,12 @@ export class JournalContributionMediaService {
       || Math.min(video.width, video.height) > 2160
       || !probe.format.format_name.split(',').some((name) => name === 'mov' || name === 'mp4')
       || (video.codec_name !== 'h264' && video.codec_name !== 'hevc')
-      || video.disposition?.attached_pic === 1
-      || video.codec_tag_string === 'dvhe'
-      || video.codec_tag_string === 'dvh1'
       || (
         video.codec_name === 'hevc'
         && video.profile !== 'Main'
         && video.profile !== 'Main 10'
       )
-      || (audio !== undefined && audio.codec_name !== 'aac')
+      || (audioStreams.length > 0 && audio === undefined)
     ) {
       this.throwVideoFormat(source.sourceName);
     }
@@ -283,7 +274,6 @@ export class JournalContributionMediaService {
       !Number.isFinite(frameRate)
       || frameRate <= 0
       || frameRate > 60
-      || this.isHdr(video.color_transfer)
     ) {
       this.throwVideoFormat(source.sourceName);
     }
@@ -292,12 +282,16 @@ export class JournalContributionMediaService {
     const ffmpegArguments = [
       '-v', 'error',
       '-i', source.absolutePath,
-      '-map', '0:v:0',
-      '-map', '0:a:0?',
+      '-map', `0:${video.index}`,
+    ];
+    if (audio) {
+      ffmpegArguments.push('-map', `0:${audio.index}`);
+    }
+    ffmpegArguments.push(
       '-c', 'copy',
       '-map_metadata', '-1',
       '-movflags', '+faststart',
-    ];
+    );
     if (video.codec_name === 'hevc') {
       ffmpegArguments.push('-tag:v', 'hvc1');
     }
@@ -406,10 +400,6 @@ export class JournalContributionMediaService {
     const [numerator, denominator] = value.split('/').map(Number);
     if (!numerator || !denominator) return Number(value);
     return numerator / denominator;
-  }
-
-  private isHdr(colorTransfer: string | undefined): boolean {
-    return colorTransfer === 'smpte2084' || colorTransfer === 'arib-std-b67';
   }
 
   private throwVideoFormat(filename: string): never {

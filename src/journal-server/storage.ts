@@ -19,7 +19,7 @@ export interface ContributionAssetTarget {
 export class JournalStorage {
   private readonly assetsDir: string;
   private readonly temporaryDir: string;
-  private readonly contributionRequestsDir = '/tmp/journal-contribution-requests';
+  private readonly contributionUploadsDir = '/tmp/journal-contribution-uploads';
 
   constructor(private readonly dataDir: string) {
     this.assetsDir = path.join(dataDir, 'assets');
@@ -28,23 +28,14 @@ export class JournalStorage {
   }
 
   async initializeContributionStorage(): Promise<void> {
-    await fs.promises.rm(this.contributionRequestsDir, { recursive: true, force: true });
+    await fs.promises.rm(this.contributionUploadsDir, { recursive: true, force: true });
     await fs.promises.rm(this.temporaryDir, { recursive: true, force: true });
-    await fs.promises.mkdir(this.contributionRequestsDir, { recursive: true });
+    await fs.promises.mkdir(this.contributionUploadsDir, { recursive: true });
     await fs.promises.mkdir(this.temporaryDir, { recursive: true });
   }
 
-  async beginContributionRequest(): Promise<string> {
-    return fs.promises.mkdtemp(path.join(this.contributionRequestsDir, 'request-'));
-  }
-
-  async discardContributionRequest(requestDir: string): Promise<void> {
-    const absoluteRequestDir = path.resolve(requestDir);
-    const absoluteRoot = path.resolve(this.contributionRequestsDir);
-    if (!absoluteRequestDir.startsWith(`${absoluteRoot}${path.sep}`)) {
-      throw new Error(`Contribution request directory ${requestDir} is outside its root.`);
-    }
-    await fs.promises.rm(absoluteRequestDir, { recursive: true });
+  contributionUploadDirectory(): string {
+    return this.contributionUploadsDir;
   }
 
   async begin(publicId: string, sourceCreatedAt: string): Promise<EntryStorageSession> {

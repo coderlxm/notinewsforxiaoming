@@ -162,7 +162,7 @@ onBeforeUnmount(() => {
 
       <div class="contribution-format-note">
         <p>照片：JPG、PNG、WebP、HEIC/HEIF，每张不超过 40 MiB、50 MP。</p>
-        <p>视频：MP4 或 MOV，每段不超过 90 MiB、5 分钟。</p>
+        <p>视频：MP4 或 MOV，每段不超过 500 MiB、5 分钟，支持现代手机拍摄的 HEVC、HDR 视频。</p>
         <p>照片会整理为适合 Journal 展示的尺寸，不作为原片保存。</p>
       </div>
     </section>

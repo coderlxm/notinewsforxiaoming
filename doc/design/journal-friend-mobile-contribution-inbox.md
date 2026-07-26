@@ -18,13 +18,13 @@
 ### 1.1 固定决策
 
 1. 不建设“上传草稿系统”。选择中的文件只保存在当前页面，点击送达后才上传。
-2. 点击送达后创建进程内上传会话，素材逐个使用独立 `multipart/form-data` 请求上传；不使用 tus、分块上传、断点续传、上传指纹或状态轮询。
-3. 单个视频请求不超过 90 MiB，明确低于 Cloudflare Free/Pro 的 100 MB 单请求上限；服务端累计整份投稿不超过 500 MiB。
+2. 点击送达后创建进程内上传会话，素材逐个使用 tus 上传；每个 PATCH 分片为 32 MiB，不增加上传状态轮询或自动重试。
+3. 单个视频和整份投稿都不超过 500 MiB；分片请求明确低于 Cloudflare Free/Pro 的 100 MB 单请求上限。
 4. 客户端只检查数量、扩展名和大小，不加载 `mediainfo.js`，不在浏览器中分析视频编码。
-5. 服务端流式接收文件到临时目录，不调用 `part.toBuffer()`，不在 Node.js 内存中形成完整媒体副本。
+5. `@tus/server` 与 `@tus/file-store` 将分片直接写入临时目录，不在 Node.js 内存中形成完整媒体副本。
 6. JPEG、PNG、WebP 和 HEIC/HEIF 仍由服务端生成 Journal 展示图，源文件不归档。
-7. 合规的 H.264 和 HEVC 视频都只做 MP4 容器整理与流复制，不因为 HEVC 名称本身转码成 H.264。
-8. 媒体随单文件请求按顺序处理；全局最多有一个素材进入媒体处理，不建设持久任务队列。
+7. H.264、HEVC、HDR、HLG 和 Dolby Vision 视频都只做 MP4 容器整理与流复制，不因为输入格式重新编码。
+8. 全部源文件上传完成后按选择顺序整理；全局最多有一个素材进入媒体处理，不建设持久任务队列。
 9. 页面只表达“正在上传”“服务器正在整理”“已送达”或具体失败，不展示伪造的服务端百分比。
 10. 媒体与 SQLite 已提交即表示投稿送达；Telegram 只在送达后提醒小明。
 11. 不自动重试、不切换上传通道、不降低输出要求、不跳过失败文件。
@@ -37,12 +37,12 @@
 - 不需要为陌生用户建设账号、限流、审计或内容审核；
 - 不需要为大量并发投稿建设任务平台；
 - 不需要持久化每个文件的上传状态；
-- 不需要为了偶发网络失败预先建设断点续传；
+- 不需要持久化跨页面、跨进程的断点恢复状态；
 - 不需要在浏览器里提前识别所有媒体边界；
 - 可以通过清楚约定格式和大小，把极少发生的非法输入交给服务端直接拒绝。
 
-首期接受一个明确取舍：如果任一请求失败，服务端丢弃本次上传会话，页面保留已经填写
-的文字和本地文件选择，由朋友明确再次点击提交；不会自动恢复已经传输的字节。
+首期接受一个明确取舍：tus 只承担分片传输和当前上传资源的 offset 协议，不建设跨页面
+草稿或自动重试。失败时页面保留文字和本地文件选择，由朋友明确再次点击提交。
 
 ## 2. 证据与设计判断
 
@@ -52,7 +52,7 @@
 
 - 前端为 Vue 3.5 和 Vite 8，当前只有一个 HTML 入口；
 - 当前 `App.vue` 会加载信息流、管理会话和编辑能力，不适合直接作为朋友投稿入口；
-- 服务端为 Fastify 5，已经安装并注册 `@fastify/multipart`；
+- 服务端为 Fastify 5，投稿上传使用 tus，并继续为其他表单接口保留 `@fastify/multipart`；
 - 现有普通发布接口通过 `part.toBuffer()` 读取小图片；投稿路由不能复用这段完整 Buffer 路径；
 - 数据库为 SQLite WAL；
 - 已有本地资产目录、图片预览、媒体鉴权与 Range 响应；
@@ -71,10 +71,10 @@
   [Debian libheif-examples](https://packages.debian.org/bookworm/libheif-examples)。
 - Safari 对 HEVC 支持成熟；Chromium 也支持 HEVC，但要求浏览器、操作系统和硬件提供对应能力。首期接受这一设备前提，不再为了覆盖所有浏览器把 HEVC 统一转码为 H.264。参考：[WebKit media support](https://webkit.org/blog/15063/webkit-features-in-safari-17-4/)、
   [Chromium audio/video](https://www.chromium.org/audio-video/)。
-- Cloudflare Free 和 Pro 的单请求体上限为 100 MB。90 MiB 单文件加 multipart
-  开销仍留有明确余量；500 MiB 总量通过逐文件请求累计。参考：[Cloudflare request limits](https://developers.cloudflare.com/workers/platform/limits/#request-and-response-limits)。
-- `@fastify/multipart` 支持按流消费 multipart 文件，不要求将文件读取成 Buffer。
-  参考：[`@fastify/multipart`](https://github.com/fastify/fastify-multipart)。
+- Cloudflare Free 和 Pro 的单请求体上限为 100 MB。tus 固定使用 32 MiB PATCH
+  分片，500 MiB 文件不再依赖单个大请求。参考：[Cloudflare request limits](https://developers.cloudflare.com/workers/platform/limits/#request-and-response-limits)。
+- `@tus/server` 与 `@tus/file-store` 提供标准 tus 协议和本地文件存储，不需要在业务代码
+  中手写分片协议。参考：[`tus-node-server`](https://github.com/tus/tus-node-server)。
 
 ### 2.3 产品假设
 
@@ -98,7 +98,7 @@
   → 选择约定范围内的照片或短视频
   → 页面检查数量、扩展名和大小
   → 朋友点击“送给小明”
-  → 一次 multipart 请求流式上传整份投稿
+  → tus 按 32 MiB 分片逐个上传素材
   → 服务端按顺序检查并整理媒体
   → 投稿写入私有收件箱
   → 尝试发送 Telegram 提醒
@@ -110,11 +110,10 @@
 - 打开页面时创建服务器草稿；
 - 为草稿生成第二个能力令牌；
 - 选择文件后立即开始后台上传；
-- 每个文件建立 tus 上传；
 - 浏览器加载 WASM 分析视频；
 - 上传结束后轮询媒体处理状态；
 - 清理 24 小时草稿和上传分块；
-- 恢复、暂停、终止或拼接上传。
+- 持久草稿、自动重试、上传暂停或并行拼接。
 
 ## 4. 内容与容量合同
 
@@ -165,20 +164,20 @@
 | 容器 | MP4、MOV |
 | 视频编码 | H.264/AVC；HEVC/H.265 Main 或 Main10 |
 | 音频 | AAC 或无音频 |
-| 单文件大小 | 不超过 90 MiB |
+| 单文件大小 | 不超过 500 MiB |
 | 时长 | 不超过 5 分钟 |
 | 最大画面 | 3,840 × 2,160 |
 | 最大帧率 | 60 fps |
-| 色彩 | SDR |
-| 轨道 | 1 条视频轨，最多 1 条音频轨 |
+| 色彩 | SDR、HDR、HLG、Dolby Vision |
+| 输入轨道 | 允许手机 MOV 的附加音轨与 metadata 轨 |
 | 正式输出 | MP4 fast start，音视频流复制 |
 | 海报 | 最长边 960 px 的 WebP |
 | 源文件 | 标准 MP4 与海报成功后删除 |
 
 H.264 和 HEVC 使用同一条主路径：
 
-1. `ffprobe` 确认容器、轨道、编码、时长、尺寸、帧率和色彩；
-2. FFmpeg 复制合规音视频流到标准 MP4；
+1. `ffprobe` 确认容器、主视频编码、时长、尺寸和帧率；
+2. FFmpeg 选择首条主视频轨和首条 AAC 音轨，复制到标准 MP4；
 3. HEVC 输出使用适合浏览器识别的 `hvc1` sample entry；
 4. 保留播放所需的方向和色彩信息；
 5. 删除定位、设备和无关容器 metadata；
@@ -194,8 +193,8 @@ H.264 和 HEVC 使用同一条主路径：
 - 视频或音频重新编码；
 - 失败后保留原 MOV 作为正式资产。
 
-HDR、HLG、Dolby Vision、ProRes、WebM、AVI 和 MKV 不在首期约定格式中。格式由这
-5 位朋友事先控制，因此不为它们增加转码或兼容分支。
+ProRes、WebM、AVI 和 MKV 不在首期约定格式中。HDR、HLG 和 Dolby Vision 使用
+同一条流复制路径，不增加色调映射或兼容转码分支。
 
 ### 4.4 校验职责
 
@@ -211,7 +210,7 @@ HDR、HLG、Dolby Vision、ProRes、WebM、AVI 和 MKV 不在首期约定格式�
 
 - 文件头和真实格式；
 - 图片页数、像素与可解码性；
-- 视频容器、轨道、编码、时长、尺寸、帧率和色彩；
+- 视频容器、主轨编码、时长、尺寸和帧率；
 - 服务端实际收到的字节数；
 - 分享链接状态和整次投稿上限。
 
@@ -331,14 +330,15 @@ Vite 通过 `build.rolldownOptions.input` 同时构建现有入口和投稿入�
 
 1. 锁定表单、文件增删和排序；
 2. 创建一个进程内上传会话；
-3. 按当前顺序为每个文件创建独立 `FormData`；
-4. 使用 `XMLHttpRequest` 逐个上传文件；
-5. 用已完成文件字节与当前请求进度计算整份投稿的总字节进度；
-6. 所有素材上传并整理完毕后，以 JSON 提交称呼和正文；
-7. 收到成功响应后原地切换为成功页；
-8. 收到错误后显示服务端的具体错误并重新解锁表单。
+3. 按当前顺序为每个文件创建 tus 上传；
+4. `tus-js-client` 使用 32 MiB PATCH 分片逐个上传文件；
+5. 用已完成文件字节与 tus 当前进度计算整份投稿的总字节进度；
+6. 所有源文件上传完成后按顺序请求服务端整理素材；
+7. 所有素材整理完毕后，以 JSON 提交称呼和正文；
+8. 收到成功响应后原地切换为成功页；
+9. 收到错误后显示服务端的具体错误并重新解锁表单。
 
-`XMLHttpRequest` 只用于浏览器原生上传进度，不引入另一套 HTTP 客户端依赖。
+`tus-js-client` 是唯一的文件上传客户端；普通 JSON 请求继续使用原生 `fetch`。
 
 ### 6.5 状态
 
@@ -353,17 +353,17 @@ idle
 任一提交阶段 → failed
 ```
 
-上传进度来自 `xhr.upload.onprogress`：
+上传进度来自 tus `onProgress`：
 
 ```text
 loaded / total
 ```
 
-单个 `xhr.upload` 完成只表示当前文件已经发送，不表示素材已经整理或投稿成功。
-全部素材请求成功后显示“服务器正在整理”，不估算最终提交百分比。
+单个 tus 上传完成只表示当前文件已经发送，不表示素材已经整理或投稿成功。
+全部源文件上传成功后显示“服务器正在整理”，不估算媒体处理百分比。
 
 不存在每项素材的 `queued`、`processing`、`ready` 服务端状态，也不存在
-`paused`、`retrying`、`resuming` 或 `degraded`。
+`paused`、`retrying` 或 `degraded`。
 
 ### 6.6 离开与失败
 
@@ -402,8 +402,11 @@ loaded / total
 POST /api/contribution-uploads
 Authorization: Bearer <share-token>
 
-POST /api/contribution-uploads/:uploadId/assets
-Content-Type: multipart/form-data
+POST/PATCH/HEAD /api/contribution-file-uploads[/<assetUploadId>]
+Tus-Resumable: 1.0.0
+Authorization: Bearer <share-token>
+
+POST /api/contribution-uploads/:uploadId/assets/:assetUploadId
 Authorization: Bearer <share-token>
 
 POST /api/contributions
@@ -411,10 +414,12 @@ Content-Type: application/json
 Authorization: Bearer <share-token>
 ```
 
-单文件 multipart 字段：
+创建 tus 文件时的 metadata：
 
 ```text
-asset
+contributionUploadId
+filename
+filetype
 ```
 
 最终 JSON 字段：
@@ -426,39 +431,37 @@ contentText
 ```
 
 上传会话只存在于当前 Journal 进程和临时目录，不写入 SQLite，不提供读取状态、暂停、
-恢复或远端素材编辑接口。
+跨页面恢复或远端素材编辑接口。
 
 ### 7.2 Fastify 接收
 
-素材路由使用 `@fastify/multipart` 的流式 parts API，并设置独立限制：
+素材上传使用 `@tus/server` 与 `@tus/file-store`，并设置独立限制：
 
-- 每个请求只有 1 个文件；
-- 单文件最大 90 MiB；
+- 每个 PATCH 请求最多 32 MiB；
+- 单文件最大 500 MiB；
 - 上传会话最多 30 个文件、5 个视频；
 - 上传会话源文件总量最大 500 MiB；
-- 字段数量和字段长度按第 4.1 节限制；
 - 遇到超限立即结束请求。
 
 处理顺序：
 
 1. 校验分享令牌；
 2. 创建进程内上传会话；
-3. 每个素材请求创建独立源文件临时目录；
-4. 文件 part 直接通过 Node stream 写入临时文件；
+3. tus 为每项素材创建临时文件并按 offset 接收分片；
+4. 全部素材上传完成后，朋友端按顺序请求整理；
 5. 累计会话的素材数量、视频数量和源文件字节；
 6. 当前素材进入全局单并发媒体处理区；
-7. 当前素材处理完成后删除其源文件；
-8. 所有素材请求完成后校验最终正文；
+7. 当前素材处理完成后删除 tus 源文件及其 metadata；
+8. 所有素材整理完成后校验最终正文；
 9. 移动正式资产目录并创建投稿记录。
 
 禁止：
 
-- `part.toBuffer()`；
 - `FileReader.readAsArrayBuffer()`；
 - Blob 转 base64；
 - 完整媒体 Buffer；
 - 全文件哈希；
-- tus、分块拼接或另一条上传通道。
+- 第二条上传通道。
 
 ### 7.3 单并发处理
 
@@ -466,7 +469,7 @@ contentText
 
 它只解决当前 `1 CPU / 1 GB` 下两份请求偶然同时到达的问题：
 
-- 上传仍可同时流式落盘；
+- 上传分片仍直接流式落盘；
 - 一次只整理一个素材；
 - 朋友端严格按投稿顺序发出素材请求；
 - 请求等待的是当前进程内 Promise；
@@ -514,24 +517,24 @@ Sharp 的 `limitInputPixels` 固定为 50 MP。图片逐张处理，`heif-conver
 视频只走一条确定路径：
 
 1. `ffprobe` 输出 JSON；
-2. 检查第 4.3 节合同；
-3. FFmpeg 将 H.264 或 HEVC 流复制到 MP4；
-4. AAC 直接复制；
+2. 检查第 4.3 节主视频合同；
+3. FFmpeg 选择首条主视频轨，将 H.264 或 HEVC 流复制到 MP4；
+4. 存在 AAC 时选择首条 AAC 音轨直接复制；
 5. HEVC 标记为 `hvc1`；
 6. 启用 fast start；
 7. 只保留播放需要的方向与色彩信息；
 8. 提取一帧；
 9. Sharp 输出 960 px WebP 海报。
 
-FFmpeg 失败即本次投稿失败。不得转码、降低分辨率、丢弃不兼容轨道后继续，也不得把
-原始 MOV 直接当作正式资产。
+FFmpeg 失败即本次投稿失败。附加音轨和 Core Media metadata 轨不进入正式资产；
+不得转码、降低分辨率，也不得把原始 MOV 直接当作正式资产。
 
 ### 8.4 文件落点
 
 请求临时源文件：
 
 ```text
-/tmp/journal-contribution-requests/<request-id>/
+/tmp/journal-contribution-uploads/<asset-upload-id>
 ```
 
 处理输出：
@@ -614,7 +617,7 @@ Telegram 提醒不属于送达事务。数据库提交成功即表示投稿送�
 
 服务启动时直接删除：
 
-- `/tmp/journal-contribution-requests` 中的遗留请求目录；
+- `/tmp/journal-contribution-uploads` 中的遗留 tus 文件与 metadata；
 - `/data/assets/.tmp` 中的遗留投稿目录。
 
 不存在草稿表、分块文件或 `uploading`/`processing` 数据库状态，因此不需要推断
@@ -693,7 +696,8 @@ journal_contribution_assets(contribution_id, sort_order, id)
 |---|---|---|
 | `GET` | `/api/contribution-link` | 校验分享令牌并返回限制摘要 |
 | `POST` | `/api/contribution-uploads` | 创建当前进程内的临时上传会话 |
-| `POST` | `/api/contribution-uploads/:uploadId/assets` | 上传并整理一个素材 |
+| tus | `/api/contribution-file-uploads[/<assetUploadId>]` | 以 32 MiB 分片上传一个素材 |
+| `POST` | `/api/contribution-uploads/:uploadId/assets/:assetUploadId` | 整理一个已上传素材 |
 | `POST` | `/api/contributions` | 提交正文与已整理素材 |
 
 正文不自动保存。朋友端 API 不使用管理员 Cookie。
@@ -842,8 +846,8 @@ useContributionForm.ts
   - 总量与可提交状态
 
 useContributionSubmit.ts
-  - FormData
-  - 单个 XMLHttpRequest
+  - tus-js-client
+  - 32 MiB 分片
   - 上传进度
   - 上传结束后的处理状态
   - 成功或错误
@@ -853,10 +857,10 @@ useContributionSubmit.ts
 
 - Vue 3 Composition API；
 - `<script setup lang="ts">`；
-- `File`、`XMLHttpRequest` 和对象 URL 使用 `shallowRef` 或非响应对象；
+- `File`、tus `Upload` 和对象 URL 使用 `shallowRef` 或非响应对象；
 - 总字节、可提交状态和素材计数使用纯 `computed`；
 - `watch` 只用于 `beforeunload` 与资源释放等副作用；
-- 组件卸载时撤销 Object URL 并终止仍活动的 XHR；
+- 组件卸载时撤销 Object URL 并终止仍活动的 tus 上传；
 - 不使用全局 Pinia store；
 - 不使用 `requestAnimationFrame`、`cancelAnimationFrame` 或任何别名。
 
@@ -883,17 +887,17 @@ useContributionSubmit.ts
 
 ### 16.1 OpenResty
 
-只为素材上传接口增加：
+素材上传接口使用：
 
 ```text
-/api/contribution-uploads/:uploadId/assets
-  client_max_body_size 95m
+/api/contribution-file-uploads
+  client_max_body_size 40m
   proxy_request_buffering off
   proxy_buffering off
 ```
 
-95 MiB 为 90 MiB 单文件和 multipart 边界留出余量。最终 `/api/contributions` 是
-小型 JSON 请求，独立限制为 1 MiB；500 MiB 投稿总量由 Journal 上传会话累计。
+40 MiB 为 32 MiB tus 分片留出明确余量。最终 `/api/contributions` 是小型 JSON
+请求，独立限制为 1 MiB；500 MiB 投稿总量由 Journal 上传会话累计。
 
 投稿页面与 API 增加：
 
@@ -914,7 +918,7 @@ useContributionSubmit.ts
 - Stream；
 - 备用通道。
 
-如果单个真实视频经常超过 90 MiB，才重新评估分块上传；不在当前版本同时维护两套协议。
+不增加 DNS-only 大文件入口或第二套上传协议。
 
 ### 16.3 Docker
 
@@ -933,10 +937,12 @@ useContributionSubmit.ts
 - `file-type`
 - `p-limit`
 - `qrcode`
+- `@tus/server`
+- `@tus/file-store`
+- `tus-js-client`
 
 继续复用：
 
-- `@fastify/multipart`
 - Fastify
 - better-sqlite3
 - Sharp
@@ -946,9 +952,6 @@ useContributionSubmit.ts
 
 明确不新增：
 
-- `@tus/server`
-- `@tus/file-store`
-- `tus-js-client`
 - `mediainfo.js`
 - 新的 HTTP 客户端
 - 任务队列或 Redis 客户端
@@ -959,7 +962,7 @@ useContributionSubmit.ts
 
 - 投稿链接仓储与服务；
 - 进程内上传会话与逐文件投稿路由；
-- 流式 multipart 临时文件写入；
+- tus 分片临时文件写入；
 - 单并发媒体处理；
 - 图片标准化；
 - H.264/HEVC 容器整理和海报；
@@ -975,7 +978,7 @@ useContributionSubmit.ts
 - Fastify 静态路由增加 `/contribute`；
 - Vite 增加投稿 HTML 入口；
 - Docker 增加系统媒体工具；
-- OpenResty 增加单个 multipart 路径的流式代理。
+- OpenResty 增加 tus 分片路径的流式代理。
 
 ### 17.3 前端
 
@@ -984,7 +987,7 @@ useContributionSubmit.ts
 - 独立 HTML 与 Vue 入口；
 - 一页投稿表单；
 - 本地数量和大小检查；
-- 单次 XHR 上传；
+- tus 32 MiB 分片上传；
 - 总上传进度；
 - 服务端整理状态；
 - 成功页；
@@ -997,8 +1000,7 @@ useContributionSubmit.ts
 - 服务器草稿；
 - 正文自动保存；
 - 选择文件后立即后台上传；
-- tus 或其他分块协议；
-- 断点续传；
+- 跨页面或跨进程的断点续传；
 - 上传暂停；
 - 自动重试；
 - 浏览器视频编码分析；
@@ -1028,7 +1030,7 @@ useContributionSubmit.ts
 - 页面不创建服务器草稿；
 - 朋友可以填写称呼、正文并选择约定媒体；
 - 页面在发送前阻止明显超数量、超单文件和超总量；
-- 点击一次后按顺序产生单文件 multipart 请求，并在最后提交一次 JSON；
+- 点击一次后按顺序产生 tus 分片请求，并在全部整理完成后提交一次 JSON；
 - 上传时有可信的总字节进度；
 - 全部素材请求完成后明确显示服务器正在整理；
 - HEIC 生成 Journal WebP，不保存源文件；
@@ -1040,12 +1042,12 @@ useContributionSubmit.ts
 ### 19.2 资源
 
 - 投稿首屏不包含 Router、Pinia、Tiptap、信息流或管理员视图；
-- 不包含 tus 或 mediainfo WASM；
+- 不包含 mediainfo WASM；
 - 浏览器不读取完整媒体为 ArrayBuffer 或 base64；
 - OpenResty 不完整缓冲请求体；
-- Fastify 不调用 `part.toBuffer()`；
+- Fastify 不把上传素材读取为完整 Buffer；
 - Node 内存占用不随上传总文件大小线性增长；
-- 一次只处理一个素材，同一投稿的素材按顺序上传；
+- 一次只处理一个素材，同一投稿的素材按顺序上传和整理；
 - 视频不重新编码；
 - 投稿列表只读取预览图或海报；
 - 视频在明确播放前不请求主体。
@@ -1077,13 +1079,13 @@ useContributionSubmit.ts
 
 | 真实问题 | 再考虑的能力 |
 |---|---|
-| 单个视频经常超过 90 MiB | 分块上传或 tus |
+| 单个视频或整份投稿经常超过 500 MiB | 重新评估本地磁盘额度与对象存储 |
 | 一份投稿经常超过 500 MiB | 重新评估本地磁盘额度与原片存储 |
 | 朋友网络失败使已完成文件重传成为主要阻碍 | 持久上传会话、断点续传与明确重试 |
 | 服务端整理经常接近 Cloudflare 响应时限 | 上传与处理拆分、状态读取 |
 | 多人同时投稿使单并发等待明显 | 持久任务队列 |
 | 目标设备确实无法播放大量 HEVC | 生成 H.264 展示副本 |
-| HDR 视频成为常见输入 | 固定 HDR 展示或色调映射路径 |
+| 目标设备确实无法正确显示 HDR | 固定 HDR 展示或色调映射路径 |
 | 待处理投稿数量使一次列表响应明显变大 | 分页 |
 | 原片保存成为明确需求 | 回到大文件方案重新设计存储 |
 

@@ -1,4 +1,5 @@
 import { computed, onBeforeUnmount, shallowRef } from 'vue';
+import { Upload } from 'tus-js-client';
 import type { ContributionFormPayload } from './useContributionForm';
 
 export type ContributionSubmitStatus =
@@ -46,6 +47,8 @@ const ERROR_MESSAGES: Record<string, string> = {
   MEDIA_PROCESSING_FAILED: '服务器整理素材时失败，投稿没有送达。',
 };
 
+const TUS_CHUNK_BYTES = 32 * 1024 * 1024;
+
 function errorMessage(error: ContributionErrorResponse['error']): string {
   const message = ERROR_MESSAGES[error.code] ?? error.message;
   return error.filename ? `${error.filename}：${message}` : message;
@@ -69,7 +72,7 @@ export function useContributionSubmit() {
   const uploadPercent = shallowRef(0);
   const error = shallowRef('');
   const result = shallowRef<ContributionSuccessResult | null>(null);
-  const activeXhr = shallowRef<XMLHttpRequest | null>(null);
+  const activeUpload = shallowRef<Upload | null>(null);
   const activeFetchController = shallowRef<AbortController | null>(null);
   let disposed = false;
 
@@ -113,46 +116,87 @@ export function useContributionSubmit() {
     return parseResponse<ContributionUploadResponse>(responseText).uploadId;
   }
 
+  function uploadError(reason: Error): Error {
+    const response = (
+      reason as Error & {
+        originalResponse?: { getBody: () => string };
+      }
+    ).originalResponse;
+    if (response) {
+      const body = response.getBody();
+      if (body) return responseError(body);
+    }
+    return new Error('网络连接中断，投稿没有送达。');
+  }
+
   function uploadAsset(
     token: string,
     uploadId: string,
     file: File,
     completedBytes: number,
     totalBytes: number,
-  ): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const formData = new FormData();
-      formData.append('asset', file, file.name);
-
-      const xhr = new XMLHttpRequest();
-      activeXhr.value = xhr;
-      xhr.open('POST', `/api/contribution-uploads/${encodeURIComponent(uploadId)}/assets`);
-      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-      xhr.upload.onprogress = (event) => {
-        if (!event.lengthComputable || disposed) return;
-        uploadPercent.value = Math.round(
-          ((completedBytes + event.loaded) / totalBytes) * 100,
-        );
-      };
-      xhr.onerror = () => {
-        reject(new Error('网络连接中断，投稿没有送达。'));
-      };
-      xhr.onabort = () => {
-        reject(new Error('投稿请求已经中止。'));
-      };
-      xhr.onload = () => {
-        if (xhr.status < 200 || xhr.status >= 300) {
-          reject(responseError(xhr.responseText));
-          return;
-        }
-        parseResponse(xhr.responseText);
-        resolve();
-      };
-      xhr.onloadend = () => {
-        if (activeXhr.value === xhr) activeXhr.value = null;
-      };
-      xhr.send(formData);
+  ): Promise<string> {
+    return new Promise<string>((resolve, reject) => {
+      const upload = new Upload(file, {
+        endpoint: '/api/contribution-file-uploads',
+        chunkSize: TUS_CHUNK_BYTES,
+        retryDelays: [],
+        storeFingerprintForResuming: false,
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        metadata: {
+          contributionUploadId: uploadId,
+          filename: file.name,
+          filetype: file.type,
+        },
+        onProgress(bytesUploaded) {
+          if (disposed) return;
+          uploadPercent.value = Math.round(
+            ((completedBytes + bytesUploaded) / totalBytes) * 100,
+          );
+        },
+        onError(reason) {
+          reject(uploadError(reason));
+        },
+        onSuccess() {
+          if (!upload.url) {
+            reject(new Error('服务器没有返回素材上传标识，投稿没有送达。'));
+            return;
+          }
+          const assetUploadId = new URL(upload.url, window.location.origin)
+            .pathname
+            .split('/')
+            .pop();
+          if (!assetUploadId) {
+            reject(new Error('服务器没有返回素材上传标识，投稿没有送达。'));
+            return;
+          }
+          resolve(assetUploadId);
+        },
+      });
+      activeUpload.value = upload;
+      upload.start();
+    }).finally(() => {
+      activeUpload.value = null;
     });
+  }
+
+  async function processAsset(
+    token: string,
+    uploadId: string,
+    assetUploadId: string,
+  ): Promise<void> {
+    const response = await authorizedFetch(
+      token,
+      `/api/contribution-uploads/${encodeURIComponent(uploadId)}/assets/${encodeURIComponent(assetUploadId)}`,
+      {
+        method: 'POST',
+      },
+    );
+    const responseText = await response.text();
+    if (!response.ok) throw responseError(responseText);
+    parseResponse(responseText);
   }
 
   async function completeUpload(
@@ -186,12 +230,18 @@ export function useContributionSubmit() {
       const uploadId = await createUpload(token);
       const totalBytes = payload.assets.reduce((total, file) => total + file.size, 0);
       let completedBytes = 0;
+      const assetUploadIds: string[] = [];
       for (const file of payload.assets) {
-        await uploadAsset(token, uploadId, file, completedBytes, totalBytes);
+        assetUploadIds.push(
+          await uploadAsset(token, uploadId, file, completedBytes, totalBytes),
+        );
         completedBytes += file.size;
         uploadPercent.value = Math.round((completedBytes / totalBytes) * 100);
       }
       status.value = 'processing';
+      for (const assetUploadId of assetUploadIds) {
+        await processAsset(token, uploadId, assetUploadId);
+      }
       result.value = await completeUpload(token, uploadId, payload);
       status.value = 'success';
     } catch (submissionError) {
@@ -206,8 +256,8 @@ export function useContributionSubmit() {
 
   onBeforeUnmount(() => {
     disposed = true;
-    activeXhr.value?.abort();
-    activeXhr.value = null;
+    void activeUpload.value?.abort();
+    activeUpload.value = null;
     activeFetchController.value?.abort();
     activeFetchController.value = null;
   });

@@ -1,27 +1,26 @@
-import { randomUUID } from 'node:crypto';
-import fs from 'node:fs';
-import path from 'node:path';
-import { pipeline } from 'node:stream/promises';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { JournalContributionError } from '../contributionError.js';
 import type { JournalContributionLinkService } from '../contributionLinkService.js';
-import type { ContributionUploadSource } from '../contributionMedia.js';
 import type { JournalContributionNotificationService } from '../contributionNotification.js';
 import type { JournalContributionService } from '../contributionService.js';
+import { JournalContributionUploadService } from '../contributionUploadService.js';
 import type { JournalStorage } from '../storage.js';
 
 const maxAssets = 30;
 const maxVideos = 5;
 const maxTotalBytes = 500 * 1024 * 1024;
 const maxImageBytes = 40 * 1024 * 1024;
-const maxVideoBytes = 90 * 1024 * 1024;
+const maxVideoBytes = 500 * 1024 * 1024;
 const maxImagePixels = 50_000_000;
 const maxVideoDuration = 300;
-const assetUploadBodyLimit = 95 * 1024 * 1024;
 
 const uploadParamsSchema = z.object({
   uploadId: z.string().uuid(),
+});
+
+const assetUploadParamsSchema = uploadParamsSchema.extend({
+  assetUploadId: z.string().min(1),
 });
 
 const submissionSchema = z.object({
@@ -58,6 +57,13 @@ export async function registerContributionRoutes(
     storage: JournalStorage;
   },
 ): Promise<void> {
+  const uploads = new JournalContributionUploadService(
+    dependencies.storage.contributionUploadDirectory(),
+    dependencies.links,
+    dependencies.contributions,
+  );
+  uploads.registerRoutes(server);
+
   server.get('/api/contribution-link', async (request, reply) => {
     setContributionResponseHeaders(reply);
     const link = dependencies.links.requireValid(bearerToken(request));
@@ -85,71 +91,14 @@ export async function registerContributionRoutes(
     };
   });
 
-  server.post('/api/contribution-uploads/:uploadId/assets', {
-    bodyLimit: assetUploadBodyLimit,
+  server.post('/api/contribution-uploads/:uploadId/assets/:assetUploadId', {
+    bodyLimit: 1024,
   }, async (request, reply) => {
     setContributionResponseHeaders(reply);
     const link = dependencies.links.requireValid(bearerToken(request));
-    const { uploadId } = uploadParamsSchema.parse(request.params);
-    dependencies.contributions.requireUpload(link, uploadId);
-    if (!request.isMultipart()) {
-      await dependencies.contributions.discardUpload(link, uploadId);
-      throw invalidForm('投稿素材必须使用 multipart/form-data。');
-    }
-
-    const requestDir = await dependencies.storage.beginContributionRequest();
-    let accepted = false;
+    const { uploadId, assetUploadId } = assetUploadParamsSchema.parse(request.params);
     try {
-      let source: ContributionUploadSource | null = null;
-      try {
-        for await (const part of request.parts({
-          limits: {
-            files: 1,
-            fileSize: maxVideoBytes,
-            fields: 0,
-            parts: 1,
-          },
-        })) {
-          if (part.type === 'field') {
-            throw invalidForm(`不支持字段 ${part.fieldname}。`);
-          }
-          if (part.fieldname !== 'asset') {
-            throw invalidForm(`不支持文件字段 ${part.fieldname}。`);
-          }
-          const sourceName = part.filename;
-          if (!sourceName) throw invalidForm('素材缺少文件名。');
-
-          const absolutePath = path.join(requestDir, randomUUID());
-          await pipeline(
-            part.file,
-            fs.createWriteStream(absolutePath, { flags: 'wx' }),
-          );
-          const file = await fs.promises.stat(absolutePath);
-          source = { absolutePath, sourceName, byteSize: file.size };
-        }
-      } catch (error) {
-        if (error instanceof server.multipartErrors.FilesLimitError) {
-          throw invalidForm('每次请求只能上传一个素材。');
-        }
-        if (error instanceof server.multipartErrors.RequestFileTooLargeError) {
-          throw new JournalContributionError(
-            'FILE_TOO_LARGE',
-            '单个文件不能超过 90 MiB。',
-            400,
-          );
-        }
-        if (
-          error instanceof server.multipartErrors.FieldsLimitError
-          || error instanceof server.multipartErrors.PartsLimitError
-        ) {
-          throw invalidForm('每次请求只能上传一个素材。');
-        }
-        throw error;
-      }
-
-      if (!source) throw invalidForm('没有收到投稿素材。');
-      const asset = await dependencies.contributions.addUploadAsset(link, uploadId, source);
-      accepted = true;
+      const asset = await uploads.process(link, uploadId, assetUploadId);
       return {
         asset: {
           kind: asset.kind,
@@ -157,11 +106,10 @@ export async function registerContributionRoutes(
           byteSize: asset.byteSize,
         },
       };
-    } finally {
-      await dependencies.storage.discardContributionRequest(requestDir);
-      if (!accepted) {
-        await dependencies.contributions.discardUpload(link, uploadId);
-      }
+    } catch (error) {
+      await dependencies.contributions.discardUpload(link, uploadId);
+      await uploads.discard(uploadId);
+      throw error;
     }
   });
 
