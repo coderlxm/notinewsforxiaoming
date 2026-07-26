@@ -14,6 +14,7 @@ export const videoDownloadEventSchema = z.discriminatedUnion('type', [
     fileName: z.string(),
     byteSize: z.number().int().nonnegative(),
     drivePath: z.string(),
+    elapsedMs: z.number().int().positive(),
   }),
 ]);
 

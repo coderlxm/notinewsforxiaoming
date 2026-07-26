@@ -157,6 +157,26 @@ function formatVideoDownloadBytes(bytes: number): string {
     : `${(bytes / mib).toFixed(1)} MiB`;
 }
 
+function formatVideoDownloadDuration(elapsedMs: number): string {
+  const totalSeconds = Math.max(1, Math.round(elapsedMs / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) return `${hours}小时${minutes}分${seconds}秒`;
+  if (minutes > 0) return `${minutes}分${seconds}秒`;
+  return `${seconds}秒`;
+}
+
+function formatVideoDownloadSpeed(bytes: number, elapsedMs: number): string {
+  const bytesPerSecond = bytes / (elapsedMs / 1000);
+  const gib = 1024 ** 3;
+  const mib = 1024 ** 2;
+  const kib = 1024;
+  if (bytesPerSecond >= gib) return `${(bytesPerSecond / gib).toFixed(2)} GiB/s`;
+  if (bytesPerSecond >= mib) return `${(bytesPerSecond / mib).toFixed(1)} MiB/s`;
+  return `${(bytesPerSecond / kib).toFixed(1)} KiB/s`;
+}
+
 const STARTGG_GO_NATURAL_ALIASES = new Set([
   '比赛了',
   '街霸',
@@ -361,6 +381,8 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
           '✅ 视频已上传到 Google Drive',
           `文件：${result.fileName}`,
           `大小：${formatVideoDownloadBytes(result.byteSize)}`,
+          `总耗时：${formatVideoDownloadDuration(result.elapsedMs)}`,
+          `全程平均速度：${formatVideoDownloadSpeed(result.byteSize, result.elapsedMs)}`,
           `路径：${result.drivePath}`,
         ].join('\n'),
       );

@@ -34,6 +34,7 @@ export async function runLocalVideoDownload(
   await mkdir(options.workRoot, { recursive: true, mode: 0o700 });
   const taskDirectory = await mkdtemp(join(options.workRoot, 'job-'));
   const downloadedPathFile = join(taskDirectory, 'downloaded-path.txt');
+  const startedAt = Date.now();
 
   try {
     await options.onStage('downloading');
@@ -90,6 +91,7 @@ export async function runLocalVideoDownload(
       fileName,
       byteSize: fileStats.size,
       drivePath,
+      elapsedMs: Math.max(1, Date.now() - startedAt),
     };
   } finally {
     await rm(taskDirectory, { recursive: true, force: true });
