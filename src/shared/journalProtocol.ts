@@ -204,6 +204,7 @@ export const journalSiteProfileBioSchema = z.string().trim().max(120);
 export const journalSiteProfileSchema = z.object({
   bio: journalSiteProfileBioSchema,
   avatarUrl: z.string().min(1),
+  weatherEnabled: z.boolean(),
   updatedAt: z.string().datetime(),
 });
 export type JournalSiteProfile = z.infer<typeof journalSiteProfileSchema>;

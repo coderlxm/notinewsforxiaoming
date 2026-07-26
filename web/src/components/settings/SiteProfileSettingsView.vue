@@ -22,6 +22,7 @@ const {
 const { profile, loading, loadError } = storeToRefs(siteProfile);
 const draftBio = shallowRef('');
 const draftAvatarFile = shallowRef<File | null>(null);
+const draftWeatherEnabled = shallowRef(true);
 const formError = shallowRef<string | null>(null);
 const submitting = shallowRef(false);
 const initialized = shallowRef(false);
@@ -62,6 +63,7 @@ const canSubmit = computed(() =>
 watch(profile, (value) => {
   if (!value || initialized.value) return;
   draftBio.value = value.bio;
+  draftWeatherEnabled.value = value.weatherEnabled;
   initialized.value = true;
 }, { immediate: true });
 
@@ -94,8 +96,10 @@ async function save(): Promise<void> {
     const updated = await siteProfile.update(
       normalizedDraftBio.value,
       draftAvatarFile.value,
+      draftWeatherEnabled.value,
     );
     draftBio.value = updated.bio;
+    draftWeatherEnabled.value = updated.weatherEnabled;
     draftAvatarFile.value = null;
     resetFileDialog();
   }
@@ -125,8 +129,8 @@ async function save(): Promise<void> {
 
     <section v-if="ownerAuthenticated && profile" class="settings-view__section" aria-labelledby="site-profile-title">
       <div class="settings-view__section-heading">
-        <h1 id="site-profile-title">公开资料</h1>
-        <p>这些内容会展示在公开记录页和内容详情中</p>
+        <h1 id="site-profile-title">站点设置</h1>
+        <p>管理公开资料与页面展示内容</p>
       </div>
 
       <p v-if="visibleError" class="notice notice--error" role="alert">{{ visibleError }}</p>
@@ -169,6 +173,21 @@ async function save(): Promise<void> {
           <span class="settings-view__counter" :class="{ 'settings-view__counter--invalid': validationError }">
             {{ bioLength }} / {{ MAX_BIO_LENGTH }}
           </span>
+        </label>
+
+        <label class="weather-setting">
+          <span class="weather-setting__copy">
+            <strong>公开页天气</strong>
+            <span>关闭后不展示天气栏目，也不会请求天气数据</span>
+          </span>
+          <input
+            v-model="draftWeatherEnabled"
+            class="weather-setting__input"
+            type="checkbox"
+            role="switch"
+            :disabled="submitting"
+          >
+          <span class="weather-setting__switch" aria-hidden="true" />
         </label>
 
         <div class="settings-view__actions">
@@ -328,6 +347,88 @@ async function save(): Promise<void> {
 
 .settings-view__counter--invalid {
   color: var(--danger);
+}
+
+.weather-setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  cursor: pointer;
+}
+
+.weather-setting__copy {
+  display: grid;
+  gap: 0.22rem;
+}
+
+.weather-setting__copy strong {
+  font-size: 0.84rem;
+}
+
+.weather-setting__copy span {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+.weather-setting__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.weather-setting__switch {
+  position: relative;
+  width: 2.4rem;
+  height: 1.35rem;
+  flex: none;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface-muted);
+  transition: background-color 160ms ease, border-color 160ms ease;
+}
+
+.weather-setting__switch::after {
+  position: absolute;
+  top: 0.14rem;
+  left: 0.14rem;
+  width: 0.95rem;
+  height: 0.95rem;
+  border-radius: 50%;
+  background: var(--surface-card);
+  box-shadow: 0 1px 3px rgb(32 32 30 / 18%);
+  content: "";
+  transition: transform 160ms ease;
+}
+
+.weather-setting__input:checked + .weather-setting__switch {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.weather-setting__input:checked + .weather-setting__switch::after {
+  transform: translateX(1rem);
+}
+
+.weather-setting__input:focus-visible + .weather-setting__switch {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.weather-setting:has(.weather-setting__input:disabled) {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .weather-setting__switch,
+  .weather-setting__switch::after {
+    transition: none;
+  }
 }
 
 .settings-view__actions {

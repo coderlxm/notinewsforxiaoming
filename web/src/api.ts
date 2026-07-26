@@ -96,9 +96,11 @@ export function fetchCurrentWeather(): Promise<CurrentWeather> {
 export function updateSiteProfile(input: {
   bio: string;
   avatar: File | null;
+  weatherEnabled: boolean;
 }): Promise<SiteProfile> {
   const form = new FormData();
   form.append('bio', input.bio);
+  form.append('weatherEnabled', String(input.weatherEnabled));
   if (input.avatar !== null) form.append('avatar', input.avatar);
   return requestJson<SiteProfile>('/api/me/site-profile', { method: 'PATCH', body: form });
 }

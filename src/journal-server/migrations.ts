@@ -371,6 +371,16 @@ const migrations: JournalMigration[] = [
       `);
     },
   },
+  {
+    version: 6,
+    up(database) {
+      database.exec(`
+        ALTER TABLE journal_site_profile
+        ADD COLUMN weather_enabled INTEGER NOT NULL DEFAULT 1
+          CHECK (weather_enabled IN (0, 1));
+      `);
+    },
+  },
 ];
 
 export function runJournalMigrations(database: Database.Database): void {

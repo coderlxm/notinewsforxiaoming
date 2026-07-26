@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { List } from 'vant';
+import { storeToRefs } from 'pinia';
 import { computed, nextTick, onActivated, onMounted, reactive, shallowRef, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import ArticleCardContent from '../article/ArticleCardContent.vue';
@@ -9,6 +10,7 @@ import { useCurrentWeather } from '../../composables/useCurrentWeather';
 import { useDeferredLoading } from '../../composables/useDeferredLoading';
 import { useJournalApi } from '../../composables/useJournalApi';
 import { useSessionStore } from '../../stores/session';
+import { useSiteProfileStore } from '../../stores/siteProfile';
 import {
   emptyFeedFilters,
   type FeedFilters,
@@ -53,6 +55,8 @@ const filters = reactive<FeedFilters>({
 });
 const journal = useJournalApi();
 const currentWeather = useCurrentWeather();
+const siteProfile = useSiteProfileStore();
+const { profile: siteProfileData } = storeToRefs(siteProfile);
 const router = useRouter();
 const session = useSessionStore();
 const initialLoadPending = shallowRef(true);
@@ -64,6 +68,7 @@ const paginationLayoutPending = shallowRef(false);
 const feedLayoutReady = shallowRef(false);
 
 const isDetail = computed(() => props.mode === 'public' && props.detailId !== undefined);
+const weatherEnabled = computed(() => siteProfileData.value?.weatherEnabled === true);
 const isOverlay = computed(() => props.overlayEntryId !== undefined);
 const currentOverlayEntry = computed(() => {
   if (props.overlayEntryId === undefined) return null;
@@ -114,6 +119,18 @@ watch(() => journal.authenticationState.value, (state) => {
   if (state !== 'checking') session.setAuthenticated(state === 'authenticated');
 });
 
+watch(weatherEnabled, (enabled, wasEnabled) => {
+  if (
+    !initialLoadPending.value
+    && enabled
+    && !wasEnabled
+    && props.mode === 'public'
+    && !isDetail.value
+  ) {
+    void currentWeather.load();
+  }
+}, { immediate: true });
+
 async function loadDirectPrivateDetail(): Promise<void> {
   if (
     !props.directOverlay
@@ -131,10 +148,14 @@ onMounted(async () => {
       return;
     }
     if (props.mode === 'public') {
-      await Promise.all([
-        journal.loadPublic({ tag: props.initialTag }),
-        currentWeather.load(),
-      ]);
+      const feedRequest = journal.loadPublic({ tag: props.initialTag });
+      await siteProfile.ensureLoaded();
+      if (weatherEnabled.value) {
+        await Promise.all([feedRequest, currentWeather.load()]);
+      }
+      else {
+        await feedRequest;
+      }
       return;
     }
     await journal.loadPrivate(filters);
@@ -192,10 +213,9 @@ async function refreshFeed(): Promise<void> {
   refreshRequestComplete.value = false;
 
   if (props.mode === 'public') {
-    await Promise.all([
-      journal.loadPublic({ tag: props.initialTag }),
-      currentWeather.load(),
-    ]);
+    const requests = [journal.loadPublic({ tag: props.initialTag })];
+    if (weatherEnabled.value) requests.push(currentWeather.load());
+    await Promise.all(requests);
   }
   else {
     await journal.refreshPrivateFeed(filters);
@@ -411,6 +431,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
           </button>
         </div>
         <CurrentWeather
+          v-if="weatherEnabled"
           :weather="currentWeather.weather.value"
           :loading="currentWeather.loading.value"
           :error="currentWeather.error.value"

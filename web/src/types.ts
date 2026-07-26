@@ -75,6 +75,7 @@ export interface JournalApiError {
 export interface SiteProfile {
   bio: string;
   avatarUrl: string;
+  weatherEnabled: boolean;
   updatedAt: string;
 }
 

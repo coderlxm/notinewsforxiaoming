@@ -131,6 +131,7 @@ export interface JournalSiteProfileRecord {
   bio: string;
   avatarWebp: Buffer;
   avatarRevision: number;
+  weatherEnabled: boolean;
   updatedAt: string;
 }
 
@@ -138,6 +139,7 @@ interface SiteProfileRow {
   bio: string;
   avatar_webp: Buffer;
   avatar_revision: number;
+  weather_enabled: 0 | 1;
   updated_at: string;
 }
 
@@ -753,7 +755,7 @@ export class JournalRepository {
 
   getSiteProfileOrNull(): JournalSiteProfileRecord | null {
     const row = this.database.prepare(`
-      SELECT bio, avatar_webp, avatar_revision, updated_at
+      SELECT bio, avatar_webp, avatar_revision, weather_enabled, updated_at
       FROM journal_site_profile
       WHERE id = 1
     `).get() as SiteProfileRow | undefined;
@@ -771,23 +773,30 @@ export class JournalRepository {
   updateSiteProfile(input: {
     bio: string;
     avatarWebp: Buffer | null;
+    weatherEnabled: boolean;
     updatedAt: string;
   }): JournalSiteProfileRecord {
     const update = this.database.transaction(() => {
       const result = input.avatarWebp === null
         ? this.database.prepare(`
             UPDATE journal_site_profile
-            SET bio = ?, updated_at = ?
+            SET bio = ?, weather_enabled = ?, updated_at = ?
             WHERE id = 1
-          `).run(input.bio, input.updatedAt)
+          `).run(input.bio, Number(input.weatherEnabled), input.updatedAt)
         : this.database.prepare(`
             UPDATE journal_site_profile
             SET bio = ?,
                 avatar_webp = ?,
                 avatar_revision = avatar_revision + 1,
+                weather_enabled = ?,
                 updated_at = ?
             WHERE id = 1
-          `).run(input.bio, input.avatarWebp, input.updatedAt);
+          `).run(
+            input.bio,
+            input.avatarWebp,
+            Number(input.weatherEnabled),
+            input.updatedAt,
+          );
       if (result.changes !== 1) {
         throw new Error('Journal site profile was not initialized.');
       }
@@ -1019,6 +1028,7 @@ export class JournalRepository {
       bio: row.bio,
       avatarWebp: row.avatar_webp,
       avatarRevision: row.avatar_revision,
+      weatherEnabled: row.weather_enabled === 1,
       updatedAt: row.updated_at,
     };
   }

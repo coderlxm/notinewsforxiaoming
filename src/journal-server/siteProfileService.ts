@@ -40,6 +40,7 @@ export class JournalSiteProfileService {
   async update(input: {
     bio: string;
     avatar: JournalSiteProfileAvatarUpload | null;
+    weatherEnabled: boolean;
   }): Promise<JournalSiteProfile> {
     const bio = journalSiteProfileBioSchema.parse(input.bio);
     const avatarWebp = input.avatar === null
@@ -48,6 +49,7 @@ export class JournalSiteProfileService {
     const profile = this.repository.updateSiteProfile({
       bio,
       avatarWebp,
+      weatherEnabled: input.weatherEnabled,
       updatedAt: new Date().toISOString(),
     });
     return this.toPublicProfile(profile);
@@ -98,6 +100,7 @@ export class JournalSiteProfileService {
     return {
       bio: profile.bio,
       avatarUrl: `/api/site-profile/avatar?v=${profile.avatarRevision}`,
+      weatherEnabled: profile.weatherEnabled,
       updatedAt: profile.updatedAt,
     };
   }

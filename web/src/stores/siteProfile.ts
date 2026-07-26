@@ -7,8 +7,20 @@ export const useSiteProfileStore = defineStore('siteProfile', () => {
   const profile = shallowRef<SiteProfile | null>(null);
   const loading = shallowRef(false);
   const loadError = shallowRef<string | null>(null);
+  let pendingLoad: Promise<void> | null = null;
 
   async function load(): Promise<void> {
+    if (pendingLoad !== null) return await pendingLoad;
+    pendingLoad = loadOnce();
+    try {
+      await pendingLoad;
+    }
+    finally {
+      pendingLoad = null;
+    }
+  }
+
+  async function loadOnce(): Promise<void> {
     loading.value = true;
     profile.value = null;
     loadError.value = null;
@@ -23,8 +35,17 @@ export const useSiteProfileStore = defineStore('siteProfile', () => {
     }
   }
 
-  async function update(bio: string, avatar: File | null): Promise<SiteProfile> {
-    const updated = await updateSiteProfile({ bio, avatar });
+  async function ensureLoaded(): Promise<void> {
+    if (profile.value !== null || loadError.value !== null) return;
+    await load();
+  }
+
+  async function update(
+    bio: string,
+    avatar: File | null,
+    weatherEnabled: boolean,
+  ): Promise<SiteProfile> {
+    const updated = await updateSiteProfile({ bio, avatar, weatherEnabled });
     profile.value = updated;
     return updated;
   }
@@ -34,6 +55,7 @@ export const useSiteProfileStore = defineStore('siteProfile', () => {
     loading,
     loadError,
     load,
+    ensureLoaded,
     update,
   };
 });

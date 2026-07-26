@@ -11,11 +11,13 @@ import {
 
 const siteProfileFieldsSchema = z.object({
   bio: journalSiteProfileBioSchema,
+  weatherEnabled: z.enum(['true', 'false']).transform(value => value === 'true'),
 });
 
 async function readSiteProfileMultipart(request: FastifyRequest): Promise<{
   bio: string;
   avatar: JournalSiteProfileAvatarUpload | null;
+  weatherEnabled: boolean;
 }> {
   const fields: Record<string, string> = {};
   let avatar: JournalSiteProfileAvatarUpload | null = null;
@@ -23,10 +25,10 @@ async function readSiteProfileMultipart(request: FastifyRequest): Promise<{
   for await (const part of request.parts({
     limits: {
       fieldSize: 1024,
-      fields: 1,
+      fields: 2,
       fileSize: maxSiteProfileAvatarBytes,
       files: 1,
-      parts: 2,
+      parts: 3,
     },
   })) {
     if (part.type === 'file') {
@@ -41,19 +43,21 @@ async function readSiteProfileMultipart(request: FastifyRequest): Promise<{
       };
       continue;
     }
-    if (part.fieldname !== 'bio') {
+    if (part.fieldname !== 'bio' && part.fieldname !== 'weatherEnabled') {
       throw new JournalSiteProfileInputError(
         `Unexpected multipart field ${part.fieldname}.`,
       );
     }
     if (part.valueTruncated) {
-      throw new JournalSiteProfileInputError('Bio exceeds the multipart field limit.');
+      throw new JournalSiteProfileInputError(
+        `${part.fieldname} exceeds the multipart field limit.`,
+      );
     }
-    fields.bio = String(part.value);
+    fields[part.fieldname] = String(part.value);
   }
 
-  const { bio } = siteProfileFieldsSchema.parse(fields);
-  return { bio, avatar };
+  const { bio, weatherEnabled } = siteProfileFieldsSchema.parse(fields);
+  return { bio, avatar, weatherEnabled };
 }
 
 export async function registerSiteProfileRoutes(
