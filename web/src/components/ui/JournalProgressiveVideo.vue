@@ -9,28 +9,18 @@ const props = withDefaults(defineProps<{
   fit: 'cover',
 });
 
-const state = shallowRef<'loading' | 'loaded' | 'error'>('loading');
-const previewReady = shallowRef(false);
-const videoReady = shallowRef(false);
+const state = shallowRef<'loading' | 'ready' | 'playing' | 'error'>('loading');
 
 watch([() => props.src, () => props.previewSrc], () => {
   state.value = 'loading';
-  previewReady.value = false;
-  videoReady.value = false;
 });
 
-function revealWhenReady(): void {
-  if (previewReady.value && videoReady.value) state.value = 'loaded';
-}
-
 function markPreviewReady(): void {
-  previewReady.value = true;
-  revealWhenReady();
+  state.value = 'ready';
 }
 
-function markVideoReady(): void {
-  videoReady.value = true;
-  revealWhenReady();
+function playVideo(): void {
+  state.value = 'playing';
 }
 
 function exposeVideoError(): void {
@@ -44,22 +34,33 @@ function exposeVideoError(): void {
     :class="[`progressive-video--${fit}`, `progressive-video--${state}`]"
     :aria-busy="state === 'loading'"
   >
-    <img
-      class="progressive-video__preview"
-      :src="previewSrc"
-      alt=""
-      aria-hidden="true"
-      loading="eager"
-      draggable="false"
-      @load="markPreviewReady"
+    <button
+      v-if="state === 'loading' || state === 'ready'"
+      class="progressive-video__cover"
+      type="button"
+      :disabled="state === 'loading'"
+      aria-label="播放视频"
+      @click="playVideo"
     >
+      <img
+        class="progressive-video__preview"
+        :src="previewSrc"
+        alt=""
+        aria-hidden="true"
+        loading="eager"
+        draggable="false"
+        @load="markPreviewReady"
+      >
+      <span class="progressive-video__play" aria-hidden="true">▶</span>
+    </button>
     <video
+      v-else
       class="progressive-video__media"
       :src="src"
       :poster="previewSrc"
       controls
+      autoplay
       preload="metadata"
-      @loadeddata="markVideoReady"
       @error="exposeVideoError"
     />
   </span>
@@ -72,7 +73,7 @@ function exposeVideoError(): void {
   overflow: hidden;
 }
 
-.progressive-video__preview,
+.progressive-video__cover,
 .progressive-video__media {
   display: block;
   width: 100%;
@@ -90,50 +91,58 @@ function exposeVideoError(): void {
   object-fit: contain;
 }
 
+.progressive-video__cover {
+  position: relative;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  background: var(--surface-muted);
+  color: #fff;
+  cursor: pointer;
+}
+
+.progressive-video__cover:disabled {
+  cursor: default;
+}
+
 .progressive-video__preview {
+  display: block;
+  width: 100%;
+  height: 100%;
   filter: blur(14px);
-  opacity: 1;
+  object-fit: inherit;
   transform: scale(1.06);
 }
 
-.progressive-video__media {
-  opacity: 0;
-  pointer-events: none;
+.progressive-video--ready .progressive-video__preview {
+  filter: none;
+  transform: none;
+  animation: progressive-video-cover-reveal 320ms ease both;
 }
 
-.progressive-video--loaded .progressive-video__preview {
-  opacity: 0;
-  animation: progressive-video-preview-hide 320ms ease both;
+.progressive-video__play {
+  position: absolute;
+  display: grid;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  background: rgb(20 20 18 / 66%);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 32%);
+  font-size: 0.9rem;
+  inset: 50% auto auto 50%;
+  place-items: center;
+  transform: translate(-50%, -50%);
 }
 
-.progressive-video--loaded .progressive-video__media {
-  opacity: 1;
-  pointer-events: auto;
-  animation: progressive-video-media-reveal 320ms ease both;
-}
-
-.progressive-video--error .progressive-video__preview {
-  opacity: 0;
-}
-
-.progressive-video--error .progressive-video__media {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-@keyframes progressive-video-preview-hide {
-  from { opacity: 1; }
-  to { opacity: 0; }
-}
-
-@keyframes progressive-video-media-reveal {
-  from { opacity: 0; }
-  to { opacity: 1; }
+@keyframes progressive-video-cover-reveal {
+  from {
+    filter: blur(14px);
+    transform: scale(1.06);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .progressive-video__preview,
-  .progressive-video__media {
+  .progressive-video__preview {
     animation: none;
   }
 }
