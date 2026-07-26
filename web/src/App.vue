@@ -273,23 +273,27 @@ onUnmounted(removeAfterEach);
   <div class="app-shell">
     <div class="profile-bar">
       <header class="profile">
-        <template v-if="profile">
-          <button class="profile__home" type="button" aria-label="返回公开首页" @click="navigate('/')">
-            <img class="profile__avatar" :src="profile.avatarUrl" alt="小明同学">
-          </button>
-          <div class="profile__copy">
-            <button class="profile__name" type="button" @click="navigate('/')">小明同学</button>
-            <p v-if="profile.bio" class="profile__bio">{{ profile.bio }}</p>
-          </div>
-        </template>
-        <div
-          v-else
-          class="profile__status"
-          :class="{ 'profile__status--error': profileLoadError }"
-          :role="profileLoadError ? 'alert' : 'status'"
-        >
+        <button class="profile__home" type="button" aria-label="返回公开首页" @click="navigate('/')">
+          <img v-if="profile" class="profile__avatar" :src="profile.avatarUrl" alt="小明同学">
+          <span
+            v-else
+            class="profile__avatar-placeholder"
+            :class="{ 'profile__avatar-placeholder--error': profileLoadError }"
+            aria-hidden="true"
+          />
+        </button>
+        <div class="profile__copy">
           <button class="profile__name" type="button" @click="navigate('/')">小明同学</button>
-          <span>{{ profileLoadError ? `公开资料加载失败：${profileLoadError}` : '正在读取公开资料…' }}</span>
+          <p v-if="profile?.bio" class="profile__bio">{{ profile.bio }}</p>
+          <span
+            v-else-if="!profile && !profileLoadError"
+            class="profile__bio-skeleton"
+            role="status"
+            aria-label="正在读取公开资料"
+          />
+          <p v-else-if="profileLoadError" class="profile__load-error" role="alert">
+            公开资料加载失败：{{ profileLoadError }}
+          </p>
         </div>
         <nav v-if="showProfileNavigation" class="profile__nav" aria-label="主导航">
           <button
@@ -451,34 +455,32 @@ onUnmounted(removeAfterEach);
   border-radius: 50%;
 }
 
-.profile__avatar {
+.profile__avatar,
+.profile__avatar-placeholder {
   display: block;
   width: 3rem;
   height: 3rem;
   border-radius: 50%;
   box-shadow: 0 0 0 1px var(--border-strong);
+}
+
+.profile__avatar {
   object-fit: cover;
+}
+
+.profile__avatar-placeholder,
+.profile__bio-skeleton {
+  background: var(--surface-muted);
+  animation: profile-skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+.profile__avatar-placeholder--error {
+  background: var(--danger-soft);
+  animation: none;
 }
 
 .profile__copy {
   min-width: 0;
-}
-
-.profile__status {
-  display: grid;
-  min-width: 0;
-  grid-column: 1 / 3;
-  gap: 0.14rem;
-  color: var(--text-muted);
-  font-size: 0.74rem;
-}
-
-.profile__status .profile__name {
-  justify-self: start;
-}
-
-.profile__status--error {
-  color: var(--danger);
 }
 
 .profile__name {
@@ -494,6 +496,23 @@ onUnmounted(removeAfterEach);
   overflow: hidden;
   color: var(--text-muted);
   font-family: var(--font-serif);
+  font-size: 0.74rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile__bio-skeleton {
+  display: block;
+  width: 13.5rem;
+  height: 0.74rem;
+  margin-top: 0.26rem;
+  border-radius: 999px;
+}
+
+.profile__load-error {
+  margin: 0.14rem 0 0;
+  overflow: hidden;
+  color: var(--danger);
   font-size: 0.74rem;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -556,6 +575,17 @@ onUnmounted(removeAfterEach);
   color: inherit;
 }
 
+@keyframes profile-skeleton-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
 @media (max-width: 599px) {
   .profile {
     grid-template-columns: auto minmax(0, 1fr) auto;
@@ -563,12 +593,15 @@ onUnmounted(removeAfterEach);
     padding: 0.8rem 0 0.72rem;
   }
 
-  .profile__avatar {
+  .profile__avatar,
+  .profile__avatar-placeholder {
     width: 2.35rem;
     height: 2.35rem;
   }
 
-  .profile__bio {
+  .profile__bio,
+  .profile__bio-skeleton,
+  .profile__load-error {
     display: none;
   }
 
