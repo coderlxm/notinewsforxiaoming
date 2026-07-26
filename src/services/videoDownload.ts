@@ -51,6 +51,10 @@ function runDownloadJob(
       'src/videoDownloadJob.ts',
     ], {
       cwd: projectDirectory,
+      env: {
+        ...process.env,
+        DOTENV_CONFIG_QUIET: 'true',
+      },
       shell: false,
       timeout: jobTimeout,
       stdio: ['pipe', 'pipe', 'pipe'],
