@@ -215,10 +215,10 @@ Telegram /download
 Google Drive 目标目录建议为：
 
 ```text
-NotiNewsDownloads/YYYY-MM/<job-id>/<yt-dlp 最终文件名>
+NotiNewsDownloads/YYYY-MM/<yt-dlp 最终文件名>
 ```
 
-服务器使用 `notinews-drive`，用户本机使用 `personal-gdrive`；两个 remote 已确认指向同一个 Google Drive。每次任务使用独立目录，重复下载同一 URL 不会覆盖已有文件。
+服务器使用 `notinews-drive`，用户本机使用 `personal-gdrive`；两个 remote 已确认指向同一个 Google Drive。文件名包含 yt-dlp 提供的视频 ID，重复下载同一视频时直接覆盖同名文件。
 
 yt-dlp 使用其默认格式选择，以获得该站点能提供的最佳可用质量；不自行维护站点格式规则。官方说明默认会选择最佳可用格式，分离的音视频流需要 ffmpeg 合并。参考：[yt-dlp README 的格式选择与依赖说明](https://github.com/yt-dlp/yt-dlp#format-selection)。
 

@@ -1,7 +1,6 @@
 import { spawn } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, rm, stat } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
-import { randomUUID } from 'node:crypto';
 import { lookup } from 'mime-types';
 import { bj } from '../utils/time.js';
 import type {
@@ -70,11 +69,7 @@ export async function runLocalVideoDownload(
     }
 
     await options.onStage('uploading');
-    const driveDirectory = [
-      'NotiNewsDownloads',
-      bj().format('YYYY-MM'),
-      `${bj().format('YYYYMMDD-HHmmss')}-${randomUUID()}`,
-    ].join('/');
+    const driveDirectory = `NotiNewsDownloads/${bj().format('YYYY-MM')}`;
     const drivePath = `${driveDirectory}/${fileName}`;
 
     await runProcess(options.rclonePath, [
