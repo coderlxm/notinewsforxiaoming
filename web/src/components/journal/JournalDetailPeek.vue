@@ -1,17 +1,22 @@
 <script setup lang="ts">
+import { storeToRefs } from 'pinia';
+import { useSiteProfileStore } from '../../stores/siteProfile';
 import type { JournalEntry } from '../../types';
 import { formatEntryTime } from '../../utils/formatters';
 
 defineProps<{
   entry: JournalEntry;
 }>();
+
+const siteProfile = useSiteProfileStore();
+const { profile } = storeToRefs(siteProfile);
 </script>
 
 <template>
   <aside class="detail-peek" aria-hidden="true">
     <span class="detail-peek__handle" />
     <div class="detail-peek__identity">
-      <img class="detail-peek__avatar" src="/avatar-ming.png" alt="">
+      <img v-if="profile" class="detail-peek__avatar" :src="profile.avatarUrl" alt="">
       <div class="detail-peek__identity-copy">
         <strong>小明同学</strong>
         <time :datetime="entry.sourceCreatedAt">{{ formatEntryTime(entry.sourceCreatedAt) }}</time>
@@ -68,6 +73,7 @@ defineProps<{
     height: 34px;
     flex: none;
     border-radius: 50%;
+    object-fit: cover;
   }
 
   .detail-peek__identity-copy {

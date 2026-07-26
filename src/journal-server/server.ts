@@ -1,3 +1,4 @@
+import path from 'node:path';
 import fastifyCookie from '@fastify/cookie';
 import fastifyMultipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
@@ -23,6 +24,8 @@ import { registerInternalRoutes } from './routes/internal.js';
 import { registerMediaRoutes } from './routes/media.js';
 import { registerPrivateEntryRoutes } from './routes/privateEntries.js';
 import { registerPublicFeedRoutes } from './routes/publicFeed.js';
+import { registerSiteProfileRoutes } from './routes/siteProfile.js';
+import { JournalSiteProfileService } from './siteProfileService.js';
 import { JournalStorage } from './storage.js';
 import { TelegramFileDownloader } from './telegramFiles.js';
 import type { JournalServerConfig } from './types.js';
@@ -32,6 +35,7 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
   const server = Fastify({ logger: true });
   const database = openJournalDatabase(config.dataDir);
   const repository = new JournalRepository(database);
+  const siteProfileService = new JournalSiteProfileService(repository);
   const auth = new JournalAuth(config.ingestToken, config.adminPassword);
   const storage = new JournalStorage(config.dataDir);
   const previews = new JournalImagePreviewService();
@@ -47,6 +51,7 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
     previews,
   );
   await new JournalImagePreviewBackfillService(repository, storage, previews).run();
+  await siteProfileService.initialize(path.join(config.webRoot, 'avatar-ming.png'));
 
   await server.register(fastifyCookie, { secret: config.cookieSecret });
   await server.register(fastifyMultipart, {
@@ -86,7 +91,8 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
   );
   await registerArticleRoutes(server, auth, articleService);
   await registerMediaRoutes(server, auth, repository, config.dataDir);
-  await registerFeedRoutes(server, repository, config.publicBaseUrl);
+  await registerSiteProfileRoutes(server, auth, siteProfileService);
+  await registerFeedRoutes(server, repository, siteProfileService, config.publicBaseUrl);
 
   const sendApplication = async (_request: FastifyRequest, reply: FastifyReply) => {
     reply.header('Cache-Control', 'no-cache');
@@ -95,6 +101,7 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
   server.get('/', sendApplication);
   server.get('/p/:publicId', sendApplication);
   server.get('/me', sendApplication);
+  server.get('/me/settings', sendApplication);
   server.get('/me/articles/new', sendApplication);
   server.get('/me/articles/:id/edit', sendApplication);
   server.get('/me/entries/new', sendApplication);

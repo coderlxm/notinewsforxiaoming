@@ -357,6 +357,20 @@ const migrations: JournalMigration[] = [
       `);
     },
   },
+  {
+    version: 5,
+    up(database) {
+      database.exec(`
+        CREATE TABLE journal_site_profile (
+          id INTEGER PRIMARY KEY CHECK (id = 1),
+          bio TEXT NOT NULL CHECK (length(bio) <= 120),
+          avatar_webp BLOB NOT NULL,
+          avatar_revision INTEGER NOT NULL CHECK (avatar_revision > 0),
+          updated_at TEXT NOT NULL
+        );
+      `);
+    },
+  },
 ];
 
 export function runJournalMigrations(database: Database.Database): void {

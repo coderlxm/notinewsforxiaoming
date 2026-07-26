@@ -3,6 +3,7 @@ import { Feed } from 'feed';
 import type { JournalEntry } from '../../shared/journalProtocol.js';
 import type { JournalRepository } from '../repository.js';
 import { generateArticleHtml } from '../richText.js';
+import type { JournalSiteProfileService } from '../siteProfileService.js';
 
 function itemTitle(entry: JournalEntry): string {
   if (entry.title) return entry.title;
@@ -25,11 +26,15 @@ function itemDescription(entry: JournalEntry): string {
   return entry.contentText;
 }
 
-function buildFeed(repository: JournalRepository, publicBaseUrl: string): Feed {
+function buildFeed(
+  repository: JournalRepository,
+  siteProfileService: JournalSiteProfileService,
+  publicBaseUrl: string,
+): Feed {
   const entries = repository.list({ visibility: 'public', limit: 50 }).entries;
   const feed = new Feed({
     title: '小明同学',
-    description: '姚黄魏紫开次第，不觉成恨俱零凋',
+    description: siteProfileService.getProfile().bio,
     id: publicBaseUrl,
     link: publicBaseUrl,
     language: 'zh-CN',
@@ -68,15 +73,16 @@ function buildFeed(repository: JournalRepository, publicBaseUrl: string): Feed {
 export async function registerFeedRoutes(
   server: FastifyInstance,
   repository: JournalRepository,
+  siteProfileService: JournalSiteProfileService,
   publicBaseUrl: string,
 ): Promise<void> {
   server.get('/rss.xml', async (_request, reply) => {
     reply.type('application/rss+xml; charset=utf-8');
-    return buildFeed(repository, publicBaseUrl).rss2();
+    return buildFeed(repository, siteProfileService, publicBaseUrl).rss2();
   });
 
   server.get('/feed.json', async (_request, reply) => {
     reply.type('application/feed+json; charset=utf-8');
-    return buildFeed(repository, publicBaseUrl).json1();
+    return buildFeed(repository, siteProfileService, publicBaseUrl).json1();
   });
 }

@@ -198,3 +198,12 @@ export const journalApiErrorSchema = z.object({
   error: z.string().min(1),
 });
 export type JournalApiError = z.infer<typeof journalApiErrorSchema>;
+
+export const journalSiteProfileBioSchema = z.string().trim().max(120);
+
+export const journalSiteProfileSchema = z.object({
+  bio: journalSiteProfileBioSchema,
+  avatarUrl: z.string().min(1),
+  updatedAt: z.string().datetime(),
+});
+export type JournalSiteProfile = z.infer<typeof journalSiteProfileSchema>;

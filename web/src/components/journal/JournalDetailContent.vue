@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import { storeToRefs } from 'pinia';
 import { computed, shallowRef, watch } from 'vue';
 import RichArticleRenderer from '../article/RichArticleRenderer.vue';
 import JournalLoading from '../ui/JournalLoading.vue';
+import { useSiteProfileStore } from '../../stores/siteProfile';
 import type { JournalAsset, JournalEntry, JournalVisibility } from '../../types';
 import { formatEntryTime, formatStructuredValue } from '../../utils/formatters';
 import CardActionMenu from './CardActionMenu.vue';
@@ -15,6 +17,9 @@ const props = defineProps<{
   hasLeadingStage: boolean;
   supplementalAssets: readonly JournalAsset[];
 }>();
+
+const siteProfile = useSiteProfileStore();
+const { profile } = storeToRefs(siteProfile);
 
 const emit = defineEmits<{
   selectTag: [tag: string];
@@ -92,7 +97,7 @@ function requestPublishedTimeEditing(): void {
   >
     <header class="detail-content__header">
       <div class="detail-content__identity">
-        <img class="detail-content__avatar" src="/avatar-ming.png" alt="">
+        <img v-if="profile" class="detail-content__avatar" :src="profile.avatarUrl" alt="">
         <div class="detail-content__identity-copy">
           <strong>小明同学</strong>
           <time :datetime="entry.sourceCreatedAt">{{ formattedTime }}</time>
@@ -261,6 +266,7 @@ function requestPublishedTimeEditing(): void {
   height: 38px;
   flex: none;
   border-radius: 50%;
+  object-fit: cover;
 }
 
 .detail-content__identity-copy {

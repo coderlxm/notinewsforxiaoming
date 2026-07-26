@@ -72,6 +72,12 @@ export interface JournalApiError {
   error: string;
 }
 
+export interface SiteProfile {
+  bio: string;
+  avatarUrl: string;
+  updatedAt: string;
+}
+
 export interface FeedFilters {
   visibility: 'all' | JournalVisibility;
   query: string;

@@ -127,6 +127,20 @@ export interface CoverAssetRecord {
   previewRelativePath: string;
 }
 
+export interface JournalSiteProfileRecord {
+  bio: string;
+  avatarWebp: Buffer;
+  avatarRevision: number;
+  updatedAt: string;
+}
+
+interface SiteProfileRow {
+  bio: string;
+  avatar_webp: Buffer;
+  avatar_revision: number;
+  updated_at: string;
+}
+
 const cursorSchema = z.object({
   pinned: z.union([z.literal(0), z.literal(1)]),
   sourceCreatedAt: z.string().datetime(),
@@ -737,6 +751,51 @@ export class JournalRepository {
     }
   }
 
+  getSiteProfileOrNull(): JournalSiteProfileRecord | null {
+    const row = this.database.prepare(`
+      SELECT bio, avatar_webp, avatar_revision, updated_at
+      FROM journal_site_profile
+      WHERE id = 1
+    `).get() as SiteProfileRow | undefined;
+    return row ? this.toSiteProfile(row) : null;
+  }
+
+  initializeSiteProfile(bio: string, avatarWebp: Buffer, updatedAt: string): void {
+    this.database.prepare(`
+      INSERT INTO journal_site_profile (
+        id, bio, avatar_webp, avatar_revision, updated_at
+      ) VALUES (1, ?, ?, 1, ?)
+    `).run(bio, avatarWebp, updatedAt);
+  }
+
+  updateSiteProfile(input: {
+    bio: string;
+    avatarWebp: Buffer | null;
+    updatedAt: string;
+  }): JournalSiteProfileRecord {
+    const update = this.database.transaction(() => {
+      const result = input.avatarWebp === null
+        ? this.database.prepare(`
+            UPDATE journal_site_profile
+            SET bio = ?, updated_at = ?
+            WHERE id = 1
+          `).run(input.bio, input.updatedAt)
+        : this.database.prepare(`
+            UPDATE journal_site_profile
+            SET bio = ?,
+                avatar_webp = ?,
+                avatar_revision = avatar_revision + 1,
+                updated_at = ?
+            WHERE id = 1
+          `).run(input.bio, input.avatarWebp, input.updatedAt);
+      if (result.changes !== 1) {
+        throw new Error('Journal site profile was not initialized.');
+      }
+    });
+    update();
+    return this.getRequiredSiteProfile();
+  }
+
   private getById(id: number): JournalEntry {
     const row = this.findRowById(id);
     if (!row) throw new Error(`Journal entry ${id} does not exist.`);
@@ -947,5 +1006,20 @@ export class JournalRepository {
           AND grouped.media_group_id = ${alias}.media_group_id
       )
     )`;
+  }
+
+  private getRequiredSiteProfile(): JournalSiteProfileRecord {
+    const profile = this.getSiteProfileOrNull();
+    if (!profile) throw new Error('Journal site profile was not initialized.');
+    return profile;
+  }
+
+  private toSiteProfile(row: SiteProfileRow): JournalSiteProfileRecord {
+    return {
+      bio: row.bio,
+      avatarWebp: row.avatar_webp,
+      avatarRevision: row.avatar_revision,
+      updatedAt: row.updated_at,
+    };
   }
 }

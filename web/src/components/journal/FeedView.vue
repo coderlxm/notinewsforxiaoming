@@ -351,6 +351,14 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
               v-if="journal.authenticationState.value === 'authenticated'"
               class="button button--quiet"
               type="button"
+              @click="router.push({ name: 'settings' })"
+            >
+              设置
+            </button>
+            <button
+              v-if="journal.authenticationState.value === 'authenticated'"
+              class="button button--quiet"
+              type="button"
               :disabled="journal.loading.value"
               :aria-busy="loggingOut"
               @click="logout"

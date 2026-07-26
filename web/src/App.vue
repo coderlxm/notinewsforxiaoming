@@ -5,7 +5,9 @@ import { useRoute, useRouter } from 'vue-router';
 import ArticleEditorView from './components/article/ArticleEditorView.vue';
 import FeedView from './components/journal/FeedView.vue';
 import EntryPublisherView from './components/publisher/EntryPublisherView.vue';
+import SiteProfileSettingsView from './components/settings/SiteProfileSettingsView.vue';
 import { useSessionStore } from './stores/session';
+import { useSiteProfileStore } from './stores/siteProfile';
 import type { JournalEntry } from './types';
 
 type AppRoute =
@@ -16,6 +18,7 @@ type AppRoute =
   | { name: 'entry-edit'; key: string; entryId: number }
   | { name: 'article-new'; key: string }
   | { name: 'article-edit'; key: string; articleId: number }
+  | { name: 'settings'; key: string }
   | { name: 'not-found'; key: string };
 
 type FeedRoute = Extract<AppRoute, { name: 'public' | 'private' }>;
@@ -29,7 +32,9 @@ interface OverlayContext {
 const currentRoute = useRoute();
 const router = useRouter();
 const session = useSessionStore();
+const siteProfile = useSiteProfileStore();
 const { ownerAuthenticated } = storeToRefs(session);
+const { profile, loadError: profileLoadError } = storeToRefs(siteProfile);
 const overlayContext = shallowRef<OverlayContext | null>(null);
 const directPublicEntry = shallowRef<JournalEntry | null>(null);
 const contentScroll = useTemplateRef<HTMLDivElement>('contentScroll');
@@ -61,6 +66,9 @@ const route = computed<AppRoute>(() => {
   if (currentRoute.name === 'article-edit') {
     const articleId = Number(currentRoute.params.articleId);
     return { name: 'article-edit', key: `article-edit:${articleId}`, articleId };
+  }
+  if (currentRoute.name === 'settings') {
+    return { name: 'settings', key: 'settings' };
   }
   if (currentRoute.name === 'detail') {
     const publicId = String(currentRoute.params.publicId);
@@ -124,7 +132,8 @@ const isPrivateRoute = computed(() =>
   || route.value.name === 'entry-new'
   || route.value.name === 'entry-edit'
   || route.value.name === 'article-new'
-  || route.value.name === 'article-edit',
+  || route.value.name === 'article-edit'
+  || route.value.name === 'settings',
 );
 const showProfileNavigation = computed(() => isPrivateRoute.value || ownerAuthenticated.value);
 
@@ -253,7 +262,10 @@ const removeAfterEach = router.afterEach((to, from) => {
   if (to.fullPath !== from.fullPath) handleRouteChange(to.fullPath, from.fullPath);
 });
 
-onMounted(() => session.load());
+onMounted(() => {
+  void session.load();
+  void siteProfile.load();
+});
 onUnmounted(removeAfterEach);
 </script>
 
@@ -261,12 +273,23 @@ onUnmounted(removeAfterEach);
   <div class="app-shell">
     <div class="profile-bar">
       <header class="profile">
-        <button class="profile__home" type="button" aria-label="返回公开首页" @click="navigate('/')">
-          <img class="profile__avatar" src="/avatar-ming.png" alt="小明同学">
-        </button>
-        <div class="profile__copy">
+        <template v-if="profile">
+          <button class="profile__home" type="button" aria-label="返回公开首页" @click="navigate('/')">
+            <img class="profile__avatar" :src="profile.avatarUrl" alt="小明同学">
+          </button>
+          <div class="profile__copy">
+            <button class="profile__name" type="button" @click="navigate('/')">小明同学</button>
+            <p v-if="profile.bio" class="profile__bio">{{ profile.bio }}</p>
+          </div>
+        </template>
+        <div
+          v-else
+          class="profile__status"
+          :class="{ 'profile__status--error': profileLoadError }"
+          :role="profileLoadError ? 'alert' : 'status'"
+        >
           <button class="profile__name" type="button" @click="navigate('/')">小明同学</button>
-          <p class="profile__bio">姚黄魏紫开次第，不觉成恨俱零凋</p>
+          <span>{{ profileLoadError ? `公开资料加载失败：${profileLoadError}` : '正在读取公开资料…' }}</span>
         </div>
         <nav v-if="showProfileNavigation" class="profile__nav" aria-label="主导航">
           <button
@@ -282,9 +305,9 @@ onUnmounted(removeAfterEach);
           <button
             v-if="isPrivateRoute || ownerAuthenticated"
             class="profile__nav-link"
-            :class="{ 'profile__nav-link--active': route.name === 'private' || route.name === 'entry-new' || route.name === 'entry-edit' || route.name === 'article-new' || route.name === 'article-edit' }"
+            :class="{ 'profile__nav-link--active': isPrivateRoute }"
             type="button"
-            :aria-current="route.name === 'private' || route.name === 'entry-new' || route.name === 'entry-edit' || route.name === 'article-new' || route.name === 'article-edit' ? 'page' : undefined"
+            :aria-current="isPrivateRoute ? 'page' : undefined"
             @click="navigate('/me')"
           >
             我的资产
@@ -335,6 +358,10 @@ onUnmounted(removeAfterEach);
         v-else-if="route.name === 'entry-edit'"
         :key="route.key"
         :entry-id="route.entryId"
+      />
+      <SiteProfileSettingsView
+        v-else-if="route.name === 'settings'"
+        :key="route.key"
       />
       <main v-else-if="route.name === 'not-found'" class="not-found">
         <span class="not-found__code">404</span>
@@ -430,10 +457,28 @@ onUnmounted(removeAfterEach);
   height: 3rem;
   border-radius: 50%;
   box-shadow: 0 0 0 1px var(--border-strong);
+  object-fit: cover;
 }
 
 .profile__copy {
   min-width: 0;
+}
+
+.profile__status {
+  display: grid;
+  min-width: 0;
+  grid-column: 1 / 3;
+  gap: 0.14rem;
+  color: var(--text-muted);
+  font-size: 0.74rem;
+}
+
+.profile__status .profile__name {
+  justify-self: start;
+}
+
+.profile__status--error {
+  color: var(--danger);
 }
 
 .profile__name {

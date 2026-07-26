@@ -5,6 +5,7 @@ export const router = createRouter({
   routes: [
     { path: '/', name: 'public' },
     { path: '/me', name: 'private' },
+    { path: '/me/settings', name: 'settings' },
     { path: '/me/entries/new', name: 'entry-new' },
     { path: '/me/entries/:entryId(\\d+)/edit', name: 'entry-edit' },
     { path: '/me/articles/new', name: 'article-new' },

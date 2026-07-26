@@ -8,6 +8,7 @@ import type {
   JournalRichDocument,
   JournalVisibility,
   OnThisDayResponse,
+  SiteProfile,
 } from './types';
 
 export class JournalRequestError extends Error {
@@ -81,6 +82,20 @@ export function fetchPublicEntry(publicId: string): Promise<JournalEntry> {
 
 export function fetchAuthenticationState(): Promise<{ authenticated: boolean }> {
   return requestJson<{ authenticated: boolean }>('/api/auth/session');
+}
+
+export function fetchSiteProfile(): Promise<SiteProfile> {
+  return requestJson<SiteProfile>('/api/site-profile');
+}
+
+export function updateSiteProfile(input: {
+  bio: string;
+  avatar: File | null;
+}): Promise<SiteProfile> {
+  const form = new FormData();
+  form.append('bio', input.bio);
+  if (input.avatar !== null) form.append('avatar', input.avatar);
+  return requestJson<SiteProfile>('/api/me/site-profile', { method: 'PATCH', body: form });
 }
 
 export function login(password: string): Promise<void> {
