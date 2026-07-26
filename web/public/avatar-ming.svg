@@ -15,5 +15,5 @@
   <circle cx="256" cy="256" r="248" fill="url(#background)"/>
   <circle cx="256" cy="256" r="248" fill="url(#light)"/>
   <circle cx="256" cy="256" r="244" fill="none" stroke="#fff" stroke-opacity="0.32" stroke-width="8"/>
-  <text x="256" y="334" fill="#fffaf4" font-family="STKaiti, KaiTi, serif" font-size="224" font-weight="600" text-anchor="middle">明</text>
+  <text x="224" y="334" fill="#fffaf4" font-family="STKaiti, KaiTi, serif" font-size="224" font-weight="600" text-anchor="middle">明</text>
 </svg>
