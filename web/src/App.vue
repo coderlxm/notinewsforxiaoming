@@ -686,8 +686,8 @@ onUnmounted(removeAfterEach);
 
 @media (max-width: 599px) {
   .profile {
-    grid-template-columns: auto minmax(0, 1fr);
-    gap: 0.6rem;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    gap: 0.45rem;
     padding: 0.8rem 0 0.72rem;
   }
 
@@ -705,17 +705,30 @@ onUnmounted(removeAfterEach);
 
   .profile__name {
     font-size: 0.92rem;
+    white-space: nowrap;
   }
 
   .profile__nav {
-    grid-column: 1 / -1;
+    grid-column: auto;
+    justify-self: end;
     justify-content: flex-end;
-    gap: 0.65rem;
+    gap: 0.5rem;
   }
 
   .profile__nav-link {
     min-height: 2.25rem;
-    font-size: 0.72rem;
+    font-size: 0.7rem;
+    white-space: nowrap;
+  }
+
+  .profile__nav-link--inbox {
+    position: relative;
+  }
+
+  .profile__nav-count {
+    position: absolute;
+    top: -0.05rem;
+    right: -0.45rem;
   }
 }
 </style>
