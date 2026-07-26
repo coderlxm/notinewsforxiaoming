@@ -10,10 +10,10 @@ import { JournalContributionError } from './contributionError.js';
 import type { EntryStorageSession, JournalStorage } from './storage.js';
 
 const execFileAsync = promisify(execFile);
-const maxImagePixels = 25_000_000;
-const maxImageBytes = 20 * 1024 * 1024;
-const maxVideoBytes = 70 * 1024 * 1024;
-const maxVideoDuration = 90;
+const maxImagePixels = 50_000_000;
+const maxImageBytes = 40 * 1024 * 1024;
+const maxVideoBytes = 90 * 1024 * 1024;
+const maxVideoDuration = 300;
 
 const ffprobeSchema = z.object({
   format: z.object({
@@ -211,7 +211,7 @@ export class JournalContributionMediaService {
     if (source.byteSize > maxVideoBytes) {
       throw new JournalContributionError(
         'FILE_TOO_LARGE',
-        `${source.sourceName} 超过 70 MiB。`,
+        `${source.sourceName} 超过 90 MiB。`,
         400,
         source.sourceName,
       );
@@ -273,7 +273,7 @@ export class JournalContributionMediaService {
     if (duration > maxVideoDuration) {
       throw new JournalContributionError(
         'VIDEO_DURATION_EXCEEDED',
-        `${source.sourceName} 超过 90 秒。`,
+        `${source.sourceName} 超过 5 分钟。`,
         400,
         source.sourceName,
       );
@@ -371,7 +371,7 @@ export class JournalContributionMediaService {
     if (source.byteSize > maxImageBytes) {
       throw new JournalContributionError(
         'FILE_TOO_LARGE',
-        `${source.sourceName} 图片超过 20 MiB。`,
+        `${source.sourceName} 图片超过 40 MiB。`,
         400,
         source.sourceName,
       );
@@ -394,7 +394,7 @@ export class JournalContributionMediaService {
     if (width * height > maxImagePixels) {
       throw new JournalContributionError(
         'IMAGE_PIXEL_LIMIT_EXCEEDED',
-        `${filename} 超过 25 MP。`,
+        `${filename} 超过 50 MP。`,
         400,
         filename,
       );

@@ -7,7 +7,7 @@
 - 产品定位：让朋友把手机里的文字、照片和短视频直接送到小明的 Journal 投稿箱，由小明确认后发布
 - 用户规模：最多 5 位已知朋友，不按开放投稿平台设计
 - 输入前提：朋友使用的文件格式和大小可以事先约定，不为未知公众输入设计复杂兼容路径
-- 硬件边界：沿用当前 Journal 单容器 `1 CPU / 512 MB`、SQLite、本地磁盘、Cloudflare 与 OpenResty
+- 硬件边界：Journal 单容器 `1 CPU / 1 GB`、SQLite、本地磁盘、Cloudflare 与 OpenResty
 - 与旧方案的关系：本文件是首期实施依据；`journal-friend-contribution-inbox.md` 只保留为未来大文件边界参考
 - 与性能版的关系：`journal-friend-mobile-contribution-inbox-performance-extreme.md` 只供未来升级硬件时参考，不把其中的高并发和转码设计提前带入首期
 
@@ -18,13 +18,13 @@
 ### 1.1 固定决策
 
 1. 不建设“上传草稿系统”。选择中的文件只保存在当前页面，点击送达后才上传。
-2. 整份投稿使用一次 `multipart/form-data` 请求，不使用 tus、分块上传、断点续传、上传指纹或状态轮询。
-3. 单次请求全部文件总量不超过 80 MiB，明确低于 Cloudflare Free/Pro 的 100 MB 单请求上限。
+2. 点击送达后创建进程内上传会话，素材逐个使用独立 `multipart/form-data` 请求上传；不使用 tus、分块上传、断点续传、上传指纹或状态轮询。
+3. 单个视频请求不超过 90 MiB，明确低于 Cloudflare Free/Pro 的 100 MB 单请求上限；服务端累计整份投稿不超过 500 MiB。
 4. 客户端只检查数量、扩展名和大小，不加载 `mediainfo.js`，不在浏览器中分析视频编码。
 5. 服务端流式接收文件到临时目录，不调用 `part.toBuffer()`，不在 Node.js 内存中形成完整媒体副本。
 6. JPEG、PNG、WebP 和 HEIC/HEIF 仍由服务端生成 Journal 展示图，源文件不归档。
 7. 合规的 H.264 和 HEVC 视频都只做 MP4 容器整理与流复制，不因为 HEVC 名称本身转码成 H.264。
-8. 媒体按顺序处理；全局最多有一份投稿进入媒体处理，不建设持久任务队列。
+8. 媒体随单文件请求按顺序处理；全局最多有一个素材进入媒体处理，不建设持久任务队列。
 9. 页面只表达“正在上传”“服务器正在整理”“已送达”或具体失败，不展示伪造的服务端百分比。
 10. 媒体与 SQLite 已提交即表示投稿送达；Telegram 只在送达后提醒小明。
 11. 不自动重试、不切换上传通道、不降低输出要求、不跳过失败文件。
@@ -41,8 +41,8 @@
 - 不需要在浏览器里提前识别所有媒体边界；
 - 可以通过清楚约定格式和大小，把极少发生的非法输入交给服务端直接拒绝。
 
-首期接受一个明确取舍：如果整次请求失败，页面保留已经填写的文字和本地文件选择，
-由朋友明确再次点击提交；不会自动恢复已经传输的字节。
+首期接受一个明确取舍：如果任一请求失败，服务端丢弃本次上传会话，页面保留已经填写
+的文字和本地文件选择，由朋友明确再次点击提交；不会自动恢复已经传输的字节。
 
 ## 2. 证据与设计判断
 
@@ -56,7 +56,7 @@
 - 现有普通发布接口通过 `part.toBuffer()` 读取小图片；投稿路由不能复用这段完整 Buffer 路径；
 - 数据库为 SQLite WAL；
 - 已有本地资产目录、图片预览、媒体鉴权与 Range 响应；
-- 当前 Journal 容器限制为 `1 CPU / 512 MB`；
+- 当前 Journal 容器限制为 `1 CPU / 1 GB`；
 - OpenResty 当前全局 `client_max_body_size` 为 `210m`；
 - 每日 04:50 的备份会停止 Journal 容器并复制 `/opt/journal/data`。
 
@@ -71,8 +71,8 @@
   [Debian libheif-examples](https://packages.debian.org/bookworm/libheif-examples)。
 - Safari 对 HEVC 支持成熟；Chromium 也支持 HEVC，但要求浏览器、操作系统和硬件提供对应能力。首期接受这一设备前提，不再为了覆盖所有浏览器把 HEVC 统一转码为 H.264。参考：[WebKit media support](https://webkit.org/blog/15063/webkit-features-in-safari-17-4/)、
   [Chromium audio/video](https://www.chromium.org/audio-video/)。
-- Cloudflare Free 和 Pro 的单请求体上限为 100 MB。80 MiB 文件总量加 multipart
-  开销仍留有明确余量。参考：[Cloudflare request limits](https://developers.cloudflare.com/workers/platform/limits/#request-and-response-limits)。
+- Cloudflare Free 和 Pro 的单请求体上限为 100 MB。90 MiB 单文件加 multipart
+  开销仍留有明确余量；500 MiB 总量通过逐文件请求累计。参考：[Cloudflare request limits](https://developers.cloudflare.com/workers/platform/limits/#request-and-response-limits)。
 - `@fastify/multipart` 支持按流消费 multipart 文件，不要求将文件读取成 Buffer。
   参考：[`@fastify/multipart`](https://github.com/fastify/fastify-multipart)。
 
@@ -124,15 +124,15 @@
 |---|---:|
 | 称呼 | 必填，1–24 个字符 |
 | 正文 | 最多 2,000 个字符 |
-| 素材总数 | 最多 12 项 |
-| 视频数量 | 最多 2 项 |
-| 全部文件总量 | 不超过 80 MiB |
+| 素材总数 | 最多 30 项 |
+| 视频数量 | 最多 5 项 |
+| 全部文件总量 | 不超过 500 MiB |
 | 分享链接有效期 | 72 小时 |
 
 正文和素材至少有一个非空。仅文字、仅照片、仅视频和混合投稿都允许。
 
-80 MiB 是整次请求中所有文件的字节总和，不是单个文件额度。页面在请求发出前完成
-计算；服务端在接收过程中再次累计，超出后直接终止请求。
+500 MiB 是一份上传会话中所有源文件的字节总和，不是单个文件额度。页面在请求发出前
+完成计算；服务端每接收一个文件后再次累计，超出后直接终止本次上传会话。
 
 ### 4.2 照片
 
@@ -140,8 +140,8 @@
 |---|---|
 | 扩展名 | `.jpg`、`.jpeg`、`.png`、`.webp`、`.heic`、`.heif` |
 | 真实格式 | JPEG、PNG、静态 WebP、单张 HEIC/HEIF |
-| 单文件大小 | 不超过 20 MiB |
-| 像素 | 不超过 25 MP |
+| 单文件大小 | 不超过 40 MiB |
+| 像素 | 不超过 50 MP |
 | 正式输出 | 最长边 2,560 px、WebP quality 82 |
 | 预览输出 | 最长边 320 px、WebP quality 60 |
 | 元数据 | 删除 EXIF、GPS、设备与编辑信息 |
@@ -151,9 +151,8 @@
 
 - 动图和多页图片；
 - Live Photo 动态部分；
-- 48 MP 高分辨率模式；
 - RAW、DNG、ProRAW、TIFF、PSD；
-- 专业相机原片。
+- 超过 50 MP 的专业相机照片。
 
 页面持续说明：
 
@@ -166,8 +165,8 @@
 | 容器 | MP4、MOV |
 | 视频编码 | H.264/AVC；HEVC/H.265 Main 或 Main10 |
 | 音频 | AAC 或无音频 |
-| 单文件大小 | 不超过 70 MiB |
-| 时长 | 不超过 90 秒 |
+| 单文件大小 | 不超过 90 MiB |
+| 时长 | 不超过 5 分钟 |
 | 最大画面 | 3,840 × 2,160 |
 | 最大帧率 | 60 fps |
 | 色彩 | SDR |
@@ -331,11 +330,11 @@ Vite 通过 `build.rolldownOptions.input` 同时构建现有入口和投稿入�
 点击后：
 
 1. 锁定表单、文件增删和排序；
-2. 创建一个 `FormData`；
-3. 先加入称呼、正文和素材顺序，再按顺序加入文件；
-4. 使用一个 `XMLHttpRequest` 发出请求；
-5. 上传期间显示总字节进度；
-6. 请求体发送完毕后显示“服务器正在整理”；
+2. 创建一个进程内上传会话；
+3. 按当前顺序为每个文件创建独立 `FormData`；
+4. 使用 `XMLHttpRequest` 逐个上传文件；
+5. 用已完成文件字节与当前请求进度计算整份投稿的总字节进度；
+6. 所有素材上传并整理完毕后，以 JSON 提交称呼和正文；
 7. 收到成功响应后原地切换为成功页；
 8. 收到错误后显示服务端的具体错误并重新解锁表单。
 
@@ -360,8 +359,8 @@ idle
 loaded / total
 ```
 
-`xhr.upload` 完成只表示文件已经发送，不表示投稿成功。等待响应期间只显示
-“服务器正在整理”，不估算图片或视频处理百分比。
+单个 `xhr.upload` 完成只表示当前文件已经发送，不表示素材已经整理或投稿成功。
+全部素材请求成功后显示“服务器正在整理”，不估算最终提交百分比。
 
 不存在每项素材的 `queued`、`processing`、`ready` 服务端状态，也不存在
 `paused`、`retrying`、`resuming` 或 `degraded`。
@@ -397,46 +396,60 @@ loaded / total
 
 ### 7.1 请求
 
-朋友端只有一个写接口：
+朋友端使用三个写入步骤：
 
 ```text
-POST /api/contributions
+POST /api/contribution-uploads
+Authorization: Bearer <share-token>
+
+POST /api/contribution-uploads/:uploadId/assets
 Content-Type: multipart/form-data
+Authorization: Bearer <share-token>
+
+POST /api/contributions
+Content-Type: application/json
 Authorization: Bearer <share-token>
 ```
 
-multipart 字段：
+单文件 multipart 字段：
 
 ```text
-senderName
-contentText
-assetOrder
-assets[]
+asset
 ```
 
-不增加创建草稿、上传素材、读取状态、删除远端草稿素材或最终提交等分段接口。
+最终 JSON 字段：
+
+```text
+uploadId
+senderName
+contentText
+```
+
+上传会话只存在于当前 Journal 进程和临时目录，不写入 SQLite，不提供读取状态、暂停、
+恢复或远端素材编辑接口。
 
 ### 7.2 Fastify 接收
 
-投稿路由使用 `@fastify/multipart` 的流式 parts API，并设置独立限制：
+素材路由使用 `@fastify/multipart` 的流式 parts API，并设置独立限制：
 
-- 最多 12 个文件；
-- 单文件最大 70 MiB；
-- 文件总量最大 80 MiB；
+- 每个请求只有 1 个文件；
+- 单文件最大 90 MiB；
+- 上传会话最多 30 个文件、5 个视频；
+- 上传会话源文件总量最大 500 MiB；
 - 字段数量和字段长度按第 4.1 节限制；
 - 遇到超限立即结束请求。
 
 处理顺序：
 
 1. 校验分享令牌；
-2. 创建仅属于当前请求的临时目录；
-3. 逐个读取 part；
-4. 文本字段进入小型普通对象；
-5. 文件 part 直接通过 Node stream 写入临时文件；
-6. 写入过程中累计单文件与整次请求字节；
-7. multipart 完整结束后检查正文、数量和顺序；
-8. 进入全局单并发媒体处理区；
-9. 所有媒体完成后创建投稿记录。
+2. 创建进程内上传会话；
+3. 每个素材请求创建独立源文件临时目录；
+4. 文件 part 直接通过 Node stream 写入临时文件；
+5. 累计会话的素材数量、视频数量和源文件字节；
+6. 当前素材进入全局单并发媒体处理区；
+7. 当前素材处理完成后删除其源文件；
+8. 所有素材请求完成后校验最终正文；
+9. 移动正式资产目录并创建投稿记录。
 
 禁止：
 
@@ -445,17 +458,17 @@ assets[]
 - Blob 转 base64；
 - 完整媒体 Buffer；
 - 全文件哈希；
-- multipart 之外的第二套上传协议。
+- tus、分块拼接或另一条上传通道。
 
 ### 7.3 单并发处理
 
-使用一个成熟的 `p-limit(1)` 包住整份投稿的媒体处理阶段。
+使用一个成熟的 `p-limit(1)` 包住单个素材的媒体处理阶段。
 
-它只解决当前 `1 CPU / 512 MB` 下两份请求偶然同时到达的问题：
+它只解决当前 `1 CPU / 1 GB` 下两份请求偶然同时到达的问题：
 
 - 上传仍可同时流式落盘；
-- 一次只整理一份投稿；
-- 投稿内媒体严格按顺序处理；
+- 一次只整理一个素材；
+- 朋友端严格按投稿顺序发出素材请求；
 - 请求等待的是当前进程内 Promise；
 - 不持久化任务；
 - 不建立消费者服务；
@@ -479,7 +492,7 @@ assets[]
 JPEG、PNG、WebP：
 
 1. Sharp 从临时文件路径读取；
-2. 确认单页、真实格式和 25 MP 上限；
+2. 确认单页、真实格式和 50 MP 上限；
 3. 应用方向；
 4. 转换到 sRGB；
 5. 去除全部 metadata；
@@ -493,7 +506,7 @@ HEIC、HEIF：
 3. Sharp 按相同规则生成两个 WebP；
 4. 删除中间 JPEG。
 
-Sharp 的 `limitInputPixels` 固定为 25 MP。图片逐张处理，`heif-convert` 与 Sharp
+Sharp 的 `limitInputPixels` 固定为 50 MP。图片逐张处理，`heif-convert` 与 Sharp
 不同时运行。
 
 ### 8.3 视频
@@ -527,7 +540,7 @@ FFmpeg 失败即本次投稿失败。不得转码、降低分辨率、丢弃不�
 /data/assets/.tmp/<contribution-public-id>/
 ```
 
-全部媒体成功后，同一投稿目录移动到：
+最终提交成功时，同一投稿目录移动到：
 
 ```text
 /data/assets/<year>/<month>/<contribution-public-id>/
@@ -542,7 +555,7 @@ FFmpeg 失败即本次投稿失败。不得转码、降低分辨率、丢弃不�
 
 服务端只有在以下条件全部成立后返回成功：
 
-1. multipart 完整接收；
+1. 上传会话中的全部单文件请求完整接收；
 2. 所有文件真实格式合规；
 3. 所有图片和视频处理完成；
 4. 正式资产目录已经就绪；
@@ -564,7 +577,7 @@ Telegram 提醒不属于送达事务。数据库提交成功即表示投稿送�
 - 不自动重新发送；
 - 返回具体文件名和业务错误。
 
-这是小规模、受控输入下换取单请求实现的明确行为。
+这是小规模、受控输入下换取简单逐文件实现的明确行为。
 
 ### 9.3 错误格式
 
@@ -679,7 +692,9 @@ journal_contribution_assets(contribution_id, sort_order, id)
 | 方法 | 路径 | 作用 |
 |---|---|---|
 | `GET` | `/api/contribution-link` | 校验分享令牌并返回限制摘要 |
-| `POST` | `/api/contributions` | 一次上传并提交完整投稿 |
+| `POST` | `/api/contribution-uploads` | 创建当前进程内的临时上传会话 |
+| `POST` | `/api/contribution-uploads/:uploadId/assets` | 上传并整理一个素材 |
+| `POST` | `/api/contributions` | 提交正文与已整理素材 |
 
 正文不自动保存。朋友端 API 不使用管理员 Cookie。
 
@@ -868,17 +883,17 @@ useContributionSubmit.ts
 
 ### 16.1 OpenResty
 
-只为提交接口增加：
+只为素材上传接口增加：
 
 ```text
-/api/contributions
-  client_max_body_size 85m
+/api/contribution-uploads/:uploadId/assets
+  client_max_body_size 95m
   proxy_request_buffering off
   proxy_buffering off
 ```
 
-85 MiB 为 80 MiB 文件总量、文本字段和 multipart 边界留出余量。该配置不影响其他
-JSON API，也不保留现有 `210m` 作为投稿额度。
+95 MiB 为 90 MiB 单文件和 multipart 边界留出余量。最终 `/api/contributions` 是
+小型 JSON 请求，独立限制为 1 MiB；500 MiB 投稿总量由 Journal 上传会话累计。
 
 投稿页面与 API 增加：
 
@@ -899,7 +914,7 @@ JSON API，也不保留现有 `210m` 作为投稿额度。
 - Stream；
 - 备用通道。
 
-如果以后真实投稿经常超过 80 MiB，才重新评估分块上传；不在首期同时维护两套协议。
+如果单个真实视频经常超过 90 MiB，才重新评估分块上传；不在当前版本同时维护两套协议。
 
 ### 16.3 Docker
 
@@ -909,7 +924,7 @@ JSON API，也不保留现有 `210m` 作为投稿额度。
 - Debian `libheif-examples`；
 - HEIC 解码所需运行库。
 
-不编译自定义 libvips，不增加 GPU 映射。当前 CPU 和内存限制保持不变。
+不编译自定义 libvips，不增加 GPU 映射。CPU 保持 1 核，容器内存提高到 1 GB。
 
 ## 17. 依赖与实施范围
 
@@ -943,7 +958,7 @@ JSON API，也不保留现有 `210m` 作为投稿额度。
 新增：
 
 - 投稿链接仓储与服务；
-- 单请求投稿路由；
+- 进程内上传会话与逐文件投稿路由；
 - 流式 multipart 临时文件写入；
 - 单并发媒体处理；
 - 图片标准化；
@@ -1013,13 +1028,13 @@ JSON API，也不保留现有 `210m` 作为投稿额度。
 - 页面不创建服务器草稿；
 - 朋友可以填写称呼、正文并选择约定媒体；
 - 页面在发送前阻止明显超数量、超单文件和超总量；
-- 点击一次后只产生一个 multipart 请求；
+- 点击一次后按顺序产生单文件 multipart 请求，并在最后提交一次 JSON；
 - 上传时有可信的总字节进度；
-- 请求体发送完后明确显示服务器正在整理；
+- 全部素材请求完成后明确显示服务器正在整理；
 - HEIC 生成 Journal WebP，不保存源文件；
 - 合规 H.264 和 HEVC 都以流复制方式生成 MP4；
 - HEVC 不因为浏览器兼容性的理论边界被统一转码；
-- 任一素材失败时整次请求明确失败；
+- 任一素材失败时本次投稿明确失败；
 - 成功只在媒体和数据库全部完成后显示。
 
 ### 19.2 资源
@@ -1030,7 +1045,7 @@ JSON API，也不保留现有 `210m` 作为投稿额度。
 - OpenResty 不完整缓冲请求体；
 - Fastify 不调用 `part.toBuffer()`；
 - Node 内存占用不随上传总文件大小线性增长；
-- 一次只处理一份投稿，投稿内素材按顺序处理；
+- 一次只处理一个素材，同一投稿的素材按顺序上传；
 - 视频不重新编码；
 - 投稿列表只读取预览图或海报；
 - 视频在明确播放前不请求主体。
@@ -1062,8 +1077,9 @@ JSON API，也不保留现有 `210m` 作为投稿额度。
 
 | 真实问题 | 再考虑的能力 |
 |---|---|
-| 正常手机内容经常超过 80 MiB | 逐文件上传或 tus |
-| 朋友网络失败使整次重传成为主要阻碍 | 断点续传与明确重试 |
+| 单个视频经常超过 90 MiB | 分块上传或 tus |
+| 一份投稿经常超过 500 MiB | 重新评估本地磁盘额度与原片存储 |
+| 朋友网络失败使已完成文件重传成为主要阻碍 | 持久上传会话、断点续传与明确重试 |
 | 服务端整理经常接近 Cloudflare 响应时限 | 上传与处理拆分、状态读取 |
 | 多人同时投稿使单并发等待明显 | 持久任务队列 |
 | 目标设备确实无法播放大量 HEVC | 生成 H.264 展示副本 |

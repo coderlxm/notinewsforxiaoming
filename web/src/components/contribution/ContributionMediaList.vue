@@ -25,7 +25,7 @@ function formatBytes(bytes: number): string {
   <div v-if="media.length" class="contribution-media-list">
     <div class="contribution-media-list__summary" aria-live="polite">
       <span>{{ photoCount }} 张照片 · {{ videoCount }} 段视频</span>
-      <span>{{ formatBytes(totalBytes) }} / 80 MiB</span>
+      <span>{{ formatBytes(totalBytes) }} / 500 MiB</span>
     </div>
     <ol class="contribution-media-list__items">
       <ContributionMediaItem

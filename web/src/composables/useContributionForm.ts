@@ -1,11 +1,11 @@
 import { computed, onBeforeUnmount, shallowRef } from 'vue';
 
 const MIB = 1024 * 1024;
-const MAX_ASSETS = 12;
-const MAX_VIDEOS = 2;
-const MAX_TOTAL_BYTES = 80 * MIB;
-const MAX_IMAGE_BYTES = 20 * MIB;
-const MAX_VIDEO_BYTES = 70 * MIB;
+const MAX_ASSETS = 30;
+const MAX_VIDEOS = 5;
+const MAX_TOTAL_BYTES = 500 * MIB;
+const MAX_IMAGE_BYTES = 40 * MIB;
+const MAX_VIDEO_BYTES = 90 * MIB;
 const MAX_SENDER_NAME_LENGTH = 24;
 const MAX_CONTENT_TEXT_LENGTH = 2000;
 
@@ -103,7 +103,7 @@ export function useContributionForm() {
       errors.push(`一次最多选择 ${MAX_VIDEOS} 段视频。`);
     }
     if (totalBytes.value > MAX_TOTAL_BYTES) {
-      errors.push('全部文件总量不能超过 80 MiB。');
+      errors.push('全部文件总量不能超过 500 MiB。');
     }
 
     for (const item of media.value) {
@@ -115,10 +115,10 @@ export function useContributionForm() {
         errors.push(`${item.file.name} 的文件类型与扩展名不一致。`);
       }
       if (item.kind === 'photo' && item.file.size > MAX_IMAGE_BYTES) {
-        errors.push(`${item.file.name} 超过了照片 20 MiB 的限制。`);
+        errors.push(`${item.file.name} 超过了照片 40 MiB 的限制。`);
       }
       if (item.kind === 'video' && item.file.size > MAX_VIDEO_BYTES) {
-        errors.push(`${item.file.name} 超过了视频 70 MiB 的限制。`);
+        errors.push(`${item.file.name} 超过了视频 90 MiB 的限制。`);
       }
     }
 

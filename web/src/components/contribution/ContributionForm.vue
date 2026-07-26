@@ -70,7 +70,7 @@ watch(validationErrors, async (messages, previousMessages) => {
 
 function handleSubmit(): void {
   if (!canSubmit.value || isSubmitting.value) return;
-  submit(props.token, payload());
+  void submit(props.token, payload());
 }
 
 onBeforeUnmount(() => {
@@ -124,10 +124,10 @@ onBeforeUnmount(() => {
         <div>
           <h2 class="contribution-section-heading__title">照片与短视频</h2>
           <p class="contribution-section-heading__description">
-            最多 12 项，其中视频最多 2 段，全部文件合计不超过 80 MiB。
+            最多 30 项，其中视频最多 5 段，全部文件合计不超过 500 MiB。
           </p>
         </div>
-        <span v-if="media.length" class="contribution-count-badge">{{ media.length }}/12</span>
+        <span v-if="media.length" class="contribution-count-badge">{{ media.length }}/30</span>
       </div>
 
       <ContributionMediaPicker
@@ -161,8 +161,8 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="contribution-format-note">
-        <p>照片：JPG、PNG、WebP、HEIC/HEIF，每张不超过 20 MiB。</p>
-        <p>视频：MP4 或 MOV，每段不超过 70 MiB、90 秒。</p>
+        <p>照片：JPG、PNG、WebP、HEIC/HEIF，每张不超过 40 MiB、50 MP。</p>
+        <p>视频：MP4 或 MOV，每段不超过 90 MiB、5 分钟。</p>
         <p>照片会整理为适合 Journal 展示的尺寸，不作为原片保存。</p>
       </div>
     </section>

@@ -16,7 +16,7 @@ services:
     ports:
       - "127.0.0.1:3100:3100"
     cpus: 1.0
-    mem_limit: 512m
+    mem_limit: 1g
     healthcheck:
       test: ["CMD", "node", "/usr/local/bin/journal-healthcheck.mjs"]
       interval: 30s

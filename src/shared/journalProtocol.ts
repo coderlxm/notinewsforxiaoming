@@ -262,7 +262,7 @@ export const journalContributionPublishRequestSchema = z.object({
   contentText: z.string().refine((value) => [...value].length <= 2000, {
     message: 'Contribution content must not exceed 2,000 Unicode characters.',
   }),
-  assetIds: z.array(z.number().int().positive()).max(12)
+  assetIds: z.array(z.number().int().positive()).max(30)
     .refine((assetIds) => new Set(assetIds).size === assetIds.length, {
       message: 'Contribution asset IDs must be unique.',
     }),

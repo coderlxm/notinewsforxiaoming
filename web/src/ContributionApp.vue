@@ -15,6 +15,8 @@ interface ContributionLinkResponse {
     maxTotalBytes: number;
     maxImageBytes: number;
     maxVideoBytes: number;
+    maxImagePixels: number;
+    maxVideoDuration: number;
     maxSenderNameLength: number;
     maxContentTextLength: number;
   };
