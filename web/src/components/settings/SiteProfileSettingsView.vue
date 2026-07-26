@@ -3,6 +3,7 @@ import { useFileDialog, useObjectUrl } from '@vueuse/core';
 import { storeToRefs } from 'pinia';
 import { computed, shallowRef, watch } from 'vue';
 import { useRouter } from 'vue-router';
+import AdminContributionLinkSettings from '../contribution/AdminContributionLinkSettings.vue';
 import JournalLoading from '../ui/JournalLoading.vue';
 import { useSessionStore } from '../../stores/session';
 import { useSiteProfileStore } from '../../stores/siteProfile';
@@ -202,6 +203,8 @@ async function save(): Promise<void> {
           </button>
         </div>
       </form>
+
+      <AdminContributionLinkSettings />
     </section>
 
     <div v-else-if="waitingForAccess" class="settings-view__loading">

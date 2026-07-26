@@ -29,6 +29,10 @@ ENV JOURNAL_WEB_PORT=3100
 ENV JOURNAL_DATA_DIR=/data
 ENV JOURNAL_WEB_ROOT=/app/web/dist
 
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ffmpeg libheif-examples \
+  && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 COPY --from=dependencies /app/node_modules ./node_modules

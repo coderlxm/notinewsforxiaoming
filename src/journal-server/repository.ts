@@ -5,6 +5,10 @@ import type {
   JournalAssetRole,
   JournalAssetSourceKind,
   JournalBodyFormat,
+  JournalContributionAsset,
+  JournalContributionAssetKind,
+  JournalContributionDetail,
+  JournalContributionSummary,
   JournalDeletionResult,
   JournalEntry,
   JournalFeed,
@@ -141,6 +145,77 @@ interface SiteProfileRow {
   avatar_revision: number;
   weather_enabled: 0 | 1;
   updated_at: string;
+}
+
+interface ContributionLinkRow {
+  id: number;
+  token_hash: string;
+  expires_at: string;
+  revoked_at: string | null;
+  created_at: string;
+}
+
+interface ContributionRow {
+  id: number;
+  public_id: string;
+  link_id: number;
+  sender_name: string;
+  content_text: string;
+  submitted_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface ContributionAssetRow {
+  id: number;
+  contribution_id: number;
+  kind: JournalContributionAssetKind;
+  source_name: string;
+  mime_type: string;
+  byte_size: number;
+  relative_path: string;
+  preview_relative_path: string;
+  width: number;
+  height: number;
+  duration: number | null;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface JournalContributionLinkRecord {
+  id: number;
+  tokenHash: string;
+  expiresAt: string;
+  revokedAt: string | null;
+  createdAt: string;
+}
+
+export interface JournalContributionAssetInput {
+  kind: JournalContributionAssetKind;
+  sourceName: string;
+  mimeType: string;
+  byteSize: number;
+  relativePath: string;
+  previewRelativePath: string;
+  width: number;
+  height: number;
+  duration: number | null;
+  sortOrder: number;
+}
+
+export interface CreateJournalContributionInput {
+  publicId: string;
+  linkId: number;
+  senderName: string;
+  contentText: string;
+  submittedAt: string;
+  assets: JournalContributionAssetInput[];
+}
+
+export interface JournalContributionStoredAsset {
+  id: number;
+  relativePath: string;
+  previewRelativePath: string;
 }
 
 const cursorSchema = z.object({
@@ -753,6 +828,287 @@ export class JournalRepository {
     }
   }
 
+  findContributionLinkByTokenHash(tokenHash: string): JournalContributionLinkRecord | null {
+    const row = this.database.prepare(`
+      SELECT id, token_hash, expires_at, revoked_at, created_at
+      FROM journal_contribution_links
+      WHERE token_hash = ?
+    `).get(tokenHash) as ContributionLinkRow | undefined;
+    return row ? this.toContributionLink(row) : null;
+  }
+
+  getActiveContributionLink(now: string): JournalContributionLinkRecord | null {
+    const row = this.database.prepare(`
+      SELECT id, token_hash, expires_at, revoked_at, created_at
+      FROM journal_contribution_links
+      WHERE revoked_at IS NULL AND expires_at > ?
+      ORDER BY id DESC
+      LIMIT 1
+    `).get(now) as ContributionLinkRow | undefined;
+    return row ? this.toContributionLink(row) : null;
+  }
+
+  createContributionLink(
+    tokenHash: string,
+    expiresAt: string,
+    createdAt: string,
+  ): JournalContributionLinkRecord {
+    const insert = this.database.transaction(() => {
+      this.database.prepare(`
+        UPDATE journal_contribution_links
+        SET revoked_at = ?
+        WHERE revoked_at IS NULL
+      `).run(createdAt);
+      const result = this.database.prepare(`
+        INSERT INTO journal_contribution_links (
+          token_hash, expires_at, revoked_at, created_at
+        ) VALUES (?, ?, NULL, ?)
+      `).run(tokenHash, expiresAt, createdAt);
+      return Number(result.lastInsertRowid);
+    });
+    const id = insert();
+    const row = this.database.prepare(`
+      SELECT id, token_hash, expires_at, revoked_at, created_at
+      FROM journal_contribution_links
+      WHERE id = ?
+    `).get(id) as ContributionLinkRow;
+    return this.toContributionLink(row);
+  }
+
+  revokeActiveContributionLink(revokedAt: string): boolean {
+    const result = this.database.prepare(`
+      UPDATE journal_contribution_links
+      SET revoked_at = ?
+      WHERE revoked_at IS NULL AND expires_at > ?
+    `).run(revokedAt, revokedAt);
+    return result.changes > 0;
+  }
+
+  createContribution(input: CreateJournalContributionInput): JournalContributionDetail {
+    const insert = this.database.transaction(() => {
+      const result = this.database.prepare(`
+        INSERT INTO journal_contributions (
+          public_id, link_id, sender_name, content_text,
+          submitted_at, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        input.publicId,
+        input.linkId,
+        input.senderName,
+        input.contentText,
+        input.submittedAt,
+        input.submittedAt,
+        input.submittedAt,
+      );
+      const contributionId = Number(result.lastInsertRowid);
+      const insertAsset = this.database.prepare(`
+        INSERT INTO journal_contribution_assets (
+          contribution_id, kind, source_name, mime_type, byte_size,
+          relative_path, preview_relative_path, width, height,
+          duration, sort_order, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      for (const asset of input.assets) {
+        insertAsset.run(
+          contributionId,
+          asset.kind,
+          asset.sourceName,
+          asset.mimeType,
+          asset.byteSize,
+          asset.relativePath,
+          asset.previewRelativePath,
+          asset.width,
+          asset.height,
+          asset.duration,
+          asset.sortOrder,
+          input.submittedAt,
+        );
+      }
+      return contributionId;
+    });
+    const contributionId = insert();
+    return this.getContributionDetailById(contributionId);
+  }
+
+  listContributions(): {
+    contributions: JournalContributionSummary[];
+    pendingCount: number;
+  } {
+    const rows = this.database.prepare(`
+      SELECT *
+      FROM journal_contributions
+      ORDER BY submitted_at DESC, id DESC
+    `).all() as ContributionRow[];
+    return {
+      contributions: rows.map((row) => {
+        const assets = this.contributionAssetsFor(row.id);
+        return {
+          publicId: row.public_id,
+          senderName: row.sender_name,
+          contentText: row.content_text,
+          submittedAt: row.submitted_at,
+          photoCount: assets.filter((asset) => asset.kind === 'photo').length,
+          videoCount: assets.filter((asset) => asset.kind === 'video').length,
+          assets: assets.slice(0, 4).map((asset) => this.toContributionAsset(row, asset)),
+        };
+      }),
+      pendingCount: rows.length,
+    };
+  }
+
+  getContribution(publicId: string): JournalContributionDetail | null {
+    const row = this.findContributionRow(publicId);
+    return row ? this.toContributionDetail(row) : null;
+  }
+
+  findContributionStoredAsset(
+    publicId: string,
+    assetId: number,
+  ): JournalContributionStoredAsset | null {
+    const row = this.database.prepare(`
+      SELECT a.*
+      FROM journal_contribution_assets a
+      JOIN journal_contributions c ON c.id = a.contribution_id
+      WHERE c.public_id = ? AND a.id = ?
+    `).get(publicId, assetId) as ContributionAssetRow | undefined;
+    return row ? {
+      id: row.id,
+      relativePath: row.relative_path,
+      previewRelativePath: row.preview_relative_path,
+    } : null;
+  }
+
+  deleteContributionAsset(publicId: string, assetId: number): JournalContributionDetail | null {
+    const result = this.database.prepare(`
+      DELETE FROM journal_contribution_assets
+      WHERE id = ?
+        AND contribution_id = (
+          SELECT id FROM journal_contributions WHERE public_id = ?
+        )
+    `).run(assetId, publicId);
+    if (result.changes === 0) return null;
+    const contribution = this.getContribution(publicId);
+    if (!contribution) {
+      throw new Error(`Contribution ${publicId} disappeared while deleting an asset.`);
+    }
+    return contribution;
+  }
+
+  deleteContribution(publicId: string): boolean {
+    const remove = this.database.transaction(() => {
+      const row = this.findContributionRow(publicId);
+      if (!row) return false;
+      this.database.prepare(`
+        DELETE FROM journal_contribution_assets
+        WHERE contribution_id = ?
+      `).run(row.id);
+      const result = this.database.prepare(`
+        DELETE FROM journal_contributions
+        WHERE id = ?
+      `).run(row.id);
+      return result.changes === 1;
+    });
+    return remove();
+  }
+
+  publishContribution(
+    publicId: string,
+    input: {
+      contentText: string;
+      assetIds: number[];
+      sourceCreatedAt: string;
+      visibility: JournalVisibility;
+      updatedAt: string;
+    },
+  ): JournalEntry | null {
+    const publish = this.database.transaction(() => {
+      const contribution = this.findContributionRow(publicId);
+      if (!contribution) return null;
+      const assets = this.contributionAssetsFor(contribution.id);
+      const byId = new Map(assets.map((asset) => [asset.id, asset]));
+      const selectedAssets = input.assetIds.map((assetId) => {
+        const asset = byId.get(assetId);
+        if (!asset) {
+          throw new Error(`Contribution asset ${assetId} does not belong to ${publicId}.`);
+        }
+        return asset;
+      });
+      if (selectedAssets.length !== assets.length) {
+        throw new Error('Contribution assets must be deleted before publishing.');
+      }
+
+      const contentType = selectedAssets.some((asset) => asset.kind === 'video')
+        ? 'video'
+        : selectedAssets.length > 0
+          ? 'photo'
+          : 'text';
+      const entryResult = this.database.prepare(`
+        INSERT INTO journal_entries (
+          public_id, source_kind, chat_id, source_message_id, media_group_id,
+          content_type, title, body_format, content_text, rich_body_json,
+          publication_status, visibility, tags_json, structured_content_json,
+          telegram_message_json, pinned, source_created_at, captured_at, updated_at
+        ) VALUES (
+          ?, 'web', NULL, NULL, NULL,
+          ?, NULL, 'plain', ?, NULL,
+          'published', ?, ?, NULL,
+          NULL, 0, ?, ?, ?
+        )
+      `).run(
+        contribution.public_id,
+        contentType,
+        input.contentText,
+        input.visibility,
+        JSON.stringify(extractJournalTags(input.contentText)),
+        input.sourceCreatedAt,
+        contribution.submitted_at,
+        input.updatedAt,
+      );
+      const entryId = Number(entryResult.lastInsertRowid);
+      const insertAsset = this.database.prepare(`
+        INSERT INTO journal_assets (
+          entry_id, source_kind, role, kind,
+          telegram_file_id, telegram_file_unique_id,
+          original_name, mime_type, byte_size,
+          relative_path, preview_relative_path,
+          width, height, duration, sort_order
+        ) VALUES (
+          ?, 'web', 'attachment', ?,
+          NULL, NULL,
+          ?, ?, ?,
+          ?, ?,
+          ?, ?, ?, ?
+        )
+      `);
+      selectedAssets.forEach((asset, sortOrder) => {
+        insertAsset.run(
+          entryId,
+          asset.kind,
+          asset.source_name,
+          asset.mime_type,
+          asset.byte_size,
+          asset.relative_path,
+          asset.preview_relative_path,
+          asset.width,
+          asset.height,
+          asset.duration,
+          sortOrder,
+        );
+      });
+      this.database.prepare(`
+        DELETE FROM journal_contribution_assets
+        WHERE contribution_id = ?
+      `).run(contribution.id);
+      this.database.prepare(`
+        DELETE FROM journal_contributions
+        WHERE id = ?
+      `).run(contribution.id);
+      return entryId;
+    });
+    const entryId = publish();
+    return entryId === null ? null : this.getById(entryId);
+  }
+
   getSiteProfileOrNull(): JournalSiteProfileRecord | null {
     const row = this.database.prepare(`
       SELECT bio, avatar_webp, avatar_revision, weather_enabled, updated_at
@@ -1015,6 +1371,74 @@ export class JournalRepository {
           AND grouped.media_group_id = ${alias}.media_group_id
       )
     )`;
+  }
+
+  private findContributionRow(publicId: string): ContributionRow | undefined {
+    return this.database.prepare(`
+      SELECT *
+      FROM journal_contributions
+      WHERE public_id = ?
+    `).get(publicId) as ContributionRow | undefined;
+  }
+
+  private getContributionDetailById(id: number): JournalContributionDetail {
+    const row = this.database.prepare(`
+      SELECT *
+      FROM journal_contributions
+      WHERE id = ?
+    `).get(id) as ContributionRow | undefined;
+    if (!row) throw new Error(`Contribution ${id} does not exist.`);
+    return this.toContributionDetail(row);
+  }
+
+  private contributionAssetsFor(contributionId: number): ContributionAssetRow[] {
+    return this.database.prepare(`
+      SELECT *
+      FROM journal_contribution_assets
+      WHERE contribution_id = ?
+      ORDER BY sort_order, id
+    `).all(contributionId) as ContributionAssetRow[];
+  }
+
+  private toContributionDetail(row: ContributionRow): JournalContributionDetail {
+    return {
+      publicId: row.public_id,
+      senderName: row.sender_name,
+      contentText: row.content_text,
+      submittedAt: row.submitted_at,
+      assets: this.contributionAssetsFor(row.id)
+        .map((asset) => this.toContributionAsset(row, asset)),
+    };
+  }
+
+  private toContributionAsset(
+    contribution: ContributionRow,
+    asset: ContributionAssetRow,
+  ): JournalContributionAsset {
+    const assetUrl = `/api/private/contributions/${contribution.public_id}/assets/${asset.id}`;
+    return {
+      id: asset.id,
+      kind: asset.kind,
+      url: assetUrl,
+      previewUrl: `${assetUrl}/preview`,
+      sourceName: asset.source_name,
+      mimeType: asset.mime_type,
+      byteSize: asset.byte_size,
+      width: asset.width,
+      height: asset.height,
+      duration: asset.duration,
+      sortOrder: asset.sort_order,
+    };
+  }
+
+  private toContributionLink(row: ContributionLinkRow): JournalContributionLinkRecord {
+    return {
+      id: row.id,
+      tokenHash: row.token_hash,
+      expiresAt: row.expires_at,
+      revokedAt: row.revoked_at,
+      createdAt: row.created_at,
+    };
   }
 
   private getRequiredSiteProfile(): JournalSiteProfileRecord {

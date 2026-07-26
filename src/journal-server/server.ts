@@ -10,6 +10,11 @@ import Fastify, {
 import { ZodError } from 'zod';
 import { JournalArticleService } from './articleService.js';
 import { JournalAuth } from './auth.js';
+import { JournalContributionError } from './contributionError.js';
+import { JournalContributionLinkService } from './contributionLinkService.js';
+import { JournalContributionMediaService } from './contributionMedia.js';
+import { JournalContributionNotificationService } from './contributionNotification.js';
+import { JournalContributionService } from './contributionService.js';
 import { openJournalDatabase } from './database.js';
 import { JournalDeletionService } from './deletion.js';
 import { JournalIngestService } from './ingest.js';
@@ -19,9 +24,11 @@ import {
 } from './imagePreview.js';
 import { JournalRepository } from './repository.js';
 import { registerArticleRoutes } from './routes/articles.js';
+import { registerContributionRoutes } from './routes/contributions.js';
 import { registerFeedRoutes } from './routes/feeds.js';
 import { registerInternalRoutes } from './routes/internal.js';
 import { registerMediaRoutes } from './routes/media.js';
+import { registerPrivateContributionRoutes } from './routes/privateContributions.js';
 import { registerPrivateEntryRoutes } from './routes/privateEntries.js';
 import { registerPublicFeedRoutes } from './routes/publicFeed.js';
 import { registerSiteProfileRoutes } from './routes/siteProfile.js';
@@ -44,11 +51,26 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
   );
   const auth = new JournalAuth(config.ingestToken, config.adminPassword);
   const storage = new JournalStorage(config.dataDir);
+  await storage.initializeContributionStorage();
   const previews = new JournalImagePreviewService();
   const articleService = new JournalArticleService(repository, storage, previews);
   const webEntryService = new JournalWebEntryService(repository, storage, previews);
   const deletionService = new JournalDeletionService(repository, storage);
   const downloader = new TelegramFileDownloader(config.telegramToken);
+  const contributionLinks = new JournalContributionLinkService(
+    repository,
+    config.publicBaseUrl,
+  );
+  const contributionService = new JournalContributionService(
+    repository,
+    storage,
+    new JournalContributionMediaService(storage),
+  );
+  const contributionNotifications = new JournalContributionNotificationService(
+    config.telegramToken,
+    config.allowedChatId,
+    config.publicBaseUrl,
+  );
   const ingestService = new JournalIngestService(
     config.allowedChatId,
     repository,
@@ -72,6 +94,10 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
 
   server.setErrorHandler(async (error, request, reply) => {
     request.log.error(error);
+    if (error instanceof JournalContributionError) {
+      await reply.code(error.statusCode).send(error.response());
+      return;
+    }
     const requestError = error as Error & { statusCode?: number };
     const statusCode = error instanceof ZodError
       ? 400
@@ -87,6 +113,12 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
   });
 
   await registerInternalRoutes(server, { auth, deletionService, ingestService, repository });
+  await registerContributionRoutes(server, {
+    links: contributionLinks,
+    contributions: contributionService,
+    notifications: contributionNotifications,
+    storage,
+  });
   await registerPublicFeedRoutes(server, repository);
   await registerPrivateEntryRoutes(
     server,
@@ -97,6 +129,13 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
   );
   await registerArticleRoutes(server, auth, articleService);
   await registerMediaRoutes(server, auth, repository, config.dataDir);
+  await registerPrivateContributionRoutes(server, {
+    auth,
+    links: contributionLinks,
+    contributions: contributionService,
+    repository,
+    dataDir: config.dataDir,
+  });
   await registerSiteProfileRoutes(server, auth, siteProfileService);
   await registerWeatherRoutes(server, weatherService);
   await registerFeedRoutes(server, repository, siteProfileService, config.publicBaseUrl);
@@ -113,6 +152,19 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
   server.get('/me/articles/:id/edit', sendApplication);
   server.get('/me/entries/new', sendApplication);
   server.get('/me/entries/:id/edit', sendApplication);
+  server.get('/me/contributions', sendApplication);
+  server.get('/me/contributions/:publicId', sendApplication);
+
+  server.get('/contribute', async (_request, reply) => {
+    reply.header('Cache-Control', 'no-cache');
+    reply.header('Referrer-Policy', 'no-referrer');
+    reply.header('X-Content-Type-Options', 'nosniff');
+    reply.header(
+      'Content-Security-Policy',
+      "default-src 'self'; img-src 'self' blob: data:; media-src 'self' blob:; style-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
+    );
+    return reply.sendFile('contribute.html');
+  });
 
   server.addHook('onClose', async () => {
     database.close();

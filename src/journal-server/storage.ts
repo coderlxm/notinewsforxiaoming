@@ -9,14 +9,42 @@ export interface EntryStorageSession {
   relativeDir: string;
 }
 
+export interface ContributionAssetTarget {
+  absolutePath: string;
+  relativePath: string;
+  previewAbsolutePath: string;
+  previewRelativePath: string;
+}
+
 export class JournalStorage {
   private readonly assetsDir: string;
   private readonly temporaryDir: string;
+  private readonly contributionRequestsDir = '/tmp/journal-contribution-requests';
 
   constructor(private readonly dataDir: string) {
     this.assetsDir = path.join(dataDir, 'assets');
     this.temporaryDir = path.join(this.assetsDir, '.tmp');
     fs.mkdirSync(this.temporaryDir, { recursive: true });
+  }
+
+  async initializeContributionStorage(): Promise<void> {
+    await fs.promises.rm(this.contributionRequestsDir, { recursive: true, force: true });
+    await fs.promises.rm(this.temporaryDir, { recursive: true, force: true });
+    await fs.promises.mkdir(this.contributionRequestsDir, { recursive: true });
+    await fs.promises.mkdir(this.temporaryDir, { recursive: true });
+  }
+
+  async beginContributionRequest(): Promise<string> {
+    return fs.promises.mkdtemp(path.join(this.contributionRequestsDir, 'request-'));
+  }
+
+  async discardContributionRequest(requestDir: string): Promise<void> {
+    const absoluteRequestDir = path.resolve(requestDir);
+    const absoluteRoot = path.resolve(this.contributionRequestsDir);
+    if (!absoluteRequestDir.startsWith(`${absoluteRoot}${path.sep}`)) {
+      throw new Error(`Contribution request directory ${requestDir} is outside its root.`);
+    }
+    await fs.promises.rm(absoluteRequestDir, { recursive: true });
   }
 
   async begin(publicId: string, sourceCreatedAt: string): Promise<EntryStorageSession> {
@@ -40,6 +68,21 @@ export class JournalStorage {
     previewRelativePath: string;
   } {
     const filename = randomUUID();
+    const absolutePath = path.join(session.tempDir, filename);
+    const relativePath = path.posix.join(session.relativeDir, filename);
+    return {
+      absolutePath,
+      relativePath,
+      previewAbsolutePath: `${absolutePath}.preview.webp`,
+      previewRelativePath: this.previewRelativePath(relativePath),
+    };
+  }
+
+  contributionAssetTarget(
+    session: EntryStorageSession,
+    extension: '.webp' | '.mp4',
+  ): ContributionAssetTarget {
+    const filename = `${randomUUID()}${extension}`;
     const absolutePath = path.join(session.tempDir, filename);
     const relativePath = path.posix.join(session.relativeDir, filename);
     return {
@@ -139,5 +182,16 @@ export class JournalStorage {
   async deleteAssetPair(relativePath: string, previewRelativePath: string): Promise<void> {
     await fs.promises.rm(this.absoluteAssetPath(previewRelativePath));
     await fs.promises.rm(this.absoluteAssetPath(relativePath));
+  }
+
+  async deleteContributionDirectory(
+    publicId: string,
+    submittedAt: string,
+  ): Promise<void> {
+    const submittedDate = new Date(submittedAt);
+    const year = String(submittedDate.getUTCFullYear());
+    const month = String(submittedDate.getUTCMonth() + 1).padStart(2, '0');
+    const absoluteDirectory = path.join(this.assetsDir, year, month, publicId);
+    await fs.promises.rm(absoluteDirectory, { recursive: true });
   }
 }

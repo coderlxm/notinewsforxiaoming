@@ -87,6 +87,49 @@ export interface CurrentWeather {
   observedAt: string;
 }
 
+export interface AdminContributionLink {
+  url?: string;
+  expiresAt: string;
+  createdAt: string;
+}
+
+export interface AdminContributionAsset {
+  id: number;
+  kind: 'photo' | 'video';
+  url: string;
+  previewUrl: string;
+  sourceName: string;
+  mimeType: string;
+  byteSize: number;
+  width: number;
+  height: number;
+  duration: number | null;
+  sortOrder: number;
+}
+
+export interface AdminContributionSummary {
+  publicId: string;
+  senderName: string;
+  contentText: string;
+  submittedAt: string;
+  photoCount: number;
+  videoCount: number;
+  assets: AdminContributionAsset[];
+}
+
+export interface AdminContributionDetail {
+  publicId: string;
+  senderName: string;
+  contentText: string;
+  submittedAt: string;
+  assets: AdminContributionAsset[];
+}
+
+export interface AdminContributionListResponse {
+  contributions: AdminContributionSummary[];
+  pendingCount: number;
+}
+
 export interface FeedFilters {
   visibility: 'all' | JournalVisibility;
   query: string;

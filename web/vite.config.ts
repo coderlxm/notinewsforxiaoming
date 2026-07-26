@@ -20,5 +20,11 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
+    rolldownOptions: {
+      input: {
+        main: fileURLToPath(new URL('index.html', import.meta.url)),
+        contribute: fileURLToPath(new URL('contribute.html', import.meta.url)),
+      },
+    },
   },
 });

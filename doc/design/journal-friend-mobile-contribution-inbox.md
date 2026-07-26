@@ -2,7 +2,7 @@
 
 ## 1. 文档定位
 
-- 状态：首期产品定义与实施基线，待实施
+- 状态：首期产品定义与实施基线，已实施
 - 日期：2026-07-26
 - 产品定位：让朋友把手机里的文字、照片和短视频直接送到小明的 Journal 投稿箱，由小明确认后发布
 - 用户规模：最多 5 位已知朋友，不按开放投稿平台设计
@@ -26,7 +26,7 @@
 7. 合规的 H.264 和 HEVC 视频都只做 MP4 容器整理与流复制，不因为 HEVC 名称本身转码成 H.264。
 8. 媒体按顺序处理；全局最多有一份投稿进入媒体处理，不建设持久任务队列。
 9. 页面只表达“正在上传”“服务器正在整理”“已送达”或具体失败，不展示伪造的服务端百分比。
-10. 成功仍表示媒体已就绪、投稿已写入收件箱且 Telegram 通知已发送。
+10. 媒体与 SQLite 已提交即表示投稿送达；Telegram 只在送达后提醒小明。
 11. 不自动重试、不切换上传通道、不降低输出要求、不跳过失败文件。
 12. 小明发布时默认私有，明确选择后才能公开。
 
@@ -100,8 +100,8 @@
   → 朋友点击“送给小明”
   → 一次 multipart 请求流式上传整份投稿
   → 服务端按顺序检查并整理媒体
-  → Telegram 通知成功
   → 投稿写入私有收件箱
+  → 尝试发送 Telegram 提醒
   → 页面显示“已经送到小明”
 ```
 
@@ -546,11 +546,12 @@ FFmpeg 失败即本次投稿失败。不得转码、降低分辨率、丢弃不�
 2. 所有文件真实格式合规；
 3. 所有图片和视频处理完成；
 4. 正式资产目录已经就绪；
-5. Telegram 通知已经成功发送；
-6. 投稿、素材顺序和最终路径已经写入 SQLite；
-7. 投稿状态为 `submitted`。
+5. 投稿、素材顺序和最终路径已经写入 SQLite。
 
 页面不能因上传达到 100% 或媒体文件已经落盘而提前显示成功。
+
+Telegram 提醒不属于送达事务。数据库提交成功即表示投稿送达；提醒失败时保留投稿，
+记录明确的 Journal 服务日志，并继续返回成功。不自动重试，不切换提醒通道。
 
 ### 9.2 失败
 
@@ -593,7 +594,6 @@ FFmpeg 失败即本次投稿失败。不得转码、降低分辨率、丢弃不�
 - `VIDEO_FORMAT_UNSUPPORTED`
 - `VIDEO_DURATION_EXCEEDED`
 - `MEDIA_PROCESSING_FAILED`
-- `TELEGRAM_NOTIFICATION_FAILED`
 
 前端按 `code` 显示固定中文文案，不匹配底层英文异常文本。
 
@@ -631,15 +631,13 @@ public_id                 UNIQUE
 link_id
 sender_name
 content_text
-status                    submitted | published
-entry_id                  NULLABLE
 submitted_at
-published_at              NULLABLE
 created_at
 updated_at
 ```
 
-没有 `draft` 状态和 `draft_token_hash`。数据库中的投稿都已经完整送达。
+没有 `draft`、`status` 或 `draft_token_hash`。数据库中的投稿都已经完整送达且等待处理；
+发布或保存为私有 Journal Entry 后直接删除投稿中间记录。
 
 ### 10.3 `journal_contribution_assets`
 
@@ -668,7 +666,7 @@ created_at
 
 ```text
 journal_contribution_links(token_hash)
-journal_contributions(status, submitted_at DESC, id DESC)
+journal_contributions(submitted_at DESC, id DESC)
 journal_contribution_assets(contribution_id, sort_order, id)
 ```
 
@@ -739,7 +737,7 @@ journal_contribution_assets(contribution_id, sort_order, id)
 
 ### 12.3 发布
 
-发布前确认投稿仍为 `submitted`，并且保留素材文件存在。
+发布前确认投稿记录仍存在，并且保留素材文件存在。
 
 单个 SQLite 事务：
 
@@ -749,9 +747,10 @@ journal_contribution_assets(contribution_id, sort_order, id)
 4. 只有图片时使用 `photo`；
 5. 含视频时使用 `video`；
 6. 删除已经转交的投稿素材行；
-7. 投稿改为 `published` 并记录 `entry_id`。
+7. 删除投稿记录。
 
 媒体已经是正式资产，发布时不复制、不转换、不重新生成预览。
+已处理历史由普通 Journal Entry 承担，不保留第二套投稿状态和发布关系。
 
 图片继续使用现有预览加载；视频先显示海报，用户明确播放后才请求 MP4，并继续使用
 现有 Range 响应。
@@ -761,8 +760,8 @@ journal_contribution_assets(contribution_id, sort_order, id)
 媒体全部完成后：
 
 1. 生成投稿 `public_id`；
-2. 发送一条 Telegram 通知；
-3. SQLite 事务写入 `submitted` 投稿与素材；
+2. SQLite 事务写入投稿与素材；
+3. 数据库提交后发送一条 Telegram 提醒；
 4. 返回成功。
 
 通知示例：
@@ -781,11 +780,11 @@ journal_contribution_assets(contribution_id, sort_order, id)
 
 Telegram 失败时：
 
-- 本次请求失败；
-- 不写入投稿；
-- 不显示成功；
+- 已经送达的投稿保留；
+- Journal 服务记录明确错误；
+- 页面仍显示送达成功；
 - 不切换通知渠道；
-- 不吞掉错误。
+- 不自动重试。
 
 首期不发送上传开始、单文件完成或媒体处理过程通知。
 
@@ -1021,7 +1020,7 @@ JSON API，也不保留现有 `210m` 作为投稿额度。
 - 合规 H.264 和 HEVC 都以流复制方式生成 MP4；
 - HEVC 不因为浏览器兼容性的理论边界被统一转码；
 - 任一素材失败时整次请求明确失败；
-- 成功只在媒体、通知和数据库全部完成后显示。
+- 成功只在媒体和数据库全部完成后显示。
 
 ### 19.2 资源
 
@@ -1038,7 +1037,7 @@ JSON API，也不保留现有 `210m` 作为投稿额度。
 
 ### 19.3 错误
 
-- 链接失效、表单错误、超限、图片错误、视频错误、处理错误和通知错误有明确文案；
+- 链接失效、表单错误、超限、图片错误、视频错误和处理错误有明确文案；
 - 不自动重试；
 - 不跳过失败文件继续提交；
 - 不把上传 100% 当作送达；
@@ -1055,6 +1054,7 @@ JSON API，也不保留现有 `210m` 作为投稿额度。
 - 发布时不复制或重新处理媒体；
 - H.264 与 HEVC MP4 都沿用现有 Range 响应；
 - 删除投稿会删除其未发布资产，不影响其他 Journal 记录。
+- 发布或保存为私有记录后，投稿中间记录被删除，历史只由 Journal Entry 承担。
 
 ## 20. 以后重新设计的触发条件
 
@@ -1072,58 +1072,3 @@ JSON API，也不保留现有 `210m` 作为投稿额度。
 | 原片保存成为明确需求 | 回到大文件方案重新设计存储 |
 
 在触发条件发生前，不为它们保留空表、状态、接口或备用依赖。
-
-## 21. 两处一致性调整建议
-
-本节是评审建议，尚未替换前文实施基线。确认后应直接修改对应章节并删除本节，不把
-“原设计 + 修正规则”长期保留为两套语义。
-
-### 21.1 投稿记录在发布后删除
-
-建议采用第 4.3 节的短生命周期：
-
-```text
-完整送达并写入投稿箱
-  → 小明发布或保存为私有 Journal Entry
-  → 删除 journal_contributions 与 journal_contribution_assets 中间记录
-```
-
-数据库只保存完整、待处理投稿，因此：
-
-- `journal_contributions` 不需要 `status`；
-- 不需要 `published`、`entry_id` 和 `published_at`；
-- 投稿箱查询直接读取全部 `journal_contributions`；
-- 发布事务创建 Entry 和 Journal assets 后，删除对应投稿与投稿资产行；
-- 删除普通 Journal Entry 时不需要再维护投稿来源记录；
-- 已处理历史继续由现有 Journal Entry 承担。
-
-投稿人称呼只服务投稿整理，首期不在发布后保留。将来只有出现“需要长期查询是谁投稿”
-的真实需求时，才给 Journal Entry 增加明确的私有来源字段；不为这个假设先保留第二套
-历史关系。
-
-### 21.2 投稿落库是成功边界，Telegram 是后续提醒
-
-Telegram Bot API 与 SQLite 无法组成原子事务。无论先执行哪一个，都存在无法消除的
-中间结果：
-
-- 先发 Telegram：数据库提交失败时会留下没有投稿的通知；
-- 先写 SQLite：Telegram 失败时投稿已经存在。
-
-不建议为了模拟原子性而增加补偿删除、通知 outbox、持久任务、重试或额外状态。推荐
-明确选择 Journal 数据为唯一事实来源：
-
-1. 完成全部媒体处理；
-2. 正式资产目录就绪；
-3. SQLite 事务写入投稿和资产；
-4. 数据库提交成功即认定“已经送达”；
-5. 随后发送一条 Telegram 提醒；
-6. Telegram 失败时不删除已送达投稿，也不要求朋友重新上传。
-
-这意味着需要从第 1.1、3、9.1、9.3、13 和 19 节删除“Telegram 成功是投稿成功条件”
-的约束，并明确批准一个最小业务例外：
-
-> 已经完整落库的投稿不会因为通知失败而回滚；通知错误必须记录到 Journal 服务日志，
-> 不自动重试，不切换通道，也不向朋友伪装成投稿失败。
-
-如果不能接受这项例外，建议首期完全移除 Telegram 通知，只依赖管理端待处理数量；
-不建议继续保留“通知与投稿必须同时成功”这一实际上无法严格实现的承诺。

@@ -217,3 +217,91 @@ export const journalCurrentWeatherSchema = z.object({
   observedAt: z.string().datetime({ offset: true }),
 });
 export type JournalCurrentWeather = z.infer<typeof journalCurrentWeatherSchema>;
+
+export const journalContributionAssetKindSchema = z.enum(['photo', 'video']);
+export type JournalContributionAssetKind = z.infer<
+  typeof journalContributionAssetKindSchema
+>;
+
+export const journalContributionAssetSchema = z.object({
+  id: z.number().int().positive(),
+  kind: journalContributionAssetKindSchema,
+  url: z.string().min(1),
+  previewUrl: z.string().min(1),
+  sourceName: z.string().min(1),
+  mimeType: z.string().min(1),
+  byteSize: z.number().int().nonnegative(),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+  duration: z.number().nonnegative().nullable(),
+  sortOrder: z.number().int().nonnegative(),
+});
+export type JournalContributionAsset = z.infer<typeof journalContributionAssetSchema>;
+
+export const journalContributionSummarySchema = z.object({
+  publicId: z.string().uuid(),
+  senderName: z.string().min(1),
+  contentText: z.string(),
+  submittedAt: z.string().datetime(),
+  photoCount: z.number().int().nonnegative(),
+  videoCount: z.number().int().nonnegative(),
+  assets: z.array(journalContributionAssetSchema).max(4),
+});
+export type JournalContributionSummary = z.infer<typeof journalContributionSummarySchema>;
+
+export const journalContributionDetailSchema = z.object({
+  publicId: z.string().uuid(),
+  senderName: z.string().min(1),
+  contentText: z.string(),
+  submittedAt: z.string().datetime(),
+  assets: z.array(journalContributionAssetSchema),
+});
+export type JournalContributionDetail = z.infer<typeof journalContributionDetailSchema>;
+
+export const journalContributionPublishRequestSchema = z.object({
+  contentText: z.string().refine((value) => [...value].length <= 2000, {
+    message: 'Contribution content must not exceed 2,000 Unicode characters.',
+  }),
+  assetIds: z.array(z.number().int().positive()).max(12)
+    .refine((assetIds) => new Set(assetIds).size === assetIds.length, {
+      message: 'Contribution asset IDs must be unique.',
+    }),
+  sourceCreatedAt: z.string().datetime({ offset: true }),
+  visibility: journalVisibilitySchema,
+}).refine(
+  ({ contentText, assetIds }) => contentText.trim() !== '' || assetIds.length > 0,
+  { message: 'Published contribution must include text or at least one asset.' },
+);
+export type JournalContributionPublishRequest = z.infer<
+  typeof journalContributionPublishRequestSchema
+>;
+
+export const journalContributionSubmissionResponseSchema = z.object({
+  contribution: z.object({
+    publicId: z.string().uuid(),
+    senderName: z.string().min(1),
+    assetCount: z.number().int().nonnegative(),
+    submittedAt: z.string().datetime(),
+  }),
+});
+export type JournalContributionSubmissionResponse = z.infer<
+  typeof journalContributionSubmissionResponseSchema
+>;
+
+export const journalContributionErrorCodeSchema = z.enum([
+  'LINK_EXPIRED',
+  'LINK_REVOKED',
+  'INVALID_FORM',
+  'TOO_MANY_ASSETS',
+  'TOO_MANY_VIDEOS',
+  'FILE_TOO_LARGE',
+  'CONTRIBUTION_TOO_LARGE',
+  'IMAGE_FORMAT_UNSUPPORTED',
+  'IMAGE_PIXEL_LIMIT_EXCEEDED',
+  'VIDEO_FORMAT_UNSUPPORTED',
+  'VIDEO_DURATION_EXCEEDED',
+  'MEDIA_PROCESSING_FAILED',
+]);
+export type JournalContributionErrorCode = z.infer<
+  typeof journalContributionErrorCodeSchema
+>;

@@ -1,11 +1,20 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia';
-import { computed, onMounted, onUnmounted, shallowRef, useTemplateRef, watch } from 'vue';
+import {
+  computed,
+  defineAsyncComponent,
+  onMounted,
+  onUnmounted,
+  shallowRef,
+  useTemplateRef,
+  watch,
+} from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import ArticleEditorView from './components/article/ArticleEditorView.vue';
 import FeedView from './components/journal/FeedView.vue';
 import EntryPublisherView from './components/publisher/EntryPublisherView.vue';
 import SiteProfileSettingsView from './components/settings/SiteProfileSettingsView.vue';
+import { useAdminContributions } from './composables/useAdminContributions';
 import { useSessionStore } from './stores/session';
 import { useSiteProfileStore } from './stores/siteProfile';
 import type { JournalEntry } from './types';
@@ -19,6 +28,8 @@ type AppRoute =
   | { name: 'article-new'; key: string }
   | { name: 'article-edit'; key: string; articleId: number }
   | { name: 'settings'; key: string }
+  | { name: 'contribution-inbox'; key: string }
+  | { name: 'contribution-review'; key: string; publicId: string }
   | { name: 'not-found'; key: string };
 
 type FeedRoute = Extract<AppRoute, { name: 'public' | 'private' }>;
@@ -29,10 +40,18 @@ interface OverlayContext {
   originPath: string;
 }
 
+const AdminContributionInboxView = defineAsyncComponent(
+  () => import('./components/contribution/AdminContributionInboxView.vue'),
+);
+const AdminContributionReviewView = defineAsyncComponent(
+  () => import('./components/contribution/AdminContributionReviewView.vue'),
+);
+
 const currentRoute = useRoute();
 const router = useRouter();
 const session = useSessionStore();
 const siteProfile = useSiteProfileStore();
+const contributionInbox = useAdminContributions();
 const { ownerAuthenticated } = storeToRefs(session);
 const { profile, loadError: profileLoadError } = storeToRefs(siteProfile);
 const overlayContext = shallowRef<OverlayContext | null>(null);
@@ -69,6 +88,13 @@ const route = computed<AppRoute>(() => {
   }
   if (currentRoute.name === 'settings') {
     return { name: 'settings', key: 'settings' };
+  }
+  if (currentRoute.name === 'contribution-inbox') {
+    return { name: 'contribution-inbox', key: 'contribution-inbox' };
+  }
+  if (currentRoute.name === 'contribution-review') {
+    const publicId = String(currentRoute.params.publicId);
+    return { name: 'contribution-review', key: `contribution-review:${publicId}`, publicId };
   }
   if (currentRoute.name === 'detail') {
     const publicId = String(currentRoute.params.publicId);
@@ -127,7 +153,10 @@ const directPrivateOverlay = computed(() =>
   && route.value.entryId !== null
   && activeOverlayContext.value === null,
 );
-const isPrivateRoute = computed(() =>
+const isContributionRoute = computed(() =>
+  route.value.name === 'contribution-inbox' || route.value.name === 'contribution-review',
+);
+const isAssetRoute = computed(() =>
   route.value.name === 'private'
   || route.value.name === 'entry-new'
   || route.value.name === 'entry-edit'
@@ -135,10 +164,31 @@ const isPrivateRoute = computed(() =>
   || route.value.name === 'article-edit'
   || route.value.name === 'settings',
 );
+const isPrivateRoute = computed(() =>
+  isAssetRoute.value || isContributionRoute.value,
+);
 const showProfileNavigation = computed(() => isPrivateRoute.value || ownerAuthenticated.value);
 
 watch(() => route.value.key, () => {
   directPublicEntry.value = null;
+});
+
+watch(ownerAuthenticated, (authenticated) => {
+  if (authenticated) {
+    void contributionInbox.loadInbox();
+    return;
+  }
+  contributionInbox.clear();
+}, { immediate: true });
+
+watch(() => route.value.name, (name, previousName) => {
+  if (
+    name === 'contribution-inbox'
+    && previousName !== 'contribution-inbox'
+    && ownerAuthenticated.value
+  ) {
+    void contributionInbox.loadInbox();
+  }
 });
 
 function feedRouteKey(path: string): string | null {
@@ -309,12 +359,29 @@ onUnmounted(removeAfterEach);
           <button
             v-if="isPrivateRoute || ownerAuthenticated"
             class="profile__nav-link"
-            :class="{ 'profile__nav-link--active': isPrivateRoute }"
+            :class="{ 'profile__nav-link--active': isAssetRoute }"
             type="button"
-            :aria-current="isPrivateRoute ? 'page' : undefined"
+            :aria-current="isAssetRoute ? 'page' : undefined"
             @click="navigate('/me')"
           >
             我的资产
+          </button>
+          <button
+            v-if="isPrivateRoute || ownerAuthenticated"
+            class="profile__nav-link profile__nav-link--inbox"
+            :class="{ 'profile__nav-link--active': isContributionRoute }"
+            type="button"
+            :aria-current="isContributionRoute ? 'page' : undefined"
+            @click="navigate('/me/contributions')"
+          >
+            <span>朋友投稿</span>
+            <span
+              v-if="contributionInbox.pendingCount.value"
+              class="profile__nav-count"
+              :aria-label="`${contributionInbox.pendingCount.value} 份待处理投稿`"
+            >
+              {{ contributionInbox.pendingCount.value }}
+            </span>
           </button>
         </nav>
       </header>
@@ -366,6 +433,13 @@ onUnmounted(removeAfterEach);
       <SiteProfileSettingsView
         v-else-if="route.name === 'settings'"
         :key="route.key"
+      />
+      <AdminContributionInboxView
+        v-else-if="route.name === 'contribution-inbox'"
+      />
+      <AdminContributionReviewView
+        v-else-if="route.name === 'contribution-review'"
+        :public-id="route.publicId"
       />
       <main v-else-if="route.name === 'not-found'" class="not-found">
         <span class="not-found__code">404</span>
@@ -542,6 +616,26 @@ onUnmounted(removeAfterEach);
   border-bottom-color: var(--accent);
 }
 
+.profile__nav-link--inbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.profile__nav-count {
+  display: grid;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.28rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 750;
+  line-height: 1;
+  place-items: center;
+}
+
 .not-found {
   display: grid;
   min-height: 55vh;
@@ -592,7 +686,7 @@ onUnmounted(removeAfterEach);
 
 @media (max-width: 599px) {
   .profile {
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: auto minmax(0, 1fr);
     gap: 0.6rem;
     padding: 0.8rem 0 0.72rem;
   }
@@ -614,6 +708,8 @@ onUnmounted(removeAfterEach);
   }
 
   .profile__nav {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
     gap: 0.65rem;
   }
 
