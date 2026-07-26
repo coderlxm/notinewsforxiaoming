@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, rm, stat } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { lookup } from 'mime-types';
 import { bj } from '../utils/time.js';
 import type {
   VideoDownloadResult,
@@ -61,13 +62,18 @@ export async function runLocalVideoDownload(
       throw new Error('下载结果超过 8 GiB 限制。');
     }
 
+    const fileName = basename(downloadedPath);
+    const contentType = lookup(fileName);
+    if (!contentType || !contentType.startsWith('video/')) {
+      throw new Error(`下载结果不是可识别的视频文件：${fileName}`);
+    }
+
     await options.onStage('uploading');
     const driveDirectory = [
       'NotiNewsDownloads',
       bj().format('YYYY-MM'),
       `${bj().format('YYYYMMDD-HHmmss')}-${randomUUID()}`,
     ].join('/');
-    const fileName = basename(downloadedPath);
     const drivePath = `${driveDirectory}/${fileName}`;
 
     await runProcess(options.rclonePath, [
@@ -76,6 +82,7 @@ export async function runLocalVideoDownload(
       `${options.rcloneRemote}:${drivePath}`,
       '--retries', '1',
       '--low-level-retries', '1',
+      '--metadata-set', `content-type=${contentType}`,
     ]);
 
     return {
