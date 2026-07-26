@@ -74,7 +74,9 @@ jobs:
               - 'deploy/notinews-backup.service'
               - 'deploy/notinews-backup.timer'
               - 'deploy/notinews-failure-notify@.service'
+              - 'scripts/install-video-download-tools'
               - 'scripts/notinews-backup'
+              - 'scripts/notinews-video-worker'
               - 'package.json'
               - 'pnpm-lock.yaml'
               - 'pnpm-workspace.yaml'
@@ -238,6 +240,15 @@ jobs:
             fi
             export npm_config_disturl=https://npmmirror.com/mirrors/node
             pnpm install --frozen-lockfile
+          "
+
+      - name: Install bot media tools
+        run: |
+          PORT="${SERVER_PORT:-22}"
+          ssh -p "$PORT" "$SERVER_USER@$SERVER_HOST" "
+            set -e
+            install -m 755 '$SERVER_PROJECT_DIR/scripts/install-video-download-tools' /usr/local/sbin/install-video-download-tools
+            /usr/local/sbin/install-video-download-tools
           "
 
       - name: Setup bot service

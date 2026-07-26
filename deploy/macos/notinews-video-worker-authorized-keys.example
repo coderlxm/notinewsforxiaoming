@@ -1,0 +1,1 @@
+restrict,command="/Users/xiaomingli/Code/NotiNewsForXiaoming/scripts/notinews-video-worker" ssh-ed25519 <bwgdc01-video-worker-public-key>

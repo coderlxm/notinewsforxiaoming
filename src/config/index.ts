@@ -11,4 +11,8 @@ export const config = {
   journalApiBaseUrl: process.env.JOURNAL_API_BASE_URL || '',
   journalIngestToken: process.env.JOURNAL_INGEST_TOKEN || '',
   journalPublicBaseUrl: process.env.JOURNAL_PUBLIC_BASE_URL || '',
+  videoDownloadMacSshHost: process.env.VIDEO_DOWNLOAD_MAC_SSH_HOST || '',
+  videoDownloadMacSshPort: Number(process.env.VIDEO_DOWNLOAD_MAC_SSH_PORT || '22'),
+  videoDownloadMacSshUser: process.env.VIDEO_DOWNLOAD_MAC_SSH_USER || '',
+  videoDownloadMacSshKeyPath: process.env.VIDEO_DOWNLOAD_MAC_SSH_KEY_PATH || '',
 };

@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PATH=/Users/xiaomingli/.local/share/fnm/aliases/default/bin:/opt/homebrew/bin:/usr/bin:/bin
+RCLONE_CONFIG=/Users/xiaomingli/.config/rclone/rclone.conf
+PROJECT_DIR=/Users/xiaomingli/Code/NotiNewsForXiaoming
+
+export PATH RCLONE_CONFIG
+cd "${PROJECT_DIR}"
+exec /opt/homebrew/bin/pnpm exec tsx src/videoDownloadWorker.ts

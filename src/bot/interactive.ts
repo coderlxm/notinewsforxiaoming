@@ -103,6 +103,10 @@ import {
   runXLikedVideoSync,
 } from '../services/xLikedVideoSync.js';
 import {
+  isVideoDownloadRunning,
+  runVideoDownload,
+} from '../services/videoDownload.js';
+import {
   disableStartggPolling,
   enableStartggPolling,
   getStartggPollingRuntimeStatus,
@@ -143,6 +147,14 @@ interface StartggWatchCandidate {
   playerName: string;
   userId: number | null;
   gamerTag: string;
+}
+
+function formatVideoDownloadBytes(bytes: number): string {
+  const gib = 1024 ** 3;
+  const mib = 1024 ** 2;
+  return bytes >= gib
+    ? `${(bytes / gib).toFixed(2)} GiB`
+    : `${(bytes / mib).toFixed(1)} MiB`;
 }
 
 const STARTGG_GO_NATURAL_ALIASES = new Set([
@@ -310,6 +322,56 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     } catch (e) {
       if (e instanceof Error) {
         await ctx.reply(`X 点赞视频同步失败：${e.message}`);
+        return;
+      }
+      throw e;
+    }
+  });
+
+  bot.command('download', async (ctx) => {
+    if (!isAuthorized(ctx)) return;
+    const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
+    const url = text.replace(/^\/download(?:@\S+)?\s*/i, '').trim();
+    if (!url) {
+      await ctx.reply('用法：/download <视频链接>');
+      return;
+    }
+    if (isVideoDownloadRunning()) {
+      await ctx.reply('已有视频下载任务正在运行。');
+      return;
+    }
+
+    const statusMessage = await ctx.reply('正在解析并下载视频…');
+    const chatId = String(ctx.chat.id);
+    try {
+      const result = await runVideoDownload(url, async (stage) => {
+        if (stage !== 'uploading') return;
+        await ctx.telegram.editMessageText(
+          chatId,
+          statusMessage.message_id,
+          undefined,
+          '视频已下载，正在上传到 Google Drive…',
+        );
+      });
+      await ctx.telegram.editMessageText(
+        chatId,
+        statusMessage.message_id,
+        undefined,
+        [
+          '✅ 视频已上传到 Google Drive',
+          `文件：${result.fileName}`,
+          `大小：${formatVideoDownloadBytes(result.byteSize)}`,
+          `路径：${result.drivePath}`,
+        ].join('\n'),
+      );
+    } catch (e) {
+      if (e instanceof Error) {
+        await ctx.telegram.editMessageText(
+          chatId,
+          statusMessage.message_id,
+          undefined,
+          `视频下载失败：${e.message.slice(0, 3000)}`,
+        );
         return;
       }
       throw e;

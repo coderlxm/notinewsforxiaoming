@@ -5,6 +5,7 @@ PATH=/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 PROJECT_DIR=/root/NotiNewsForXiaoming
 BACKUP_WORK_DIR=/var/lib/notinews-backup
+DOWNLOAD_LOCK=/run/lock/notinews-download.lock
 REMOTE_ROOT=notinews-drive:NotiNewsBackups/bot
 DAILY_REMOTE=${REMOTE_ROOT}/daily
 MONTHLY_REMOTE=${REMOTE_ROOT}/monthly
@@ -19,12 +20,21 @@ STAGING_ROOT=$(mktemp -d "${BACKUP_WORK_DIR}/staging.XXXXXX")
 BUNDLE_ROOT=${STAGING_ROOT}/notinews-backup-v1
 PAYLOAD_ROOT=${BUNDLE_ROOT}/payload
 RCLONE_ARGS=(--retries 1 --low-level-retries 1)
+BOT_STOPPED=false
 
 cleanup() {
   rm -rf -- "${STAGING_ROOT}"
   rm -f -- "${ARCHIVE_PATH}" "${ARCHIVE_CHECKSUM_PATH}"
+  if [[ ${BOT_STOPPED} == true ]]; then
+    systemctl start notinews-bot.service
+  fi
 }
 trap cleanup EXIT
+
+exec 9>"${DOWNLOAD_LOCK}"
+flock --exclusive 9
+systemctl stop notinews-bot.service
+BOT_STOPPED=true
 
 install -d -m 700 "${PAYLOAD_ROOT}/data"
 install -m 600 "${PROJECT_DIR}/.env" "${PAYLOAD_ROOT}/app.env"

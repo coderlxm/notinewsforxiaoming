@@ -12,6 +12,8 @@ EnvironmentFile=/root/NotiNewsForXiaoming/.env
 Environment=NODE_ENV=production
 Environment=NODE_OPTIONS=--dns-result-order=ipv4first
 Environment=npm_config_disturl=https://npmmirror.com/mirrors/node
+Environment=RCLONE_CONFIG=/root/.config/rclone/rclone.conf
+UMask=0077
 ExecStart=/usr/local/bin/pnpm start:bot
 Restart=on-failure
 RestartSec=5

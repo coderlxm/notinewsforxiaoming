@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PATH=/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+YTDLP_VERSION=2026.07.23.234303
+YTDLP_SHA256=737e0fe33019afee4ccfebc775dc492167382c20d845c5abd99bda410b2b5d74
+YTDLP_URL=https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/download/${YTDLP_VERSION}/yt-dlp_linux
+YTDLP_PATH=/usr/local/bin/yt-dlp
+
+if ! command -v ffmpeg >/dev/null 2>&1 \
+  || ! command -v curl >/dev/null 2>&1 \
+  || ! command -v flock >/dev/null 2>&1; then
+  apt-get update
+  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    ffmpeg \
+    util-linux
+fi
+
+if [[ ! -x ${YTDLP_PATH} ]] || [[ $("${YTDLP_PATH}" --version) != "${YTDLP_VERSION}" ]]; then
+  DOWNLOAD_PATH=$(mktemp)
+  trap 'rm -f -- "${DOWNLOAD_PATH}"' EXIT
+  curl -fsSL "${YTDLP_URL}" -o "${DOWNLOAD_PATH}"
+  echo "${YTDLP_SHA256}  ${DOWNLOAD_PATH}" | sha256sum --check -
+  install -m 755 "${DOWNLOAD_PATH}" "${YTDLP_PATH}"
+fi
+
+if ! command -v rclone >/dev/null 2>&1; then
+  echo 'rclone is missing on server' >&2
+  exit 1
+fi
