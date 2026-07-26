@@ -24,6 +24,7 @@ import type {
   JournalDeletionTarget,
   JournalImagePreviewBackfillAsset,
   JournalListFilters,
+  JournalVideoPreviewBackfillAsset,
 } from './types.js';
 
 interface EntryRow {
@@ -825,6 +826,37 @@ export class JournalRepository {
     `).run(previewRelativePath, width, height, assetId);
     if (result.changes !== 1) {
       throw new Error(`Journal asset ${assetId} preview state changed before backfill completed.`);
+    }
+  }
+
+  listVideoAssetsMissingPreview(): JournalVideoPreviewBackfillAsset[] {
+    const rows = this.database.prepare(`
+      SELECT id, relative_path
+      FROM journal_assets
+      WHERE preview_relative_path IS NULL
+        AND (
+          kind IN ('video', 'video_note')
+          OR (
+            kind = 'animation'
+            AND (mime_type IS NULL OR mime_type NOT LIKE 'image/%')
+          )
+          OR (kind = 'sticker' AND mime_type LIKE 'video/%')
+        )
+      ORDER BY id
+    `).all() as Array<{ id: number; relative_path: string }>;
+    return rows.map((row) => ({ id: row.id, relativePath: row.relative_path }));
+  }
+
+  completeVideoPreviewBackfill(assetId: number, previewRelativePath: string): void {
+    const result = this.database.prepare(`
+      UPDATE journal_assets
+      SET preview_relative_path = ?
+      WHERE id = ? AND preview_relative_path IS NULL
+    `).run(previewRelativePath, assetId);
+    if (result.changes !== 1) {
+      throw new Error(
+        `Journal video asset ${assetId} preview state changed before backfill completed.`,
+      );
     }
   }
 

@@ -37,6 +37,10 @@ import { JournalSiteProfileService } from './siteProfileService.js';
 import { JournalStorage } from './storage.js';
 import { TelegramFileDownloader } from './telegramFiles.js';
 import type { JournalServerConfig } from './types.js';
+import {
+  JournalVideoPreviewBackfillService,
+  JournalVideoPreviewService,
+} from './videoPreview.js';
 import { JournalWebEntryService } from './webEntryService.js';
 import { JournalWeatherService } from './weatherService.js';
 
@@ -53,6 +57,7 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
   const storage = new JournalStorage(config.dataDir);
   await storage.initializeContributionStorage();
   const previews = new JournalImagePreviewService();
+  const videoPreviews = new JournalVideoPreviewService();
   const articleService = new JournalArticleService(repository, storage, previews);
   const webEntryService = new JournalWebEntryService(repository, storage, previews);
   const deletionService = new JournalDeletionService(repository, storage);
@@ -64,7 +69,7 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
   const contributionService = new JournalContributionService(
     repository,
     storage,
-    new JournalContributionMediaService(storage),
+    new JournalContributionMediaService(storage, videoPreviews),
   );
   const contributionNotifications = new JournalContributionNotificationService(
     config.telegramToken,
@@ -77,8 +82,10 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
     storage,
     downloader,
     previews,
+    videoPreviews,
   );
   await new JournalImagePreviewBackfillService(repository, storage, previews).run();
+  await new JournalVideoPreviewBackfillService(repository, storage, videoPreviews).run();
   await siteProfileService.initialize(path.join(config.webRoot, 'avatar-ming.png'));
 
   await server.register(fastifyCookie, { secret: config.cookieSecret });

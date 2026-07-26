@@ -13,6 +13,10 @@ import { JournalStorage, type EntryStorageSession } from './storage.js';
 import { parseTelegramMessage, telegramMessageChatId } from './telegramContent.js';
 import { TelegramFileDownloader } from './telegramFiles.js';
 import type { StoredAssetInput } from './types.js';
+import {
+  isJournalVideoAsset,
+  type JournalVideoPreviewService,
+} from './videoPreview.js';
 
 export class JournalIngestService {
   constructor(
@@ -21,6 +25,7 @@ export class JournalIngestService {
     private readonly storage: JournalStorage,
     private readonly downloader: TelegramFileDownloader,
     private readonly previews: JournalImagePreviewService,
+    private readonly videoPreviews: JournalVideoPreviewService,
   ) {}
 
   async ingest(rawRequest: JournalIngestRequest): Promise<JournalEntry> {
@@ -54,13 +59,18 @@ export class JournalIngestService {
         for (const source of parsed.assets) {
           const target = this.storage.assetTarget(storageSession);
           const downloaded = await this.downloader.download(source, target.absolutePath);
-          const dimensions = isJournalImageAsset(source.kind, downloaded.mimeType)
+          const isImage = isJournalImageAsset(source.kind, downloaded.mimeType);
+          const isVideo = isJournalVideoAsset(source.kind, downloaded.mimeType);
+          const dimensions = isImage
             ? await this.previews.generate(target.absolutePath, target.previewAbsolutePath)
             : null;
+          if (isVideo) {
+            await this.videoPreviews.generate(target.absolutePath, target.previewAbsolutePath);
+          }
           storedAssets.push({
             ...source,
             relativePath: target.relativePath,
-            previewRelativePath: dimensions ? target.previewRelativePath : null,
+            previewRelativePath: isImage || isVideo ? target.previewRelativePath : null,
             byteSize: downloaded.byteSize,
             mimeType: downloaded.mimeType,
             width: dimensions?.width ?? source.width,

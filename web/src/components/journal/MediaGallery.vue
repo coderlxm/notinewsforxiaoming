@@ -107,6 +107,7 @@ function preserveAssetRatio(asset: DisplayAsset): { aspectRatio: string } | unde
           class="media__video"
           :class="{ 'media__video--round': asset.kind === 'video_note' }"
           :src="asset.url"
+          :preview-src="asset.previewUrl!"
           fit="cover"
         />
         <video
@@ -114,6 +115,7 @@ function preserveAssetRatio(asset: DisplayAsset): { aspectRatio: string } | unde
           class="media__video"
           :class="{ 'media__video--round': asset.kind === 'video_note' }"
           :src="asset.url"
+          :poster="asset.previewUrl!"
           controls
           preload="metadata"
         />

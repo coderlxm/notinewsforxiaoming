@@ -8,6 +8,7 @@ import { z } from 'zod';
 import type { JournalContributionAssetInput } from './repository.js';
 import { JournalContributionError } from './contributionError.js';
 import type { EntryStorageSession, JournalStorage } from './storage.js';
+import type { JournalVideoPreviewService } from './videoPreview.js';
 
 const execFileAsync = promisify(execFile);
 const maxImagePixels = 50_000_000;
@@ -42,7 +43,10 @@ export interface ContributionUploadSource {
 }
 
 export class JournalContributionMediaService {
-  constructor(private readonly storage: JournalStorage) {}
+  constructor(
+    private readonly storage: JournalStorage,
+    private readonly videoPreviews: JournalVideoPreviewService,
+  ) {}
 
   async process(
     source: ContributionUploadSource,
@@ -296,26 +300,9 @@ export class JournalContributionMediaService {
       ffmpegArguments.push('-tag:v', 'hvc1');
     }
     ffmpegArguments.push(target.absolutePath);
-    const posterPath = `${target.absolutePath}.poster.png`;
     try {
       await execFileAsync('ffmpeg', ffmpegArguments, { maxBuffer: 1024 * 1024 });
-      await execFileAsync('ffmpeg', [
-        '-v', 'error',
-        '-i', target.absolutePath,
-        '-frames:v', '1',
-        posterPath,
-      ], { maxBuffer: 1024 * 1024 });
-      await sharp(posterPath, { limitInputPixels: maxImagePixels })
-        .resize({
-          width: 960,
-          height: 960,
-          fit: 'inside',
-          withoutEnlargement: true,
-        })
-        .toColourspace('srgb')
-        .webp({ quality: 82 })
-        .toFile(target.previewAbsolutePath);
-      await fs.promises.rm(posterPath);
+      await this.videoPreviews.generate(target.absolutePath, target.previewAbsolutePath);
     } catch {
       throw new JournalContributionError(
         'MEDIA_PROCESSING_FAILED',

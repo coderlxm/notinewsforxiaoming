@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, shallowRef, useTemplateRef, watch } from 'vue';
 import type { CSSProperties } from 'vue';
-import JournalLoading from '../ui/JournalLoading.vue';
 import type { JournalAsset } from '../../types';
 
 const props = defineProps<{
@@ -117,18 +116,12 @@ onBeforeUnmount(() => activeVideo.value?.pause());
           class="media-stage__media media-stage__video"
           :class="{ 'media-stage__video--ready': videoReady }"
           :src="currentAsset.url"
+          :poster="currentAsset.previewUrl!"
           controls
           preload="auto"
+          :aria-busy="!videoReady"
           @loadeddata="revealVideo"
         />
-        <div
-          v-if="currentAsset.mediaType === 'video'"
-          class="media-stage__video-loading"
-          :class="{ 'media-stage__video-loading--hidden': videoReady }"
-          :aria-hidden="videoReady"
-        >
-          <JournalLoading variant="inline" label="正在展开影像…" />
-        </div>
       </div>
     </div>
 
@@ -170,8 +163,10 @@ onBeforeUnmount(() => activeVideo.value?.pause());
           :aria-current="index === currentIndex ? 'true' : undefined"
           @click="goTo(index)"
         >
-          <img v-if="asset.mediaType === 'image'" :src="asset.previewUrl" alt="" loading="lazy">
-          <span v-else class="media-stage__video-mark" aria-hidden="true">▶</span>
+          <img :src="asset.previewUrl" alt="" loading="lazy">
+          <span v-if="asset.mediaType === 'video'" class="media-stage__video-mark" aria-hidden="true">
+            ▶
+          </span>
         </button>
       </div>
     </footer>
@@ -232,33 +227,11 @@ onBeforeUnmount(() => activeVideo.value?.pause());
 }
 
 .media-stage__video {
-  opacity: 0;
   pointer-events: none;
-  transition: opacity 180ms ease;
 }
 
 .media-stage__video--ready {
-  opacity: 1;
   pointer-events: auto;
-}
-
-.media-stage__video-loading {
-  z-index: 1;
-  display: grid;
-  grid-area: 1 / 1;
-  padding: 0.75rem 1rem;
-  border: 1px solid rgb(255 255 255 / 10%);
-  border-radius: 999px;
-  background: rgb(255 255 255 / 6%);
-  color: rgb(255 255 255 / 76%);
-  opacity: 1;
-  pointer-events: none;
-  place-items: center;
-  transition: opacity 140ms ease;
-}
-
-.media-stage__video-loading--hidden {
-  opacity: 0;
 }
 
 .media-stage__item--sticker .media-stage__media {
@@ -353,6 +326,7 @@ onBeforeUnmount(() => activeVideo.value?.pause());
 }
 
 .media-stage__thumbnail {
+  position: relative;
   display: grid;
   width: 46px;
   height: 46px;
@@ -372,6 +346,7 @@ onBeforeUnmount(() => activeVideo.value?.pause());
 }
 
 .media-stage__thumbnail img {
+  grid-area: 1 / 1;
   width: 100%;
   height: 100%;
   border-radius: 4px;
@@ -379,12 +354,16 @@ onBeforeUnmount(() => activeVideo.value?.pause());
 }
 
 .media-stage__video-mark {
+  z-index: 1;
   display: grid;
-  width: 28px;
-  height: 28px;
+  width: 22px;
+  height: 22px;
+  grid-area: 1 / 1;
   border-radius: 50%;
-  background: rgb(255 255 255 / 14%);
-  font-size: 0.7rem;
+  background: rgb(0 0 0 / 62%);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 32%);
+  color: #fff;
+  font-size: 0.58rem;
   place-items: center;
 }
 
@@ -441,8 +420,7 @@ onBeforeUnmount(() => activeVideo.value?.pause());
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .media-stage__media,
-  .media-stage__video-loading {
+  .media-stage__media {
     animation: none;
     transition: none;
   }

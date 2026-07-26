@@ -93,3 +93,8 @@ export interface JournalImagePreviewBackfillAsset {
   id: number;
   relativePath: string;
 }
+
+export interface JournalVideoPreviewBackfillAsset {
+  id: number;
+  relativePath: string;
+}
