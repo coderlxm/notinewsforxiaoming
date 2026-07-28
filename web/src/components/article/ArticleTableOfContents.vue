@@ -44,22 +44,24 @@ function restoreTriggerFocus(): void {
 </script>
 
 <template>
-  <aside class="article-toc article-toc--desktop">
-    <span class="article-toc__eyebrow">本文目录</span>
-    <nav aria-label="文章目录">
-      <a
-        v-for="heading in headings"
-        :key="heading.id"
-        class="article-toc__link"
-        :class="{ 'article-toc__link--nested': heading.level === 3 }"
-        :href="`#${heading.id}`"
-        :aria-current="heading.id === activeId ? 'location' : undefined"
-        @click.prevent="select(heading.id)"
-      >
-        {{ heading.text }}
-      </a>
-    </nav>
-  </aside>
+  <div class="article-toc__slot">
+    <aside class="article-toc article-toc--desktop">
+      <span class="article-toc__eyebrow">本文目录</span>
+      <nav aria-label="文章目录">
+        <a
+          v-for="heading in headings"
+          :key="heading.id"
+          class="article-toc__link"
+          :class="{ 'article-toc__link--nested': heading.level === 3 }"
+          :href="`#${heading.id}`"
+          :aria-current="heading.id === activeId ? 'location' : undefined"
+          @click.prevent="select(heading.id)"
+        >
+          {{ heading.text }}
+        </a>
+      </nav>
+    </aside>
+  </div>
 
   <button
     ref="trigger"
@@ -102,11 +104,15 @@ function restoreTriggerFocus(): void {
 
 <style scoped>
 .article-toc {
-  position: sticky;
-  top: 1rem;
-  align-self: start;
+  position: fixed;
+  z-index: 2;
+  top: 50%;
+  width: 12rem;
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
   padding-left: 1rem;
   border-left: 1px solid var(--border-subtle);
+  transform: translateY(-50%);
 }
 
 .article-toc__eyebrow {
@@ -152,7 +158,7 @@ function restoreTriggerFocus(): void {
 }
 
 @media (max-width: 959px) {
-  .article-toc--desktop {
+  .article-toc__slot {
     display: none;
   }
 
