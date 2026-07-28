@@ -138,10 +138,10 @@ onMounted(initializeReading);
   scroll-margin-top: 1rem;
 }
 
-@media (min-width: 960px) {
+@media (min-width: 1180px) {
   .article-rich-body--with-toc {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 12rem;
+    grid-template-columns: minmax(0, 1fr) 11.5rem;
     gap: clamp(1.5rem, 3vw, 2.6rem);
     align-items: start;
   }

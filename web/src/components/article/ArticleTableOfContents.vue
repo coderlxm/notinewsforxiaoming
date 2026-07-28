@@ -15,7 +15,7 @@ const emit = defineEmits<{
 const dialog = useTemplateRef<HTMLDialogElement>('dialog');
 const trigger = useTemplateRef<HTMLButtonElement>('trigger');
 const drawerTitleId = useId();
-const isDesktop = useMediaQuery('(min-width: 960px)');
+const isDesktop = useMediaQuery('(min-width: 1180px)');
 
 watch(isDesktop, (desktop) => {
   if (desktop && dialog.value?.open) dialog.value.close();
@@ -44,24 +44,22 @@ function restoreTriggerFocus(): void {
 </script>
 
 <template>
-  <div class="article-toc__slot">
-    <aside class="article-toc article-toc--desktop">
-      <span class="article-toc__eyebrow">本文目录</span>
-      <nav aria-label="文章目录">
-        <a
-          v-for="heading in headings"
-          :key="heading.id"
-          class="article-toc__link"
-          :class="{ 'article-toc__link--nested': heading.level === 3 }"
-          :href="`#${heading.id}`"
-          :aria-current="heading.id === activeId ? 'location' : undefined"
-          @click.prevent="select(heading.id)"
-        >
-          {{ heading.text }}
-        </a>
-      </nav>
-    </aside>
-  </div>
+  <aside class="article-toc article-toc--desktop">
+    <span class="article-toc__eyebrow">本文目录</span>
+    <nav class="article-toc__links" aria-label="文章目录">
+      <a
+        v-for="heading in headings"
+        :key="heading.id"
+        class="article-toc__link article-toc__link--desktop"
+        :class="{ 'article-toc__link--nested': heading.level === 3 }"
+        :href="`#${heading.id}`"
+        :aria-current="heading.id === activeId ? 'location' : undefined"
+        @click.prevent="select(heading.id)"
+      >
+        {{ heading.text }}
+      </a>
+    </nav>
+  </aside>
 
   <button
     ref="trigger"
@@ -104,43 +102,69 @@ function restoreTriggerFocus(): void {
 
 <style scoped>
 .article-toc {
-  position: fixed;
-  z-index: 2;
-  top: 50%;
-  width: 12rem;
-  max-height: calc(100dvh - 2rem);
-  overflow-y: auto;
-  padding-left: 1rem;
+  --article-toc-offset: clamp(5rem, 15vh, 7.5rem);
+
+  position: sticky;
+  top: var(--article-toc-offset);
+  align-self: start;
+  min-width: 0;
+  padding-left: 0.9rem;
   border-left: 1px solid var(--border-subtle);
-  transform: translateY(-50%);
 }
 
 .article-toc__eyebrow {
   display: block;
-  margin-bottom: 0.55rem;
+  margin-bottom: 0.45rem;
   color: var(--text-muted);
-  font-size: 0.68rem;
-  font-weight: 750;
+  font-size: 0.7rem;
+  font-weight: 700;
   letter-spacing: 0.08em;
 }
 
-.article-toc nav,
+.article-toc__links,
 .article-toc__drawer-links {
   display: grid;
 }
 
+.article-toc__links {
+  max-height: calc(100dvh - var(--article-toc-offset) - 2rem);
+  padding-right: 0.35rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
 .article-toc__link {
-  padding: 0.36rem 0;
+  position: relative;
+  padding: 0.4rem 0.25rem 0.4rem 0.75rem;
   color: var(--text-muted);
-  font-size: 0.76rem;
-  line-height: 1.45;
-  overflow-wrap: anywhere;
+  font-size: 0.8rem;
+  line-height: 1.5;
   text-decoration: none;
 }
 
+.article-toc__link--desktop {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.article-toc__link--desktop::before {
+  position: absolute;
+  top: 50%;
+  left: calc(-0.9rem - 1px);
+  width: 2px;
+  height: 1.15rem;
+  border-radius: 999px;
+  background: transparent;
+  content: '';
+  transform: translateY(-50%);
+}
+
 .article-toc__link--nested {
-  padding-left: 0.8rem;
-  font-size: 0.72rem;
+  padding-left: 1.4rem;
+  font-size: 0.76rem;
 }
 
 .article-toc__link:hover,
@@ -148,8 +172,14 @@ function restoreTriggerFocus(): void {
   color: var(--accent-strong);
 }
 
-.article-toc__link[aria-current="location"] {
-  font-weight: 750;
+.article-toc__link--desktop[aria-current="location"]::before {
+  background: var(--accent);
+}
+
+.article-toc__link:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .article-toc__trigger,
@@ -157,8 +187,8 @@ function restoreTriggerFocus(): void {
   display: none;
 }
 
-@media (max-width: 959px) {
-  .article-toc__slot {
+@media (max-width: 1179px) {
+  .article-toc--desktop {
     display: none;
   }
 
