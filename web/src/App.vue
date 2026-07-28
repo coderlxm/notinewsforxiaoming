@@ -255,6 +255,12 @@ async function navigate(path: string): Promise<void> {
 
 function handleRouteChange(nextPath: string, currentPath: string): void {
   if (currentPath === nextPath) return;
+  const nextUrl = new URL(nextPath, window.location.origin);
+  const currentUrl = new URL(currentPath, window.location.origin);
+  if (
+    nextUrl.pathname === currentUrl.pathname
+    && nextUrl.search === currentUrl.search
+  ) return;
   if (isOverlayHistoryTransition(currentPath, nextPath)) {
     return;
   }

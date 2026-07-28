@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia';
 import { computed, shallowRef, watch } from 'vue';
-import RichArticleRenderer from '../article/RichArticleRenderer.vue';
+import ArticleRichBody from '../article/ArticleRichBody.vue';
 import JournalLoading from '../ui/JournalLoading.vue';
 import { useSiteProfileStore } from '../../stores/siteProfile';
 import type { JournalAsset, JournalEntry, JournalVisibility } from '../../types';
@@ -143,7 +143,7 @@ function requestPublishedTimeEditing(): void {
         <img :src="cover.url" :alt="entry.title ?? ''">
       </figure>
 
-      <RichArticleRenderer :document="entry.richBody" class="detail-content__rich-body" />
+      <ArticleRichBody :document="entry.richBody" class="detail-content__rich-body" />
     </template>
 
     <template v-else>

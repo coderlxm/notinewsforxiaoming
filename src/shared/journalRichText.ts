@@ -1,5 +1,9 @@
+import type { JSONContent } from '@tiptap/core';
 import Image from '@tiptap/extension-image';
+import { generateUniqueIds, UniqueID } from '@tiptap/extension-unique-id';
 import StarterKit from '@tiptap/starter-kit';
+
+export const journalHeadingIdPattern = /^section-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 export const journalImageExtension = Image.extend({
   addAttributes() {
@@ -17,7 +21,7 @@ export const journalImageExtension = Image.extend({
   },
 });
 
-export function createJournalRichTextExtensions() {
+export function createJournalRichTextExtensions(options: { updateHeadingIds?: boolean } = {}) {
   return [
     StarterKit.configure({
       heading: { levels: [2, 3] },
@@ -28,6 +32,19 @@ export function createJournalRichTextExtensions() {
         HTMLAttributes: { rel: 'noopener noreferrer', target: '_blank' },
       },
     }),
+    UniqueID.configure({
+      attributeName: 'anchorId',
+      types: ['heading'],
+      generateID: () => `section-${crypto.randomUUID()}`,
+      updateDocument: options.updateHeadingIds ?? true,
+    }),
     journalImageExtension,
   ];
+}
+
+export function addJournalHeadingIds(document: JSONContent): JSONContent {
+  return generateUniqueIds(
+    document,
+    createJournalRichTextExtensions({ updateHeadingIds: false }),
+  );
 }

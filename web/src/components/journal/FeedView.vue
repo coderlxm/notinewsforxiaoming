@@ -340,7 +340,12 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
 </script>
 
 <template>
-  <JournalPullRefresh v-model="refreshing" :disabled="refreshDisabled" @refresh="refreshFeed">
+  <JournalPullRefresh
+    v-model="refreshing"
+    :allow-overflow="isDetail"
+    :disabled="refreshDisabled"
+    @refresh="refreshFeed"
+  >
     <main class="feed" :class="{ 'feed--detail': isDetail }">
       <div v-if="isDetail" class="feed__detail-heading">
         <button class="text-button" type="button" @click="emit('returnToFeed')">← 返回信息流</button>
@@ -472,6 +477,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
             :entry="journal.detail.value"
             :linkable="false"
             display="full"
+            anchored
             @select-tag="selectTag"
           />
           <EntryCard
@@ -577,7 +583,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
 }
 
 .feed--detail {
-  width: min(calc(100% - (var(--page-gutter) * 2)), var(--reading-width));
+  width: min(calc(100% - (var(--page-gutter) * 2)), 1100px);
 }
 
 .feed__public-heading,

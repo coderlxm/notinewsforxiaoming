@@ -3,9 +3,13 @@ import { generateHTML } from '@tiptap/html/server';
 import { load } from 'cheerio';
 import sanitizeHtml from 'sanitize-html';
 import type { JournalRichDocument, JournalRichNode } from '../shared/journalProtocol.js';
-import { createJournalRichTextExtensions } from '../shared/journalRichText.js';
+import {
+  addJournalHeadingIds,
+  createJournalRichTextExtensions,
+  journalHeadingIdPattern,
+} from '../shared/journalRichText.js';
 
-const serverExtensions = createJournalRichTextExtensions();
+const serverExtensions = createJournalRichTextExtensions({ updateHeadingIds: false });
 
 export function extractContentText(document: JournalRichDocument): string {
   return generateText(document as unknown as Parameters<typeof generateText>[0], serverExtensions);
@@ -36,7 +40,18 @@ export function assertRichDocument(document: JournalRichDocument, options: { all
   if (!options.allowImages && collectInlineAssetIds(document).length > 0) {
     throw new Error('An article cannot contain images before its first save.');
   }
+  const headingIds = new Set<string>();
   const visit = (node: JournalRichNode): void => {
+    if (node.type === 'heading') {
+      const anchorId = node.attrs?.anchorId;
+      if (typeof anchorId !== 'string' || !journalHeadingIdPattern.test(anchorId)) {
+        throw new Error('Heading nodes must contain a valid anchor id.');
+      }
+      if (headingIds.has(anchorId)) {
+        throw new Error(`Heading anchor id ${anchorId} is duplicated.`);
+      }
+      headingIds.add(anchorId);
+    }
     if (Array.isArray(node.marks)) {
       for (const mark of node.marks) {
         if (mark.type === 'link') {
@@ -76,6 +91,10 @@ export function assertRichDocument(document: JournalRichDocument, options: { all
     }
   };
   visit(document);
+}
+
+export function normalizeRichDocument(document: JournalRichDocument): JournalRichDocument {
+  return addJournalHeadingIds(document) as JournalRichDocument;
 }
 
 export function generateArticleHtml(document: JournalRichDocument, publicBaseUrl: string): string {

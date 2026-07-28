@@ -4,6 +4,7 @@ import JournalLoading from './JournalLoading.vue';
 
 defineProps<{
   disabled: boolean;
+  allowOverflow?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -21,6 +22,7 @@ const refreshing = defineModel<boolean>({ required: true });
   <PullRefresh
     v-model="refreshing"
     class="journal-pull-refresh"
+    :class="{ 'journal-pull-refresh--overflow-visible': allowOverflow }"
     :disabled="disabled"
     :head-height="50"
     :pull-distance="64"
@@ -52,6 +54,10 @@ const refreshing = defineModel<boolean>({ required: true });
 <style scoped>
 .journal-pull-refresh {
   overflow: hidden;
+}
+
+.journal-pull-refresh--overflow-visible {
+  overflow: visible;
 }
 
 .journal-pull-refresh :deep(.van-pull-refresh__track) {

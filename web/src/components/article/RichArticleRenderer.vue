@@ -13,7 +13,7 @@ const editor = shallowRef<Editor | null>(null);
 function buildEditor(document: JournalRichDocument | null): Editor {
   return new Editor({
     editable: false,
-    extensions: createJournalRichTextExtensions(),
+    extensions: createJournalRichTextExtensions({ updateHeadingIds: false }),
     content: document ?? { type: 'doc', content: [] },
   });
 }

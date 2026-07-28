@@ -20,6 +20,7 @@ import {
   assertRichDocument,
   collectInlineAssetIds,
   extractContentText,
+  normalizeRichDocument,
 } from './richText.js';
 import { JournalStorage } from './storage.js';
 import {
@@ -186,11 +187,12 @@ export class JournalArticleService {
   }
 
   private serializeRichBody(document: JournalRichDocument, options: { allowImages: boolean }): string {
-    const json = JSON.stringify(document);
+    const normalized = normalizeRichDocument(document);
+    const json = JSON.stringify(normalized);
     if (Buffer.byteLength(json, 'utf8') > maxRichBodyBytes) {
       throw new Error('Article rich body exceeds the 512 KB limit.');
     }
-    assertRichDocument(document, options);
+    assertRichDocument(normalized, options);
     return json;
   }
 

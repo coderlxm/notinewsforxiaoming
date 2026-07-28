@@ -1,4 +1,6 @@
 import type Database from 'better-sqlite3';
+import { journalRichDocumentSchema, type JournalRichDocument } from '../shared/journalProtocol.js';
+import { assertRichDocument, normalizeRichDocument } from './richText.js';
 
 interface JournalMigration {
   version: number;
@@ -563,6 +565,30 @@ const migrations: JournalMigration[] = [
         CREATE INDEX idx_journal_contribution_assets_contribution
         ON journal_contribution_assets(contribution_id, sort_order, id);
       `);
+    },
+  },
+  {
+    version: 8,
+    up(database) {
+      const rows = database.prepare(`
+        SELECT id, rich_body_json
+        FROM journal_entries
+        WHERE body_format = 'rich'
+      `).all() as Array<{ id: number; rich_body_json: string }>;
+      const update = database.prepare(`
+        UPDATE journal_entries
+        SET rich_body_json = ?
+        WHERE id = ?
+      `);
+
+      for (const row of rows) {
+        const document = journalRichDocumentSchema.parse(
+          JSON.parse(row.rich_body_json),
+        ) as JournalRichDocument;
+        const normalized = normalizeRichDocument(document);
+        assertRichDocument(normalized, { allowImages: true });
+        update.run(JSON.stringify(normalized), row.id);
+      }
     },
   },
 ];

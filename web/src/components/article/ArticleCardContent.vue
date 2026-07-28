@@ -7,6 +7,7 @@ import type { JournalEntry, JournalVisibility } from '../../types';
 import CardActionMenu from '../journal/CardActionMenu.vue';
 import CardDateSpine from '../journal/CardDateSpine.vue';
 import PublishedTimeDialog from '../journal/PublishedTimeDialog.vue';
+import ArticleRichBody from './ArticleRichBody.vue';
 import RichArticleRenderer from './RichArticleRenderer.vue';
 
 const props = withDefaults(defineProps<{
@@ -15,11 +16,13 @@ const props = withDefaults(defineProps<{
   busy?: boolean;
   linkable?: boolean;
   display?: 'summary' | 'full';
+  anchored?: boolean;
 }>(), {
   editable: false,
   busy: false,
   linkable: true,
   display: 'summary',
+  anchored: false,
 });
 
 const emit = defineEmits<{
@@ -157,6 +160,11 @@ function handleCardClick(event: MouseEvent): void {
     </button>
     <p v-else-if="display === 'summary' && summary" class="article-card__summary">{{ summary }}</p>
 
+    <ArticleRichBody
+      v-else-if="display === 'full' && anchored"
+      :document="entry.richBody"
+      class="article-card__body"
+    />
     <RichArticleRenderer
       v-else-if="display === 'full'"
       :document="entry.richBody"
