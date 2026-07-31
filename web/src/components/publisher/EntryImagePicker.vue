@@ -21,12 +21,15 @@ const files = defineModel<File[]>({ required: true });
 const previews = shallowRef<LocalPreview[]>([]);
 const selectionError = shallowRef<string | null>(null);
 const dropZone = useTemplateRef<HTMLButtonElement>('dropZone');
-const acceptedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+const acceptedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'video/mp4', 'video/quicktime'];
 const acceptedTypes = new Set(acceptedMimeTypes);
-const maximumImageCount = 10;
+const maximumMediaCount = 10;
+const maximumVideoCount = 5;
 const maximumFileSize = 20 * 1024 * 1024;
+const maximumVideoSize = 500 * 1024 * 1024;
 const imageCount = computed(() => props.existingAssets.length + files.value.length);
-const imageLimitReached = computed(() => imageCount.value >= maximumImageCount);
+const videoCount = computed(() => [...props.existingAssets, ...files.value].filter(item => item instanceof File ? item.type.startsWith('video/') : item.kind === 'video').length);
+const imageLimitReached = computed(() => imageCount.value >= maximumMediaCount);
 const pickerDisabled = computed(() => props.disabled || imageLimitReached.value);
 
 const { open: openFileDialog, onChange } = useFileDialog({
@@ -59,18 +62,22 @@ function addImages(selected: File[]): void {
   selectionError.value = null;
   if (selected.length === 0) return;
 
-  if (imageCount.value + selected.length > maximumImageCount) {
-    selectionError.value = '每条内容最多选择 10 张图片。';
+  if (imageCount.value + selected.length > maximumMediaCount) {
+    selectionError.value = '每条内容最多选择 10 项媒体。';
     return;
   }
   const unsupported = selected.find(file => !acceptedTypes.has(file.type));
   if (unsupported) {
-    selectionError.value = `${unsupported.name} 不是支持的图片格式。`;
+    selectionError.value = `${unsupported.name} 不是支持的图片或视频格式。`;
     return;
   }
-  const oversized = selected.find(file => file.size > maximumFileSize);
+  const oversized = selected.find(file => file.size > (file.type.startsWith('video/') ? maximumVideoSize : maximumFileSize));
   if (oversized) {
-    selectionError.value = `${oversized.name} 超过 20 MB。`;
+    selectionError.value = `${oversized.name} 超过${oversized.type.startsWith('video/') ? ' 500 MiB' : ' 20 MB'}。`;
+    return;
+  }
+  if (videoCount.value + selected.filter(file => file.type.startsWith('video/')).length > maximumVideoCount) {
+    selectionError.value = '每条内容最多选择 5 段视频。';
     return;
   }
 
@@ -127,8 +134,8 @@ onBeforeUnmount(() => {
 <template>
   <section class="image-picker" aria-labelledby="entry-images-label">
     <div class="image-picker__heading">
-      <h2 id="entry-images-label" class="image-picker__label">图片</h2>
-      <p id="entry-images-hint" class="image-picker__hint">支持 JPEG、PNG、WebP、GIF，最多 10 张，每张不超过 20 MB；可使用 Ctrl / Command + V 粘贴。</p>
+      <h2 id="entry-images-label" class="image-picker__label">图片与视频</h2>
+      <p id="entry-images-hint" class="image-picker__hint">图片支持 JPEG、PNG、WebP、GIF；视频支持 MP4、MOV。最多 10 项，其中视频最多 5 段；可使用 Ctrl / Command + V 粘贴图片。</p>
     </div>
 
     <button
@@ -144,12 +151,12 @@ onBeforeUnmount(() => {
       aria-describedby="entry-images-hint"
       @click="selectImages"
     >
-      <strong v-if="imageLimitReached" class="image-picker__drop-title">已达到 10 张上限</strong>
+      <strong v-if="imageLimitReached" class="image-picker__drop-title">已达到 10 项上限</strong>
       <strong v-else-if="disabled" class="image-picker__drop-title">图片选择暂不可用</strong>
       <strong v-else-if="dropZoneActive" class="image-picker__drop-title">松开以添加图片</strong>
       <template v-else>
-        <strong class="image-picker__drop-title image-picker__drop-title--desktop">拖拽图片到这里，点击选择，或直接粘贴</strong>
-        <strong class="image-picker__drop-title image-picker__drop-title--mobile">点击选择图片</strong>
+        <strong class="image-picker__drop-title image-picker__drop-title--desktop">拖拽媒体到这里，点击选择，或直接粘贴图片</strong>
+        <strong class="image-picker__drop-title image-picker__drop-title--mobile">点击选择媒体</strong>
       </template>
       <span class="image-picker__drop-hint">图片将在保存草稿或发布时上传</span>
     </button>
@@ -158,7 +165,14 @@ onBeforeUnmount(() => {
 
     <div v-if="existingAssets.length || previews.length" class="image-picker__grid">
       <figure v-for="asset in existingAssets" :key="`asset-${asset.id}`" class="image-picker__item">
-        <img :src="asset.previewUrl ?? asset.url" :alt="asset.originalName ?? '草稿图片'">
+        <video
+          v-if="asset.kind === 'video'"
+          :src="asset.url"
+          :poster="asset.previewUrl ?? undefined"
+          muted
+          preload="metadata"
+        />
+        <img v-else :src="asset.previewUrl ?? asset.url" :alt="asset.originalName ?? '草稿图片'">
         <button
           class="image-picker__remove"
           type="button"
@@ -170,7 +184,8 @@ onBeforeUnmount(() => {
         </button>
       </figure>
       <figure v-for="preview in previews" :key="preview.url" class="image-picker__item">
-        <img :src="preview.url" :alt="preview.file.name">
+        <video v-if="preview.file.type.startsWith('video/')" :src="preview.url" muted preload="metadata"></video>
+        <img v-else :src="preview.url" :alt="preview.file.name">
         <button
           class="image-picker__remove"
           type="button"
@@ -278,9 +293,12 @@ onBeforeUnmount(() => {
   margin: 0;
 }
 
-.image-picker__item img {
+.image-picker__item img,
+.image-picker__item video {
+  display: block;
   width: 100%;
   aspect-ratio: 1;
+  max-height: 12rem;
   border-radius: var(--radius-media);
   background: var(--surface-muted);
   object-fit: cover;

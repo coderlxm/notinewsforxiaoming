@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router';
 import JournalLoading from '../ui/JournalLoading.vue';
 import { useDeferredLoading } from '../../composables/useDeferredLoading';
 import { useEntryPublisher } from '../../composables/useEntryPublisher';
+import { useEntryMediaSubmit } from '../../composables/useEntryMediaSubmit';
 import type { JournalAsset, JournalVisibility } from '../../types';
 import EntryImagePicker from './EntryImagePicker.vue';
 import EntryVisibilityField from './EntryVisibilityField.vue';
@@ -18,9 +19,10 @@ const router = useRouter();
 const publisher = useEntryPublisher();
 const contentText = shallowRef('');
 const visibility = shallowRef<JournalVisibility>('public');
-const newImages = shallowRef<File[]>([]);
+const newMedia = shallowRef<File[]>([]);
 const removedAssetIds = shallowRef<ReadonlySet<number>>(new Set());
 const initializedEntryId = shallowRef<number | null>(null);
+const mediaSubmit = useEntryMediaSubmit();
 
 const isEditing = computed(() => props.entryId !== undefined);
 const awaitingDraft = computed(() =>
@@ -32,9 +34,9 @@ const formAvailable = computed(() => !isEditing.value || isDraft.value);
 const existingAssets = computed<JournalAsset[]>(() =>
   (publisher.entry.value?.assets ?? []).filter(asset => !removedAssetIds.value.has(asset.id)),
 );
-const busy = computed(() => publisher.submitting.value !== null);
+const busy = computed(() => publisher.submitting.value !== null || mediaSubmit.busy.value);
 const hasContent = computed(() =>
-  contentText.value.trim().length > 0 || existingAssets.value.length + newImages.value.length > 0,
+  contentText.value.trim().length > 0 || existingAssets.value.length + newMedia.value.length > 0,
 );
 const canSubmit = computed(() => formAvailable.value && hasContent.value && !busy.value);
 const routeError = computed(() => {
@@ -47,7 +49,7 @@ watch(() => publisher.entry.value, (entry) => {
   if (!entry || initializedEntryId.value === entry.id) return;
   initializedEntryId.value = entry.id;
   contentText.value = entry.contentText;
-  newImages.value = [];
+  newMedia.value = [];
   removedAssetIds.value = new Set();
 });
 
@@ -62,18 +64,20 @@ function removeExisting(assetId: number): void {
 function buildInput() {
   return {
     contentText: contentText.value,
-    newImages: newImages.value,
+    uploadId: '',
     removedAssetIds: [...removedAssetIds.value],
     visibility: visibility.value,
   };
 }
 
 async function saveDraft(): Promise<void> {
-  const saved = await publisher.saveDraft(buildInput());
+  const uploadId = await mediaSubmit.submit(newMedia.value, publisher.entry.value?.id);
+  if (!uploadId) return;
+  const saved = await publisher.saveDraft({ ...buildInput(), uploadId });
   if (!saved) return;
   initializedEntryId.value = saved.id;
   contentText.value = saved.contentText;
-  newImages.value = [];
+  newMedia.value = [];
   removedAssetIds.value = new Set();
   if (!isEditing.value) {
     await router.replace({ name: 'entry-edit', params: { entryId: saved.id } });
@@ -81,7 +85,9 @@ async function saveDraft(): Promise<void> {
 }
 
 async function publish(): Promise<void> {
-  const published = await publisher.publish(buildInput());
+  const uploadId = await mediaSubmit.submit(newMedia.value, publisher.entry.value?.id);
+  if (!uploadId) return;
+  const published = await publisher.publish({ ...buildInput(), uploadId });
   if (!published) return;
   await router.push({ name: 'private' });
 }
@@ -95,6 +101,7 @@ async function publish(): Promise<void> {
     </div>
 
     <p v-if="routeError && formAvailable" class="notice notice--error" role="alert">{{ routeError }}</p>
+    <p v-if="mediaSubmit.error.value" class="notice notice--error" role="alert">{{ mediaSubmit.error.value }}</p>
 
     <div class="publisher-view__stage" :class="{ 'publisher-view__stage--reading': !formAvailable }" :aria-busy="awaitingDraft">
       <Transition name="publisher-stage" mode="out-in">
@@ -112,7 +119,7 @@ async function publish(): Promise<void> {
           </label>
 
           <EntryImagePicker
-            v-model="newImages"
+            v-model="newMedia"
             :existing-assets="existingAssets"
             :disabled="busy"
             @remove-existing="removeExisting"

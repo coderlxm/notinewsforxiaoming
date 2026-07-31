@@ -8,7 +8,7 @@ import type { JournalEntry, JournalVisibility } from '../types';
 
 interface EntryPublisherInput {
   contentText: string;
-  newImages: File[];
+  uploadId: string;
   removedAssetIds: number[];
   visibility?: JournalVisibility;
 }
@@ -45,13 +45,13 @@ export function useEntryPublisher() {
       const saved = entry.value === null
         ? await publishEntryRequest({
             contentText: input.contentText,
-            images: input.newImages,
+            uploadId: input.uploadId,
             action,
             visibility: action === 'publish' ? input.visibility : undefined,
           })
         : await updateDraftRequest(entry.value.id, {
             contentText: input.contentText,
-            newImages: input.newImages,
+            uploadId: input.uploadId,
             removedAssetIds: input.removedAssetIds,
             action,
             visibility: action === 'publish' ? input.visibility : undefined,

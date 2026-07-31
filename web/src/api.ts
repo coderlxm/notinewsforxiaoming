@@ -187,35 +187,39 @@ export function fetchPrivateEntry(id: number): Promise<JournalEntry> {
 
 export function publishEntry(input: {
   contentText: string;
-  images: File[];
+  uploadId: string;
   action: 'draft' | 'publish';
   visibility?: JournalVisibility;
 }): Promise<JournalEntry> {
-  const form = new FormData();
-  form.append('contentText', input.contentText);
-  form.append('action', input.action);
-  if (input.visibility !== undefined) form.append('visibility', input.visibility);
-  input.images.forEach(file => form.append('images', file));
-  return requestJson<JournalEntry>('/api/me/entries', { method: 'POST', body: form });
+  return requestJson<JournalEntry>('/api/me/entries', jsonRequest('POST', input));
 }
 
 export function updateDraft(id: number, input: {
   contentText: string;
-  newImages: File[];
+  uploadId: string;
   removedAssetIds: number[];
   action: 'draft' | 'publish';
   visibility?: JournalVisibility;
 }): Promise<JournalEntry> {
-  const form = new FormData();
-  form.append('contentText', input.contentText);
-  form.append('action', input.action);
-  if (input.visibility !== undefined) form.append('visibility', input.visibility);
-  input.newImages.forEach(file => form.append('newImages', file));
-  form.append('removedAssetIds', JSON.stringify(input.removedAssetIds));
-  return requestJson<JournalEntry>(
-    `/api/me/entries/${id}/draft`,
-    { method: 'PATCH', body: form },
+  return requestJson<JournalEntry>(`/api/me/entries/${id}/draft`, jsonRequest('PATCH', input));
+}
+
+export function createEntryUpload(entryId?: number): Promise<{ uploadId: string; token: string }> {
+  return requestJson<{ uploadId: string; token: string }>(
+    '/api/me/entry-uploads',
+    jsonRequest('POST', entryId === undefined ? {} : { entryId }),
   );
+}
+
+export function processEntryUpload(uploadId: string, assetUploadId: string): Promise<void> {
+  return requestWithoutResponse(
+    `/api/me/entry-uploads/${encodeURIComponent(uploadId)}/assets/${encodeURIComponent(assetUploadId)}`,
+    { method: 'POST' },
+  );
+}
+
+export function discardEntryUpload(uploadId: string): Promise<void> {
+  return requestWithoutResponse(`/api/me/entry-uploads/${encodeURIComponent(uploadId)}`, { method: 'DELETE' });
 }
 
 export function fetchOnThisDay(): Promise<OnThisDayResponse> {
