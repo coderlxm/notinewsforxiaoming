@@ -89,6 +89,7 @@ export interface WebEntryAssetInput {
   width: number;
   height: number;
   duration?: number | null;
+  sortOrder?: number;
 }
 
 export interface CreateWebEntryInput {
@@ -255,6 +256,14 @@ export function extractJournalTags(contentText: string): string[] {
   )];
 }
 
+export function contentTypeOf(assets: Array<{ kind: string }>): 'video' | 'photo' | 'text' {
+  return assets.some((asset) => asset.kind === 'video')
+    ? 'video'
+    : assets.length > 0
+      ? 'photo'
+      : 'text';
+}
+
 export class JournalRepository {
   constructor(private readonly database: Database.Database) {}
 
@@ -362,7 +371,7 @@ export class JournalRepository {
         ) VALUES (?, 'web', NULL, NULL, NULL, ?, NULL, 'plain', NULL, ?, ?, ?, ?, NULL, NULL, ?, ?, ?)
       `).run(
         input.publicId,
-        input.assets.length === 0 ? 'text' : 'photo',
+        contentTypeOf(input.assets),
         input.contentText,
         input.publicationStatus,
         input.visibility,
@@ -380,7 +389,7 @@ export class JournalRepository {
 
   updateWebDraft(id: number, input: UpdateWebDraftInput): JournalEntry {
     const update = this.database.transaction(() => {
-      const assetCount = this.replaceWebDraftAssets(id, input.removedAssetIds, input.newAssets);
+      const assets = this.replaceWebDraftAssets(id, input.removedAssetIds, input.newAssets);
       const result = this.database.prepare(`
         UPDATE journal_entries
         SET content_type = ?, content_text = ?, tags_json = ?, updated_at = ?
@@ -389,7 +398,7 @@ export class JournalRepository {
           AND body_format = 'plain'
           AND publication_status = 'draft'
       `).run(
-        assetCount === 0 ? 'text' : 'photo',
+        contentTypeOf(assets),
         input.contentText,
         JSON.stringify(input.tags),
         input.updatedAt,
@@ -405,7 +414,7 @@ export class JournalRepository {
 
   publishWebDraft(id: number, input: PublishWebDraftInput): JournalEntry {
     const publish = this.database.transaction(() => {
-      const assetCount = this.replaceWebDraftAssets(id, input.removedAssetIds, input.newAssets);
+      const assets = this.replaceWebDraftAssets(id, input.removedAssetIds, input.newAssets);
       const result = this.database.prepare(`
         UPDATE journal_entries
         SET content_type = ?, content_text = ?, tags_json = ?,
@@ -416,7 +425,7 @@ export class JournalRepository {
           AND body_format = 'plain'
           AND publication_status = 'draft'
       `).run(
-        assetCount === 0 ? 'text' : 'photo',
+        contentTypeOf(assets),
         input.contentText,
         JSON.stringify(input.tags),
         input.visibility,
@@ -1069,11 +1078,7 @@ export class JournalRepository {
         throw new Error('Contribution assets must be deleted before publishing.');
       }
 
-      const contentType = selectedAssets.some((asset) => asset.kind === 'video')
-        ? 'video'
-        : selectedAssets.length > 0
-          ? 'photo'
-          : 'text';
+      const contentType = contentTypeOf(selectedAssets);
       const entryResult = this.database.prepare(`
         INSERT INTO journal_entries (
           public_id, source_kind, chat_id, source_message_id, media_group_id,
@@ -1229,7 +1234,7 @@ export class JournalRepository {
     id: number,
     removedAssetIds: number[],
     newAssets: WebEntryAssetInput[],
-  ): number {
+  ): Array<{ kind: string }> {
     if (removedAssetIds.length > 0) {
       const placeholders = removedAssetIds.map(() => '?').join(', ');
       const result = this.database.prepare(`
@@ -1253,7 +1258,7 @@ export class JournalRepository {
     }
 
     const existingRows = this.database.prepare(`
-      SELECT a.id
+      SELECT a.id, a.kind
       FROM journal_assets a
       JOIN journal_entries e ON e.id = a.entry_id
       WHERE a.entry_id = ?
@@ -1263,7 +1268,7 @@ export class JournalRepository {
         AND e.body_format = 'plain'
         AND e.publication_status = 'draft'
       ORDER BY a.sort_order, a.id
-    `).all(id) as Array<{ id: number }>;
+    `).all(id) as Array<{ id: number; kind: string }>;
     const updateSortOrder = this.database.prepare(`
       UPDATE journal_assets SET sort_order = ? WHERE id = ?
     `);
@@ -1271,7 +1276,10 @@ export class JournalRepository {
       updateSortOrder.run(index, row.id);
     });
     this.insertWebAttachments(id, newAssets, existingRows.length);
-    return existingRows.length + newAssets.length;
+    return [
+      ...existingRows.map((row) => ({ kind: row.kind })),
+      ...newAssets.map((asset) => ({ kind: asset.kind })),
+    ];
   }
 
   private insertWebAttachments(
@@ -1298,7 +1306,7 @@ export class JournalRepository {
         asset.width,
         asset.height,
         asset.duration ?? null,
-        startingSortOrder + index,
+        asset.sortOrder ?? startingSortOrder + index,
       );
     });
   }

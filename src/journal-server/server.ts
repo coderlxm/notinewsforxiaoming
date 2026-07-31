@@ -37,11 +37,13 @@ import { JournalSiteProfileService } from './siteProfileService.js';
 import { JournalStorage } from './storage.js';
 import { TelegramFileDownloader } from './telegramFiles.js';
 import type { JournalServerConfig } from './types.js';
+import { JournalVideoNormalizationService } from './videoNormalization.js';
 import {
   JournalVideoPreviewBackfillService,
   JournalVideoPreviewService,
 } from './videoPreview.js';
 import { JournalWebEntryService } from './webEntryService.js';
+import { JournalWebEntryUploadService } from './webEntryUploadService.js';
 import { JournalWeatherService } from './weatherService.js';
 
 export async function createJournalServer(config: JournalServerConfig): Promise<FastifyInstance> {
@@ -58,8 +60,15 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
   await storage.initializeContributionStorage();
   const previews = new JournalImagePreviewService();
   const videoPreviews = new JournalVideoPreviewService();
+  const videoNormalization = new JournalVideoNormalizationService(storage, videoPreviews);
   const articleService = new JournalArticleService(repository, storage, previews);
-  const webEntryService = new JournalWebEntryService(repository, storage, previews);
+  const webEntryService = new JournalWebEntryService(repository, storage);
+  const webEntryUploads = new JournalWebEntryUploadService(
+    repository,
+    storage,
+    previews,
+    videoNormalization,
+  );
   const deletionService = new JournalDeletionService(repository, storage);
   const downloader = new TelegramFileDownloader(config.telegramToken);
   const contributionLinks = new JournalContributionLinkService(
@@ -69,7 +78,7 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
   const contributionService = new JournalContributionService(
     repository,
     storage,
-    new JournalContributionMediaService(storage, videoPreviews),
+    new JournalContributionMediaService(storage, videoNormalization),
   );
   const contributionNotifications = new JournalContributionNotificationService(
     config.telegramToken,
@@ -92,6 +101,10 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
   await server.register(fastifyMultipart, {
     limits: { fileSize: 20 * 1024 * 1024 },
   });
+  server.addContentTypeParser(
+    'application/offset+octet-stream',
+    (_request, _payload, done) => done(null),
+  );
   await server.register(fastifyStatic, {
     root: config.webRoot,
     prefix: '/',
@@ -133,7 +146,9 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
     repository,
     deletionService,
     webEntryService,
+    webEntryUploads,
   );
+  webEntryUploads.registerRoutes(server);
   await registerArticleRoutes(server, auth, articleService);
   await registerMediaRoutes(server, auth, repository, config.dataDir);
   await registerPrivateContributionRoutes(server, {

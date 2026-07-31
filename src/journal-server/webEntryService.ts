@@ -1,32 +1,27 @@
-import { randomUUID } from 'node:crypto';
 import type {
   JournalEntry,
   JournalVisibility,
 } from '../shared/journalProtocol.js';
-import { JournalImagePreviewService } from './imagePreview.js';
 import {
   extractJournalTags,
-  JournalRepository,
-  type WebEntryAssetInput,
+  type JournalRepository,
 } from './repository.js';
-import { JournalStorage } from './storage.js';
-import {
-  assertWebImageUpload,
-  maxWebImageCount,
-  type WebImageUpload,
-  webImageKind,
-} from './webImage.js';
+import type { JournalStorage } from './storage.js';
+import type { PreparedWebEntryUpload } from './webEntryUploadService.js';
+
+const maxWebEntryMediaCount = 10;
+const maxWebEntryVideoCount = 5;
 
 export interface CreateWebEntryServiceInput {
   contentText: string;
-  images: WebImageUpload[];
   action: 'draft' | 'publish';
   visibility?: JournalVisibility;
+  uploadId: string;
 }
 
 export interface UpdateWebDraftServiceInput {
   contentText: string;
-  newImages: WebImageUpload[];
+  uploadId: string;
   removedAssetIds: number[];
 }
 
@@ -38,65 +33,67 @@ export class JournalWebEntryService {
   constructor(
     private readonly repository: JournalRepository,
     private readonly storage: JournalStorage,
-    private readonly previews: JournalImagePreviewService,
   ) {}
 
-  async create(input: CreateWebEntryServiceInput): Promise<JournalEntry> {
+  async createPrepared(
+    input: Omit<CreateWebEntryServiceInput, 'uploadId'>,
+    upload: PreparedWebEntryUpload,
+  ): Promise<JournalEntry> {
     this.assertActionVisibility(input.action, input.visibility);
-    this.assertContent(input.contentText, input.images.length);
-    this.assertImageCount(input.images.length);
-    input.images.forEach(assertWebImageUpload);
+    this.assertContent(input.contentText, upload.assets.length);
+    this.assertMediaCount(
+      upload.assets.length,
+      upload.assets.filter((asset) => asset.kind === 'video').length,
+    );
 
-    const publicId = randomUUID();
-    const now = new Date().toISOString();
-    const assets = await this.prepareAssets(publicId, now, input.images);
-
+    if (upload.assets.length > 0) {
+      await this.storage.finalize(upload.storageSession);
+    } else {
+      await this.storage.discardTemporary(upload.storageSession);
+    }
     try {
       return this.repository.createWebEntry({
-        publicId,
+        publicId: upload.publicId,
         contentText: input.contentText,
         tags: extractJournalTags(input.contentText),
         publicationStatus: input.action === 'draft' ? 'draft' : 'published',
         visibility: input.action === 'draft' ? 'private' : input.visibility as JournalVisibility,
-        sourceCreatedAt: now,
-        assets,
+        sourceCreatedAt: upload.createdAt,
+        assets: upload.assets,
       });
     } catch (error) {
-      await this.deletePreparedAssets(assets);
+      if (upload.assets.length > 0) {
+        await this.storage.discardFinal(upload.storageSession);
+      }
       throw error;
     }
   }
 
-  async updateDraft(id: number, input: UpdateWebDraftServiceInput): Promise<JournalEntry> {
-    return this.writeDraft(id, input, null);
-  }
-
-  async publishDraft(id: number, input: PublishWebDraftServiceInput): Promise<JournalEntry> {
-    return this.writeDraft(id, input, input.visibility);
-  }
-
-  private async writeDraft(
+  async updatePreparedDraft(
     id: number,
-    input: UpdateWebDraftServiceInput,
+    input: Omit<UpdateWebDraftServiceInput, 'uploadId'>,
+    upload: PreparedWebEntryUpload,
     publishVisibility: JournalVisibility | null,
   ): Promise<JournalEntry> {
     const draft = this.getDraft(id);
     const storedAssets = this.repository.listWebDraftAssets(id);
     this.assertRemovedAssetIds(draft, storedAssets, input.removedAssetIds);
-
     const removedIds = new Set(input.removedAssetIds);
     const retainedAssets = draft.assets.filter((asset) => !removedIds.has(asset.id));
-    this.assertContent(input.contentText, retainedAssets.length + input.newImages.length);
-    this.assertImageCount(retainedAssets.length + input.newImages.length);
-    input.newImages.forEach(assertWebImageUpload);
-
-    const newAssets = await this.prepareAssets(
-      draft.publicId,
-      draft.sourceCreatedAt,
-      input.newImages,
+    const newAssets = upload.assets;
+    this.assertContent(input.contentText, retainedAssets.length + newAssets.length);
+    this.assertMediaCount(
+      retainedAssets.length + newAssets.length,
+      retainedAssets.filter((asset) => asset.kind === 'video').length
+        + newAssets.filter((asset) => asset.kind === 'video').length,
     );
-    const updatedAt = new Date().toISOString();
 
+    if (newAssets.length > 0) {
+      await this.storage.appendToFinal(upload.storageSession);
+    } else {
+      await this.storage.discardTemporary(upload.storageSession);
+    }
+    const updatedAt = new Date().toISOString();
     let updated: JournalEntry;
     try {
       updated = publishVisibility === null
@@ -117,16 +114,15 @@ export class JournalWebEntryService {
             sourceCreatedAt: updatedAt,
           });
     } catch (error) {
-      await this.deletePreparedAssets(newAssets);
+      for (const asset of newAssets) {
+        await this.storage.deleteAssetPair(asset.relativePath, asset.previewRelativePath);
+      }
       throw error;
     }
-
     for (const asset of storedAssets) {
-      if (!removedIds.has(asset.id)) continue;
-      await this.storage.deleteAssetPair(
-        asset.relativePath,
-        asset.previewRelativePath,
-      );
+      if (removedIds.has(asset.id)) {
+        await this.storage.deleteAssetPair(asset.relativePath, asset.previewRelativePath);
+      }
     }
     return updated;
   }
@@ -156,15 +152,18 @@ export class JournalWebEntryService {
     }
   }
 
-  private assertContent(contentText: string, imageCount: number): void {
-    if (contentText.trim() === '' && imageCount === 0) {
-      throw new Error('Web content must include text or at least one image.');
+  private assertContent(contentText: string, mediaCount: number): void {
+    if (contentText.trim() === '' && mediaCount === 0) {
+      throw new Error('Web content must include text or at least one media item.');
     }
   }
 
-  private assertImageCount(imageCount: number): void {
-    if (imageCount > maxWebImageCount) {
-      throw new Error(`Web content supports at most ${maxWebImageCount} images.`);
+  private assertMediaCount(mediaCount: number, videoCount: number): void {
+    if (mediaCount > maxWebEntryMediaCount) {
+      throw new Error(`Web content supports at most ${maxWebEntryMediaCount} media items.`);
+    }
+    if (videoCount > maxWebEntryVideoCount) {
+      throw new Error(`Web content supports at most ${maxWebEntryVideoCount} videos.`);
     }
   }
 
@@ -181,55 +180,6 @@ export class JournalWebEntryService {
       if (!assetIds.has(assetId)) {
         throw new Error(`Web entry asset ${assetId} does not belong to draft ${entry.id}.`);
       }
-    }
-  }
-
-  private async prepareAssets(
-    publicId: string,
-    sourceCreatedAt: string,
-    images: WebImageUpload[],
-  ): Promise<WebEntryAssetInput[]> {
-    const assets: WebEntryAssetInput[] = [];
-    try {
-      for (const image of images) {
-        const relativePath = await this.storage.writeWebAsset(
-          publicId,
-          sourceCreatedAt,
-          image.buffer,
-        );
-        const previewRelativePath = this.storage.previewRelativePath(relativePath);
-        let dimensions;
-        try {
-          dimensions = await this.previews.generate(
-            this.storage.absoluteAssetPath(relativePath),
-            this.storage.absoluteAssetPath(previewRelativePath),
-          );
-        } catch (error) {
-          await this.storage.deleteAsset(relativePath);
-          throw error;
-        }
-        assets.push({
-          relativePath,
-          previewRelativePath,
-          kind: webImageKind(image.mimeType),
-          mimeType: image.mimeType,
-          originalName: image.originalName,
-          byteSize: image.buffer.byteLength,
-          width: dimensions.width,
-          height: dimensions.height,
-          duration: null,
-        });
-      }
-      return assets;
-    } catch (error) {
-      await this.deletePreparedAssets(assets);
-      throw error;
-    }
-  }
-
-  private async deletePreparedAssets(assets: WebEntryAssetInput[]): Promise<void> {
-    for (const asset of assets) {
-      await this.storage.deleteAssetPair(asset.relativePath, asset.previewRelativePath);
     }
   }
 }

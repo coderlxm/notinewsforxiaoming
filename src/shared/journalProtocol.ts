@@ -122,12 +122,14 @@ export type JournalArticleAssetResponse = z.infer<typeof journalArticleAssetResp
 const journalWebEntryDraftFieldsSchema = z.object({
   contentText: z.string(),
   action: z.literal('draft'),
+  uploadId: z.string().uuid(),
   visibility: z.never().optional(),
 });
 
 const journalWebEntryPublishFieldsSchema = z.object({
   contentText: z.string(),
   action: z.literal('publish'),
+  uploadId: z.string().uuid(),
   visibility: journalVisibilitySchema,
 });
 

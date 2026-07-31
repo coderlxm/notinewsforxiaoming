@@ -99,7 +99,32 @@ export class JournalStorage {
 
   async finalize(session: EntryStorageSession): Promise<void> {
     await fs.promises.mkdir(path.dirname(session.finalDir), { recursive: true });
-    await fs.promises.rename(session.tempDir, session.finalDir);
+    try {
+      await fs.promises.rename(session.tempDir, session.finalDir);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOTEMPTY') throw error;
+      await fs.promises.mkdir(session.finalDir, { recursive: true });
+      const files = await fs.promises.readdir(session.tempDir);
+      for (const file of files) {
+        await fs.promises.rename(
+          path.join(session.tempDir, file),
+          path.join(session.finalDir, file),
+        );
+      }
+      await fs.promises.rm(session.tempDir, { recursive: true });
+    }
+  }
+
+  async appendToFinal(session: EntryStorageSession): Promise<void> {
+    await fs.promises.mkdir(session.finalDir, { recursive: true });
+    const filenames = await fs.promises.readdir(session.tempDir);
+    for (const filename of filenames) {
+      await fs.promises.rename(
+        path.join(session.tempDir, filename),
+        path.join(session.finalDir, filename),
+      );
+    }
+    await fs.promises.rm(session.tempDir, { recursive: true });
   }
 
   async discardTemporary(session: EntryStorageSession): Promise<void> {

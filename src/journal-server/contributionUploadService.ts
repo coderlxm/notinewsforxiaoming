@@ -107,10 +107,6 @@ export class JournalContributionUploadService {
   }
 
   registerRoutes(server: FastifyInstance): void {
-    server.addContentTypeParser(
-      'application/offset+octet-stream',
-      (_request, _payload, done) => done(null),
-    );
     const handleTus = async (
       request: FastifyRequest,
       reply: FastifyReply,
