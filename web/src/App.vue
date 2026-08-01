@@ -83,14 +83,14 @@ const route = computed<AppRoute>(() => {
     if (entry !== undefined && (typeof entry !== 'string' || !/^[1-9]\d*$/.test(entry))) {
       return { name: 'not-found', key: currentRoute.fullPath };
     }
-    if (view !== undefined && view !== 'table') {
+    if (view !== undefined && view !== 'table' && view !== 'waterfall') {
       return { name: 'not-found', key: currentRoute.fullPath };
     }
     return {
       name: 'private',
       key: 'private',
       entryId: entry === undefined ? null : Number(entry),
-      assetView: view === 'table' ? 'table' : 'waterfall',
+      assetView: view === 'waterfall' ? 'waterfall' : 'table',
     };
   }
   if (currentRoute.name === 'article-new') {
@@ -273,7 +273,7 @@ async function navigate(path: string): Promise<void> {
 
 function privateFeedPath(assetView: AssetView, entryId?: number): string {
   const search = new URLSearchParams();
-  if (assetView === 'table') search.set('view', 'table');
+  if (assetView === 'waterfall') search.set('view', 'waterfall');
   if (entryId !== undefined) search.set('entry', String(entryId));
   const query = search.toString();
   return query ? `/me?${query}` : '/me';
