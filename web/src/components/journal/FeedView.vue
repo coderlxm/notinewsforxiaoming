@@ -212,7 +212,7 @@ async function applyFilters(nextFilters: FeedFilters): Promise<void> {
   feedLayoutReady.value = false;
   listReplacing.value = true;
   try {
-    await journal.loadPrivate(filters);
+    await journal.refreshPrivateFeed(filters);
   } finally {
     listReplacing.value = false;
   }
@@ -285,14 +285,7 @@ async function selectTag(tag: string): Promise<void> {
     await router.push({ name: 'public', query: { tag } });
     return;
   }
-  filters.tag = tag;
-  feedLayoutReady.value = false;
-  listReplacing.value = true;
-  try {
-    await journal.loadPrivate(filters);
-  } finally {
-    listReplacing.value = false;
-  }
+  await applyFilters({ ...filters, tag });
 }
 
 async function logout(): Promise<void> {

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Connection, Lock } from '@element-plus/icons-vue';
+import { useDebounceFn } from '@vueuse/core';
 import { computed, reactive, shallowRef, watch } from 'vue';
 import { emptyFeedFilters, type FeedFilters } from '../../types';
 
@@ -63,6 +64,18 @@ const filterSummary = computed(() => {
   const remainingCount = appliedFilterLabels.value.length - 2;
   return remainingCount > 0 ? `${visibleLabels} 等 ${appliedFilterLabels.value.length} 项` : visibleLabels;
 });
+const hasDraftFilters = computed(() =>
+  draft.visibility !== 'all'
+  || draft.query !== ''
+  || draft.tag !== ''
+  || draft.contentType !== ''
+  || draft.from !== ''
+  || draft.to !== '',
+);
+
+const queueApply = useDebounceFn(() => {
+  emit('apply', { ...draft });
+}, 350);
 
 watch(
   () => [
@@ -78,19 +91,18 @@ watch(
   },
 );
 
-function apply(): void {
-  emit('apply', { ...draft });
-  expanded.value = false;
-}
-
 function reset(): void {
   Object.assign(draft, emptyFeedFilters());
-  apply();
+  void queueApply();
 }
 </script>
 
 <template>
-  <section class="filters" aria-label="记录筛选器">
+  <section
+    class="filters"
+    :class="{ 'filters--expanded': expanded }"
+    aria-label="记录筛选器"
+  >
     <button
       class="filters__toolbar"
       type="button"
@@ -103,15 +115,19 @@ function reset(): void {
       <span class="filters__toggle" aria-hidden="true">{{ expanded ? '收起' : '展开' }}</span>
     </button>
 
-    <form
-      v-show="expanded"
+    <div
       id="journal-filter-panel"
       class="filters__panel"
-      @submit.prevent="apply"
     >
       <div class="filters__visibility" aria-label="可见性筛选">
         <label v-for="option in visibilityOptions" :key="option.value" class="filters__choice">
-          <input v-model="draft.visibility" type="radio" name="visibility" :value="option.value">
+          <input
+            v-model="draft.visibility"
+            type="radio"
+            name="visibility"
+            :value="option.value"
+            @change="queueApply"
+          >
           <span>
             <Lock v-if="option.value === 'private'" aria-hidden="true" />
             <Connection v-else-if="option.value === 'public'" aria-hidden="true" />
@@ -120,40 +136,52 @@ function reset(): void {
         </label>
       </div>
 
-      <div class="filters__search-row">
-        <label class="field filters__query">
-          <span class="field__label">正文关键词</span>
-          <input v-model.trim="draft.query" type="search" placeholder="搜索记录">
-        </label>
-        <label class="field filters__tag">
-          <span class="field__label">标签</span>
-          <input v-model.trim="draft.tag" type="text" placeholder="例如：旅行">
-        </label>
-        <label class="field filters__type">
-          <span class="field__label">格式</span>
-          <select v-model="draft.contentType">
-            <option v-for="contentType in contentTypes" :key="contentType.value" :value="contentType.value">
-              {{ contentType.label }}
-            </option>
-          </select>
-        </label>
-      </div>
+      <label class="field filters__query">
+        <span class="field__label">正文关键词</span>
+        <input
+          v-model.trim="draft.query"
+          type="search"
+          placeholder="搜索记录"
+          @input="queueApply"
+        >
+      </label>
+      <label class="field filters__tag">
+        <span class="field__label">标签</span>
+        <input
+          v-model.trim="draft.tag"
+          type="text"
+          placeholder="例如：旅行"
+          @input="queueApply"
+        >
+      </label>
+      <label class="field filters__type">
+        <span class="field__label">格式</span>
+        <select v-model="draft.contentType" @change="queueApply">
+          <option v-for="contentType in contentTypes" :key="contentType.value" :value="contentType.value">
+            {{ contentType.label }}
+          </option>
+        </select>
+      </label>
 
-      <div class="filters__date-row">
+      <div class="filters__date-range" role="group" aria-label="日期范围">
         <label class="field">
           <span class="field__label">从</span>
-          <input v-model="draft.from" type="date">
+          <input v-model="draft.from" type="date" @change="queueApply">
         </label>
         <label class="field">
           <span class="field__label">到</span>
-          <input v-model="draft.to" type="date">
+          <input v-model="draft.to" type="date" @change="queueApply">
         </label>
-        <div class="filters__actions">
-          <button class="button button--quiet" type="button" @click="reset">清空</button>
-          <button class="button button--primary" type="submit">筛选</button>
-        </div>
       </div>
-    </form>
+      <button
+        class="button button--quiet filters__clear"
+        type="button"
+        :disabled="!hasDraftFilters"
+        @click="reset"
+      >
+        清空
+      </button>
+    </div>
   </section>
 </template>
 
@@ -166,7 +194,7 @@ function reset(): void {
 }
 
 .filters__toolbar {
-  display: grid;
+  display: none;
   grid-template-columns: auto minmax(0, 1fr) auto;
   width: 100%;
   min-height: 3.25rem;
@@ -202,14 +230,16 @@ function reset(): void {
 
 .filters__panel {
   display: grid;
-  gap: 0.9rem;
-  padding: 1rem;
-  border-top: 1px solid var(--border-subtle);
+  grid-template-columns: minmax(12rem, 1fr) minmax(8rem, 0.55fr) minmax(8rem, 0.5fr) minmax(17rem, 0.9fr) auto;
+  align-items: end;
+  gap: 0.7rem;
+  padding: 0.8rem;
   background: color-mix(in srgb, var(--surface-muted) 34%, var(--surface-card));
 }
 
 .filters__visibility {
   display: flex;
+  grid-column: 1 / -1;
   gap: 0.35rem;
   flex-wrap: wrap;
 }
@@ -253,40 +283,43 @@ function reset(): void {
   outline-offset: 2px;
 }
 
-.filters__search-row,
-.filters__date-row {
+.filters__date-range {
   display: grid;
-  gap: 0.7rem;
+  min-width: 0;
+  grid-template-columns: repeat(2, minmax(8rem, 1fr));
+  gap: 0.5rem;
 }
 
-.filters__search-row {
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(8rem, 0.7fr);
+@media (max-width: 1119px) and (min-width: 760px) {
+  .filters__panel {
+    grid-template-columns: minmax(12rem, 1fr) minmax(8rem, 0.65fr) minmax(8rem, 0.55fr) auto;
+  }
+
+  .filters__date-range {
+    grid-column: 1 / 4;
+  }
 }
 
-.filters__date-row {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
-  align-items: end;
-}
-
-.filters__actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.45rem;
-}
-
-@media (max-width: 620px) {
+@media (max-width: 759px) {
   .filters__toolbar {
+    display: grid;
     min-height: 3rem;
     gap: 0.55rem;
     padding: 0.6rem 0.7rem;
   }
 
   .filters__panel {
+    display: none;
+    grid-template-columns: 1fr;
     padding: 0.8rem;
+    border-top: 1px solid var(--border-subtle);
   }
 
-  .filters__search-row,
-  .filters__date-row {
+  .filters--expanded .filters__panel {
+    display: grid;
+  }
+
+  .filters__date-range {
     grid-template-columns: 1fr;
   }
 }
