@@ -591,6 +591,29 @@ const migrations: JournalMigration[] = [
       }
     },
   },
+  {
+    version: 9,
+    up(database) {
+      database.exec(`
+        ALTER TABLE journal_entries
+        ADD COLUMN channel TEXT NOT NULL DEFAULT 'life';
+
+        UPDATE journal_entries
+        SET channel = 'article'
+        WHERE body_format = 'rich';
+
+        CREATE INDEX idx_journal_entries_channel_timeline
+        ON journal_entries(
+          visibility,
+          publication_status,
+          channel,
+          pinned DESC,
+          source_created_at DESC,
+          id DESC
+        );
+      `);
+    },
+  },
 ];
 
 export function runJournalMigrations(database: Database.Database): void {

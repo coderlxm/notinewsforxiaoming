@@ -5,7 +5,12 @@ import { computed, shallowRef, watch } from 'vue';
 import ArticleRichBody from '../article/ArticleRichBody.vue';
 import JournalLoading from '../ui/JournalLoading.vue';
 import { useSiteProfileStore } from '../../stores/siteProfile';
-import type { JournalAsset, JournalEntry, JournalVisibility } from '../../types';
+import type {
+  JournalAsset,
+  JournalEntry,
+  JournalPlainChannel,
+  JournalVisibility,
+} from '../../types';
 import { formatEntryTime, formatStructuredValue } from '../../utils/formatters';
 import CardActionMenu from './CardActionMenu.vue';
 import MediaGallery from './MediaGallery.vue';
@@ -29,6 +34,7 @@ const emit = defineEmits<{
   saveContent: [entry: JournalEntry, contentText: string];
   setPublishedTime: [entry: JournalEntry, sourceCreatedAt: string];
   setVisibility: [entry: JournalEntry, visibility: JournalVisibility];
+  setChannel: [entry: JournalEntry, channel: JournalPlainChannel];
   setPinned: [entry: JournalEntry, pinned: boolean];
   deleteEntry: [entry: JournalEntry];
 }>();
@@ -41,6 +47,9 @@ const hiddenStructuredKeys = new Set(['entities', 'caption_entities']);
 
 const isPrivateMode = computed(() => props.mode === 'private');
 const isRich = computed(() => props.entry.bodyFormat === 'rich');
+const plainChannel = computed(() => isRich.value
+  ? undefined
+  : props.entry.channel as JournalPlainChannel);
 const formattedTime = computed(() => formatEntryTime(props.entry.sourceCreatedAt));
 const structuredRows = computed(() => Object.entries(props.entry.structuredContent ?? {})
   .filter(([key]) => !hiddenStructuredKeys.has(key)));
@@ -119,12 +128,15 @@ function requestPublishedTimeEditing(): void {
           :pinned="entry.pinned"
           :visibility="entry.visibility"
           :publication-status="entry.publicationStatus"
+          :channel="plainChannel"
+          :channel-editable="!isRich"
           :teleported="false"
           @edit="requestEdit"
           @continue-edit="emit('continueDraft', entry)"
           @edit-published-time="requestPublishedTimeEditing"
           @set-pinned="emit('setPinned', entry, $event)"
           @set-visibility="emit('setVisibility', entry, $event)"
+          @set-channel="emit('setChannel', entry, $event)"
           @request-delete="requestDeletion"
         />
       </div>

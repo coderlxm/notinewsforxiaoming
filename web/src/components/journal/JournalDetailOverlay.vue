@@ -2,7 +2,12 @@
 import { computed, onBeforeUnmount, onMounted, shallowRef, useTemplateRef } from 'vue';
 import type { CSSProperties } from 'vue';
 import JournalLoading from '../ui/JournalLoading.vue';
-import type { JournalAsset, JournalEntry, JournalVisibility } from '../../types';
+import type {
+  JournalAsset,
+  JournalEntry,
+  JournalPlainChannel,
+  JournalVisibility,
+} from '../../types';
 import JournalDetailLayout from './JournalDetailLayout.vue';
 
 const props = defineProps<{
@@ -20,6 +25,7 @@ const emit = defineEmits<{
   saveContent: [entry: JournalEntry, contentText: string];
   setPublishedTime: [entry: JournalEntry, sourceCreatedAt: string];
   setVisibility: [entry: JournalEntry, visibility: JournalVisibility];
+  setChannel: [entry: JournalEntry, channel: JournalPlainChannel];
   setPinned: [entry: JournalEntry, pinned: boolean];
   deleteEntry: [entry: JournalEntry];
 }>();
@@ -148,6 +154,10 @@ function forwardVisibility(entry: JournalEntry, visibility: JournalVisibility): 
   emit('setVisibility', entry, visibility);
 }
 
+function forwardChannel(entry: JournalEntry, channel: JournalPlainChannel): void {
+  emit('setChannel', entry, channel);
+}
+
 function forwardPinned(entry: JournalEntry, pinned: boolean): void {
   emit('setPinned', entry, pinned);
 }
@@ -199,6 +209,7 @@ function forwardPinned(entry: JournalEntry, pinned: boolean): void {
           @save-content="forwardSaveContent"
           @set-published-time="forwardPublishedTime"
           @set-visibility="forwardVisibility"
+          @set-channel="forwardChannel"
           @set-pinned="forwardPinned"
           @delete-entry="emit('deleteEntry', $event)"
         />

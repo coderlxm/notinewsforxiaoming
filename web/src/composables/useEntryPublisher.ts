@@ -4,12 +4,13 @@ import {
   publishEntry as publishEntryRequest,
   updateDraft as updateDraftRequest,
 } from '../api';
-import type { JournalEntry, JournalVisibility } from '../types';
+import type { JournalEntry, JournalPlainChannel, JournalVisibility } from '../types';
 
 interface EntryPublisherInput {
   contentText: string;
   uploadId: string;
   removedAssetIds: number[];
+  channel: JournalPlainChannel;
   visibility?: JournalVisibility;
 }
 
@@ -47,6 +48,7 @@ export function useEntryPublisher() {
             contentText: input.contentText,
             uploadId: input.uploadId,
             action,
+            channel: input.channel,
             visibility: action === 'publish' ? input.visibility : undefined,
           })
         : await updateDraftRequest(entry.value.id, {
@@ -54,6 +56,7 @@ export function useEntryPublisher() {
             uploadId: input.uploadId,
             removedAssetIds: input.removedAssetIds,
             action,
+            channel: input.channel,
             visibility: action === 'publish' ? input.visibility : undefined,
           });
       entry.value = saved;

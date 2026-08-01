@@ -4,18 +4,22 @@ import { storeToRefs } from 'pinia';
 import { computed, nextTick, onActivated, onBeforeUnmount, onMounted, reactive, shallowRef, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import ArticleCardContent from '../article/ArticleCardContent.vue';
+import PublicArticleFeed from '../article/PublicArticleFeed.vue';
 import JournalLoading from '../ui/JournalLoading.vue';
 import JournalPullRefresh from '../ui/JournalPullRefresh.vue';
 import { useCurrentWeather } from '../../composables/useCurrentWeather';
 import { useDeferredLoading } from '../../composables/useDeferredLoading';
 import { useJournalApi } from '../../composables/useJournalApi';
+import { journalChannels, publicFeedPath } from '../../journalChannels';
 import { useSessionStore } from '../../stores/session';
 import { useSiteProfileStore } from '../../stores/siteProfile';
 import {
   emptyFeedFilters,
   type AssetView,
   type FeedFilters,
+  type JournalChannel,
   type JournalEntry,
+  type JournalPlainChannel,
   type JournalVisibility,
 } from '../../types';
 import { showMessage } from '../../utils/message';
@@ -33,6 +37,7 @@ const props = withDefaults(defineProps<{
   mode: 'public' | 'private';
   detailId?: string;
   initialTag?: string;
+  channel?: JournalChannel;
   overlayEntryId?: number;
   overlayEntry?: JournalEntry;
   directOverlay?: boolean;
@@ -40,6 +45,7 @@ const props = withDefaults(defineProps<{
 }>(), {
   detailId: undefined,
   initialTag: '',
+  channel: 'life',
   overlayEntryId: undefined,
   overlayEntry: undefined,
   directOverlay: false,
@@ -95,8 +101,11 @@ const deferredDetailLoading = useDeferredLoading(detailPreparing);
 const listTitle = computed(() => {
   if (props.mode === 'private') return '我的全部记录';
   if (props.initialTag) return `#${props.initialTag}`;
-  return '最近记录';
+  return journalChannels.find(item => item.value === props.channel)!.label;
 });
+const publicLayout = computed(() =>
+  journalChannels.find(item => item.value === props.channel)!.layout,
+);
 const paginationLoading = computed(() =>
   journal.loadingMore.value || paginationLayoutPending.value,
 );
@@ -178,7 +187,7 @@ onMounted(async () => {
       return;
     }
     if (props.mode === 'public') {
-      const feedRequest = journal.loadPublic({ tag: props.initialTag });
+      const feedRequest = journal.loadPublic({ channel: props.channel, tag: props.initialTag });
       await siteProfile.ensureLoaded();
       if (weatherEnabled.value) {
         await Promise.all([feedRequest, currentWeather.load()]);
@@ -223,7 +232,7 @@ async function loadMore(): Promise<void> {
   paginationLayoutPending.value = true;
 
   if (props.mode === 'public') {
-    await journal.loadMorePublic({ tag: props.initialTag });
+    await journal.loadMorePublic({ channel: props.channel, tag: props.initialTag });
   }
   else {
     await journal.loadMorePrivate(filters);
@@ -245,7 +254,7 @@ async function refreshFeed(): Promise<void> {
   refreshRequestComplete.value = false;
 
   if (props.mode === 'public') {
-    const requests = [journal.loadPublic({ tag: props.initialTag })];
+    const requests = [journal.loadPublic({ channel: props.channel, tag: props.initialTag })];
     if (weatherEnabled.value) requests.push(currentWeather.load());
     await Promise.all(requests);
   }
@@ -282,7 +291,8 @@ async function authenticate(password: string): Promise<void> {
 
 async function selectTag(tag: string): Promise<void> {
   if (props.mode === 'public') {
-    await router.push({ name: 'public', query: { tag } });
+    const channel = isDetail.value ? journal.detail.value!.channel : props.channel;
+    await router.push(publicFeedPath(channel, tag));
     return;
   }
   await applyFilters({ ...filters, tag });
@@ -363,6 +373,14 @@ async function setPinned(entry: JournalEntry, pinned: boolean): Promise<void> {
   }
 }
 
+async function setChannel(entry: JournalEntry, channel: JournalPlainChannel): Promise<void> {
+  await journal.setChannel(entry, channel);
+  if (journal.error.value === null) {
+    feedLayoutReady.value = false;
+    await journal.loadPrivate(filters);
+  }
+}
+
 async function deleteEntry(entry: JournalEntry): Promise<void> {
   await journal.deleteEntry(entry);
   if (journal.error.value === null && props.overlayEntryId === entry.id) emit('removeDeletedOverlay');
@@ -376,7 +394,13 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
     :disabled="refreshDisabled"
     @refresh="refreshFeed"
   >
-    <main class="feed" :class="{ 'feed--detail': isDetail }">
+    <main
+      class="feed"
+      :class="{
+        'feed--detail': isDetail,
+        'feed--public': mode === 'public',
+      }"
+    >
       <div v-if="isDetail" class="feed__detail-heading">
         <button class="text-button" type="button" @click="emit('returnToFeed')">← 返回信息流</button>
         <span>永久记录</span>
@@ -448,7 +472,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
               <button
                 class="text-button"
                 type="button"
-                @click="router.push({ name: 'public' })"
+                @click="router.push(publicFeedPath(channel))"
               >
                 清除标签
               </button>
@@ -491,6 +515,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
           @set-published-time="setPublishedTime"
           @set-visibility="setVisibility"
           @set-pinned="setPinned"
+          @set-channel="setChannel"
           @delete-entry="deleteEntry"
         />
         <AssetViewSwitch :view="assetView" @change="changeAssetView" />
@@ -539,8 +564,16 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
           :offset="320"
           @load="loadMore"
         >
+          <PublicArticleFeed
+            v-if="mode === 'public' && publicLayout === 'article'"
+            :entries="journal.entries.value"
+            :loading="entriesLoading"
+            @layout-ready="handleLayoutReady"
+            @open-entry="openEntry"
+            @select-tag="selectTag"
+          />
           <WaterfallFeed
-            v-if="mode === 'public' || assetView === 'waterfall'"
+            v-else-if="mode === 'public' || assetView === 'waterfall'"
             :entries="journal.entries.value"
             :loading="entriesLoading"
             :mode="mode"
@@ -554,6 +587,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
             @set-published-time="setPublishedTime"
             @set-visibility="setVisibility"
             @set-pinned="setPinned"
+            @set-channel="setChannel"
             @delete-entry="deleteEntry"
           />
           <AssetTableView
@@ -605,6 +639,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
     @set-published-time="setPublishedTime"
     @set-visibility="setVisibility"
     @set-pinned="setPinned"
+    @set-channel="setChannel"
     @delete-entry="deleteEntry"
   />
 </template>
@@ -620,6 +655,10 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
 
 .feed--detail {
   width: min(calc(100% - (var(--page-gutter) * 2)), 1100px);
+}
+
+.feed--public:not(.feed--detail) {
+  width: 100%;
 }
 
 .feed__public-heading,
@@ -760,6 +799,12 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
     padding: 0.5rem 0.2rem;
     font-size: clamp(0.72rem, 3.5vw, 0.8rem);
     white-space: nowrap;
+  }
+}
+
+@media (max-width: 799px) {
+  .feed--public:not(.feed--detail) {
+    width: calc(100% - (var(--workspace-gutter) * 2));
   }
 }
 

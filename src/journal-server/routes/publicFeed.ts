@@ -1,10 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { journalChannelSchema } from '../../shared/journalProtocol.js';
 import type { JournalRepository } from '../repository.js';
 
 const publicFeedQuerySchema = z.object({
   cursor: z.string().min(1).optional(),
   tag: z.string().min(1).optional(),
+  channel: journalChannelSchema.default('life'),
 });
 
 export async function registerPublicFeedRoutes(
@@ -15,6 +17,7 @@ export async function registerPublicFeedRoutes(
     const query = publicFeedQuerySchema.parse(request.query);
     return repository.list({
       visibility: 'public',
+      channel: query.channel,
       limit: 20,
       ...(query.cursor ? { cursor: query.cursor } : {}),
       ...(query.tag ? { tag: query.tag } : {}),

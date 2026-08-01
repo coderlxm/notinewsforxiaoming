@@ -10,11 +10,18 @@ import {
   login as loginRequest,
   logout as logoutRequest,
   updateEntryContent,
+  updateEntryChannel,
   updateEntryPinned,
   updateEntryPublishedTime,
   updateEntryVisibility,
 } from '../api';
-import type { FeedFilters, JournalEntry, JournalVisibility } from '../types';
+import type {
+  FeedFilters,
+  JournalChannel,
+  JournalEntry,
+  JournalPlainChannel,
+  JournalVisibility,
+} from '../types';
 
 type AuthenticationState = 'checking' | 'authenticated' | 'anonymous';
 
@@ -50,7 +57,7 @@ export function useJournalApi() {
     authenticationState.value = 'authenticated';
   }
 
-  async function loadPublic(options: { tag?: string } = {}): Promise<void> {
+  async function loadPublic(options: { channel: JournalChannel; tag?: string }): Promise<void> {
     loading.value = true;
     error.value = null;
     try {
@@ -137,7 +144,7 @@ export function useJournalApi() {
     }
   }
 
-  async function loadMorePublic(options: { tag?: string } = {}): Promise<void> {
+  async function loadMorePublic(options: { channel: JournalChannel; tag?: string }): Promise<void> {
     if (nextCursor.value === null) return;
     loadingMore.value = true;
     error.value = null;
@@ -250,6 +257,23 @@ export function useJournalApi() {
     }
   }
 
+  async function setChannel(entry: JournalEntry, channel: JournalPlainChannel): Promise<void> {
+    mutationEntryId.value = entry.id;
+    error.value = null;
+    try {
+      replaceEntry(await updateEntryChannel(entry.id, channel));
+    }
+    catch (reason) {
+      if (reason instanceof JournalRequestError && reason.status === 401) {
+        authenticationState.value = 'anonymous';
+      }
+      exposeError(reason);
+    }
+    finally {
+      mutationEntryId.value = null;
+    }
+  }
+
   async function setPublishedTime(entry: JournalEntry, sourceCreatedAt: string): Promise<void> {
     mutationEntryId.value = entry.id;
     error.value = null;
@@ -325,6 +349,7 @@ export function useJournalApi() {
     authenticate,
     logout,
     saveContent,
+    setChannel,
     setVisibility,
     setPublishedTime,
     setPinned,

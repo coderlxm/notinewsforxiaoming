@@ -1,4 +1,4 @@
-import type { JournalVisibility } from '../shared/journalProtocol.js';
+import type { JournalChannel, JournalVisibility } from '../shared/journalProtocol.js';
 
 export interface JournalServerConfig {
   telegramToken: string;
@@ -59,6 +59,7 @@ export interface CreateJournalEntryInput {
 export interface JournalListFilters {
   cursor?: string;
   visibility?: JournalVisibility;
+  channel?: JournalChannel;
   tag?: string;
   query?: string;
   contentType?: string;

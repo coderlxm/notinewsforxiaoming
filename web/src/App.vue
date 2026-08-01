@@ -12,16 +12,18 @@ import {
 import { useRoute, useRouter } from 'vue-router';
 import ArticleEditorView from './components/article/ArticleEditorView.vue';
 import FeedView from './components/journal/FeedView.vue';
+import PublicChannelNavigation from './components/journal/PublicChannelNavigation.vue';
 import EntryPublisherView from './components/publisher/EntryPublisherView.vue';
 import SiteProfileSettingsView from './components/settings/SiteProfileSettingsView.vue';
 import { useAdminContributions } from './composables/useAdminContributions';
+import { isJournalChannel, publicFeedPath } from './journalChannels';
 import { useSessionStore } from './stores/session';
 import { useSiteProfileStore } from './stores/siteProfile';
-import type { AssetView, JournalEntry } from './types';
+import type { AssetView, JournalChannel, JournalEntry } from './types';
 import { showMessage } from './utils/message';
 
 type AppRoute =
-  | { name: 'public'; key: string; tag: string }
+  | { name: 'public'; key: string; channel: JournalChannel; tag: string }
   | { name: 'detail'; key: string; publicId: string }
   | { name: 'private'; key: string; entryId: number | null; assetView: AssetView }
   | { name: 'entry-new'; key: string }
@@ -74,8 +76,15 @@ watch(profileLoadError, (error) => {
 
 const route = computed<AppRoute>(() => {
   if (currentRoute.name === 'public') {
+    const channelQuery = currentRoute.query.channel;
+    const channel = channelQuery === undefined
+      ? 'life'
+      : typeof channelQuery === 'string' && isJournalChannel(channelQuery)
+        ? channelQuery
+        : null;
+    if (channel === null) return { name: 'not-found', key: currentRoute.fullPath };
     const tag = typeof currentRoute.query.tag === 'string' ? currentRoute.query.tag : '';
-    return { name: 'public', key: `public:${tag}`, tag };
+    return { name: 'public', key: `public:${channel}:${tag}`, channel, tag };
   }
   if (currentRoute.name === 'private') {
     const entry = currentRoute.query.entry;
@@ -154,9 +163,16 @@ const directPublicOverlayEntry = computed(() => {
 
 const backgroundFeedRoute = computed<FeedRoute | null>(() => {
   if (activeOverlayContext.value) return activeOverlayContext.value.origin;
-  if (directPublicOverlayEntry.value) return { name: 'public', key: 'public:', tag: '' };
+  if (directPublicOverlayEntry.value) {
+    const channel = directPublicOverlayEntry.value.channel;
+    return { name: 'public', key: `public:${channel}:`, channel, tag: '' };
+  }
   if (route.value.name === 'public' || route.value.name === 'private') return route.value;
   return null;
+});
+const publicFeedRoute = computed(() => {
+  const background = backgroundFeedRoute.value;
+  return background?.name === 'public' ? background : null;
 });
 
 const overlayEntryId = computed(() => {
@@ -240,7 +256,11 @@ watch(() => route.value.name, (name, previousName) => {
 
 function feedRouteKey(path: string): string | null {
   const url = new URL(path, window.location.origin);
-  if (url.pathname === '/') return `public:${url.searchParams.get('tag') ?? ''}`;
+  if (url.pathname === '/') {
+    const channel = url.searchParams.get('channel') ?? 'life';
+    if (!isJournalChannel(channel)) return null;
+    return `public:${channel}:${url.searchParams.get('tag') ?? ''}`;
+  }
   if (url.pathname === '/me') return 'private';
   return null;
 }
@@ -299,13 +319,19 @@ function handleRouteChange(nextPath: string, currentPath: string): void {
     ? context.origin.key
     : feedRouteKey(nextPath);
 
-  if (currentFeedRouteKey) {
+  const switchingPublicFeeds = currentFeedRouteKey?.startsWith('public:') === true
+    && nextFeedRouteKey?.startsWith('public:') === true
+    && currentFeedRouteKey !== nextFeedRouteKey;
+
+  if (currentFeedRouteKey && !switchingPublicFeeds) {
     feedScrollPositions.set(currentFeedRouteKey, contentScroll.value!.scrollTop);
   }
 
-  pendingFeedScrollTop = nextFeedRouteKey && nextFeedRouteKey !== currentFeedRouteKey
-    ? feedScrollPositions.get(nextFeedRouteKey) ?? 0
-    : null;
+  if (switchingPublicFeeds) pendingFeedScrollTop = 0;
+  else if (nextFeedRouteKey && nextFeedRouteKey !== currentFeedRouteKey) {
+    pendingFeedScrollTop = feedScrollPositions.get(nextFeedRouteKey) ?? 0;
+  }
+  else pendingFeedScrollTop = null;
   if (pendingFeedScrollTop === null) {
     contentScroll.value!.scrollTo({ top: 0, behavior: 'auto' });
   }
@@ -331,13 +357,17 @@ function changeAssetView(assetView: AssetView): void {
   void router.push(privateFeedPath(assetView, route.value.entryId ?? undefined));
 }
 
+function changePublicChannel(channel: JournalChannel): void {
+  void navigate(publicFeedPath(channel));
+}
+
 function closeOverlay(): void {
   if (activeOverlayContext.value) {
     router.back();
     return;
   }
   if (directPublicOverlayEntry.value) {
-    navigate('/');
+    navigate(publicFeedPath(directPublicOverlayEntry.value.channel));
     return;
   }
   if (route.value.name !== 'private' || route.value.entryId === null) return;
@@ -360,7 +390,9 @@ function returnFromDetail(): void {
     router.back();
     return;
   }
-  navigate('/');
+  const entry = directPublicEntry.value;
+  if (!entry) throw new Error('Journal detail must load before resolving its channel.');
+  navigate(publicFeedPath(entry.channel));
 }
 
 function handlePublicDetailLoaded(entry: JournalEntry): void {
@@ -469,77 +501,98 @@ onUnmounted(() => {
       </header>
     </div>
 
-    <div ref="contentScroll" class="app-scroll">
-      <KeepAlive :max="3">
+    <div class="app-main" :class="{ 'app-main--public': publicFeedRoute }">
+      <PublicChannelNavigation
+        v-if="publicFeedRoute"
+        :channel="publicFeedRoute.channel"
+        @select="changePublicChannel"
+      />
+
+      <div ref="contentScroll" class="app-scroll">
+        <KeepAlive :max="1">
+          <FeedView
+            v-if="backgroundFeedRoute?.name === 'private'"
+            :key="backgroundFeedRoute.key"
+            mode="private"
+            :asset-view="backgroundFeedRoute.assetView"
+            :overlay-entry-id="overlayEntryId"
+            :overlay-entry="overlayEntry"
+            :direct-overlay="directPrivateOverlay"
+            @layout-ready="restoreFeedScroll"
+            @change-asset-view="changeAssetView"
+            @open-entry="openEntry"
+            @close-overlay="closeOverlay"
+            @remove-deleted-overlay="removeDeletedOverlay"
+          />
+        </KeepAlive>
+
         <FeedView
-          v-if="backgroundFeedRoute"
+          v-if="backgroundFeedRoute?.name === 'public'"
           :key="backgroundFeedRoute.key"
-          :mode="backgroundFeedRoute.name"
-          :initial-tag="backgroundFeedRoute.name === 'public' ? backgroundFeedRoute.tag : ''"
-          :asset-view="backgroundFeedRoute.name === 'private' ? backgroundFeedRoute.assetView : 'waterfall'"
+          mode="public"
+          :channel="backgroundFeedRoute.channel"
+          :initial-tag="backgroundFeedRoute.tag"
           :overlay-entry-id="overlayEntryId"
           :overlay-entry="overlayEntry"
-          :direct-overlay="directPrivateOverlay"
           @layout-ready="restoreFeedScroll"
-          @change-asset-view="changeAssetView"
           @open-entry="openEntry"
           @close-overlay="closeOverlay"
           @remove-deleted-overlay="removeDeletedOverlay"
         />
-      </KeepAlive>
 
-      <FeedView
-        v-if="route.name === 'detail' && !activeOverlayContext && !directPublicOverlayEntry"
-        :key="route.key"
-        mode="public"
-        :detail-id="route.publicId"
-        @detail-loaded="handlePublicDetailLoaded"
-        @return-to-feed="returnFromDetail"
-      />
-      <ArticleEditorView
-        v-else-if="route.name === 'article-new'"
-        :key="route.key"
-      />
-      <ArticleEditorView
-        v-else-if="route.name === 'article-edit'"
-        :key="route.key"
-        :article-id="route.articleId"
-      />
-      <EntryPublisherView
-        v-else-if="route.name === 'entry-new'"
-        :key="route.key"
-      />
-      <EntryPublisherView
-        v-else-if="route.name === 'entry-edit'"
-        :key="route.key"
-        :entry-id="route.entryId"
-      />
-      <SiteProfileSettingsView
-        v-else-if="route.name === 'settings'"
-        :key="route.key"
-      />
-      <AdminContributionInboxView
-        v-else-if="route.name === 'contribution-inbox'"
-      />
-      <AdminContributionReviewView
-        v-else-if="route.name === 'contribution-review'"
-        :public-id="route.publicId"
-      />
-      <main v-else-if="route.name === 'not-found'" class="not-found">
-        <span class="not-found__code">404</span>
-        <h1>这条路没有记录</h1>
-        <button class="button button--primary" type="button" @click="navigate('/')">返回首页</button>
-      </main>
+        <FeedView
+          v-if="route.name === 'detail' && !activeOverlayContext && !directPublicOverlayEntry"
+          :key="route.key"
+          mode="public"
+          :detail-id="route.publicId"
+          @detail-loaded="handlePublicDetailLoaded"
+          @return-to-feed="returnFromDetail"
+        />
+        <ArticleEditorView
+          v-else-if="route.name === 'article-new'"
+          :key="route.key"
+        />
+        <ArticleEditorView
+          v-else-if="route.name === 'article-edit'"
+          :key="route.key"
+          :article-id="route.articleId"
+        />
+        <EntryPublisherView
+          v-else-if="route.name === 'entry-new'"
+          :key="route.key"
+        />
+        <EntryPublisherView
+          v-else-if="route.name === 'entry-edit'"
+          :key="route.key"
+          :entry-id="route.entryId"
+        />
+        <SiteProfileSettingsView
+          v-else-if="route.name === 'settings'"
+          :key="route.key"
+        />
+        <AdminContributionInboxView
+          v-else-if="route.name === 'contribution-inbox'"
+        />
+        <AdminContributionReviewView
+          v-else-if="route.name === 'contribution-review'"
+          :public-id="route.publicId"
+        />
+        <main v-else-if="route.name === 'not-found'" class="not-found">
+          <span class="not-found__code">404</span>
+          <h1>这条路没有记录</h1>
+          <button class="button button--primary" type="button" @click="navigate('/')">返回首页</button>
+        </main>
 
-      <footer class="site-footer">
-        <span>小明同学的生活记录</span>
-        <span aria-hidden="true">·</span>
-        <a href="/rss.xml">RSS</a>
-        <a href="/feed.json">JSON Feed</a>
-        <a href="https://www.qweather.com/" target="_blank" rel="noopener noreferrer">
-          天气服务：QWeather
-        </a>
-      </footer>
+        <footer class="site-footer">
+          <span>小明同学的生活记录</span>
+          <span aria-hidden="true">·</span>
+          <a href="/rss.xml">RSS</a>
+          <a href="/feed.json">JSON Feed</a>
+          <a href="https://www.qweather.com/" target="_blank" rel="noopener noreferrer">
+            天气服务：QWeather
+          </a>
+        </footer>
+      </div>
     </div>
   </div>
 </template>
@@ -558,8 +611,24 @@ onUnmounted(() => {
   background: var(--surface-page);
 }
 
+.app-main {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.app-main--public {
+  width: min(calc(100% - (var(--workspace-gutter) * 2)), var(--workspace-width));
+  margin: 0 auto;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 1.5rem;
+}
+
 .app-scroll {
   display: flex;
+  min-width: 0;
   flex-direction: column;
   min-height: 0;
   overflow-x: hidden;
@@ -843,6 +912,15 @@ onUnmounted(() => {
     position: absolute;
     top: -0.05rem;
     right: -0.45rem;
+  }
+}
+
+@media (max-width: 799px) {
+  .app-main--public {
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 0;
   }
 }
 </style>

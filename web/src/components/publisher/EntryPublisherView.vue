@@ -5,9 +5,10 @@ import JournalLoading from '../ui/JournalLoading.vue';
 import { useDeferredLoading } from '../../composables/useDeferredLoading';
 import { useEntryPublisher } from '../../composables/useEntryPublisher';
 import { useEntryMediaSubmit } from '../../composables/useEntryMediaSubmit';
-import type { JournalAsset, JournalVisibility } from '../../types';
+import type { JournalAsset, JournalPlainChannel, JournalVisibility } from '../../types';
 import { showMessage } from '../../utils/message';
 import EntryImagePicker from './EntryImagePicker.vue';
+import EntryChannelField from './EntryChannelField.vue';
 import EntryVisibilityField from './EntryVisibilityField.vue';
 
 const props = withDefaults(defineProps<{
@@ -19,6 +20,7 @@ const props = withDefaults(defineProps<{
 const router = useRouter();
 const publisher = useEntryPublisher();
 const contentText = shallowRef('');
+const channel = shallowRef<JournalPlainChannel>('life');
 const visibility = shallowRef<JournalVisibility>('public');
 const newMedia = shallowRef<File[]>([]);
 const removedAssetIds = shallowRef<ReadonlySet<number>>(new Set());
@@ -51,6 +53,7 @@ watch(() => publisher.entry.value, (entry) => {
   if (!entry || initializedEntryId.value === entry.id) return;
   initializedEntryId.value = entry.id;
   contentText.value = entry.contentText;
+  channel.value = entry.channel as JournalPlainChannel;
   newMedia.value = [];
   removedAssetIds.value = new Set();
 });
@@ -88,6 +91,7 @@ function buildInput() {
     contentText: contentText.value,
     uploadId: '',
     removedAssetIds: [...removedAssetIds.value],
+    channel: channel.value,
     visibility: visibility.value,
   };
 }
@@ -142,6 +146,8 @@ async function publish(): Promise<void> {
             :disabled="busy"
             @remove-existing="removeExisting"
           />
+
+          <EntryChannelField v-model="channel" :disabled="busy" />
 
           <EntryVisibilityField v-model="visibility" :disabled="busy" />
 

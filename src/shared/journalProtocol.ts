@@ -12,6 +12,12 @@ export type JournalBodyFormat = z.infer<typeof journalBodyFormatSchema>;
 export const journalPublicationStatusSchema = z.enum(['draft', 'published']);
 export type JournalPublicationStatus = z.infer<typeof journalPublicationStatusSchema>;
 
+export const journalChannelSchema = z.enum(['life', 'article', 'interest']);
+export type JournalChannel = z.infer<typeof journalChannelSchema>;
+
+export const journalPlainChannelSchema = z.enum(['life', 'interest']);
+export type JournalPlainChannel = z.infer<typeof journalPlainChannelSchema>;
+
 export const journalAssetSourceKindSchema = z.enum(['telegram', 'web']);
 export type JournalAssetSourceKind = z.infer<typeof journalAssetSourceKindSchema>;
 
@@ -84,6 +90,7 @@ export const journalEntrySchema = z.object({
   richBody: journalRichDocumentSchema.nullable(),
   contentText: z.string(),
   publicationStatus: journalPublicationStatusSchema,
+  channel: journalChannelSchema,
   visibility: journalVisibilitySchema,
   tags: z.array(z.string()),
   pinned: z.boolean(),
@@ -123,6 +130,7 @@ const journalWebEntryDraftFieldsSchema = z.object({
   contentText: z.string(),
   action: z.literal('draft'),
   uploadId: z.string().uuid(),
+  channel: journalPlainChannelSchema,
   visibility: z.never().optional(),
 });
 
@@ -130,6 +138,7 @@ const journalWebEntryPublishFieldsSchema = z.object({
   contentText: z.string(),
   action: z.literal('publish'),
   uploadId: z.string().uuid(),
+  channel: journalPlainChannelSchema,
   visibility: journalVisibilitySchema,
 });
 
@@ -167,6 +176,11 @@ export const journalVisibilityRequestSchema = z.object({
   visibility: journalVisibilitySchema,
 });
 export type JournalVisibilityRequest = z.infer<typeof journalVisibilityRequestSchema>;
+
+export const journalPlainChannelRequestSchema = z.object({
+  channel: journalPlainChannelSchema,
+});
+export type JournalPlainChannelRequest = z.infer<typeof journalPlainChannelRequestSchema>;
 
 export const journalLoginRequestSchema = z.object({
   password: z.string().min(1),

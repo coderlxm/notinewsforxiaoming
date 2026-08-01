@@ -1,0 +1,110 @@
+<script setup lang="ts">
+import { journalChannels } from '../../journalChannels';
+import type { JournalChannel } from '../../types';
+
+defineProps<{
+  channel: JournalChannel;
+}>();
+
+const emit = defineEmits<{
+  select: [channel: JournalChannel];
+}>();
+</script>
+
+<template>
+  <aside class="channel-sidebar">
+    <nav class="channel-sidebar__navigation" aria-label="公开内容频道">
+      <button
+        v-for="item in journalChannels"
+        :key="item.value"
+        class="channel-sidebar__item"
+        :class="{ 'channel-sidebar__item--active': channel === item.value }"
+        type="button"
+        :aria-current="channel === item.value ? 'page' : undefined"
+        @click="emit('select', item.value)"
+      >
+        <span class="channel-sidebar__marker" aria-hidden="true" />
+        <span>{{ item.label }}</span>
+      </button>
+    </nav>
+  </aside>
+</template>
+
+<style scoped>
+.channel-sidebar {
+  min-width: 0;
+  padding: 1.3rem 0 2rem;
+}
+
+.channel-sidebar__navigation {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.channel-sidebar__item {
+  display: flex;
+  width: 100%;
+  min-height: 3rem;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.55rem 0.85rem;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-weight: 680;
+  text-align: left;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.channel-sidebar__item:hover {
+  background: color-mix(in srgb, var(--surface-muted) 58%, transparent);
+  color: var(--text-primary);
+}
+
+.channel-sidebar__item--active {
+  background: var(--surface-muted);
+  color: var(--text-primary);
+}
+
+.channel-sidebar__marker {
+  width: 0.32rem;
+  height: 1.25rem;
+  border-radius: 999px;
+  background: var(--border-strong);
+}
+
+.channel-sidebar__item--active .channel-sidebar__marker {
+  background: var(--accent);
+}
+
+@media (max-width: 799px) {
+  .channel-sidebar {
+    padding: 0.55rem var(--workspace-gutter) 0;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .channel-sidebar__navigation {
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.25rem;
+  }
+
+  .channel-sidebar__item {
+    width: 100%;
+    min-width: 0;
+    min-height: 2.65rem;
+    justify-content: center;
+    gap: 0.45rem;
+    padding: 0.45rem 0.75rem;
+  }
+
+  .channel-sidebar__marker {
+    width: 0.3rem;
+    height: 0.95rem;
+  }
+}
+</style>

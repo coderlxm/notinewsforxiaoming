@@ -2,7 +2,7 @@
 import { MasonryGrid } from '@egjs/grid';
 import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, shallowRef, useTemplateRef, watch } from 'vue';
 import ArticleCardContent from '../article/ArticleCardContent.vue';
-import type { JournalEntry, JournalVisibility } from '../../types';
+import type { JournalEntry, JournalPlainChannel, JournalVisibility } from '../../types';
 import EntryCard from './EntryCard.vue';
 import JournalWaterfallPlaceholder from './JournalWaterfallPlaceholder.vue';
 
@@ -22,6 +22,7 @@ const emit = defineEmits<{
   saveContent: [entry: JournalEntry, contentText: string];
   setPublishedTime: [entry: JournalEntry, sourceCreatedAt: string];
   setVisibility: [entry: JournalEntry, visibility: JournalVisibility];
+  setChannel: [entry: JournalEntry, channel: JournalPlainChannel];
   setPinned: [entry: JournalEntry, pinned: boolean];
   deleteEntry: [entry: JournalEntry];
 }>();
@@ -55,6 +56,10 @@ function forwardPublishedTime(entry: JournalEntry, sourceCreatedAt: string): voi
 
 function forwardVisibility(entry: JournalEntry, visibility: JournalVisibility): void {
   emit('setVisibility', entry, visibility);
+}
+
+function forwardChannel(entry: JournalEntry, channel: JournalPlainChannel): void {
+  emit('setChannel', entry, channel);
 }
 
 function forwardPinned(entry: JournalEntry, pinned: boolean): void {
@@ -191,12 +196,14 @@ onBeforeUnmount(() => {
             :entry="entry"
             :editable="mode === 'private'"
             :busy="mutationEntryId === entry.id"
+            :channel-editable="mode === 'private'"
             @open-entry="emit('openEntry', $event)"
             @continue-draft="emit('continueDraft', $event)"
             @select-tag="emit('selectTag', $event)"
             @save-content="forwardSaveContent"
             @set-published-time="forwardPublishedTime"
             @set-visibility="forwardVisibility"
+            @set-channel="forwardChannel"
             @set-pinned="forwardPinned"
             @delete-entry="emit('deleteEntry', $event)"
           />

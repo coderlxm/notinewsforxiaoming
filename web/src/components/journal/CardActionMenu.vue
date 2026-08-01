@@ -1,16 +1,25 @@
 <script setup lang="ts">
 import { ElDropdown, ElDropdownItem, ElDropdownMenu } from 'element-plus';
-import { shallowRef, watch } from 'vue';
+import { computed, shallowRef, watch } from 'vue';
 import JournalLoading from '../ui/JournalLoading.vue';
-import type { JournalPublicationStatus, JournalVisibility } from '../../types';
+import { plainJournalChannels } from '../../journalChannels';
+import type {
+  JournalPlainChannel,
+  JournalPublicationStatus,
+  JournalVisibility,
+} from '../../types';
 
 const props = withDefaults(defineProps<{
   busy: boolean;
   pinned: boolean;
   visibility: JournalVisibility;
   publicationStatus: JournalPublicationStatus;
+  channel?: JournalPlainChannel;
+  channelEditable?: boolean;
   teleported?: boolean;
 }>(), {
+  channel: undefined,
+  channelEditable: false,
   teleported: true,
 });
 
@@ -20,11 +29,15 @@ const emit = defineEmits<{
   editPublishedTime: [];
   setPinned: [pinned: boolean];
   setVisibility: [visibility: JournalVisibility];
+  setChannel: [channel: JournalPlainChannel];
   requestDelete: [];
 }>();
 
 const open = shallowRef(false);
 const pendingLabel = shallowRef<string | null>(null);
+const channelTargets = computed(() => props.channelEditable && props.publicationStatus === 'published'
+  ? plainJournalChannels.filter(option => option.value !== props.channel)
+  : []);
 
 watch(() => props.busy, (busy) => {
   if (!busy) pendingLabel.value = null;
@@ -58,7 +71,16 @@ function editEntry(): void {
   emit('edit');
 }
 
+function changeChannel(channel: JournalPlainChannel): void {
+  const target = plainJournalChannels.find(option => option.value === channel)!;
+  runMutation(`正在移动到${target.label}…`, () => emit('setChannel', channel));
+}
+
 function handleCommand(command: string): void {
+  if (command.startsWith('channel:')) {
+    changeChannel(command.slice('channel:'.length) as JournalPlainChannel);
+    return;
+  }
   switch (command) {
     case 'edit': editEntry(); break;
     case 'published-time': emit('editPublishedTime'); break;
@@ -112,6 +134,13 @@ function handleCommand(command: string): void {
           </ElDropdownItem>
           <ElDropdownItem v-if="publicationStatus === 'published'" command="visibility">
             {{ visibility === 'public' ? '转为私有' : '设为公开' }}
+          </ElDropdownItem>
+          <ElDropdownItem
+            v-for="option in channelTargets"
+            :key="option.value"
+            :command="`channel:${option.value}`"
+          >
+            移动到{{ option.label }}
           </ElDropdownItem>
           <ElDropdownItem class="journal-action-menu__item--danger" command="delete">
             删除

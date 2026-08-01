@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, shallowRef, watch } from 'vue';
 import JournalLoading from '../ui/JournalLoading.vue';
-import type { JournalEntry, JournalVisibility } from '../../types';
+import type { JournalEntry, JournalPlainChannel, JournalVisibility } from '../../types';
 import { formatStructuredValue } from '../../utils/formatters';
 import CardActionMenu from './CardActionMenu.vue';
 import CardDateSpine from './CardDateSpine.vue';
@@ -13,10 +13,12 @@ const props = withDefaults(defineProps<{
   editable?: boolean;
   busy?: boolean;
   linkable?: boolean;
+  channelEditable?: boolean;
 }>(), {
   editable: false,
   busy: false,
   linkable: true,
+  channelEditable: false,
 });
 
 const emit = defineEmits<{
@@ -26,6 +28,7 @@ const emit = defineEmits<{
   saveContent: [entry: JournalEntry, contentText: string];
   setPublishedTime: [entry: JournalEntry, sourceCreatedAt: string];
   setVisibility: [entry: JournalEntry, visibility: JournalVisibility];
+  setChannel: [entry: JournalEntry, channel: JournalPlainChannel];
   setPinned: [entry: JournalEntry, pinned: boolean];
   deleteEntry: [entry: JournalEntry];
 }>();
@@ -38,6 +41,7 @@ const hiddenStructuredKeys = new Set(['entities', 'caption_entities']);
 
 const isDetail = computed(() => !props.linkable);
 const isDraft = computed(() => props.entry.publicationStatus === 'draft');
+const plainChannel = computed(() => props.entry.channel as JournalPlainChannel);
 const normalizedContent = computed(() => props.entry.contentText.replace(/\s+/g, ' ').trim());
 const displayedContent = computed(() => {
   if (isDetail.value || normalizedContent.value.length <= 72) return isDetail.value
@@ -133,11 +137,14 @@ function handleCardClick(event: MouseEvent): void {
         :pinned="entry.pinned"
         :visibility="entry.visibility"
         :publication-status="entry.publicationStatus"
+        :channel="plainChannel"
+        :channel-editable="channelEditable"
         @edit="startEditing"
         @continue-edit="emit('continueDraft', entry)"
         @edit-published-time="startPublishedTimeEditing"
         @set-pinned="emit('setPinned', entry, $event)"
         @set-visibility="emit('setVisibility', entry, $event)"
+        @set-channel="emit('setChannel', entry, $event)"
         @request-delete="startDeletion"
       />
     </header>

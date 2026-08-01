@@ -5,6 +5,7 @@ import type {
   JournalAssetRole,
   JournalAssetSourceKind,
   JournalBodyFormat,
+  JournalChannel,
   JournalContributionAsset,
   JournalContributionAssetKind,
   JournalContributionDetail,
@@ -13,6 +14,7 @@ import type {
   JournalEntry,
   JournalFeed,
   JournalPublicationStatus,
+  JournalPlainChannel,
   JournalRichDocument,
   JournalSourceKind,
   JournalVisibility,
@@ -40,6 +42,7 @@ interface EntryRow {
   content_text: string;
   rich_body_json: string | null;
   publication_status: JournalPublicationStatus;
+  channel: JournalChannel;
   visibility: JournalVisibility;
   tags_json: string;
   structured_content_json: string | null;
@@ -97,6 +100,7 @@ export interface CreateWebEntryInput {
   contentText: string;
   tags: string[];
   publicationStatus: JournalPublicationStatus;
+  channel: JournalPlainChannel;
   visibility: JournalVisibility;
   sourceCreatedAt: string;
   assets: WebEntryAssetInput[];
@@ -105,6 +109,7 @@ export interface CreateWebEntryInput {
 export interface UpdateWebDraftInput {
   contentText: string;
   tags: string[];
+  channel: JournalPlainChannel;
   updatedAt: string;
   removedAssetIds: number[];
   newAssets: WebEntryAssetInput[];
@@ -281,9 +286,9 @@ export class JournalRepository {
         INSERT INTO journal_entries (
           public_id, source_kind, chat_id, source_message_id, media_group_id, content_type,
           title, body_format, rich_body_json, content_text,
-          visibility, tags_json, structured_content_json,
+          channel, visibility, tags_json, structured_content_json,
           telegram_message_json, source_created_at, captured_at, updated_at
-        ) VALUES (?, 'telegram', ?, ?, ?, ?, NULL, 'plain', NULL, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, 'telegram', ?, ?, ?, ?, NULL, 'plain', NULL, ?, 'life', ?, ?, ?, ?, ?, ?, ?)
       `).run(
         entry.publicId,
         entry.chatId,
@@ -341,9 +346,9 @@ export class JournalRepository {
         INSERT INTO journal_entries (
           public_id, source_kind, chat_id, source_message_id, media_group_id, content_type,
           title, body_format, rich_body_json, content_text,
-          visibility, tags_json, structured_content_json, telegram_message_json,
+          channel, visibility, tags_json, structured_content_json, telegram_message_json,
           source_created_at, captured_at, updated_at
-        ) VALUES (?, 'web', NULL, NULL, NULL, 'article', ?, 'rich', ?, ?, 'private', ?, NULL, NULL, ?, ?, ?)
+        ) VALUES (?, 'web', NULL, NULL, NULL, 'article', ?, 'rich', ?, ?, 'article', 'private', ?, NULL, NULL, ?, ?, ?)
       `).run(
         publicId,
         input.title,
@@ -366,14 +371,15 @@ export class JournalRepository {
         INSERT INTO journal_entries (
           public_id, source_kind, chat_id, source_message_id, media_group_id, content_type,
           title, body_format, rich_body_json, content_text, publication_status,
-          visibility, tags_json, structured_content_json, telegram_message_json,
+          channel, visibility, tags_json, structured_content_json, telegram_message_json,
           source_created_at, captured_at, updated_at
-        ) VALUES (?, 'web', NULL, NULL, NULL, ?, NULL, 'plain', NULL, ?, ?, ?, ?, NULL, NULL, ?, ?, ?)
+        ) VALUES (?, 'web', NULL, NULL, NULL, ?, NULL, 'plain', NULL, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?)
       `).run(
         input.publicId,
         contentTypeOf(input.assets),
         input.contentText,
         input.publicationStatus,
+        input.channel,
         input.visibility,
         JSON.stringify(input.tags),
         input.sourceCreatedAt,
@@ -392,7 +398,7 @@ export class JournalRepository {
       const assets = this.replaceWebDraftAssets(id, input.removedAssetIds, input.newAssets);
       const result = this.database.prepare(`
         UPDATE journal_entries
-        SET content_type = ?, content_text = ?, tags_json = ?, updated_at = ?
+        SET content_type = ?, content_text = ?, tags_json = ?, channel = ?, updated_at = ?
         WHERE id = ?
           AND source_kind = 'web'
           AND body_format = 'plain'
@@ -401,6 +407,7 @@ export class JournalRepository {
         contentTypeOf(assets),
         input.contentText,
         JSON.stringify(input.tags),
+        input.channel,
         input.updatedAt,
         id,
       );
@@ -418,7 +425,7 @@ export class JournalRepository {
       const result = this.database.prepare(`
         UPDATE journal_entries
         SET content_type = ?, content_text = ?, tags_json = ?,
-            publication_status = 'published', visibility = ?,
+            channel = ?, publication_status = 'published', visibility = ?,
             source_created_at = ?, updated_at = ?
         WHERE id = ?
           AND source_kind = 'web'
@@ -428,6 +435,7 @@ export class JournalRepository {
         contentTypeOf(assets),
         input.contentText,
         JSON.stringify(input.tags),
+        input.channel,
         input.visibility,
         input.sourceCreatedAt,
         input.updatedAt,
@@ -617,6 +625,24 @@ export class JournalRepository {
     return this.getById(row.id);
   }
 
+  updatePlainChannel(id: number, channel: JournalPlainChannel): JournalEntry | null {
+    const row = this.findRowById(id);
+    if (!row) return null;
+    if (row.body_format !== 'plain') {
+      throw new Error('Article entries cannot change channels.');
+    }
+    if (row.publication_status === 'draft') {
+      this.database.prepare(`
+        UPDATE journal_entries
+        SET channel = ?, updated_at = ?
+        WHERE id = ? AND publication_status = 'draft'
+      `).run(channel, new Date().toISOString(), id);
+    } else {
+      this.updateGroup(row, 'channel = ?, updated_at = ?', [channel, new Date().toISOString()]);
+    }
+    return this.getById(row.id);
+  }
+
   updateContent(id: number, contentText: string): JournalEntry | null {
     const tags = extractJournalTags(contentText);
     const result = this.database.prepare(`
@@ -707,6 +733,10 @@ export class JournalRepository {
     }
     if (filters.visibility === 'public') {
       conditions.push("e.publication_status = 'published'");
+    }
+    if (filters.channel) {
+      conditions.push('e.channel = ?');
+      parameters.push(filters.channel);
     }
     if (filters.tag) {
       conditions.push('EXISTS (SELECT 1 FROM json_each(e.tags_json) WHERE instr(value, ?) > 0)');
@@ -1083,12 +1113,12 @@ export class JournalRepository {
         INSERT INTO journal_entries (
           public_id, source_kind, chat_id, source_message_id, media_group_id,
           content_type, title, body_format, content_text, rich_body_json,
-          publication_status, visibility, tags_json, structured_content_json,
+          publication_status, channel, visibility, tags_json, structured_content_json,
           telegram_message_json, pinned, source_created_at, captured_at, updated_at
         ) VALUES (
           ?, 'web', NULL, NULL, NULL,
           ?, NULL, 'plain', ?, NULL,
-          'published', ?, ?, NULL,
+          'published', 'life', ?, ?, NULL,
           NULL, 0, ?, ?, ?
         )
       `).run(
@@ -1355,6 +1385,7 @@ export class JournalRepository {
       richBody,
       contentText: row.content_text,
       publicationStatus: row.publication_status,
+      channel: row.channel,
       visibility: row.visibility,
       tags: z.array(z.string()).parse(JSON.parse(row.tags_json)),
       pinned: row.pinned === 1,

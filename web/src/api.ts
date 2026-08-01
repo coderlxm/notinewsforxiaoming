@@ -9,6 +9,8 @@ import type {
   JournalDeletionResult,
   JournalEntry,
   JournalFeed,
+  JournalChannel,
+  JournalPlainChannel,
   JournalRichDocument,
   JournalVisibility,
   OnThisDayResponse,
@@ -72,8 +74,13 @@ function appendFilterParams(params: URLSearchParams, filters: FeedFilters): void
   if (filters.to) params.set('to', filters.to);
 }
 
-export function fetchPublicFeed(options: { cursor?: string; tag?: string }): Promise<JournalFeed> {
+export function fetchPublicFeed(options: {
+  channel: JournalChannel;
+  cursor?: string;
+  tag?: string;
+}): Promise<JournalFeed> {
   const params = new URLSearchParams();
+  params.set('channel', options.channel);
   if (options.cursor) params.set('cursor', options.cursor);
   if (options.tag) params.set('tag', options.tag);
   const query = params.size ? `?${params.toString()}` : '';
@@ -189,6 +196,7 @@ export function publishEntry(input: {
   contentText: string;
   uploadId: string;
   action: 'draft' | 'publish';
+  channel: JournalPlainChannel;
   visibility?: JournalVisibility;
 }): Promise<JournalEntry> {
   return requestJson<JournalEntry>('/api/me/entries', jsonRequest('POST', input));
@@ -199,6 +207,7 @@ export function updateDraft(id: number, input: {
   uploadId: string;
   removedAssetIds: number[];
   action: 'draft' | 'publish';
+  channel: JournalPlainChannel;
   visibility?: JournalVisibility;
 }): Promise<JournalEntry> {
   return requestJson<JournalEntry>(`/api/me/entries/${id}/draft`, jsonRequest('PATCH', input));
@@ -244,6 +253,13 @@ export function updateEntryVisibility(id: number, visibility: JournalVisibility)
   return requestJson<JournalEntry>(
     `/api/me/entries/${id}/visibility`,
     jsonRequest('PATCH', { visibility }),
+  );
+}
+
+export function updateEntryChannel(id: number, channel: JournalPlainChannel): Promise<JournalEntry> {
+  return requestJson<JournalEntry>(
+    `/api/me/entries/${id}/channel`,
+    jsonRequest('PATCH', { channel }),
   );
 }
 

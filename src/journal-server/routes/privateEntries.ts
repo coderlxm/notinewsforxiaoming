@@ -4,6 +4,7 @@ import {
   journalContentUpdateRequestSchema,
   journalLoginRequestSchema,
   journalPinnedUpdateRequestSchema,
+  journalPlainChannelRequestSchema,
   journalPublishedTimeUpdateRequestSchema,
   journalVisibilityRequestSchema,
   journalWebDraftUpdateFieldsSchema,
@@ -143,6 +144,7 @@ export async function registerPrivateEntryRoutes(
     try {
       const input = {
         contentText: fields.contentText,
+        channel: fields.channel,
         removedAssetIds: fields.removedAssetIds,
       };
       return fields.action === 'draft'
@@ -179,6 +181,23 @@ export async function registerPrivateEntryRoutes(
     const entry = repository.updateVisibilityById(id, visibility);
     if (!entry) return reply.code(404).send({ error: 'Journal entry was not found.' });
     return entry;
+  });
+
+  server.patch('/api/me/entries/:id/channel', {
+    preHandler: auth.requireAdmin,
+  }, async (request, reply) => {
+    const { id } = idParamsSchema.parse(request.params);
+    const { channel } = journalPlainChannelRequestSchema.parse(request.body);
+    try {
+      const entry = repository.updatePlainChannel(id, channel);
+      if (!entry) return reply.code(404).send({ error: 'Journal entry was not found.' });
+      return entry;
+    } catch (error) {
+      if (error instanceof Error && error.message === 'Article entries cannot change channels.') {
+        return reply.code(400).send({ error: error.message });
+      }
+      throw error;
+    }
   });
 
   server.patch('/api/me/entries/:id/pinned', {

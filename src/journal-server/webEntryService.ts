@@ -1,5 +1,6 @@
 import type {
   JournalEntry,
+  JournalPlainChannel,
   JournalVisibility,
 } from '../shared/journalProtocol.js';
 import {
@@ -15,12 +16,14 @@ const maxWebEntryVideoCount = 5;
 export interface CreateWebEntryServiceInput {
   contentText: string;
   action: 'draft' | 'publish';
+  channel: JournalPlainChannel;
   visibility?: JournalVisibility;
   uploadId: string;
 }
 
 export interface UpdateWebDraftServiceInput {
   contentText: string;
+  channel: JournalPlainChannel;
   uploadId: string;
   removedAssetIds: number[];
 }
@@ -57,6 +60,7 @@ export class JournalWebEntryService {
         contentText: input.contentText,
         tags: extractJournalTags(input.contentText),
         publicationStatus: input.action === 'draft' ? 'draft' : 'published',
+        channel: input.channel,
         visibility: input.action === 'draft' ? 'private' : input.visibility as JournalVisibility,
         sourceCreatedAt: upload.createdAt,
         assets: upload.assets,
@@ -100,6 +104,7 @@ export class JournalWebEntryService {
         ? this.repository.updateWebDraft(id, {
             contentText: input.contentText,
             tags: extractJournalTags(input.contentText),
+            channel: input.channel,
             updatedAt,
             removedAssetIds: input.removedAssetIds,
             newAssets,
@@ -107,6 +112,7 @@ export class JournalWebEntryService {
         : this.repository.publishWebDraft(id, {
             contentText: input.contentText,
             tags: extractJournalTags(input.contentText),
+            channel: input.channel,
             updatedAt,
             removedAssetIds: input.removedAssetIds,
             newAssets,

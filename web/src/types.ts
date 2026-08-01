@@ -1,5 +1,7 @@
 export type JournalVisibility = 'private' | 'public';
 export type JournalPublicationStatus = 'draft' | 'published';
+export type JournalChannel = 'life' | 'article' | 'interest';
+export type JournalPlainChannel = Exclude<JournalChannel, 'article'>;
 export type AssetView = 'waterfall' | 'table';
 
 export type JournalSourceKind = 'telegram' | 'web';
@@ -44,6 +46,7 @@ export interface JournalEntry {
   bodyFormat: JournalBodyFormat;
   richBody: JournalRichDocument | null;
   contentText: string;
+  channel: JournalChannel;
   visibility: JournalVisibility;
   publicationStatus: JournalPublicationStatus;
   tags: string[];
