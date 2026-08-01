@@ -231,6 +231,11 @@ function finishRefresh(): void {
   refreshing.value = false;
 }
 
+function finishRefreshIfReady(): void {
+  if (!refreshRequestComplete.value || !feedLayoutReady.value) return;
+  finishRefresh();
+}
+
 async function refreshFeed(): Promise<void> {
   feedLayoutReady.value = false;
   refreshing.value = true;
@@ -244,12 +249,15 @@ async function refreshFeed(): Promise<void> {
   }
 
   refreshRequestComplete.value = true;
-  if (journal.error.value || journal.entries.value.length === 0) finishRefresh();
+  if (journal.error.value || journal.entries.value.length === 0) {
+    finishRefresh();
+    return;
+  }
+  finishRefreshIfReady();
 }
 
 async function handleLayoutReady(): Promise<void> {
   emit('layoutReady');
-  if (refreshRequestComplete.value) finishRefresh();
   if (paginationLayoutPending.value && !journal.loadingMore.value) {
     paginationLayoutPending.value = false;
   }
@@ -257,6 +265,7 @@ async function handleLayoutReady(): Promise<void> {
     await nextTick();
     feedLayoutReady.value = true;
   }
+  finishRefreshIfReady();
 }
 
 async function authenticate(password: string): Promise<void> {
