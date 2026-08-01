@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import sharp from 'sharp';
-import type { JournalSiteProfile } from '../shared/journalProtocol.js';
+import type { JournalChannelTags, JournalSiteProfile } from '../shared/journalProtocol.js';
 import { journalSiteProfileBioSchema } from '../shared/journalProtocol.js';
 import type { JournalRepository, JournalSiteProfileRecord } from './repository.js';
 
@@ -41,6 +41,7 @@ export class JournalSiteProfileService {
     bio: string;
     avatar: JournalSiteProfileAvatarUpload | null;
     weatherEnabled: boolean;
+    channelTags: JournalChannelTags;
   }): Promise<JournalSiteProfile> {
     const bio = journalSiteProfileBioSchema.parse(input.bio);
     const avatarWebp = input.avatar === null
@@ -50,6 +51,7 @@ export class JournalSiteProfileService {
       bio,
       avatarWebp,
       weatherEnabled: input.weatherEnabled,
+      channelTags: input.channelTags,
       updatedAt: new Date().toISOString(),
     });
     return this.toPublicProfile(profile);
@@ -101,6 +103,7 @@ export class JournalSiteProfileService {
       bio: profile.bio,
       avatarUrl: `/api/site-profile/avatar?v=${profile.avatarRevision}`,
       weatherEnabled: profile.weatherEnabled,
+      channelTags: profile.channelTags,
       updatedAt: profile.updatedAt,
     };
   }

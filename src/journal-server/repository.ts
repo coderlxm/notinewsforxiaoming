@@ -6,6 +6,7 @@ import type {
   JournalAssetSourceKind,
   JournalBodyFormat,
   JournalChannel,
+  JournalChannelTags,
   JournalContributionAsset,
   JournalContributionAssetKind,
   JournalContributionDetail,
@@ -19,7 +20,7 @@ import type {
   JournalSourceKind,
   JournalVisibility,
 } from '../shared/journalProtocol.js';
-import { journalRichDocumentSchema } from '../shared/journalProtocol.js';
+import { journalChannelTagsSchema, journalRichDocumentSchema } from '../shared/journalProtocol.js';
 import type {
   CreateJournalEntryInput,
   JournalAssetAccess,
@@ -143,6 +144,7 @@ export interface JournalSiteProfileRecord {
   avatarWebp: Buffer;
   avatarRevision: number;
   weatherEnabled: boolean;
+  channelTags: JournalChannelTags;
   updatedAt: string;
 }
 
@@ -151,6 +153,7 @@ interface SiteProfileRow {
   avatar_webp: Buffer;
   avatar_revision: number;
   weather_enabled: 0 | 1;
+  channel_tags_json: string;
   updated_at: string;
 }
 
@@ -739,7 +742,7 @@ export class JournalRepository {
       parameters.push(filters.channel);
     }
     if (filters.tag) {
-      conditions.push('EXISTS (SELECT 1 FROM json_each(e.tags_json) WHERE instr(value, ?) > 0)');
+      conditions.push('EXISTS (SELECT 1 FROM json_each(e.tags_json) WHERE value = ?)');
       parameters.push(filters.tag);
     }
     if (filters.query) {
@@ -1178,7 +1181,7 @@ export class JournalRepository {
 
   getSiteProfileOrNull(): JournalSiteProfileRecord | null {
     const row = this.database.prepare(`
-      SELECT bio, avatar_webp, avatar_revision, weather_enabled, updated_at
+      SELECT bio, avatar_webp, avatar_revision, weather_enabled, channel_tags_json, updated_at
       FROM journal_site_profile
       WHERE id = 1
     `).get() as SiteProfileRow | undefined;
@@ -1197,27 +1200,35 @@ export class JournalRepository {
     bio: string;
     avatarWebp: Buffer | null;
     weatherEnabled: boolean;
+    channelTags: JournalChannelTags;
     updatedAt: string;
   }): JournalSiteProfileRecord {
     const update = this.database.transaction(() => {
       const result = input.avatarWebp === null
         ? this.database.prepare(`
             UPDATE journal_site_profile
-            SET bio = ?, weather_enabled = ?, updated_at = ?
+            SET bio = ?, weather_enabled = ?, channel_tags_json = ?, updated_at = ?
             WHERE id = 1
-          `).run(input.bio, Number(input.weatherEnabled), input.updatedAt)
+          `).run(
+            input.bio,
+            Number(input.weatherEnabled),
+            JSON.stringify(input.channelTags),
+            input.updatedAt,
+          )
         : this.database.prepare(`
             UPDATE journal_site_profile
             SET bio = ?,
                 avatar_webp = ?,
                 avatar_revision = avatar_revision + 1,
                 weather_enabled = ?,
+                channel_tags_json = ?,
                 updated_at = ?
             WHERE id = 1
           `).run(
             input.bio,
             input.avatarWebp,
             Number(input.weatherEnabled),
+            JSON.stringify(input.channelTags),
             input.updatedAt,
           );
       if (result.changes !== 1) {
@@ -1524,6 +1535,7 @@ export class JournalRepository {
       avatarWebp: row.avatar_webp,
       avatarRevision: row.avatar_revision,
       weatherEnabled: row.weather_enabled === 1,
+      channelTags: journalChannelTagsSchema.parse(JSON.parse(row.channel_tags_json)),
       updatedAt: row.updated_at,
     };
   }

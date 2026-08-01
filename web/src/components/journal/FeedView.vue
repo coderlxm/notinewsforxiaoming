@@ -10,6 +10,7 @@ import { useDeferredLoading } from '../../composables/useDeferredLoading';
 import { useJournalApi } from '../../composables/useJournalApi';
 import { journalChannels, publicFeedPath } from '../../journalChannels';
 import { useSessionStore } from '../../stores/session';
+import { useSiteProfileStore } from '../../stores/siteProfile';
 import {
   emptyFeedFilters,
   type AssetView,
@@ -27,6 +28,7 @@ import EntryFilters from './EntryFilters.vue';
 import JournalDetailOverlay from './JournalDetailOverlay.vue';
 import LoginView from './LoginView.vue';
 import OnThisDay from './OnThisDay.vue';
+import PublicChannelTagNavigation from './PublicChannelTagNavigation.vue';
 import WaterfallFeed from './WaterfallFeed.vue';
 
 const props = withDefaults(defineProps<{
@@ -65,6 +67,7 @@ const filters = reactive<FeedFilters>({
 const journal = useJournalApi();
 const router = useRouter();
 const session = useSessionStore();
+const siteProfile = useSiteProfileStore();
 const initialLoadPending = shallowRef(true);
 const listReplacing = shallowRef(false);
 const loggingOut = shallowRef(false);
@@ -90,11 +93,13 @@ const overlayVisible = computed(() => isOverlay.value && (
 ));
 const detailPreparing = computed(() => isDetail.value && initialLoadPending.value);
 const deferredDetailLoading = useDeferredLoading(detailPreparing);
-const listTitle = computed(() => {
-  if (props.mode === 'private') return '我的全部记录';
-  if (props.initialTag) return `#${props.initialTag}`;
-  return journalChannels.find(item => item.value === props.channel)!.label;
+const publicChannelTags = computed<readonly string[]>(() => {
+  if (siteProfile.profile === null) return [];
+  return siteProfile.profile.channelTags[props.channel];
 });
+const publicTagNavigationVisible = computed(() =>
+  publicChannelTags.value.length > 0 || props.initialTag.length > 0,
+);
 const publicLayout = computed(() =>
   journalChannels.find(item => item.value === props.channel)!.layout,
 );
@@ -274,6 +279,11 @@ async function selectTag(tag: string): Promise<void> {
   await applyFilters({ ...filters, tag });
 }
 
+async function selectPublicChannelTag(tag: string): Promise<void> {
+  if (tag === props.initialTag) return;
+  await router.push(publicFeedPath(props.channel, tag));
+}
+
 async function logout(): Promise<void> {
   loggingOut.value = true;
   try {
@@ -386,7 +396,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
         <div class="feed__private-heading">
           <div>
             <span class="feed__eyebrow">PERSONAL ARCHIVE</span>
-            <h1 class="feed__title">{{ listTitle }}</h1>
+            <h1 class="feed__title">我的全部记录</h1>
           </div>
           <div class="feed__private-actions">
             <button
@@ -439,21 +449,18 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
         </div>
       </template>
 
-      <div v-else-if="!isDetail" class="feed__public-intro">
+      <div
+        v-else-if="!isDetail"
+        class="feed__public-intro"
+        :class="{ 'feed__public-intro--without-tags': !publicTagNavigationVisible }"
+      >
         <div class="feed__public-heading">
-          <div>
-            <h1 class="feed__eyebrow">PUBLIC NOTES</h1>
-            <div v-if="initialTag" class="feed__title-row">
-              <h2 class="feed__title">{{ listTitle }}</h2>
-              <button
-                class="text-button"
-                type="button"
-                @click="router.push(publicFeedPath(channel))"
-              >
-                清除标签
-              </button>
-            </div>
-          </div>
+          <PublicChannelTagNavigation
+            class="feed__public-tags"
+            :tags="publicChannelTags"
+            :active-tag="initialTag"
+            @select="selectPublicChannelTag"
+          />
           <button
             class="text-button feed__public-refresh"
             type="button"
@@ -575,7 +582,11 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
             v-if="!initialLoadPending && !listReplacing && !journal.entries.value.length && !journal.error.value"
             class="feed__empty"
           >
-            {{ mode === 'private' ? '没有符合当前筛选条件的记录。' : '这里还没有公开记录。' }}
+            {{ mode === 'private'
+              ? '没有符合当前筛选条件的记录。'
+              : initialTag
+                ? '这个标签下还没有公开内容。'
+                : '这里还没有公开记录。' }}
           </p>
 
           <template #loading>
@@ -650,12 +661,22 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
   display: flex;
   min-height: 1.5rem;
   align-items: center;
+  gap: 0.75rem;
   justify-content: space-between;
 }
 
 .feed__public-intro {
+  position: sticky;
+  z-index: 4;
+  top: 0;
   display: grid;
   gap: 0.55rem;
+  padding: 0.35rem 0;
+  background: var(--surface-page);
+}
+
+.feed__public-tags {
+  flex: 1 1 auto;
 }
 
 .feed__private-actions {
@@ -685,12 +706,6 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
   cursor: wait;
   opacity: 0.55;
   text-decoration: none;
-}
-
-.feed__title-row {
-  display: flex;
-  align-items: baseline;
-  gap: 1rem;
 }
 
 .feed__title {
@@ -752,6 +767,10 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
 }
 
 @media (max-width: 599px) {
+  .feed__public-intro--without-tags {
+    display: none;
+  }
+
   .feed__public-refresh {
     display: none;
   }

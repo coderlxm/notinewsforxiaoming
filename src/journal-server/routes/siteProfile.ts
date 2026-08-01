@@ -1,6 +1,10 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { journalSiteProfileBioSchema } from '../../shared/journalProtocol.js';
+import type { JournalChannelTags } from '../../shared/journalProtocol.js';
+import {
+  journalChannelTagsSchema,
+  journalSiteProfileBioSchema,
+} from '../../shared/journalProtocol.js';
 import type { JournalAuth } from '../auth.js';
 import {
   type JournalSiteProfileAvatarUpload,
@@ -12,23 +16,27 @@ import {
 const siteProfileFieldsSchema = z.object({
   bio: journalSiteProfileBioSchema,
   weatherEnabled: z.enum(['true', 'false']).transform(value => value === 'true'),
+  channelTags: z.string().transform(value => (
+    journalChannelTagsSchema.parse(JSON.parse(value))
+  )),
 });
 
 async function readSiteProfileMultipart(request: FastifyRequest): Promise<{
   bio: string;
   avatar: JournalSiteProfileAvatarUpload | null;
   weatherEnabled: boolean;
+  channelTags: JournalChannelTags;
 }> {
   const fields: Record<string, string> = {};
   let avatar: JournalSiteProfileAvatarUpload | null = null;
 
   for await (const part of request.parts({
     limits: {
-      fieldSize: 1024,
-      fields: 2,
+      fieldSize: 4096,
+      fields: 3,
       fileSize: maxSiteProfileAvatarBytes,
       files: 1,
-      parts: 3,
+      parts: 4,
     },
   })) {
     if (part.type === 'file') {
@@ -43,7 +51,11 @@ async function readSiteProfileMultipart(request: FastifyRequest): Promise<{
       };
       continue;
     }
-    if (part.fieldname !== 'bio' && part.fieldname !== 'weatherEnabled') {
+    if (
+      part.fieldname !== 'bio'
+      && part.fieldname !== 'weatherEnabled'
+      && part.fieldname !== 'channelTags'
+    ) {
       throw new JournalSiteProfileInputError(
         `Unexpected multipart field ${part.fieldname}.`,
       );
@@ -56,8 +68,8 @@ async function readSiteProfileMultipart(request: FastifyRequest): Promise<{
     fields[part.fieldname] = String(part.value);
   }
 
-  const { bio, weatherEnabled } = siteProfileFieldsSchema.parse(fields);
-  return { bio, avatar, weatherEnabled };
+  const { bio, weatherEnabled, channelTags } = siteProfileFieldsSchema.parse(fields);
+  return { bio, avatar, weatherEnabled, channelTags };
 }
 
 export async function registerSiteProfileRoutes(

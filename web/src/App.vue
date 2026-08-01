@@ -42,6 +42,7 @@ type ScrollDirection = -1 | 0 | 1;
 const HEADER_ALWAYS_VISIBLE_TOP = 24;
 const HEADER_HIDE_DISTANCE = 16;
 const HEADER_SHOW_DISTANCE = 8;
+const PUBLIC_FEED_CACHE_LIMIT = 30;
 
 interface OverlayContext {
   entry: JournalEntry;
@@ -273,8 +274,8 @@ function persistentFeedKey(path: string): string | null {
   if (url.pathname === '/') {
     const channel = url.searchParams.get('channel') ?? 'life';
     const tag = url.searchParams.get('tag') ?? '';
-    if (!isJournalChannel(channel) || tag) return null;
-    return `public:${channel}`;
+    if (!isJournalChannel(channel)) return null;
+    return `public:${channel}:${tag}`;
   }
   if (url.pathname === '/me') return 'private';
   return null;
@@ -282,7 +283,7 @@ function persistentFeedKey(path: string): string | null {
 
 function persistentFeedRouteKey(feedRoute: FeedRoute): string | null {
   if (feedRoute.name === 'private') return 'private';
-  return feedRoute.tag ? null : `public:${feedRoute.channel}`;
+  return `public:${feedRoute.channel}:${feedRoute.tag}`;
 }
 
 function pathMatchesOverlayContext(path: string, context: OverlayContext): boolean {
@@ -586,12 +587,13 @@ onUnmounted(() => {
           />
         </KeepAlive>
 
-        <KeepAlive :max="3">
+        <KeepAlive :max="PUBLIC_FEED_CACHE_LIMIT">
           <FeedView
-            v-if="backgroundFeedRoute?.name === 'public' && !backgroundFeedRoute.tag"
-            :key="`public:${backgroundFeedRoute.channel}`"
+            v-if="backgroundFeedRoute?.name === 'public'"
+            :key="backgroundFeedRoute.key"
             mode="public"
             :channel="backgroundFeedRoute.channel"
+            :initial-tag="backgroundFeedRoute.tag"
             :overlay-entry-id="overlayEntryId"
             :overlay-entry="overlayEntry"
             @layout-ready="restoreFeedScroll"
@@ -600,20 +602,6 @@ onUnmounted(() => {
             @remove-deleted-overlay="removeDeletedOverlay"
           />
         </KeepAlive>
-
-        <FeedView
-          v-if="backgroundFeedRoute?.name === 'public' && backgroundFeedRoute.tag"
-          :key="backgroundFeedRoute.key"
-          mode="public"
-          :channel="backgroundFeedRoute.channel"
-          :initial-tag="backgroundFeedRoute.tag"
-          :overlay-entry-id="overlayEntryId"
-          :overlay-entry="overlayEntry"
-          @layout-ready="restoreFeedScroll"
-          @open-entry="openEntry"
-          @close-overlay="closeOverlay"
-          @remove-deleted-overlay="removeDeletedOverlay"
-        />
 
         <FeedView
           v-if="route.name === 'detail' && !activeOverlayContext && !directPublicOverlayEntry"

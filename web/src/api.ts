@@ -2,6 +2,7 @@ import type {
   AdminContributionDetail,
   AdminContributionLink,
   AdminContributionListResponse,
+  ChannelTags,
   FeedFilters,
   JournalApiError,
   JournalArticleAssetResponse,
@@ -102,10 +103,12 @@ export function updateSiteProfile(input: {
   bio: string;
   avatar: File | null;
   weatherEnabled: boolean;
+  channelTags: ChannelTags;
 }): Promise<SiteProfile> {
   const form = new FormData();
   form.append('bio', input.bio);
   form.append('weatherEnabled', String(input.weatherEnabled));
+  form.append('channelTags', JSON.stringify(input.channelTags));
   if (input.avatar !== null) form.append('avatar', input.avatar);
   return requestJson<SiteProfile>('/api/me/site-profile', { method: 'PATCH', body: form });
 }

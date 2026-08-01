@@ -614,6 +614,16 @@ const migrations: JournalMigration[] = [
       `);
     },
   },
+  {
+    version: 10,
+    up(database) {
+      database.exec(`
+        ALTER TABLE journal_site_profile
+        ADD COLUMN channel_tags_json TEXT NOT NULL
+          DEFAULT '{"life":[],"article":[],"interest":[]}';
+      `);
+    },
+  },
 ];
 
 export function runJournalMigrations(database: Database.Database): void {

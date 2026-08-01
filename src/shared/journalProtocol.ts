@@ -217,10 +217,28 @@ export type JournalApiError = z.infer<typeof journalApiErrorSchema>;
 
 export const journalSiteProfileBioSchema = z.string().trim().max(120);
 
+const journalChannelTagListSchema = z
+  .array(z.string()
+    .trim()
+    .min(1)
+    .max(32)
+    .refine(tag => !tag.includes('#'), 'Channel tags must not contain #.')
+    .refine(tag => tag !== '全部', 'The all-content tab is fixed and cannot be configured.'))
+  .max(8)
+  .refine(tags => new Set(tags).size === tags.length, 'Channel tags must be unique.');
+
+export const journalChannelTagsSchema = z.object({
+  life: journalChannelTagListSchema,
+  article: journalChannelTagListSchema,
+  interest: journalChannelTagListSchema,
+});
+export type JournalChannelTags = z.infer<typeof journalChannelTagsSchema>;
+
 export const journalSiteProfileSchema = z.object({
   bio: journalSiteProfileBioSchema,
   avatarUrl: z.string().min(1),
   weatherEnabled: z.boolean(),
+  channelTags: journalChannelTagsSchema,
   updatedAt: z.string().datetime(),
 });
 export type JournalSiteProfile = z.infer<typeof journalSiteProfileSchema>;

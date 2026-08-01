@@ -4,6 +4,8 @@ export type JournalChannel = 'life' | 'article' | 'interest';
 export type JournalPlainChannel = Exclude<JournalChannel, 'article'>;
 export type AssetView = 'waterfall' | 'table';
 
+export type ChannelTags = Record<JournalChannel, string[]>;
+
 export type JournalSourceKind = 'telegram' | 'web';
 export type JournalBodyFormat = 'plain' | 'rich';
 export type JournalAssetSourceKind = 'telegram' | 'web';
@@ -80,6 +82,7 @@ export interface SiteProfile {
   bio: string;
   avatarUrl: string;
   weatherEnabled: boolean;
+  channelTags: ChannelTags;
   updatedAt: string;
 }
 
