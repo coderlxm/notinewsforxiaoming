@@ -598,16 +598,6 @@ onUnmounted(() => {
           <h1>这条路没有记录</h1>
           <button class="button button--primary" type="button" @click="navigate('/')">返回首页</button>
         </main>
-
-        <footer class="site-footer">
-          <span>小明同学的生活记录</span>
-          <span aria-hidden="true">·</span>
-          <a href="/rss.xml">RSS</a>
-          <a href="/feed.json">JSON Feed</a>
-          <a href="https://www.qweather.com/" target="_blank" rel="noopener noreferrer">
-            天气服务：QWeather
-          </a>
-        </footer>
       </div>
     </div>
   </div>
@@ -657,7 +647,7 @@ onUnmounted(() => {
   display: none;
 }
 
-.app-scroll > :not(.site-footer) {
+.app-scroll > * {
   flex-shrink: 0;
 }
 
@@ -812,22 +802,6 @@ onUnmounted(() => {
   font-size: 1.35rem;
 }
 
-.site-footer {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 0.55rem;
-  margin-top: auto;
-  padding: 1.8rem var(--page-gutter) 2.6rem;
-  color: var(--text-muted);
-  font-size: 0.72rem;
-}
-
-.site-footer a {
-  color: inherit;
-}
-
 @keyframes profile-skeleton-pulse {
   0%,
   100% {
@@ -919,8 +893,12 @@ onUnmounted(() => {
   .app-main--public {
     width: 100%;
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
     gap: 0;
+  }
+
+  .app-main--public > .app-scroll {
+    grid-row: 1;
   }
 }
 </style>

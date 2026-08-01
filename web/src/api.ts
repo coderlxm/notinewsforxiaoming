@@ -2,7 +2,6 @@ import type {
   AdminContributionDetail,
   AdminContributionLink,
   AdminContributionListResponse,
-  CurrentWeather,
   FeedFilters,
   JournalApiError,
   JournalArticleAssetResponse,
@@ -97,10 +96,6 @@ export function fetchAuthenticationState(): Promise<{ authenticated: boolean }> 
 
 export function fetchSiteProfile(): Promise<SiteProfile> {
   return requestJson<SiteProfile>('/api/site-profile');
-}
-
-export function fetchCurrentWeather(): Promise<CurrentWeather> {
-  return requestJson<CurrentWeather>('/api/weather');
 }
 
 export function updateSiteProfile(input: {

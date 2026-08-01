@@ -83,14 +83,6 @@ export interface SiteProfile {
   updatedAt: string;
 }
 
-export interface CurrentWeather {
-  text: string;
-  temperature: number;
-  feelsLike: number;
-  windDirection: string;
-  observedAt: string;
-}
-
 export interface AdminContributionLink {
   url?: string;
   expiresAt: string;

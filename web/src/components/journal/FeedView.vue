@@ -1,18 +1,15 @@
 <script setup lang="ts">
 import { List } from 'vant';
-import { storeToRefs } from 'pinia';
 import { computed, nextTick, onActivated, onBeforeUnmount, onMounted, reactive, shallowRef, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import ArticleCardContent from '../article/ArticleCardContent.vue';
 import PublicArticleFeed from '../article/PublicArticleFeed.vue';
 import JournalLoading from '../ui/JournalLoading.vue';
 import JournalPullRefresh from '../ui/JournalPullRefresh.vue';
-import { useCurrentWeather } from '../../composables/useCurrentWeather';
 import { useDeferredLoading } from '../../composables/useDeferredLoading';
 import { useJournalApi } from '../../composables/useJournalApi';
 import { journalChannels, publicFeedPath } from '../../journalChannels';
 import { useSessionStore } from '../../stores/session';
-import { useSiteProfileStore } from '../../stores/siteProfile';
 import {
   emptyFeedFilters,
   type AssetView,
@@ -23,7 +20,6 @@ import {
   type JournalVisibility,
 } from '../../types';
 import { showMessage } from '../../utils/message';
-import CurrentWeather from './CurrentWeather.vue';
 import AssetTableView from './AssetTableView.vue';
 import AssetViewSwitch from './AssetViewSwitch.vue';
 import EntryCard from './EntryCard.vue';
@@ -67,9 +63,6 @@ const filters = reactive<FeedFilters>({
   tag: props.initialTag,
 });
 const journal = useJournalApi();
-const currentWeather = useCurrentWeather();
-const siteProfile = useSiteProfileStore();
-const { profile: siteProfileData } = storeToRefs(siteProfile);
 const router = useRouter();
 const session = useSessionStore();
 const initialLoadPending = shallowRef(true);
@@ -82,7 +75,6 @@ const feedLayoutReady = shallowRef(false);
 let terminalErrorMessage: ReturnType<typeof showMessage> | null = null;
 
 const isDetail = computed(() => props.mode === 'public' && props.detailId !== undefined);
-const weatherEnabled = computed(() => siteProfileData.value?.weatherEnabled === true);
 const isOverlay = computed(() => props.overlayEntryId !== undefined);
 const currentOverlayEntry = computed(() => {
   if (props.overlayEntryId === undefined) return null;
@@ -158,18 +150,6 @@ watch(() => journal.error.value, (error) => {
   showMessage({ message: error, type: 'error' });
 });
 
-watch(weatherEnabled, (enabled, wasEnabled) => {
-  if (
-    !initialLoadPending.value
-    && enabled
-    && !wasEnabled
-    && props.mode === 'public'
-    && !isDetail.value
-  ) {
-    void currentWeather.load();
-  }
-}, { immediate: true });
-
 async function loadDirectPrivateDetail(): Promise<void> {
   if (
     !props.directOverlay
@@ -187,14 +167,7 @@ onMounted(async () => {
       return;
     }
     if (props.mode === 'public') {
-      const feedRequest = journal.loadPublic({ channel: props.channel, tag: props.initialTag });
-      await siteProfile.ensureLoaded();
-      if (weatherEnabled.value) {
-        await Promise.all([feedRequest, currentWeather.load()]);
-      }
-      else {
-        await feedRequest;
-      }
+      await journal.loadPublic({ channel: props.channel, tag: props.initialTag });
       return;
     }
     await journal.loadPrivate(filters);
@@ -254,9 +227,7 @@ async function refreshFeed(): Promise<void> {
   refreshRequestComplete.value = false;
 
   if (props.mode === 'public') {
-    const requests = [journal.loadPublic({ channel: props.channel, tag: props.initialTag })];
-    if (weatherEnabled.value) requests.push(currentWeather.load());
-    await Promise.all(requests);
+    await journal.loadPublic({ channel: props.channel, tag: props.initialTag });
   }
   else {
     await journal.refreshPrivateFeed(filters);
@@ -489,12 +460,6 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
             <template v-else>刷新</template>
           </button>
         </div>
-        <CurrentWeather
-          v-if="weatherEnabled"
-          :weather="currentWeather.weather.value"
-          :loading="currentWeather.loading.value"
-          :error="currentWeather.error.value"
-        />
       </div>
 
       <LoginView

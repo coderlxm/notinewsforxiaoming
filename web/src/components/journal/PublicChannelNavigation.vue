@@ -82,29 +82,43 @@ const emit = defineEmits<{
 
 @media (max-width: 799px) {
   .channel-sidebar {
-    padding: 0.55rem var(--workspace-gutter) 0;
-    border-bottom: 1px solid var(--border-subtle);
+    z-index: 10;
+    grid-row: 2;
+    padding:
+      0.25rem
+      max(0.55rem, env(safe-area-inset-right))
+      max(0.25rem, env(safe-area-inset-bottom))
+      max(0.55rem, env(safe-area-inset-left));
+    border-top: 1px solid var(--border-subtle);
+    background: var(--surface-page);
+    box-shadow: 0 -0.6rem 1.6rem rgb(24 22 20 / 5%);
   }
 
   .channel-sidebar__navigation {
     display: grid;
     width: 100%;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.25rem;
+    gap: 0.18rem;
   }
 
   .channel-sidebar__item {
     width: 100%;
     min-width: 0;
-    min-height: 2.65rem;
+    min-height: 2.6rem;
     justify-content: center;
-    gap: 0.45rem;
-    padding: 0.45rem 0.75rem;
+    gap: 0;
+    padding: 0.3rem 0.6rem;
+    font-size: 0.76rem;
   }
 
   .channel-sidebar__marker {
-    width: 0.3rem;
-    height: 0.95rem;
+    display: none;
+  }
+
+  .channel-sidebar__item.channel-sidebar__item--active,
+  .channel-sidebar__item.channel-sidebar__item--active:hover {
+    background: var(--accent-soft);
+    color: var(--accent-strong);
   }
 }
 </style>
