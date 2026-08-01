@@ -2,20 +2,23 @@
 import { ArrowRight, Connection, Document, Lock, Top } from '@element-plus/icons-vue';
 import { ElTable, ElTableColumn } from 'element-plus';
 import { computed, onMounted, onUpdated } from 'vue';
-import type { JournalEntry } from '../../types';
+import type { JournalEntry, JournalPlainChannel } from '../../types';
 import { formatEntryTime, formatFileSize } from '../../utils/formatters';
+import AssetTableChannelCell from './AssetTableChannelCell.vue';
 import AssetTableContentCell from './AssetTableContentCell.vue';
 import JournalAssetTablePlaceholder from './JournalAssetTablePlaceholder.vue';
 
 const props = defineProps<{
   entries: JournalEntry[];
   loading: boolean;
+  mutationEntryId: number | null;
 }>();
 
 const emit = defineEmits<{
   layoutReady: [];
   openEntry: [entry: JournalEntry];
   selectTag: [tag: string];
+  setChannel: [entry: JournalEntry, channel: JournalPlainChannel];
 }>();
 
 const contentTypeLabels: Record<string, string> = {
@@ -95,6 +98,16 @@ onUpdated(() => emit('layoutReady'));
             :entry="row.entry"
             :type-label="row.typeLabel"
             @select-tag="emit('selectTag', $event)"
+          />
+        </template>
+      </ElTableColumn>
+
+      <ElTableColumn label="所属板块" width="96">
+        <template #default="{ row }">
+          <AssetTableChannelCell
+            :entry="row.entry"
+            :busy="mutationEntryId === row.entry.id"
+            @set-channel="emit('setChannel', row.entry, $event)"
           />
         </template>
       </ElTableColumn>

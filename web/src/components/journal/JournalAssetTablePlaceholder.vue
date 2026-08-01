@@ -2,7 +2,7 @@
   <div class="asset-table-placeholder" role="status" aria-label="正在读取资产列表">
     <div class="asset-table-placeholder__canvas" aria-hidden="true">
       <div class="asset-table-placeholder__header">
-        <span v-for="column in 6" :key="column" />
+        <span v-for="column in 7" :key="column" />
       </div>
       <div v-for="row in 6" :key="row" class="asset-table-placeholder__row">
         <span class="asset-table-placeholder__time" />
@@ -10,6 +10,7 @@
           <i />
           <b />
         </span>
+        <span />
         <span />
         <span />
         <span />
@@ -28,13 +29,13 @@
 }
 
 .asset-table-placeholder__canvas {
-  min-width: 984px;
+  min-width: 1080px;
 }
 
 .asset-table-placeholder__header,
 .asset-table-placeholder__row {
   display: grid;
-  grid-template-columns: 190px minmax(360px, 1fr) 96px 88px 130px 120px;
+  grid-template-columns: 190px minmax(360px, 1fr) 96px 96px 88px 130px 120px;
   align-items: center;
 }
 

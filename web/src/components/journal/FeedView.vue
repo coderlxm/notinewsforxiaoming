@@ -378,8 +378,6 @@ async function setChannel(entry: JournalEntry, channel: JournalPlainChannel): Pr
   if (journal.error.value === null) {
     const target = journalChannels.find(item => item.value === channel)!;
     showMessage({ message: `已移动到“${target.label}”频道`, type: 'success' });
-    feedLayoutReady.value = false;
-    await journal.loadPrivate(filters);
   }
 }
 
@@ -596,9 +594,11 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
             v-else
             :entries="journal.entries.value"
             :loading="entriesLoading"
+            :mutation-entry-id="journal.mutationEntryId.value"
             @layout-ready="handleLayoutReady"
             @open-entry="openEntry"
             @select-tag="selectTag"
+            @set-channel="setChannel"
           />
 
           <p
