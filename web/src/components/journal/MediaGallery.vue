@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { TopRight } from '@element-plus/icons-vue';
 import { computed } from 'vue';
 import type { JournalAsset } from '../../types';
 import { formatFileSize } from '../../utils/formatters';
@@ -150,7 +151,7 @@ function preserveAssetRatio(asset: DisplayAsset): { aspectRatio: string } | unde
         target="_blank"
         rel="noopener noreferrer"
       >
-        <span class="media__file-icon" aria-hidden="true">↗</span>
+        <span class="media__file-icon" aria-hidden="true"><TopRight /></span>
         <span class="media__file-copy">
           <strong>{{ asset.originalName ?? asset.kind }}</strong>
           <small v-if="asset.mimeType || asset.sizeLabel">
@@ -332,6 +333,11 @@ function preserveAssetRatio(asset: DisplayAsset): { aspectRatio: string } | unde
   color: var(--accent-strong);
   font-weight: 800;
   place-items: center;
+}
+
+.media__file-icon svg {
+  width: 1rem;
+  height: 1rem;
 }
 
 .media__file-copy {

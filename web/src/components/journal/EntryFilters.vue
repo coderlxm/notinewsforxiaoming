@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Connection, Lock } from '@element-plus/icons-vue';
 import { computed, reactive, shallowRef, watch } from 'vue';
 import { emptyFeedFilters, type FeedFilters } from '../../types';
 
@@ -15,8 +16,8 @@ const expanded = shallowRef(false);
 
 const visibilityOptions = [
   { value: 'all', label: '全部' },
-  { value: 'private', label: '🔒 私有' },
-  { value: 'public', label: '🌐 公开' },
+  { value: 'private', label: '私有' },
+  { value: 'public', label: '公开' },
 ] satisfies { value: FeedFilters['visibility']; label: string }[];
 
 const contentTypes = [
@@ -111,7 +112,11 @@ function reset(): void {
       <div class="filters__visibility" aria-label="可见性筛选">
         <label v-for="option in visibilityOptions" :key="option.value" class="filters__choice">
           <input v-model="draft.visibility" type="radio" name="visibility" :value="option.value">
-          <span>{{ option.label }}</span>
+          <span>
+            <Lock v-if="option.value === 'private'" aria-hidden="true" />
+            <Connection v-else-if="option.value === 'public'" aria-hidden="true" />
+            {{ option.label }}
+          </span>
         </label>
       </div>
 
@@ -220,13 +225,20 @@ function reset(): void {
 }
 
 .filters__choice span {
-  display: block;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   padding: 0.42rem 0.75rem;
   border: 1px solid var(--border-subtle);
   border-radius: 999px;
   background: var(--surface-card);
   color: var(--text-muted);
   font-size: 0.8rem;
+}
+
+.filters__choice svg {
+  width: 0.9rem;
+  height: 0.9rem;
 }
 
 .filters__choice input:checked + span {

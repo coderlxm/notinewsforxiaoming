@@ -64,6 +64,7 @@ defineProps<{
 .visibility-field__option input {
   flex: none;
   margin: 0.18rem 0 0;
+  accent-color: var(--accent);
 }
 
 .visibility-field__option span {

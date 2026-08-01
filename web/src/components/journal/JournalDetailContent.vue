@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Connection, Document, Lock, Top } from '@element-plus/icons-vue';
 import { storeToRefs } from 'pinia';
 import { computed, shallowRef, watch } from 'vue';
 import ArticleRichBody from '../article/ArticleRichBody.vue';
@@ -106,9 +107,12 @@ function requestPublishedTimeEditing(): void {
 
       <div class="detail-content__management">
         <span class="detail-content__status">
-          {{ entry.publicationStatus === 'draft' ? '📝 草稿' : (entry.visibility === 'public' ? '🌐 公开' : '🔒 私有') }}
+          <Document v-if="entry.publicationStatus === 'draft'" aria-hidden="true" />
+          <Connection v-else-if="entry.visibility === 'public'" aria-hidden="true" />
+          <Lock v-else aria-hidden="true" />
+          {{ entry.publicationStatus === 'draft' ? '草稿' : (entry.visibility === 'public' ? '公开' : '私有') }}
         </span>
-        <span v-if="entry.pinned" class="detail-content__status">📌 置顶</span>
+        <span v-if="entry.pinned" class="detail-content__status"><Top aria-hidden="true" />置顶</span>
         <CardActionMenu
           v-if="isPrivateMode && !confirmingDeletion"
           :busy="busy"
@@ -293,12 +297,20 @@ function requestPublishedTimeEditing(): void {
 }
 
 .detail-content__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
   padding: 4px 7px;
   border-radius: 999px;
   background: var(--surface-muted);
   color: var(--text-muted);
   font-size: 0.68rem;
   white-space: nowrap;
+}
+
+.detail-content__status svg {
+  width: 0.8rem;
+  height: 0.8rem;
 }
 
 .detail-content__article-heading {

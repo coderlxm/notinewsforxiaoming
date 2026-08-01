@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { CircleCheck } from '@element-plus/icons-vue';
 import type { ContributionSuccessResult } from '../../composables/useContributionSubmit';
 
 defineProps<{
@@ -12,7 +13,7 @@ const emit = defineEmits<{
 
 <template>
   <section class="contribution-card contribution-success" aria-live="assertive">
-    <div class="contribution-success__mark" aria-hidden="true">✓</div>
+    <div class="contribution-success__mark" aria-hidden="true"><CircleCheck /></div>
     <p class="contribution-success__eyebrow">投稿已送达</p>
     <h2>已经送到小明</h2>
     <p class="contribution-success__description">

@@ -489,6 +489,11 @@ textarea:focus-visible,
   font-weight: 800;
 }
 
+.contribution-success__mark svg {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+
 .contribution-success h2 {
   margin: 0;
   font-family: var(--contribution-font-serif);

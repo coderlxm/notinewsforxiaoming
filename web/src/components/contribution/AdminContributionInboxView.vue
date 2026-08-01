@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Message } from '@element-plus/icons-vue';
 import { storeToRefs } from 'pinia';
 import { computed, onBeforeUnmount, watch } from 'vue';
 import { useRouter } from 'vue-router';
@@ -74,7 +75,7 @@ onBeforeUnmount(() => persistentMessage?.close());
       @select="openContribution"
     />
     <section v-else-if="ownerAuthenticated && !inbox.listError.value" class="contribution-inbox__empty">
-      <span aria-hidden="true">✉</span>
+      <Message class="contribution-inbox__empty-icon" aria-hidden="true" />
       <h2>投稿箱是空的</h2>
       <p>朋友的新内容送达后会出现在这里。</p>
     </section>
@@ -148,10 +149,10 @@ onBeforeUnmount(() => persistentMessage?.close());
   text-align: center;
 }
 
-.contribution-inbox__empty > span {
+.contribution-inbox__empty-icon {
   color: var(--border-strong);
-  font-family: var(--font-serif);
-  font-size: 3.5rem;
+  width: 3.5rem;
+  height: 3.5rem;
 }
 
 .contribution-inbox__empty h2 {
