@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { journalChannels } from '../../journalChannels';
 import type { JournalChannel } from '../../types';
+import AboutNavigationIcon from '../about/AboutNavigationIcon.vue';
 
 defineProps<{
   channel: JournalChannel | null;
@@ -37,7 +38,7 @@ const emit = defineEmits<{
         :aria-current="aboutActive ? 'page' : undefined"
         @click="emit('selectAbout')"
       >
-        <span class="channel-sidebar__marker" aria-hidden="true" />
+        <AboutNavigationIcon class="channel-sidebar__about-icon" />
         <span>关于我</span>
       </button>
     </nav>
@@ -48,7 +49,7 @@ const emit = defineEmits<{
 .channel-sidebar {
   min-width: 0;
   min-height: 0;
-  padding: 1.3rem 0 2rem;
+  padding: 1.5rem 0 2rem;
 }
 
 .channel-sidebar__navigation {
@@ -59,7 +60,7 @@ const emit = defineEmits<{
 
 .channel-sidebar__channels {
   display: grid;
-  gap: 0.35rem;
+  gap: 0.45rem;
 }
 
 .channel-sidebar__about {
@@ -69,16 +70,16 @@ const emit = defineEmits<{
 .channel-sidebar__item {
   display: flex;
   width: 100%;
-  min-height: 3rem;
+  min-height: 3.4rem;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.55rem 0.85rem;
+  gap: 0.9rem;
+  padding: 0.65rem 1rem;
   border: 0;
   border-radius: 10px;
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 0.88rem;
+  font-size: 1rem;
   font-weight: 680;
   text-align: left;
   transition: background-color 150ms ease, color 150ms ease;
@@ -95,14 +96,25 @@ const emit = defineEmits<{
 }
 
 .channel-sidebar__marker {
-  width: 0.32rem;
-  height: 1.25rem;
+  width: 0.35rem;
+  height: 1.4rem;
   border-radius: 999px;
   background: var(--border-strong);
 }
 
 .channel-sidebar__item--active .channel-sidebar__marker {
   background: var(--accent);
+}
+
+.channel-sidebar__about-icon {
+  width: 1.4rem;
+  height: 1.4rem;
+  flex: none;
+  color: var(--border-strong);
+}
+
+.channel-sidebar__item--active .channel-sidebar__about-icon {
+  color: var(--accent);
 }
 
 @media (max-width: 799px) {
@@ -146,6 +158,10 @@ const emit = defineEmits<{
   }
 
   .channel-sidebar__marker {
+    display: none;
+  }
+
+  .channel-sidebar__about-icon {
     display: none;
   }
 

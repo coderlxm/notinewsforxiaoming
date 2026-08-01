@@ -120,4 +120,16 @@ onActivated(keepActiveTagVisible);
   outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
+
+@media (min-width: 800px) {
+  .public-tag-navigation {
+    gap: 0.45rem;
+  }
+
+  .public-tag-navigation__item {
+    min-height: 2.5rem;
+    padding: 0.5rem 1rem;
+    font-size: 1rem;
+  }
+}
 </style>

@@ -702,8 +702,8 @@ onUnmounted(() => {
 .app-main--public {
   width: min(calc(100% - (var(--workspace-gutter) * 2)), var(--workspace-width));
   margin: 0 auto;
-  grid-template-columns: 200px minmax(0, 1fr);
-  gap: 1.5rem;
+  grid-template-columns: 224px minmax(0, 1fr);
+  gap: 1.75rem;
 }
 
 .app-scroll {
