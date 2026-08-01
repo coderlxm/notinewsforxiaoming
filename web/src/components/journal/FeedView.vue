@@ -105,6 +105,11 @@ const entriesLoading = computed(() =>
   initialLoadPending.value || listReplacing.value || refreshing.value,
 );
 const paginationFailed = computed(() => journal.error.value !== null);
+const paginationFinishedText = computed(() =>
+  props.mode === 'public' && props.channel === 'article'
+    ? '已经看到全部文章'
+    : '已经看到全部记录',
+);
 const infiniteLoading = computed(() => paginationLoading.value);
 const infiniteFinished = computed(() =>
   journal.nextCursor.value === null || paginationFailed.value,
@@ -450,7 +455,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
             </div>
           </div>
           <button
-            class="text-button"
+            class="text-button feed__public-refresh"
             type="button"
             :disabled="refreshDisabled || refreshing"
             :aria-busy="refreshing"
@@ -584,7 +589,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
               v-if="!infiniteLoading && !paginationFailed && journal.entries.value.length"
               class="feed__pagination-finished"
             >
-              已经看到全部记录
+              {{ paginationFinishedText }}
             </p>
           </template>
         </List>
@@ -747,6 +752,10 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
 }
 
 @media (max-width: 599px) {
+  .feed__public-refresh {
+    display: none;
+  }
+
   .feed__private-heading {
     align-items: stretch;
     flex-direction: column;

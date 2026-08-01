@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useEventListener, useMediaQuery } from '@vueuse/core';
 import { storeToRefs } from 'pinia';
 import {
   computed,
@@ -36,6 +37,11 @@ type AppRoute =
   | { name: 'not-found'; key: string };
 
 type FeedRoute = Extract<AppRoute, { name: 'public' | 'private' }>;
+type ScrollDirection = -1 | 0 | 1;
+
+const HEADER_ALWAYS_VISIBLE_TOP = 24;
+const HEADER_HIDE_DISTANCE = 16;
+const HEADER_SHOW_DISTANCE = 8;
 
 interface OverlayContext {
   entry: JournalEntry;
@@ -55,6 +61,8 @@ const router = useRouter();
 const session = useSessionStore();
 const siteProfile = useSiteProfileStore();
 const contributionInbox = useAdminContributions();
+const isMobile = useMediaQuery('(max-width: 599px)');
+const isMobileOrTablet = useMediaQuery('(max-width: 1024px)');
 const { ownerAuthenticated } = storeToRefs(session);
 const { profile, loadError: profileLoadError } = storeToRefs(siteProfile);
 const overlayContext = shallowRef<OverlayContext | null>(null);
@@ -62,7 +70,13 @@ const directPublicEntry = shallowRef<JournalEntry | null>(null);
 const contentScroll = useTemplateRef<HTMLDivElement>('contentScroll');
 const profileBio = useTemplateRef<HTMLParagraphElement>('profileBio');
 const profileBioOverflow = shallowRef(0);
+const headerHidden = shallowRef(false);
+const defaultAssetView = computed<AssetView>(() => isMobile.value ? 'waterfall' : 'table');
+const headerCollapsed = computed(() => isMobileOrTablet.value && headerHidden.value);
 const feedScrollPositions = new Map<string, number>();
+let previousContentScrollTop = 0;
+let headerScrollDistance = 0;
+let headerScrollDirection: ScrollDirection = 0;
 let pendingFeedScrollTop: number | null = null;
 let profileBioResizeObserver: ResizeObserver | null = null;
 let profileErrorMessage: ReturnType<typeof showMessage> | null = null;
@@ -99,7 +113,7 @@ const route = computed<AppRoute>(() => {
       name: 'private',
       key: 'private',
       entryId: entry === undefined ? null : Number(entry),
-      assetView: view === 'waterfall' ? 'waterfall' : 'table',
+      assetView: view ?? defaultAssetView.value,
     };
   }
   if (currentRoute.name === 'article-new') {
@@ -299,10 +313,49 @@ async function navigate(path: string): Promise<void> {
 
 function privateFeedPath(assetView: AssetView, entryId?: number): string {
   const search = new URLSearchParams();
-  if (assetView === 'waterfall') search.set('view', 'waterfall');
+  search.set('view', assetView);
   if (entryId !== undefined) search.set('entry', String(entryId));
   const query = search.toString();
   return query ? `/me?${query}` : '/me';
+}
+
+function revealHeader(): void {
+  headerHidden.value = false;
+  headerScrollDistance = 0;
+  headerScrollDirection = 0;
+}
+
+function resetHeaderScrollTracking(scrollTop: number): void {
+  previousContentScrollTop = scrollTop;
+  headerScrollDistance = 0;
+  headerScrollDirection = 0;
+}
+
+function handleContentScroll(event: Event): void {
+  const scrollTop = Math.max(0, (event.currentTarget as HTMLDivElement).scrollTop);
+  const delta = scrollTop - previousContentScrollTop;
+  previousContentScrollTop = scrollTop;
+
+  if (!isMobileOrTablet.value || scrollTop <= HEADER_ALWAYS_VISIBLE_TOP) {
+    revealHeader();
+    return;
+  }
+  if (delta === 0) return;
+
+  const direction: ScrollDirection = delta > 0 ? 1 : -1;
+  if (direction !== headerScrollDirection) {
+    headerScrollDirection = direction;
+    headerScrollDistance = 0;
+  }
+  headerScrollDistance += Math.abs(delta);
+
+  if (direction === 1 && headerScrollDistance >= HEADER_HIDE_DISTANCE) {
+    headerHidden.value = true;
+    headerScrollDistance = 0;
+  }
+  else if (direction === -1 && headerScrollDistance >= HEADER_SHOW_DISTANCE) {
+    revealHeader();
+  }
 }
 
 function handleRouteChange(nextPath: string, currentPath: string): void {
@@ -313,6 +366,7 @@ function handleRouteChange(nextPath: string, currentPath: string): void {
     nextUrl.pathname === currentUrl.pathname
     && nextUrl.search === currentUrl.search
   ) return;
+  revealHeader();
   if (isOverlayHistoryTransition(currentPath, nextPath)) {
     return;
   }
@@ -335,6 +389,7 @@ function handleRouteChange(nextPath: string, currentPath: string): void {
   else pendingFeedScrollTop = null;
   if (pendingFeedScrollTop === null) {
     contentScroll.value!.scrollTo({ top: 0, behavior: 'auto' });
+    resetHeaderScrollTracking(0);
   }
 }
 
@@ -407,7 +462,11 @@ function restoreFeedScroll(): void {
   const scrollTop = pendingFeedScrollTop;
   pendingFeedScrollTop = null;
   contentScroll.value!.scrollTo({ top: scrollTop, behavior: 'auto' });
+  resetHeaderScrollTracking(scrollTop);
 }
+
+useEventListener(contentScroll, 'scroll', handleContentScroll, { passive: true });
+useEventListener('resize', revealHeader, { passive: true });
 
 const removeAfterEach = router.afterEach((to, from) => {
   if (to.fullPath !== from.fullPath) handleRouteChange(to.fullPath, from.fullPath);
@@ -430,7 +489,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="app-shell">
+  <div class="app-shell" :class="{ 'app-shell--header-hidden': headerCollapsed }">
     <div class="profile-bar">
       <header class="profile">
         <button class="profile__home" type="button" aria-label="返回公开首页" @click="navigate('/')">
@@ -612,9 +671,18 @@ onUnmounted(() => {
 }
 
 .profile-bar {
+  display: grid;
   z-index: 20;
+  grid-template-rows: 1fr;
+  overflow: hidden;
   border-bottom: 1px solid var(--border-subtle);
   background: var(--surface-page);
+  transition: grid-template-rows 200ms ease, border-color 200ms ease;
+}
+
+.app-shell--header-hidden .profile-bar {
+  grid-template-rows: 0fr;
+  border-bottom-color: transparent;
 }
 
 .app-main {
@@ -653,12 +721,20 @@ onUnmounted(() => {
 
 .profile {
   display: grid;
+  min-height: 0;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.9rem;
   width: min(calc(100% - (var(--workspace-gutter) * 2)), var(--workspace-width));
   margin: 0 auto;
   padding: 1.15rem 0 1rem;
+  transition: opacity 180ms ease, transform 200ms ease;
+}
+
+.app-shell--header-hidden .profile {
+  transform: translateY(-0.75rem);
+  opacity: 0;
+  pointer-events: none;
 }
 
 .profile__home,
@@ -899,6 +975,13 @@ onUnmounted(() => {
 
   .app-main--public > .app-scroll {
     grid-row: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .profile-bar,
+  .profile {
+    transition: none;
   }
 }
 </style>
