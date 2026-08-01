@@ -13,12 +13,15 @@ import { useSessionStore } from '../../stores/session';
 import { useSiteProfileStore } from '../../stores/siteProfile';
 import {
   emptyFeedFilters,
+  type AssetView,
   type FeedFilters,
   type JournalEntry,
   type JournalVisibility,
 } from '../../types';
 import { showMessage } from '../../utils/message';
 import CurrentWeather from './CurrentWeather.vue';
+import AssetTableView from './AssetTableView.vue';
+import AssetViewSwitch from './AssetViewSwitch.vue';
 import EntryCard from './EntryCard.vue';
 import EntryFilters from './EntryFilters.vue';
 import JournalDetailOverlay from './JournalDetailOverlay.vue';
@@ -33,12 +36,14 @@ const props = withDefaults(defineProps<{
   overlayEntryId?: number;
   overlayEntry?: JournalEntry;
   directOverlay?: boolean;
+  assetView?: AssetView;
 }>(), {
   detailId: undefined,
   initialTag: '',
   overlayEntryId: undefined,
   overlayEntry: undefined,
   directOverlay: false,
+  assetView: 'waterfall',
 });
 
 const emit = defineEmits<{
@@ -48,6 +53,7 @@ const emit = defineEmits<{
   closeOverlay: [];
   removeDeletedOverlay: [];
   returnToFeed: [];
+  changeAssetView: [view: AssetView];
 }>();
 
 const filters = reactive<FeedFilters>({
@@ -93,6 +99,9 @@ const listTitle = computed(() => {
 });
 const paginationLoading = computed(() =>
   journal.loadingMore.value || paginationLayoutPending.value,
+);
+const entriesLoading = computed(() =>
+  initialLoadPending.value || listReplacing.value || refreshing.value,
 );
 const paginationFailed = computed(() => journal.error.value !== null);
 const infiniteLoading = computed(() => paginationLoading.value);
@@ -320,6 +329,11 @@ function openEntry(entry: JournalEntry): void {
   emit('openEntry', entry);
 }
 
+function changeAssetView(view: AssetView): void {
+  feedLayoutReady.value = false;
+  emit('changeAssetView', view);
+}
+
 function isArticleEntry(entry: JournalEntry): boolean {
   return entry.bodyFormat === 'rich';
 }
@@ -486,6 +500,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
           @set-pinned="setPinned"
           @delete-entry="deleteEntry"
         />
+        <AssetViewSwitch :view="assetView" @change="changeAssetView" />
       </template>
 
       <div v-if="isDetail" class="feed__reading-stage" :aria-busy="detailPreparing">
@@ -532,8 +547,9 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
           @load="loadMore"
         >
           <WaterfallFeed
+            v-if="mode === 'public' || assetView === 'waterfall'"
             :entries="journal.entries.value"
-            :loading="initialLoadPending || listReplacing || refreshing"
+            :loading="entriesLoading"
             :mode="mode"
             :mutation-entry-id="journal.mutationEntryId.value"
             @layout-ready="handleLayoutReady"
@@ -546,6 +562,14 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
             @set-visibility="setVisibility"
             @set-pinned="setPinned"
             @delete-entry="deleteEntry"
+          />
+          <AssetTableView
+            v-else
+            :entries="journal.entries.value"
+            :loading="entriesLoading"
+            @layout-ready="handleLayoutReady"
+            @open-entry="openEntry"
+            @select-tag="selectTag"
           />
 
           <p

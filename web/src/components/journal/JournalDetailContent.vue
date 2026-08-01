@@ -119,6 +119,7 @@ function requestPublishedTimeEditing(): void {
           :pinned="entry.pinned"
           :visibility="entry.visibility"
           :publication-status="entry.publicationStatus"
+          :teleported="false"
           @edit="requestEdit"
           @continue-edit="emit('continueDraft', entry)"
           @edit-published-time="requestPublishedTimeEditing"

@@ -1,5 +1,6 @@
 export type JournalVisibility = 'private' | 'public';
 export type JournalPublicationStatus = 'draft' | 'published';
+export type AssetView = 'waterfall' | 'table';
 
 export type JournalSourceKind = 'telegram' | 'web';
 export type JournalBodyFormat = 'plain' | 'rich';

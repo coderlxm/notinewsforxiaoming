@@ -17,13 +17,13 @@ import SiteProfileSettingsView from './components/settings/SiteProfileSettingsVi
 import { useAdminContributions } from './composables/useAdminContributions';
 import { useSessionStore } from './stores/session';
 import { useSiteProfileStore } from './stores/siteProfile';
-import type { JournalEntry } from './types';
+import type { AssetView, JournalEntry } from './types';
 import { showMessage } from './utils/message';
 
 type AppRoute =
   | { name: 'public'; key: string; tag: string }
   | { name: 'detail'; key: string; publicId: string }
-  | { name: 'private'; key: string; entryId: number | null }
+  | { name: 'private'; key: string; entryId: number | null; assetView: AssetView }
   | { name: 'entry-new'; key: string }
   | { name: 'entry-edit'; key: string; entryId: number }
   | { name: 'article-new'; key: string }
@@ -79,10 +79,19 @@ const route = computed<AppRoute>(() => {
   }
   if (currentRoute.name === 'private') {
     const entry = currentRoute.query.entry;
+    const view = currentRoute.query.view;
     if (entry !== undefined && (typeof entry !== 'string' || !/^[1-9]\d*$/.test(entry))) {
       return { name: 'not-found', key: currentRoute.fullPath };
     }
-    return { name: 'private', key: 'private', entryId: entry === undefined ? null : Number(entry) };
+    if (view !== undefined && view !== 'table') {
+      return { name: 'not-found', key: currentRoute.fullPath };
+    }
+    return {
+      name: 'private',
+      key: 'private',
+      entryId: entry === undefined ? null : Number(entry),
+      assetView: view === 'table' ? 'table' : 'waterfall',
+    };
   }
   if (currentRoute.name === 'article-new') {
     return { name: 'article-new', key: 'article-new' };
@@ -262,6 +271,14 @@ async function navigate(path: string): Promise<void> {
   });
 }
 
+function privateFeedPath(assetView: AssetView, entryId?: number): string {
+  const search = new URLSearchParams();
+  if (assetView === 'table') search.set('view', 'table');
+  if (entryId !== undefined) search.set('entry', String(entryId));
+  const query = search.toString();
+  return query ? `/me?${query}` : '/me';
+}
+
 function handleRouteChange(nextPath: string, currentPath: string): void {
   if (currentPath === nextPath) return;
   const nextUrl = new URL(nextPath, window.location.origin);
@@ -305,8 +322,13 @@ async function openEntry(entry: JournalEntry): Promise<void> {
   };
   const path = origin.name === 'public'
     ? `/p/${encodeURIComponent(entry.publicId)}`
-    : `/me?entry=${entry.id}`;
+    : privateFeedPath(origin.assetView, entry.id);
   await router.push(path);
+}
+
+function changeAssetView(assetView: AssetView): void {
+  if (route.value.name !== 'private') return;
+  void router.push(privateFeedPath(assetView, route.value.entryId ?? undefined));
 }
 
 function closeOverlay(): void {
@@ -319,12 +341,14 @@ function closeOverlay(): void {
     return;
   }
   if (route.value.name !== 'private' || route.value.entryId === null) return;
-  void router.replace('/me');
+  void router.replace(privateFeedPath(route.value.assetView));
 }
 
 async function removeDeletedOverlay(): Promise<void> {
   const context = activeOverlayContext.value;
-  const returnPath = context?.originPath ?? '/me';
+  const current = route.value;
+  const returnPath = context?.originPath
+    ?? (current.name === 'private' ? privateFeedPath(current.assetView) : '/me');
   overlayContext.value = null;
   await router.replace(returnPath);
   if (context) router.back();
@@ -452,10 +476,12 @@ onUnmounted(() => {
           :key="backgroundFeedRoute.key"
           :mode="backgroundFeedRoute.name"
           :initial-tag="backgroundFeedRoute.name === 'public' ? backgroundFeedRoute.tag : ''"
+          :asset-view="backgroundFeedRoute.name === 'private' ? backgroundFeedRoute.assetView : 'waterfall'"
           :overlay-entry-id="overlayEntryId"
           :overlay-entry="overlayEntry"
           :direct-overlay="directPrivateOverlay"
           @layout-ready="restoreFeedScroll"
+          @change-asset-view="changeAssetView"
           @open-entry="openEntry"
           @close-overlay="closeOverlay"
           @remove-deleted-overlay="removeDeletedOverlay"

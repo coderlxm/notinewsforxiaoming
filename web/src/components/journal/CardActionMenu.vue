@@ -4,12 +4,15 @@ import { shallowRef, watch } from 'vue';
 import JournalLoading from '../ui/JournalLoading.vue';
 import type { JournalPublicationStatus, JournalVisibility } from '../../types';
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   busy: boolean;
   pinned: boolean;
   visibility: JournalVisibility;
   publicationStatus: JournalPublicationStatus;
-}>();
+  teleported?: boolean;
+}>(), {
+  teleported: true,
+});
 
 const emit = defineEmits<{
   edit: [];
@@ -80,6 +83,7 @@ function handleCommand(command: string): void {
       placement="bottom-end"
       :disabled="busy"
       :show-arrow="false"
+      :teleported="teleported"
       max-height="calc(100dvh - 24px)"
       popper-class="journal-action-menu"
       @command="handleCommand"
