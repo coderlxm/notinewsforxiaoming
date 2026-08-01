@@ -31,10 +31,7 @@ const visibleContacts = computed(() =>
       </section>
 
       <section v-if="visibleContacts.length" class="about-view__section" aria-labelledby="contact-title">
-        <div class="about-view__section-heading">
-          <h2 id="contact-title" class="about-view__section-title">联系我</h2>
-          <p>选择你方便的方式。</p>
-        </div>
+        <h2 id="contact-title" class="about-view__section-title">找到我</h2>
         <AboutContactList :contacts="visibleContacts" />
       </section>
     </div>
@@ -122,20 +119,9 @@ const visibleContacts = computed(() =>
   gap: 1rem;
 }
 
-.about-view__section-heading {
-  display: grid;
-  gap: 0.22rem;
-}
-
 .about-view__section-title {
   margin: 0;
   font-size: 1.12rem;
-}
-
-.about-view__section-heading p {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: 0.76rem;
 }
 
 .about-view__introduction {
