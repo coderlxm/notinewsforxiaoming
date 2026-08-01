@@ -33,7 +33,7 @@ async function copyContact(contact: SiteContactItem): Promise<void> {
           <span class="contact-list__label">{{ contact.label }}</span>
         </span>
         <button
-          v-if="contact.kind === 'email'"
+          v-if="contact.kind === 'email' || contact.kind === 'wechat'"
           class="contact-list__copy-action"
           type="button"
           @click="copyContact(contact)"
@@ -49,7 +49,6 @@ async function copyContact(contact: SiteContactItem): Promise<void> {
         @click="copyContact(contact)"
       >
         <span class="contact-list__value">{{ contact.value }}</span>
-        <span class="contact-list__indicator">复制</span>
       </button>
       <a
         v-else
@@ -59,9 +58,7 @@ async function copyContact(contact: SiteContactItem): Promise<void> {
         :rel="contact.kind === 'email' ? undefined : 'noopener noreferrer'"
       >
         <span class="contact-list__value">{{ contact.value }}</span>
-        <span class="contact-list__indicator">
-          {{ contact.kind === 'email' ? '写信' : '↗' }}
-        </span>
+        <span v-if="contact.kind !== 'email'" class="contact-list__indicator">↗</span>
       </a>
     </li>
   </ul>
@@ -71,7 +68,7 @@ async function copyContact(contact: SiteContactItem): Promise<void> {
 .contact-list {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
-  gap: 1.35rem;
+  gap: 1rem;
   margin: 0;
   padding: 0.25rem 0 0;
   list-style: none;
@@ -105,6 +102,10 @@ async function copyContact(contact: SiteContactItem): Promise<void> {
 .contact-list__channel {
   justify-content: flex-start;
   gap: 0.38rem;
+}
+
+.contact-list__heading {
+  min-height: 1.75rem;
 }
 
 .contact-list__icon {

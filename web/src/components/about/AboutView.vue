@@ -54,7 +54,7 @@ const visibleContacts = computed(() =>
 
 <style scoped>
 .about-view {
-  width: min(calc(100% - (var(--page-gutter) * 2)), var(--reading-width));
+  width: min(calc(100% - (var(--page-gutter) * 2)), 960px);
   margin: 0 auto;
   padding: clamp(2rem, 5vw, 4.5rem) 0 5rem;
 }
@@ -125,6 +125,7 @@ const visibleContacts = computed(() =>
 }
 
 .about-view__introduction {
+  max-width: var(--reading-width);
   margin: 0;
   color: var(--text-primary);
   font-family: var(--font-serif);
@@ -180,7 +181,7 @@ const visibleContacts = computed(() =>
   }
 }
 
-@media (max-width: 599px) {
+@media (max-width: 799px) {
   .about-view {
     padding: 1.5rem 0 3.5rem;
   }
@@ -191,22 +192,7 @@ const visibleContacts = computed(() =>
 
   .about-view__identity,
   .about-view__skeleton {
-    align-items: flex-start;
-    gap: 1rem;
-  }
-
-  .about-view__avatar,
-  .about-view__skeleton-avatar {
-    width: 4.5rem;
-    height: 4.5rem;
-  }
-
-  .about-view__title {
-    font-size: 1.55rem;
-  }
-
-  .about-view__bio {
-    font-size: 0.84rem;
+    display: none;
   }
 }
 
