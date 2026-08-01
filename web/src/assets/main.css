@@ -7,10 +7,11 @@
   --font-sans: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-serif: "Noto Serif SC", "Songti SC", STSong, serif;
   --font-condensed: "Arial Narrow", "Roboto Condensed", Arial, sans-serif;
-  --canvas-width: 1440px;
+  --workspace-width: 1920px;
   --reading-width: 820px;
   --editor-width: 780px;
   --content-width: var(--editor-width);
+  --workspace-gutter: 24px;
   --page-gutter: 32px;
   --waterfall-gap: 20px;
   --radius-card: 12px;
@@ -239,6 +240,7 @@ a {
 
 @media (max-width: 959px) {
   :root {
+    --workspace-gutter: 20px;
     --page-gutter: 20px;
     --waterfall-gap: 14px;
   }
@@ -246,6 +248,7 @@ a {
 
 @media (max-width: 599px) {
   :root {
+    --workspace-gutter: 10px;
     --page-gutter: 10px;
     --waterfall-gap: 8px;
   }

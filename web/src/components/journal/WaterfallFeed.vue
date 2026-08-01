@@ -291,6 +291,12 @@ onBeforeUnmount(() => {
   }
 }
 
+@container (min-width: 1560px) {
+  .waterfall__item {
+    width: calc(100% / 6);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .waterfall,
   .waterfall-placeholder-leave-active {

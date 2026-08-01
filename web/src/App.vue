@@ -597,7 +597,7 @@ onUnmounted(() => {
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.9rem;
-  width: min(calc(100% - (var(--page-gutter) * 2)), var(--canvas-width));
+  width: min(calc(100% - (var(--workspace-gutter) * 2)), var(--workspace-width));
   margin: 0 auto;
   padding: 1.15rem 0 1rem;
 }

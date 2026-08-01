@@ -613,7 +613,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
 .feed {
   display: grid;
   gap: 1rem;
-  width: min(calc(100% - (var(--page-gutter) * 2)), var(--canvas-width));
+  width: min(calc(100% - (var(--workspace-gutter) * 2)), var(--workspace-width));
   margin: 0 auto;
   padding: 1.3rem 0 4rem;
 }
