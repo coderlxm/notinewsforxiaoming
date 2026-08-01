@@ -376,6 +376,8 @@ async function setPinned(entry: JournalEntry, pinned: boolean): Promise<void> {
 async function setChannel(entry: JournalEntry, channel: JournalPlainChannel): Promise<void> {
   await journal.setChannel(entry, channel);
   if (journal.error.value === null) {
+    const target = journalChannels.find(item => item.value === channel)!;
+    showMessage({ message: `已移动到“${target.label}”频道`, type: 'success' });
     feedLayoutReady.value = false;
     await journal.loadPrivate(filters);
   }

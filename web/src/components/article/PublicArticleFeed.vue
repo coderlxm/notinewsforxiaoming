@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUpdated } from 'vue';
+import { computed, onActivated, onMounted, onUpdated } from 'vue';
 import type { JournalEntry } from '../../types';
 import ArticleCardContent from './ArticleCardContent.vue';
 import JournalArticleFeedPlaceholder from './JournalArticleFeedPlaceholder.vue';
@@ -21,6 +21,9 @@ onMounted(() => {
   if (!preparing.value) emit('layoutReady');
 });
 onUpdated(() => {
+  if (!preparing.value) emit('layoutReady');
+});
+onActivated(() => {
   if (!preparing.value) emit('layoutReady');
 });
 </script>

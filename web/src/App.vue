@@ -254,15 +254,21 @@ watch(() => route.value.name, (name, previousName) => {
   }
 });
 
-function feedRouteKey(path: string): string | null {
+function persistentFeedKey(path: string): string | null {
   const url = new URL(path, window.location.origin);
   if (url.pathname === '/') {
     const channel = url.searchParams.get('channel') ?? 'life';
-    if (!isJournalChannel(channel)) return null;
-    return `public:${channel}:${url.searchParams.get('tag') ?? ''}`;
+    const tag = url.searchParams.get('tag') ?? '';
+    if (!isJournalChannel(channel) || tag) return null;
+    return `public:${channel}`;
   }
   if (url.pathname === '/me') return 'private';
   return null;
+}
+
+function persistentFeedRouteKey(feedRoute: FeedRoute): string | null {
+  if (feedRoute.name === 'private') return 'private';
+  return feedRoute.tag ? null : `public:${feedRoute.channel}`;
 }
 
 function pathMatchesOverlayContext(path: string, context: OverlayContext): boolean {
@@ -313,22 +319,17 @@ function handleRouteChange(nextPath: string, currentPath: string): void {
 
   const context = overlayContext.value;
   const currentFeedRouteKey = context && pathMatchesOverlayContext(currentPath, context)
-    ? context.origin.key
-    : feedRouteKey(currentPath);
+    ? persistentFeedRouteKey(context.origin)
+    : persistentFeedKey(currentPath);
   const nextFeedRouteKey = context && pathMatchesOverlayContext(nextPath, context)
-    ? context.origin.key
-    : feedRouteKey(nextPath);
+    ? persistentFeedRouteKey(context.origin)
+    : persistentFeedKey(nextPath);
 
-  const switchingPublicFeeds = currentFeedRouteKey?.startsWith('public:') === true
-    && nextFeedRouteKey?.startsWith('public:') === true
-    && currentFeedRouteKey !== nextFeedRouteKey;
-
-  if (currentFeedRouteKey && !switchingPublicFeeds) {
+  if (currentFeedRouteKey) {
     feedScrollPositions.set(currentFeedRouteKey, contentScroll.value!.scrollTop);
   }
 
-  if (switchingPublicFeeds) pendingFeedScrollTop = 0;
-  else if (nextFeedRouteKey && nextFeedRouteKey !== currentFeedRouteKey) {
+  if (nextFeedRouteKey && nextFeedRouteKey !== currentFeedRouteKey) {
     pendingFeedScrollTop = feedScrollPositions.get(nextFeedRouteKey) ?? 0;
   }
   else pendingFeedScrollTop = null;
@@ -526,8 +527,23 @@ onUnmounted(() => {
           />
         </KeepAlive>
 
+        <KeepAlive :max="3">
+          <FeedView
+            v-if="backgroundFeedRoute?.name === 'public' && !backgroundFeedRoute.tag"
+            :key="`public:${backgroundFeedRoute.channel}`"
+            mode="public"
+            :channel="backgroundFeedRoute.channel"
+            :overlay-entry-id="overlayEntryId"
+            :overlay-entry="overlayEntry"
+            @layout-ready="restoreFeedScroll"
+            @open-entry="openEntry"
+            @close-overlay="closeOverlay"
+            @remove-deleted-overlay="removeDeletedOverlay"
+          />
+        </KeepAlive>
+
         <FeedView
-          v-if="backgroundFeedRoute?.name === 'public'"
+          v-if="backgroundFeedRoute?.name === 'public' && backgroundFeedRoute.tag"
           :key="backgroundFeedRoute.key"
           mode="public"
           :channel="backgroundFeedRoute.channel"
@@ -634,27 +650,11 @@ onUnmounted(() => {
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior-y: contain;
-  scrollbar-color: var(--border-strong) transparent;
-  scrollbar-gutter: stable;
-  scrollbar-width: thin;
+  scrollbar-width: none;
 }
 
 .app-scroll::-webkit-scrollbar {
-  width: 8px;
-}
-
-.app-scroll::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.app-scroll::-webkit-scrollbar-thumb {
-  border: 2px solid var(--surface-page);
-  border-radius: 999px;
-  background: var(--border-strong);
-}
-
-.app-scroll::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted);
+  display: none;
 }
 
 .app-scroll > :not(.site-footer) {

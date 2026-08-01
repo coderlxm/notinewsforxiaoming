@@ -5,6 +5,7 @@ import JournalLoading from '../ui/JournalLoading.vue';
 import { useDeferredLoading } from '../../composables/useDeferredLoading';
 import { useEntryPublisher } from '../../composables/useEntryPublisher';
 import { useEntryMediaSubmit } from '../../composables/useEntryMediaSubmit';
+import { plainJournalChannels } from '../../journalChannels';
 import type { JournalAsset, JournalPlainChannel, JournalVisibility } from '../../types';
 import { showMessage } from '../../utils/message';
 import EntryImagePicker from './EntryImagePicker.vue';
@@ -96,6 +97,10 @@ function buildInput() {
   };
 }
 
+function channelLabel(value: JournalPlainChannel): string {
+  return plainJournalChannels.find(option => option.value === value)!.label;
+}
+
 async function saveDraft(): Promise<void> {
   const uploadId = await mediaSubmit.submit(newMedia.value, publisher.entry.value?.id);
   if (!uploadId) return;
@@ -105,6 +110,10 @@ async function saveDraft(): Promise<void> {
   contentText.value = saved.contentText;
   newMedia.value = [];
   removedAssetIds.value = new Set();
+  showMessage({
+    message: `草稿已保存到“${channelLabel(channel.value)}”频道`,
+    type: 'success',
+  });
   if (!isEditing.value) {
     await router.replace({ name: 'entry-edit', params: { entryId: saved.id } });
   }
@@ -115,6 +124,10 @@ async function publish(): Promise<void> {
   if (!uploadId) return;
   const published = await publisher.publish({ ...buildInput(), uploadId });
   if (!published) return;
+  showMessage({
+    message: `已发布到“${channelLabel(channel.value)}”频道`,
+    type: 'success',
+  });
   await router.push({ name: 'private' });
 }
 </script>

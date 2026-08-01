@@ -72,8 +72,7 @@ function editEntry(): void {
 }
 
 function changeChannel(channel: JournalPlainChannel): void {
-  const target = plainJournalChannels.find(option => option.value === channel)!;
-  runMutation(`正在移动到${target.label}…`, () => emit('setChannel', channel));
+  emit('setChannel', channel);
 }
 
 function handleCommand(command: string): void {
