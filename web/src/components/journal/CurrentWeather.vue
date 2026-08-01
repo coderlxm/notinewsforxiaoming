@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, watch } from 'vue';
 import type { CurrentWeather } from '../../types';
+import { showMessage } from '../../utils/message';
 
 const props = defineProps<{
   weather: CurrentWeather | null;
@@ -24,6 +25,10 @@ const accessibleLabel = computed(() => {
   if (props.weather === null) return '当前天气不可用';
   return `当前天气：${props.weather.temperature}度，${props.weather.text}，体感${props.weather.feelsLike}度，${props.weather.windDirection}`;
 });
+
+watch(() => props.error, (error) => {
+  if (error) showMessage({ message: `天气读取失败：${error}`, type: 'error' });
+});
 </script>
 
 <template>
@@ -43,9 +48,6 @@ const accessibleLabel = computed(() => {
         aria-hidden="true"
       />
     </template>
-    <p v-else-if="error !== null" class="current-weather__error" role="alert">
-      天气读取失败：{{ error }}
-    </p>
     <template v-else-if="weather !== null">
       <div class="current-weather__main">
         <strong class="current-weather__temperature">{{ weather.temperature }}°</strong>
@@ -113,18 +115,6 @@ const accessibleLabel = computed(() => {
   flex: none;
   width: 4.5rem;
   text-align: right;
-}
-
-.current-weather__error {
-  overflow: hidden;
-  width: 100%;
-  height: 1.35rem;
-  margin: 0;
-  color: var(--danger);
-  font-size: 0.76rem;
-  line-height: 1.35rem;
-  white-space: nowrap;
-  text-overflow: ellipsis;
 }
 
 .current-weather__skeleton {

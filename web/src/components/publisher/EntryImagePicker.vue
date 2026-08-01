@@ -2,6 +2,7 @@
 import { useDropZone, useEventListener, useFileDialog } from '@vueuse/core';
 import { computed, onBeforeUnmount, shallowRef, useTemplateRef, watch } from 'vue';
 import type { JournalAsset } from '../../types';
+import { showMessage } from '../../utils/message';
 
 interface LocalPreview {
   file: File;
@@ -19,7 +20,6 @@ const emit = defineEmits<{
 
 const files = defineModel<File[]>({ required: true });
 const previews = shallowRef<LocalPreview[]>([]);
-const selectionError = shallowRef<string | null>(null);
 const dropZone = useTemplateRef<HTMLButtonElement>('dropZone');
 const acceptedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'video/mp4', 'video/quicktime'];
 const acceptedTypes = new Set(acceptedMimeTypes);
@@ -48,6 +48,10 @@ const { isOverDropZone } = useDropZone(dropZone, {
 
 const dropZoneActive = computed(() => isOverDropZone.value && !pickerDisabled.value);
 
+function showSelectionError(message: string): void {
+  showMessage({ message, type: 'error' });
+}
+
 watch(files, (nextFiles) => {
   previews.value.forEach((preview) => {
     if (!nextFiles.includes(preview.file)) URL.revokeObjectURL(preview.url);
@@ -59,25 +63,24 @@ watch(files, (nextFiles) => {
 }, { immediate: true });
 
 function addImages(selected: File[]): void {
-  selectionError.value = null;
   if (selected.length === 0) return;
 
   if (imageCount.value + selected.length > maximumMediaCount) {
-    selectionError.value = '每条内容最多选择 10 项媒体。';
+    showSelectionError('每条内容最多选择 10 项媒体。');
     return;
   }
   const unsupported = selected.find(file => !acceptedTypes.has(file.type));
   if (unsupported) {
-    selectionError.value = `${unsupported.name} 不是支持的图片或视频格式。`;
+    showSelectionError(`${unsupported.name} 不是支持的图片或视频格式。`);
     return;
   }
   const oversized = selected.find(file => file.size > (file.type.startsWith('video/') ? maximumVideoSize : maximumFileSize));
   if (oversized) {
-    selectionError.value = `${oversized.name} 超过${oversized.type.startsWith('video/') ? ' 500 MiB' : ' 20 MB'}。`;
+    showSelectionError(`${oversized.name} 超过${oversized.type.startsWith('video/') ? ' 500 MiB' : ' 20 MB'}。`);
     return;
   }
   if (videoCount.value + selected.filter(file => file.type.startsWith('video/')).length > maximumVideoCount) {
-    selectionError.value = '每条内容最多选择 5 段视频。';
+    showSelectionError('每条内容最多选择 5 段视频。');
     return;
   }
 
@@ -94,7 +97,7 @@ function handlePaste(event: ClipboardEvent): void {
 
   event.preventDefault();
   if (props.disabled) {
-    selectionError.value = '保存或发布期间不能添加图片。';
+    showSelectionError('保存或发布期间不能添加图片。');
     return;
   }
 
@@ -102,7 +105,7 @@ function handlePaste(event: ClipboardEvent): void {
   for (const item of clipboardImages) {
     const file = item.getAsFile();
     if (file === null) {
-      selectionError.value = '无法读取剪贴板图片。';
+      showSelectionError('无法读取剪贴板图片。');
       return;
     }
     pastedFiles.push(file);
@@ -160,8 +163,6 @@ onBeforeUnmount(() => {
       </template>
       <span class="image-picker__drop-hint">图片将在保存草稿或发布时上传</span>
     </button>
-
-    <p v-if="selectionError" class="notice notice--error" role="alert">{{ selectionError }}</p>
 
     <div v-if="existingAssets.length || previews.length" class="image-picker__grid">
       <figure v-for="asset in existingAssets" :key="`asset-${asset.id}`" class="image-picker__item">

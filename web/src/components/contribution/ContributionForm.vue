@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, useTemplateRef, watch } from 'vue';
+import { onBeforeUnmount, watch } from 'vue';
 import { useContributionForm } from '../../composables/useContributionForm';
 import type { ContributionSuccessResult } from '../../composables/useContributionSubmit';
 import { useContributionSubmit } from '../../composables/useContributionSubmit';
+import { showMessage } from '../../utils/message';
 import ContributionMediaList from './ContributionMediaList.vue';
 import ContributionMediaPicker from './ContributionMediaPicker.vue';
 import ContributionSubmitBar from './ContributionSubmitBar.vue';
@@ -40,7 +41,6 @@ const {
   wakeLockActive,
   submit,
 } = useContributionSubmit();
-const validationErrorElement = useTemplateRef<HTMLElement>('validationErrorElement');
 
 function preventLeave(event: BeforeUnloadEvent): void {
   event.preventDefault();
@@ -63,10 +63,9 @@ watch(result, (submittedResult) => {
   if (submittedResult) emit('submitted', submittedResult);
 });
 
-watch(validationErrors, async (messages, previousMessages) => {
-  if (!messages.length || messages === previousMessages) return;
-  await nextTick();
-  validationErrorElement.value?.focus();
+watch(validationErrors, (messages, previousMessages) => {
+  if (!messages.length || messages.join('\n') === previousMessages.join('\n')) return;
+  showMessage({ message: messages.join('；'), type: 'error' });
 });
 
 function handleSubmit(): void {
@@ -145,21 +144,6 @@ onBeforeUnmount(() => {
         @remove="removeMedia"
         @move="moveMedia"
       />
-
-      <div
-        v-if="validationErrors.length"
-        ref="validationErrorElement"
-        class="contribution-validation-errors"
-        role="alert"
-        tabindex="-1"
-      >
-        <p
-          v-for="(message, index) in validationErrors"
-          :key="`${message}-${index}`"
-        >
-          {{ message }}
-        </p>
-      </div>
 
       <div class="contribution-format-note">
         <p>照片：JPG、PNG、WebP、HEIC/HEIF，每张不超过 40 MiB、50 MP。</p>

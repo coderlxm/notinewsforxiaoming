@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia';
+import { computed, onBeforeUnmount, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAdminContributions } from '../../composables/useAdminContributions';
 import { useSessionStore } from '../../stores/session';
+import { showMessage } from '../../utils/message';
 import JournalLoading from '../ui/JournalLoading.vue';
 import AdminContributionList from './AdminContributionList.vue';
 
@@ -14,10 +16,30 @@ const {
   authenticationChecked,
   authenticationError,
 } = storeToRefs(session);
+let persistentMessage: ReturnType<typeof showMessage> | null = null;
+const inboxError = computed(() => authenticationError.value
+  ?? (authenticationChecked.value && !ownerAuthenticated.value
+    ? '请先返回“我的资产”登录，再打开朋友投稿箱。'
+    : inbox.listError.value));
 
 function openContribution(publicId: string): void {
   void router.push({ name: 'contribution-review', params: { publicId } });
 }
+
+function showPersistentMessage(message: string): void {
+  persistentMessage?.close();
+  persistentMessage = showMessage({ message, type: 'error', duration: 0 });
+}
+
+watch(inboxError, (error) => {
+  if (error) showPersistentMessage(error);
+  else {
+    persistentMessage?.close();
+    persistentMessage = null;
+  }
+}, { immediate: true });
+
+onBeforeUnmount(() => persistentMessage?.close());
 </script>
 
 <template>
@@ -37,21 +59,8 @@ function openContribution(publicId: string): void {
       </span>
     </header>
 
-    <p v-if="authenticationError" class="notice notice--error" role="alert">
-      {{ authenticationError }}
-    </p>
-    <p
-      v-else-if="authenticationChecked && !ownerAuthenticated"
-      class="notice notice--error"
-      role="alert"
-    >
-      请先返回“我的资产”登录，再打开朋友投稿箱。
-    </p>
-    <p v-else-if="inbox.listError.value" class="notice notice--error" role="alert">
-      {{ inbox.listError.value }}
-    </p>
     <div
-      v-else-if="!authenticationChecked || inbox.listLoading.value"
+      v-if="!authenticationError && (!authenticationChecked || inbox.listLoading.value)"
       class="contribution-inbox__loading"
     >
       <JournalLoading
@@ -60,11 +69,11 @@ function openContribution(publicId: string): void {
       />
     </div>
     <AdminContributionList
-      v-else-if="inbox.contributions.value.length"
+      v-else-if="ownerAuthenticated && inbox.contributions.value.length"
       :contributions="inbox.contributions.value"
       @select="openContribution"
     />
-    <section v-else class="contribution-inbox__empty">
+    <section v-else-if="ownerAuthenticated && !inbox.listError.value" class="contribution-inbox__empty">
       <span aria-hidden="true">✉</span>
       <h2>投稿箱是空的</h2>
       <p>朋友的新内容送达后会出现在这里。</p>

@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { useFileDialog, useObjectUrl } from '@vueuse/core';
 import { storeToRefs } from 'pinia';
-import { computed, shallowRef, watch } from 'vue';
+import { computed, onBeforeUnmount, shallowRef, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import AdminContributionLinkSettings from '../contribution/AdminContributionLinkSettings.vue';
 import JournalLoading from '../ui/JournalLoading.vue';
 import { useSessionStore } from '../../stores/session';
 import { useSiteProfileStore } from '../../stores/siteProfile';
+import { showMessage } from '../../utils/message';
 
 const MAX_BIO_LENGTH = 120;
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
@@ -27,6 +28,7 @@ const draftWeatherEnabled = shallowRef(true);
 const formError = shallowRef<string | null>(null);
 const submitting = shallowRef(false);
 const initialized = shallowRef(false);
+let persistentMessage: ReturnType<typeof showMessage> | null = null;
 const draftAvatarPreviewUrl = useObjectUrl(draftAvatarFile);
 const {
   open: openFileDialog,
@@ -46,14 +48,18 @@ const previewAvatarUrl = computed(() =>
 const validationError = computed(() =>
   bioLength.value > MAX_BIO_LENGTH ? `Bio 不能超过 ${MAX_BIO_LENGTH} 个字符。` : null,
 );
-const visibleError = computed(() => formError.value ?? validationError.value);
-const waitingForAccess = computed(() =>
-  authenticationError.value === null
-  && (
-    !authenticationChecked.value
-    || (ownerAuthenticated.value && loading.value)
-  ),
-);
+const accessError = computed(() => authenticationError.value
+  ?? (authenticationChecked.value && !ownerAuthenticated.value
+    ? '请先返回“我的资产”登录后再修改公开资料。'
+    : loadError.value));
+const accessMessage = computed(() => authenticationError.value
+  ?? (authenticationChecked.value && !ownerAuthenticated.value
+    ? '请先返回“我的资产”登录后再修改公开资料。'
+    : null));
+const waitingForAccess = computed(() => accessError.value === null && (
+  !authenticationChecked.value
+  || (ownerAuthenticated.value && loading.value)
+));
 const canSubmit = computed(() =>
   ownerAuthenticated.value
   && profile.value !== null
@@ -67,6 +73,29 @@ watch(profile, (value) => {
   draftWeatherEnabled.value = value.weatherEnabled;
   initialized.value = true;
 }, { immediate: true });
+
+function showPersistentMessage(message: string): void {
+  persistentMessage?.close();
+  persistentMessage = showMessage({ message, type: 'error', duration: 0 });
+}
+
+watch(accessMessage, (error) => {
+  if (error) showPersistentMessage(error);
+  else {
+    persistentMessage?.close();
+    persistentMessage = null;
+  }
+}, { immediate: true });
+
+watch(formError, (error) => {
+  if (error) showMessage({ message: error, type: 'error' });
+});
+
+watch(validationError, (error, previousError) => {
+  if (error && error !== previousError) showMessage({ message: error, type: 'error' });
+});
+
+onBeforeUnmount(() => persistentMessage?.close());
 
 onAvatarChange((files) => {
   const file = files?.item(0);
@@ -120,21 +149,11 @@ async function save(): Promise<void> {
       <span>设置</span>
     </div>
 
-    <p v-if="authenticationError" class="notice notice--error" role="alert">
-      {{ authenticationError }}
-    </p>
-    <p v-else-if="authenticationChecked && !ownerAuthenticated" class="notice notice--error" role="alert">
-      请先返回“我的资产”登录后再修改公开资料。
-    </p>
-    <p v-else-if="loadError" class="notice notice--error" role="alert">{{ loadError }}</p>
-
     <section v-if="ownerAuthenticated && profile" class="settings-view__section" aria-labelledby="site-profile-title">
       <div class="settings-view__section-heading">
         <h1 id="site-profile-title">站点设置</h1>
         <p>管理公开资料与页面展示内容</p>
       </div>
-
-      <p v-if="visibleError" class="notice notice--error" role="alert">{{ visibleError }}</p>
 
       <div class="profile-preview" aria-label="公开资料预览">
         <img v-if="previewAvatarUrl" class="profile-preview__avatar" :src="previewAvatarUrl" alt="">

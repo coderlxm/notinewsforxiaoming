@@ -133,8 +133,7 @@ textarea:focus-visible,
 
 .contribution-field__heading,
 .contribution-section-heading,
-.contribution-media-list__summary,
-.contribution-submit-status__line {
+.contribution-media-list__summary {
   display: flex;
   justify-content: space-between;
   gap: 12px;
@@ -346,19 +345,47 @@ textarea:focus-visible,
   color: var(--contribution-danger);
 }
 
-.contribution-validation-errors {
-  display: grid;
-  gap: 4px;
-  padding: 10px 12px;
-  border: 1px solid rgba(169, 45, 56, 0.24);
-  border-radius: 8px;
-  background: var(--contribution-accent-soft);
-  color: var(--contribution-danger);
-  font-size: 0.75rem;
-  line-height: 1.45;
+.journal-message.el-message {
+  --el-message-bg-color: var(--contribution-card);
+  --el-message-border-color: var(--contribution-border);
+  --el-message-text-color: var(--contribution-ink);
+  --el-message-close-icon-color: var(--contribution-muted);
+  --el-message-close-hover-color: var(--contribution-accent);
+  max-width: min(28rem, calc(100vw - 32px));
+  padding: 0.75rem 0.9rem;
+  border-radius: 10px;
+  box-shadow: 0 10px 24px rgba(32, 32, 30, 0.12);
 }
 
-.contribution-validation-errors p,
+.journal-message.el-message .el-message__content {
+  color: var(--el-message-text-color);
+  font: 700 0.8rem/1.5 var(--contribution-font-sans);
+}
+
+.journal-message.el-message .el-message__icon {
+  color: var(--el-message-text-color);
+}
+
+.journal-message.el-message.el-message--primary,
+.journal-message.el-message.el-message--success {
+  --el-message-bg-color: var(--contribution-accent-soft);
+  --el-message-border-color: rgba(169, 45, 56, 0.24);
+  --el-message-text-color: var(--contribution-accent);
+}
+
+.journal-message.el-message.el-message--warning,
+.journal-message.el-message.el-message--info {
+  --el-message-bg-color: var(--contribution-card);
+  --el-message-border-color: var(--contribution-border);
+  --el-message-text-color: var(--contribution-ink);
+}
+
+.journal-message.el-message.el-message--error {
+  --el-message-bg-color: var(--contribution-accent-soft);
+  --el-message-border-color: rgba(169, 45, 56, 0.24);
+  --el-message-text-color: var(--contribution-danger);
+}
+
 .contribution-format-note p {
   margin: 0;
 }
@@ -416,41 +443,6 @@ textarea:focus-visible,
   box-shadow: none;
 }
 
-.contribution-submit-status {
-  display: grid;
-  gap: 6px;
-  margin: 0;
-  color: var(--contribution-muted);
-  font-size: 0.75rem;
-  font-variant-numeric: tabular-nums;
-}
-
-.contribution-progress {
-  width: 100%;
-  height: 5px;
-  overflow: hidden;
-  border: 0;
-  border-radius: 999px;
-  appearance: none;
-  background: var(--contribution-border);
-}
-
-.contribution-progress::-webkit-progress-bar {
-  border-radius: inherit;
-  background: var(--contribution-border);
-}
-
-.contribution-progress::-webkit-progress-value {
-  border-radius: inherit;
-  background: var(--contribution-accent);
-}
-
-.contribution-progress::-moz-progress-bar {
-  border-radius: inherit;
-  background: var(--contribution-accent);
-}
-
-.contribution-submit-status--processing,
 .contribution-link-state {
   display: flex;
   align-items: center;
@@ -467,29 +459,6 @@ textarea:focus-visible,
   animation: contribution-pulse 1.2s ease-in-out infinite;
 }
 
-.contribution-submit-error {
-  margin: 0;
-  padding: 10px 12px;
-  border: 1px solid rgba(169, 45, 56, 0.24);
-  border-radius: 8px;
-  background: var(--contribution-accent-soft);
-  color: var(--contribution-danger);
-  font-size: 0.75rem;
-  line-height: 1.45;
-}
-
-.contribution-submit-notice {
-  margin: 0;
-  padding: 8px 10px;
-  border: 1px solid var(--contribution-border);
-  border-radius: 8px;
-  background: var(--contribution-card);
-  color: var(--contribution-muted);
-  font-size: 0.7rem;
-  line-height: 1.45;
-  text-align: center;
-}
-
 .contribution-link-state {
   min-height: 150px;
   padding: 24px;
@@ -499,23 +468,6 @@ textarea:focus-visible,
 
 .contribution-link-state p {
   margin: 0;
-}
-
-.contribution-link-state--error {
-  display: block;
-  color: var(--contribution-ink);
-  text-align: center;
-}
-
-.contribution-link-state--error h2 {
-  margin: 0 0 10px;
-  font-family: var(--contribution-font-serif);
-  font-size: 1.35rem;
-}
-
-.contribution-link-state--error p {
-  color: var(--contribution-muted);
-  line-height: 1.6;
 }
 
 .contribution-success {

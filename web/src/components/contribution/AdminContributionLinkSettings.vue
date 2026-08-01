@@ -3,6 +3,7 @@ import QRCode from 'qrcode';
 import { computed, onMounted, shallowRef, watch } from 'vue';
 import { useAdminContributionLink } from '../../composables/useAdminContributionLink';
 import { formatEntryTime } from '../../utils/formatters';
+import { showMessage } from '../../utils/message';
 import JournalLoading from '../ui/JournalLoading.vue';
 
 const contributionLink = useAdminContributionLink();
@@ -35,6 +36,10 @@ watch(shareUrl, async (url) => {
     if (sequence === qrSequence) contributionLink.setError(reason);
   }
 }, { immediate: true });
+
+watch(contributionLink.error, (error) => {
+  if (error) showMessage({ message: error, type: 'error' });
+});
 
 async function createLink(): Promise<void> {
   if (
@@ -104,9 +109,6 @@ onMounted(() => {
       </button>
     </div>
 
-    <p v-if="contributionLink.error.value" class="notice notice--error" role="alert">
-      {{ contributionLink.error.value }}
-    </p>
     <div v-if="contributionLink.loading.value" class="link-settings__loading">
       <JournalLoading variant="inline" label="正在读取投稿链接…" />
     </div>

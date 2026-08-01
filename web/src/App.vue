@@ -18,6 +18,7 @@ import { useAdminContributions } from './composables/useAdminContributions';
 import { useSessionStore } from './stores/session';
 import { useSiteProfileStore } from './stores/siteProfile';
 import type { JournalEntry } from './types';
+import { showMessage } from './utils/message';
 
 type AppRoute =
   | { name: 'public'; key: string; tag: string }
@@ -62,6 +63,14 @@ const profileBioOverflow = shallowRef(0);
 const feedScrollPositions = new Map<string, number>();
 let pendingFeedScrollTop: number | null = null;
 let profileBioResizeObserver: ResizeObserver | null = null;
+let profileErrorMessage: ReturnType<typeof showMessage> | null = null;
+
+watch(profileLoadError, (error) => {
+  profileErrorMessage?.close();
+  profileErrorMessage = error
+    ? showMessage({ message: `公开资料加载失败：${error}`, type: 'error', duration: 0 })
+    : null;
+}, { immediate: true });
 
 const route = computed<AppRoute>(() => {
   if (currentRoute.name === 'public') {
@@ -358,6 +367,7 @@ onMounted(() => {
 });
 onUnmounted(() => {
   profileBioResizeObserver?.disconnect();
+  profileErrorMessage?.close();
   removeAfterEach();
 });
 </script>
@@ -392,9 +402,6 @@ onUnmounted(() => {
             role="status"
             aria-label="正在读取公开资料"
           />
-          <p v-else-if="profileLoadError" class="profile__load-error" role="alert">
-            公开资料加载失败：{{ profileLoadError }}
-          </p>
         </div>
         <nav v-if="showProfileNavigation" class="profile__nav" aria-label="主导航">
           <button
@@ -646,15 +653,6 @@ onUnmounted(() => {
   height: 0.74rem;
   margin-top: 0.26rem;
   border-radius: 999px;
-}
-
-.profile__load-error {
-  margin: 0.14rem 0 0;
-  overflow: hidden;
-  color: var(--danger);
-  font-size: 0.74rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .profile__nav {

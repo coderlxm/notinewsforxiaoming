@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, shallowRef, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, shallowRef, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import JournalLoading from '../ui/JournalLoading.vue';
 import { useDeferredLoading } from '../../composables/useDeferredLoading';
 import { useArticleEditor } from '../../composables/useArticleEditor';
 import type { JournalAsset, JournalEntry, JournalRichDocument, JournalVisibility } from '../../types';
+import { showMessage } from '../../utils/message';
 import ArticleMediaPanel from './ArticleMediaPanel.vue';
 import ArticleMetaForm from './ArticleMetaForm.vue';
 import ArticleCardContent from './ArticleCardContent.vue';
@@ -29,6 +30,7 @@ const previewing = shallowRef(false);
 const initializedArticleId = shallowRef<number | null>(null);
 const savingAction = shallowRef<'content' | 'publish' | 'privatize' | null>(null);
 const mediaAction = shallowRef<'cover-upload' | 'inline-upload' | 'delete' | null>(null);
+let terminalErrorMessage: ReturnType<typeof showMessage> | null = null;
 
 const isEditing = computed(() => props.articleId !== undefined);
 const article = computed(() => editor.article.value);
@@ -83,6 +85,22 @@ watch(article, (entry) => {
   tags.value = [...entry.tags];
   if (entry.richBody) richBody.value = entry.richBody;
 }, { immediate: true });
+
+watch(() => editor.error.value, (error) => {
+  if (!error) {
+    terminalErrorMessage?.close();
+    terminalErrorMessage = null;
+    return;
+  }
+  if (isEditing.value && article.value === null) {
+    terminalErrorMessage?.close();
+    terminalErrorMessage = showMessage({ message: error, type: 'error', duration: 0 });
+    return;
+  }
+  showMessage({ message: error, type: 'error' });
+});
+
+onBeforeUnmount(() => terminalErrorMessage?.close());
 
 onMounted(() => {
   if (props.articleId !== undefined) void editor.load(props.articleId);
@@ -162,12 +180,9 @@ function viewArticle(entry: JournalEntry): void {
       <span>{{ isEditing ? '编辑文章' : '写文章' }}</span>
     </div>
 
-    <p v-if="editor.error.value && formAvailable" class="notice notice--error" role="alert">{{ editor.error.value }}</p>
-
     <div class="editor-view__stage" :class="{ 'editor-view__stage--reading': !formAvailable }" :aria-busy="awaitingArticle">
       <Transition name="editor-stage" mode="out-in">
         <JournalLoading v-if="deferredLoading.visible.value" key="loading" variant="reading" label="正在打开文章…" />
-        <p v-else-if="editor.error.value && !formAvailable" key="error" class="notice notice--error" role="alert">{{ editor.error.value }}</p>
         <form v-else-if="formAvailable" key="form" class="editor-view__form" @submit.prevent="save">
           <ArticleMetaForm v-model:title="title" v-model:tags="tags" />
           <RichTextEditor
@@ -289,10 +304,6 @@ function viewArticle(entry: JournalEntry): void {
 
 .editor-stage-leave-to {
   opacity: 0;
-}
-
-.notice {
-  padding: 0 0.15rem;
 }
 
 </style>

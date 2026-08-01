@@ -10,7 +10,6 @@ const props = defineProps<{
   mode: 'public' | 'private';
   busy: boolean;
   loading?: boolean;
-  error?: string | null;
 }>();
 
 const emit = defineEmits<{
@@ -176,9 +175,6 @@ function forwardPinned(entry: JournalEntry, pinned: boolean): void {
         <h2 :id="titleId" class="detail-overlay__title">
           {{ entry?.title ?? '记录详情' }}
         </h2>
-        <p v-if="entry && error" class="detail-overlay__error notice notice--error" role="alert">
-          {{ error }}
-        </p>
         <button
           class="detail-overlay__close"
           type="button"
@@ -207,8 +203,7 @@ function forwardPinned(entry: JournalEntry, pinned: boolean): void {
           @delete-entry="emit('deleteEntry', $event)"
         />
         <div v-else class="detail-overlay__reading-stage" :aria-busy="loading">
-          <JournalLoading v-if="loading && !error" variant="reading" label="正在展开记录…" />
-          <p v-else-if="error" class="notice notice--error" role="alert">{{ error }}</p>
+          <JournalLoading v-if="loading" variant="reading" label="正在展开记录…" />
         </div>
       </section>
     </dialog>
@@ -288,15 +283,6 @@ function forwardPinned(entry: JournalEntry, pinned: boolean): void {
   place-items: center;
 }
 
-.detail-overlay__error {
-  position: absolute;
-  z-index: 9;
-  top: 64px;
-  right: 16px;
-  width: min(360px, calc(100% - 32px));
-  box-shadow: 0 12px 30px rgb(20 20 18 / 18%);
-}
-
 .detail-overlay__close {
   position: absolute;
   z-index: 10;
@@ -360,11 +346,6 @@ function forwardPinned(entry: JournalEntry, pinned: boolean): void {
     right: max(10px, env(safe-area-inset-right));
   }
 
-  .detail-overlay__error {
-    top: max(62px, calc(env(safe-area-inset-top) + 54px));
-    right: max(10px, env(safe-area-inset-right));
-    width: min(360px, calc(100% - 20px));
-  }
 }
 
 @media (prefers-color-scheme: dark) {

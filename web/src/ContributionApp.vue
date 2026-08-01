@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { nextTick, onMounted, shallowRef, useTemplateRef } from 'vue';
+import { onMounted, shallowRef } from 'vue';
 import ContributionForm from './components/contribution/ContributionForm.vue';
 import ContributionHeader from './components/contribution/ContributionHeader.vue';
 import ContributionSuccess from './components/contribution/ContributionSuccess.vue';
 import type { ContributionSuccessResult } from './composables/useContributionSubmit';
+import { showMessage } from './utils/message';
 
 type LinkState = 'loading' | 'ready' | 'error';
 
@@ -23,10 +24,8 @@ interface ContributionLinkResponse {
 }
 
 const linkState = shallowRef<LinkState>('loading');
-const linkError = shallowRef('');
 const linkInfo = shallowRef<ContributionLinkResponse | null>(null);
 const successResult = shallowRef<ContributionSuccessResult | null>(null);
-const linkErrorElement = useTemplateRef<HTMLElement>('linkError');
 
 const token = new URLSearchParams(window.location.hash.slice(1)).get('token') ?? '';
 
@@ -36,16 +35,14 @@ function linkErrorMessage(code?: string): string {
   return '无法确认投稿链接，请检查链接是否完整。';
 }
 
-async function showLinkError(message: string): Promise<void> {
-  linkError.value = message;
+function showLinkError(error: string): void {
   linkState.value = 'error';
-  await nextTick();
-  linkErrorElement.value?.focus();
+  showMessage({ message: error, type: 'error', duration: 0 });
 }
 
 async function loadContributionLink(): Promise<void> {
   if (!token) {
-    await showLinkError('投稿链接不完整，请重新打开小明分享的链接。');
+    showLinkError('投稿链接不完整，请重新打开小明分享的链接。');
     return;
   }
 
@@ -60,14 +57,14 @@ async function loadContributionLink(): Promise<void> {
     };
 
     if (!response.ok) {
-      await showLinkError(linkErrorMessage('error' in body ? body.error.code : undefined));
+      showLinkError(linkErrorMessage('error' in body ? body.error.code : undefined));
       return;
     }
 
     linkInfo.value = body as ContributionLinkResponse;
     linkState.value = 'ready';
   } catch {
-    await showLinkError('无法连接 Journal，请稍后重新打开这条投稿链接。');
+    showLinkError('无法连接 Journal，请稍后重新打开这条投稿链接。');
   }
 }
 
@@ -96,17 +93,6 @@ onMounted(() => {
       >
         <span class="contribution-status-dot" aria-hidden="true"></span>
         <p>正在确认投稿链接…</p>
-      </section>
-
-      <section
-        v-else-if="linkState === 'error'"
-        ref="linkError"
-        class="contribution-card contribution-link-state contribution-link-state--error"
-        role="alert"
-        tabindex="-1"
-      >
-        <h2>暂时不能投稿</h2>
-        <p>{{ linkError }}</p>
       </section>
 
       <ContributionSuccess

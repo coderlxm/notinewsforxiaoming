@@ -2,10 +2,11 @@
 import dayjs from 'dayjs';
 import timezone from 'dayjs/plugin/timezone';
 import utc from 'dayjs/plugin/utc';
-import { computed, shallowRef, watch } from 'vue';
+import { computed, onBeforeUnmount, shallowRef, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAdminContributions } from '../../composables/useAdminContributions';
 import type { AdminContributionAsset, JournalVisibility } from '../../types';
+import { showMessage } from '../../utils/message';
 import JournalLoading from '../ui/JournalLoading.vue';
 import AdminContributionReviewForm from './AdminContributionReviewForm.vue';
 
@@ -22,6 +23,7 @@ const inbox = useAdminContributions();
 const contentText = shallowRef('');
 const assets = shallowRef<AdminContributionAsset[]>([]);
 const visibility = shallowRef<JournalVisibility>('private');
+let detailErrorMessage: ReturnType<typeof showMessage> | null = null;
 const publishedAt = shallowRef('');
 
 const busy = computed(() => inbox.mutation.value !== null);
@@ -48,6 +50,18 @@ watch(() => props.publicId, async (publicId) => {
   await inbox.loadContribution(publicId);
   if (props.publicId === publicId) initializeForm();
 }, { immediate: true });
+
+watch(inbox.detailError, (error) => {
+  if (!error) {
+    detailErrorMessage?.close();
+    detailErrorMessage = null;
+    return;
+  }
+  detailErrorMessage?.close();
+  detailErrorMessage = showMessage({ message: error, type: 'error', duration: 0 });
+});
+
+onBeforeUnmount(() => detailErrorMessage?.close());
 
 function moveAsset(assetId: number, direction: -1 | 1): void {
   const index = assets.value.findIndex(asset => asset.id === assetId);
@@ -101,9 +115,6 @@ async function removeContribution(): Promise<void> {
       <p>检查正文与素材顺序，再选择私有保存或公开发布。</p>
     </header>
 
-    <p v-if="inbox.detailError.value" class="notice notice--error" role="alert">
-      {{ inbox.detailError.value }}
-    </p>
     <div v-if="inbox.detailLoading.value" class="contribution-review__loading">
       <JournalLoading variant="reading" label="正在打开投稿…" />
     </div>

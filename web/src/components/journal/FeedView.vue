@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { List } from 'vant';
 import { storeToRefs } from 'pinia';
-import { computed, nextTick, onActivated, onMounted, reactive, shallowRef, watch } from 'vue';
+import { computed, nextTick, onActivated, onBeforeUnmount, onMounted, reactive, shallowRef, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import ArticleCardContent from '../article/ArticleCardContent.vue';
 import JournalLoading from '../ui/JournalLoading.vue';
@@ -17,6 +17,7 @@ import {
   type JournalEntry,
   type JournalVisibility,
 } from '../../types';
+import { showMessage } from '../../utils/message';
 import CurrentWeather from './CurrentWeather.vue';
 import EntryCard from './EntryCard.vue';
 import EntryFilters from './EntryFilters.vue';
@@ -66,6 +67,7 @@ const refreshing = shallowRef(false);
 const refreshRequestComplete = shallowRef(false);
 const paginationLayoutPending = shallowRef(false);
 const feedLayoutReady = shallowRef(false);
+let terminalErrorMessage: ReturnType<typeof showMessage> | null = null;
 
 const isDetail = computed(() => props.mode === 'public' && props.detailId !== undefined);
 const weatherEnabled = computed(() => siteProfileData.value?.weatherEnabled === true);
@@ -117,6 +119,25 @@ const refreshDisabled = computed(() =>
 
 watch(() => journal.authenticationState.value, (state) => {
   if (state !== 'checking') session.setAuthenticated(state === 'authenticated');
+});
+
+watch(() => journal.error.value, (error) => {
+  if (!error) {
+    terminalErrorMessage?.close();
+    terminalErrorMessage = null;
+    return;
+  }
+  const terminal = isDetail.value
+    || journal.entries.value.length === 0
+    || (isOverlay.value && currentOverlayEntry.value === null);
+  if (terminal) {
+    terminalErrorMessage?.close();
+    terminalErrorMessage = showMessage({ message: error, type: 'error', duration: 0 });
+    return;
+  }
+  terminalErrorMessage?.close();
+  terminalErrorMessage = null;
+  showMessage({ message: error, type: 'error' });
 });
 
 watch(weatherEnabled, (enabled, wasEnabled) => {
@@ -174,6 +195,8 @@ onActivated(async () => {
   await journal.refreshPrivateFeed(filters);
   await loadDirectPrivateDetail();
 });
+
+onBeforeUnmount(() => terminalErrorMessage?.close());
 
 async function applyFilters(nextFilters: FeedFilters): Promise<void> {
   Object.assign(filters, nextFilters);
@@ -443,8 +466,6 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
         />
       </div>
 
-      <p v-if="!isDetail && !overlayVisible && journal.error.value" class="notice notice--error" role="alert">{{ journal.error.value }}</p>
-
       <LoginView
         v-if="mode === 'private' && journal.authenticationState.value === 'anonymous'"
         :busy="journal.loading.value"
@@ -470,7 +491,6 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
       <div v-if="isDetail" class="feed__reading-stage" :aria-busy="detailPreparing">
         <Transition name="feed-stage" mode="out-in">
           <JournalLoading v-if="deferredDetailLoading.visible.value && !journal.error.value" key="loading" variant="reading" label="正在展开记录…" />
-          <p v-else-if="journal.error.value" key="error" class="notice notice--error" role="alert">{{ journal.error.value }}</p>
           <ArticleCardContent
             v-else-if="journal.detail.value && isArticleEntry(journal.detail.value)"
             key="article-detail"
@@ -560,7 +580,6 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
     :mode="mode"
     :busy="currentOverlayEntry !== null && journal.mutationEntryId.value === currentOverlayEntry.id"
     :loading="directOverlay && journal.loading.value"
-    :error="journal.error.value"
     @close="emit('closeOverlay')"
     @select-tag="selectTag"
     @edit="editArticle($event.id)"

@@ -161,18 +161,45 @@ a {
   text-decoration: underline;
 }
 
-.notice {
-  margin: 0;
+.journal-message.el-message {
+  --el-message-bg-color: var(--surface-card);
+  --el-message-border-color: var(--border-strong);
+  --el-message-text-color: var(--text-primary);
+  --el-message-close-icon-color: var(--text-muted);
+  --el-message-close-hover-color: var(--accent-strong);
+  max-width: min(28rem, calc(100vw - 32px));
   padding: 0.75rem 0.9rem;
-  border-radius: 8px;
-  font-size: 0.82rem;
-  line-height: 1.5;
+  border-radius: var(--radius-card);
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--ink) 12%, transparent);
 }
 
-.notice--error {
-  border: 1px solid color-mix(in srgb, var(--danger) 32%, transparent);
-  background: var(--danger-soft);
-  color: var(--danger);
+.journal-message.el-message .el-message__content {
+  color: var(--el-message-text-color);
+  font: 650 0.82rem/1.5 var(--font-sans);
+}
+
+.journal-message.el-message .el-message__icon {
+  color: var(--el-message-text-color);
+}
+
+.journal-message.el-message.el-message--primary,
+.journal-message.el-message.el-message--success {
+  --el-message-bg-color: var(--accent-soft);
+  --el-message-border-color: color-mix(in srgb, var(--accent) 28%, transparent);
+  --el-message-text-color: var(--accent-strong);
+}
+
+.journal-message.el-message.el-message--warning,
+.journal-message.el-message.el-message--info {
+  --el-message-bg-color: var(--surface-muted);
+  --el-message-border-color: var(--border-strong);
+  --el-message-text-color: var(--text-primary);
+}
+
+.journal-message.el-message.el-message--error {
+  --el-message-bg-color: var(--danger-soft);
+  --el-message-border-color: color-mix(in srgb, var(--danger) 32%, transparent);
+  --el-message-text-color: var(--danger);
 }
 
 @media (prefers-color-scheme: dark) {

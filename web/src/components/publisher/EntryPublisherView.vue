@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, shallowRef, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, shallowRef, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import JournalLoading from '../ui/JournalLoading.vue';
 import { useDeferredLoading } from '../../composables/useDeferredLoading';
 import { useEntryPublisher } from '../../composables/useEntryPublisher';
 import { useEntryMediaSubmit } from '../../composables/useEntryMediaSubmit';
 import type { JournalAsset, JournalVisibility } from '../../types';
+import { showMessage } from '../../utils/message';
 import EntryImagePicker from './EntryImagePicker.vue';
 import EntryVisibilityField from './EntryVisibilityField.vue';
 
@@ -23,6 +24,7 @@ const newMedia = shallowRef<File[]>([]);
 const removedAssetIds = shallowRef<ReadonlySet<number>>(new Set());
 const initializedEntryId = shallowRef<number | null>(null);
 const mediaSubmit = useEntryMediaSubmit();
+let terminalErrorMessage: ReturnType<typeof showMessage> | null = null;
 
 const isEditing = computed(() => props.entryId !== undefined);
 const awaitingDraft = computed(() =>
@@ -53,9 +55,29 @@ watch(() => publisher.entry.value, (entry) => {
   removedAssetIds.value = new Set();
 });
 
+watch(routeError, (error) => {
+  if (!error) {
+    terminalErrorMessage?.close();
+    terminalErrorMessage = null;
+    return;
+  }
+  if (!formAvailable.value) {
+    terminalErrorMessage?.close();
+    terminalErrorMessage = showMessage({ message: error, type: 'error', duration: 0 });
+    return;
+  }
+  showMessage({ message: error, type: 'error' });
+});
+
+watch(() => mediaSubmit.error.value, (error) => {
+  if (error) showMessage({ message: error, type: 'error' });
+});
+
 onMounted(() => {
   if (props.entryId !== undefined) void publisher.load(props.entryId);
 });
+
+onBeforeUnmount(() => terminalErrorMessage?.close());
 
 function removeExisting(assetId: number): void {
   removedAssetIds.value = new Set([...removedAssetIds.value, assetId]);
@@ -100,13 +122,9 @@ async function publish(): Promise<void> {
       <span>{{ isEditing ? '编辑草稿' : '发布内容' }}</span>
     </div>
 
-    <p v-if="routeError && formAvailable" class="notice notice--error" role="alert">{{ routeError }}</p>
-    <p v-if="mediaSubmit.error.value" class="notice notice--error" role="alert">{{ mediaSubmit.error.value }}</p>
-
     <div class="publisher-view__stage" :class="{ 'publisher-view__stage--reading': !formAvailable }" :aria-busy="awaitingDraft">
       <Transition name="publisher-stage" mode="out-in">
         <JournalLoading v-if="deferredLoading.visible.value" key="loading" variant="reading" label="正在打开草稿…" />
-        <p v-else-if="routeError && !formAvailable" key="error" class="notice notice--error" role="alert">{{ routeError }}</p>
         <form v-else-if="formAvailable" key="form" class="publisher-view__form" @submit.prevent="publish">
           <label class="field">
             <span class="field__label">正文</span>
