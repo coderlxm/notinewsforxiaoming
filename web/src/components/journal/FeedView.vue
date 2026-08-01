@@ -659,6 +659,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
 
 .feed__public-heading {
   display: flex;
+  min-width: 0;
   min-height: 1.5rem;
   align-items: center;
   gap: 0.75rem;
@@ -670,6 +671,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
   z-index: 4;
   top: 0;
   display: grid;
+  min-width: 0;
   gap: 0.55rem;
   padding: 0.35rem 0;
   background: var(--surface-page);
@@ -677,6 +679,12 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
 
 .feed__public-tags {
   flex: 1 1 auto;
+  min-width: 0;
+}
+
+.feed__public-refresh {
+  flex: 0 0 auto;
+  margin-left: auto;
 }
 
 .feed__private-actions {
@@ -767,6 +775,15 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
 }
 
 @media (max-width: 599px) {
+  .feed--public:not(.feed--detail) {
+    gap: 0.55rem;
+    padding-top: 0.65rem;
+  }
+
+  .feed__public-intro {
+    padding: 0;
+  }
+
   .feed__public-intro--without-tags {
     display: none;
   }

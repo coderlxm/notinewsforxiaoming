@@ -77,6 +77,7 @@ onActivated(keepActiveTagVisible);
 <style scoped>
 .public-tag-navigation {
   display: flex;
+  width: 100%;
   min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
