@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, shallowRef, useId, useTemplateRef, watch } from 'vue';
-import type { CSSProperties } from 'vue';
+import { ElDropdown, ElDropdownItem, ElDropdownMenu } from 'element-plus';
+import { shallowRef, watch } from 'vue';
 import JournalLoading from '../ui/JournalLoading.vue';
 import type { JournalPublicationStatus, JournalVisibility } from '../../types';
 
@@ -22,92 +22,14 @@ const emit = defineEmits<{
 
 const open = shallowRef(false);
 const pendingLabel = shallowRef<string | null>(null);
-const panelStyle = shallowRef<CSSProperties>({});
-const menuId = useId();
-const trigger = useTemplateRef<HTMLButtonElement>('trigger');
-const panel = useTemplateRef<HTMLElement>('panel');
-const firstAction = useTemplateRef<HTMLButtonElement>('firstAction');
 
 watch(() => props.busy, (busy) => {
-  if (busy) close();
-  else pendingLabel.value = null;
+  if (!busy) pendingLabel.value = null;
 });
-
-async function setOpen(value: boolean, focusFirst = false): Promise<void> {
-  const menu = panel.value!;
-  if (!value) {
-    if (menu.matches(':popover-open')) menu.hidePopover();
-    return;
-  }
-
-  if (!menu.matches(':popover-open')) menu.showPopover();
-  await nextTick();
-  positionPanel();
-  if (focusFirst) firstAction.value!.focus();
-}
-
-function positionPanel(): void {
-  const triggerRect = trigger.value!.getBoundingClientRect();
-  const panelRect = panel.value!.getBoundingClientRect();
-  const edge = 12;
-  const gap = 6;
-  const left = Math.min(
-    Math.max(edge, triggerRect.right - panelRect.width),
-    window.innerWidth - panelRect.width - edge,
-  );
-  const top = triggerRect.bottom + gap + panelRect.height <= window.innerHeight - edge
-    ? triggerRect.bottom + gap
-    : Math.max(edge, triggerRect.top - panelRect.height - gap);
-
-  panelStyle.value = {
-    left: `${Math.round(left)}px`,
-    top: `${Math.round(top)}px`,
-  };
-}
-
-function close(): void {
-  const menu = panel.value;
-  if (menu?.matches(':popover-open')) menu.hidePopover();
-}
-
-function handleToggle(event: Event): void {
-  const isOpen = (event as ToggleEvent).newState === 'open';
-  open.value = isOpen;
-  if (isOpen) {
-    document.addEventListener('scroll', close, true);
-    window.addEventListener('resize', close);
-    return;
-  }
-  document.removeEventListener('scroll', close, true);
-  window.removeEventListener('resize', close);
-}
-
-function closeAndFocusTrigger(): void {
-  close();
-  trigger.value?.focus();
-}
-
-function handleFocusOut(event: FocusEvent): void {
-  const menu = event.currentTarget as HTMLElement;
-  if (!menu.contains(event.relatedTarget as Node | null)) close();
-}
-
-function focusAdjacent(event: KeyboardEvent, direction: 1 | -1): void {
-  const panel = event.currentTarget as HTMLElement;
-  const items = [...panel.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')];
-  const activeIndex = items.indexOf(document.activeElement as HTMLButtonElement);
-  const nextIndex = (activeIndex + direction + items.length) % items.length;
-  items[nextIndex]!.focus();
-}
-
-function run(action: () => void): void {
-  close();
-  action();
-}
 
 function runMutation(label: string, action: () => void): void {
   pendingLabel.value = label;
-  run(action);
+  action();
 }
 
 function changePinned(): void {
@@ -126,101 +48,73 @@ function changeVisibility(): void {
 }
 
 function editEntry(): void {
-  run(() => {
-    if (props.publicationStatus === 'draft') {
-      emit('continueEdit');
-      return;
-    }
-    emit('edit');
-  });
+  if (props.publicationStatus === 'draft') {
+    emit('continueEdit');
+    return;
+  }
+  emit('edit');
 }
 
-onBeforeUnmount(() => {
-  document.removeEventListener('scroll', close, true);
-  window.removeEventListener('resize', close);
-});
+function handleCommand(command: string): void {
+  switch (command) {
+    case 'edit': editEntry(); break;
+    case 'published-time': emit('editPublishedTime'); break;
+    case 'pinned': changePinned(); break;
+    case 'visibility': changeVisibility(); break;
+    case 'delete': emit('requestDelete'); break;
+  }
+}
 </script>
 
 <template>
-  <div class="action-menu" :aria-busy="busy" @focusout="handleFocusOut" @keydown.esc.stop="closeAndFocusTrigger">
+  <div class="action-menu" :aria-busy="busy">
     <JournalLoading
       v-if="busy && pendingLabel"
       class="action-menu__loading"
       variant="inline"
       :label="pendingLabel"
     />
-    <button
+    <ElDropdown
       v-else
-      ref="trigger"
-      class="action-menu__trigger"
-      type="button"
-      aria-label="打开记录管理菜单"
-      aria-haspopup="menu"
-      :aria-controls="menuId"
-      :aria-expanded="open"
+      trigger="click"
+      placement="bottom-end"
       :disabled="busy"
-      @click="setOpen(!open)"
-      @keydown.down.prevent="setOpen(true, true)"
+      :show-arrow="false"
+      max-height="calc(100dvh - 24px)"
+      popper-class="journal-action-menu"
+      @command="handleCommand"
+      @visible-change="open = $event"
     >
-      <span aria-hidden="true">•••</span>
-    </button>
+      <button
+        class="action-menu__trigger"
+        type="button"
+        aria-label="打开记录管理菜单"
+        aria-haspopup="menu"
+        :aria-expanded="open"
+      >
+        <span aria-hidden="true">•••</span>
+      </button>
 
-    <div
-      :id="menuId"
-      ref="panel"
-      class="action-menu__panel"
-      :style="panelStyle"
-      popover="auto"
-      role="menu"
-      aria-label="记录管理"
-      @toggle="handleToggle"
-      @keydown.down.prevent="focusAdjacent($event, 1)"
-      @keydown.up.prevent="focusAdjacent($event, -1)"
-    >
-      <button
-        ref="firstAction"
-        class="action-menu__item"
-        type="button"
-        role="menuitem"
-        :disabled="busy"
-        @click="editEntry"
-      >
-        {{ publicationStatus === 'draft' ? '继续编辑' : '编辑' }}
-      </button>
-      <button
-        v-if="publicationStatus === 'published'"
-        class="action-menu__item"
-        type="button"
-        role="menuitem"
-        :disabled="busy"
-        @click="run(() => emit('editPublishedTime'))"
-      >
-        修改发布时间
-      </button>
-      <button
-        v-if="publicationStatus === 'published'"
-        class="action-menu__item"
-        type="button"
-        role="menuitem"
-        :disabled="busy"
-        @click="changePinned"
-      >
-        {{ pinned ? '取消置顶' : '置顶' }}
-      </button>
-      <button
-        v-if="publicationStatus === 'published'"
-        class="action-menu__item"
-        type="button"
-        role="menuitem"
-        :disabled="busy"
-        @click="changeVisibility"
-      >
-        {{ visibility === 'public' ? '转为私有' : '设为公开' }}
-      </button>
-      <button class="action-menu__item action-menu__item--danger" type="button" role="menuitem" :disabled="busy" @click="run(() => emit('requestDelete'))">
-        删除
-      </button>
-    </div>
+      <template #dropdown>
+        <ElDropdownMenu aria-label="记录管理">
+          <ElDropdownItem command="edit">
+            {{ publicationStatus === 'draft' ? '继续编辑' : '编辑' }}
+          </ElDropdownItem>
+          <ElDropdownItem v-if="publicationStatus === 'published'" command="published-time">
+            修改发布时间
+          </ElDropdownItem>
+          <ElDropdownItem v-if="publicationStatus === 'published'" command="pinned">
+            {{ pinned ? '取消置顶' : '置顶' }}
+          </ElDropdownItem>
+          <ElDropdownItem v-if="publicationStatus === 'published'" command="visibility">
+            {{ visibility === 'public' ? '转为私有' : '设为公开' }}
+          </ElDropdownItem>
+          <ElDropdownItem class="journal-action-menu__item--danger" command="delete">
+            删除
+          </ElDropdownItem>
+        </ElDropdownMenu>
+      </template>
+    </ElDropdown>
   </div>
 </template>
 
@@ -252,8 +146,7 @@ onBeforeUnmount(() => {
   color: var(--text-primary);
 }
 
-.action-menu__trigger:focus-visible,
-.action-menu__item:focus-visible {
+.action-menu__trigger:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
@@ -269,69 +162,46 @@ onBeforeUnmount(() => {
   font-size: 0.72rem;
 }
 
-.action-menu__panel {
-  position: fixed;
-  top: auto;
-  right: auto;
-  bottom: auto;
-  left: auto;
+:global(.journal-action-menu.el-popper) {
   width: max-content;
-  height: max-content;
   min-width: 8.5rem;
   max-width: calc(100vw - 24px);
-  max-height: calc(100dvh - 24px);
-  margin: 0;
   padding: 0.3rem;
-  overflow-y: auto;
   border: 1px solid var(--border-subtle);
   border-radius: 0.75rem;
   background: var(--surface-card);
+  color: var(--text-primary);
   box-shadow: 0 0.75rem 2rem rgb(24 22 20 / 14%);
-  animation: menu-enter 140ms ease-out;
+  --el-bg-color-overlay: var(--surface-card);
+  --el-border-color-light: var(--border-subtle);
+  --el-color-primary: var(--accent);
+  --el-dropdown-menuItem-hover-fill: var(--surface-muted);
+  --el-dropdown-menuItem-hover-color: var(--accent-strong);
+  --el-fill-color-light: var(--surface-muted);
+  --el-text-color-regular: var(--text-primary);
 }
 
-.action-menu__panel:popover-open {
-  display: flex;
-  flex-direction: column;
+:global(.journal-action-menu .el-dropdown-menu) {
+  padding: 0;
 }
 
-.action-menu__item {
+:global(.journal-action-menu .el-dropdown-menu__item) {
   min-height: 2.5rem;
   padding: 0.55rem 0.75rem;
-  border: 0;
   border-radius: 0.5rem;
-  background: transparent;
   color: var(--text-primary);
-  cursor: pointer;
   font: inherit;
   font-size: 0.82rem;
   text-align: left;
 }
 
-.action-menu__item:hover,
-.action-menu__item:focus-visible {
+:global(.journal-action-menu .el-dropdown-menu__item:not(.is-disabled):hover),
+:global(.journal-action-menu .el-dropdown-menu__item:focus-visible) {
   background: var(--surface-muted);
 }
 
-.action-menu__item--danger {
+:global(.journal-action-menu .journal-action-menu__item--danger) {
   color: var(--danger);
 }
 
-.action-menu__item:disabled {
-  cursor: wait;
-  opacity: 0.5;
-}
-
-@keyframes menu-enter {
-  from {
-    opacity: 0;
-    transform: translateY(-0.3rem);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .action-menu__panel {
-    animation: none;
-  }
-}
 </style>
