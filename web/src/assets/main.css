@@ -10,6 +10,7 @@
   --workspace-width: 1920px;
   --reading-width: 820px;
   --editor-width: 780px;
+  --editor-workspace-width: 1120px;
   --content-width: var(--editor-width);
   --workspace-gutter: 24px;
   --page-gutter: 32px;

@@ -6,9 +6,9 @@ import { useDeferredLoading } from '../../composables/useDeferredLoading';
 import { useArticleEditor } from '../../composables/useArticleEditor';
 import type { JournalAsset, JournalEntry, JournalRichDocument, JournalVisibility } from '../../types';
 import { showMessage } from '../../utils/message';
-import ArticleMediaPanel from './ArticleMediaPanel.vue';
-import ArticleMetaForm from './ArticleMetaForm.vue';
 import ArticleCardContent from './ArticleCardContent.vue';
+import ArticleEditorSidebar from './ArticleEditorSidebar.vue';
+import ArticleTitleField from './ArticleTitleField.vue';
 import RichTextEditor from './RichTextEditor.vue';
 
 const props = withDefaults(defineProps<{
@@ -171,6 +171,10 @@ function viewArticle(entry: JournalEntry): void {
   }
   previewing.value = !previewing.value;
 }
+
+function viewCurrentArticle(): void {
+  if (article.value) viewArticle(article.value);
+}
 </script>
 
 <template>
@@ -184,62 +188,38 @@ function viewArticle(entry: JournalEntry): void {
       <Transition name="editor-stage" mode="out-in">
         <JournalLoading v-if="deferredLoading.visible.value" key="loading" variant="reading" label="正在打开文章…" />
         <form v-else-if="formAvailable" key="form" class="editor-view__form" @submit.prevent="save">
-          <ArticleMetaForm v-model:title="title" v-model:tags="tags" />
-          <RichTextEditor
-            v-model="richBody"
-            :assets="assets"
-            :disabled="editor.saving.value || editor.uploading.value"
-            :images-enabled="article !== null"
-            :upload-image="uploadInline"
-          />
-          <div class="editor-view__actions">
-            <button
-              class="button button--primary"
-              type="submit"
-              :disabled="!canSave"
-              :aria-busy="savingAction === 'content'"
-            >
-              <JournalLoading v-if="savingAction === 'content'" variant="inline" label="保存中…" />
-              <template v-else>{{ isEditing ? '保存修改' : '保存文章' }}</template>
-            </button>
-            <button
-              v-if="article"
-              class="button button--quiet"
-              type="button"
+          <div class="editor-view__manuscript">
+            <ArticleTitleField v-model="title" />
+            <RichTextEditor
+              v-model="richBody"
+              :assets="assets"
               :disabled="editor.saving.value || editor.uploading.value"
-              @click="article && viewArticle(article)"
-            >
-              {{ article.visibility === 'public' ? '查看文章' : (previewing ? '收起预览' : '预览文章') }}
-            </button>
-            <button
-              v-if="article"
-              class="button button--quiet"
-              type="button"
-              :disabled="editor.saving.value || editor.uploading.value"
-              :aria-busy="savingAction === 'publish' || savingAction === 'privatize'"
-              @click="changeVisibility"
-            >
-              <JournalLoading
-                v-if="savingAction === 'publish' || savingAction === 'privatize'"
-                variant="inline"
-                :label="visibilityLoadingLabel"
-              />
-              <template v-else>{{ nextVisibility === 'public' ? '设为公开' : '转为私有' }}</template>
-            </button>
+              :images-enabled="article !== null"
+              :upload-image="uploadInline"
+            />
           </div>
+          <ArticleEditorSidebar
+            v-model:tags="tags"
+            :article="article"
+            :action-busy="editor.saving.value || editor.uploading.value"
+            :assets="assets"
+            :can-save="canSave"
+            :is-editing="isEditing"
+            :media-busy="editor.uploading.value"
+            :media-busy-label="mediaPanelBusyLabel"
+            :next-visibility="nextVisibility"
+            :previewing="previewing"
+            :saving-action="savingAction"
+            :visibility-loading-label="visibilityLoadingLabel"
+            @change-visibility="changeVisibility"
+            @remove-asset="removeAsset"
+            @upload-cover="uploadCover"
+            @view-article="viewCurrentArticle"
+          />
         </form>
         <div v-else key="reserve" class="editor-view__reading-reserve" aria-hidden="true"></div>
       </Transition>
     </div>
-
-    <ArticleMediaPanel
-      v-if="article"
-      :assets="assets"
-      :busy="editor.uploading.value"
-      :busy-label="mediaPanelBusyLabel"
-      @upload-cover="uploadCover"
-      @remove-asset="removeAsset"
-    />
 
     <section v-if="previewEntry && previewing" class="editor-view__preview" aria-label="文章预览">
       <ArticleCardContent :entry="previewEntry" :linkable="false" display="full" />
@@ -251,7 +231,7 @@ function viewArticle(entry: JournalEntry): void {
 .editor-view {
   display: grid;
   gap: 1rem;
-  width: min(calc(100% - (var(--page-gutter) * 2)), var(--editor-width));
+  width: min(calc(100% - (var(--page-gutter) * 2)), var(--editor-workspace-width));
   margin: 0 auto;
   padding: 1.3rem 0 4rem;
 }
@@ -267,25 +247,30 @@ function viewArticle(entry: JournalEntry): void {
 
 .editor-view__form {
   display: grid;
+  grid-template-columns: minmax(0, var(--editor-width)) minmax(18rem, 1fr);
   gap: 1rem;
+  align-items: start;
 }
 
 .editor-view__stage {
   display: grid;
 }
 
-.editor-view__stage--reading,
-.editor-view__reading-reserve {
-  min-height: clamp(20rem, 48vh, 34rem);
+.editor-view__manuscript {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
 }
 
-.editor-view__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
+.editor-view__stage--reading,
+.editor-view__reading-reserve {
+  width: min(100%, var(--editor-width));
+  min-height: clamp(20rem, 48vh, 34rem);
+  margin: 0 auto;
 }
 
 .editor-view__preview {
+  width: min(100%, var(--editor-width));
   margin-top: 0.5rem;
 }
 
@@ -304,6 +289,16 @@ function viewArticle(entry: JournalEntry): void {
 
 .editor-stage-leave-to {
   opacity: 0;
+}
+
+@media (max-width: 1180px) {
+  .editor-view {
+    width: min(calc(100% - (var(--page-gutter) * 2)), var(--editor-width));
+  }
+
+  .editor-view__form {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 </style>

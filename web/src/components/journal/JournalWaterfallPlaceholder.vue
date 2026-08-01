@@ -1,6 +1,6 @@
 <template>
   <div class="waterfall-placeholder" aria-hidden="true">
-    <article v-for="index in 10" :key="index" class="waterfall-placeholder__card">
+    <article v-for="index in 12" :key="index" class="waterfall-placeholder__card">
       <div class="waterfall-placeholder__media" />
     </article>
   </div>
@@ -17,6 +17,10 @@
   break-inside: avoid;
   border-radius: var(--radius-media);
   overflow: hidden;
+}
+
+.waterfall-placeholder__card:nth-child(n + 11) {
+  display: none;
 }
 
 .waterfall-placeholder__media {
@@ -57,6 +61,10 @@
 @container (min-width: 1560px) {
   .waterfall-placeholder {
     columns: 6;
+  }
+
+  .waterfall-placeholder__card:nth-child(n + 11) {
+    display: block;
   }
 }
 </style>
