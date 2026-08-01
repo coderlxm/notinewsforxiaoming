@@ -78,11 +78,23 @@ export interface JournalApiError {
   error: string;
 }
 
+export type SiteContactKind = 'telegram' | 'email' | 'wechat' | 'github' | 'website';
+
+export interface SiteContactItem {
+  kind: SiteContactKind;
+  label: string;
+  value: string;
+  url: string | null;
+  enabled: boolean;
+}
+
 export interface SiteProfile {
   bio: string;
   avatarUrl: string;
   weatherEnabled: boolean;
   channelTags: ChannelTags;
+  aboutIntro: string;
+  contactItems: SiteContactItem[];
   updatedAt: string;
 }
 

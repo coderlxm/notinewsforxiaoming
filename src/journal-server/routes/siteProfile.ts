@@ -1,8 +1,13 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import type { JournalChannelTags } from '../../shared/journalProtocol.js';
+import type {
+  JournalChannelTags,
+  JournalSiteContactItem,
+} from '../../shared/journalProtocol.js';
 import {
   journalChannelTagsSchema,
+  journalSiteContactItemsSchema,
+  journalSiteProfileAboutIntroSchema,
   journalSiteProfileBioSchema,
 } from '../../shared/journalProtocol.js';
 import type { JournalAuth } from '../auth.js';
@@ -19,6 +24,10 @@ const siteProfileFieldsSchema = z.object({
   channelTags: z.string().transform(value => (
     journalChannelTagsSchema.parse(JSON.parse(value))
   )),
+  aboutIntro: journalSiteProfileAboutIntroSchema,
+  contactItems: z.string().transform(value => (
+    journalSiteContactItemsSchema.parse(JSON.parse(value))
+  )),
 });
 
 async function readSiteProfileMultipart(request: FastifyRequest): Promise<{
@@ -26,6 +35,8 @@ async function readSiteProfileMultipart(request: FastifyRequest): Promise<{
   avatar: JournalSiteProfileAvatarUpload | null;
   weatherEnabled: boolean;
   channelTags: JournalChannelTags;
+  aboutIntro: string;
+  contactItems: JournalSiteContactItem[];
 }> {
   const fields: Record<string, string> = {};
   let avatar: JournalSiteProfileAvatarUpload | null = null;
@@ -33,10 +44,10 @@ async function readSiteProfileMultipart(request: FastifyRequest): Promise<{
   for await (const part of request.parts({
     limits: {
       fieldSize: 4096,
-      fields: 3,
+      fields: 5,
       fileSize: maxSiteProfileAvatarBytes,
       files: 1,
-      parts: 4,
+      parts: 6,
     },
   })) {
     if (part.type === 'file') {
@@ -55,6 +66,8 @@ async function readSiteProfileMultipart(request: FastifyRequest): Promise<{
       part.fieldname !== 'bio'
       && part.fieldname !== 'weatherEnabled'
       && part.fieldname !== 'channelTags'
+      && part.fieldname !== 'aboutIntro'
+      && part.fieldname !== 'contactItems'
     ) {
       throw new JournalSiteProfileInputError(
         `Unexpected multipart field ${part.fieldname}.`,
@@ -68,8 +81,14 @@ async function readSiteProfileMultipart(request: FastifyRequest): Promise<{
     fields[part.fieldname] = String(part.value);
   }
 
-  const { bio, weatherEnabled, channelTags } = siteProfileFieldsSchema.parse(fields);
-  return { bio, avatar, weatherEnabled, channelTags };
+  const {
+    bio,
+    weatherEnabled,
+    channelTags,
+    aboutIntro,
+    contactItems,
+  } = siteProfileFieldsSchema.parse(fields);
+  return { bio, avatar, weatherEnabled, channelTags, aboutIntro, contactItems };
 }
 
 export async function registerSiteProfileRoutes(

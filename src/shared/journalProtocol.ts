@@ -216,6 +216,58 @@ export const journalApiErrorSchema = z.object({
 export type JournalApiError = z.infer<typeof journalApiErrorSchema>;
 
 export const journalSiteProfileBioSchema = z.string().trim().max(120);
+export const journalSiteProfileAboutIntroSchema = z.string().trim().max(1200);
+
+const journalSiteContactKinds = [
+  'telegram',
+  'email',
+  'wechat',
+  'github',
+  'website',
+] as const;
+
+export const journalSiteContactKindSchema = z.enum(journalSiteContactKinds);
+export type JournalSiteContactKind = z.infer<typeof journalSiteContactKindSchema>;
+
+export const journalSiteContactItemSchema = z.object({
+  kind: journalSiteContactKindSchema,
+  label: z.string().trim().min(1).max(24),
+  value: z.string().trim().max(120),
+  url: z.string().trim().url().max(500).nullable(),
+  enabled: z.boolean(),
+}).superRefine((item, context) => {
+  if (item.kind === 'wechat' && item.url !== null) {
+    context.addIssue({
+      code: 'custom',
+      message: 'WeChat contact URL must be null.',
+      path: ['url'],
+    });
+  }
+  if (!item.enabled) return;
+  if (item.value.length === 0) {
+    context.addIssue({
+      code: 'custom',
+      message: 'Enabled contact value must not be empty.',
+      path: ['value'],
+    });
+  }
+  if (item.kind !== 'wechat' && item.url === null) {
+    context.addIssue({
+      code: 'custom',
+      message: 'Enabled linked contact URL must not be empty.',
+      path: ['url'],
+    });
+  }
+});
+export type JournalSiteContactItem = z.infer<typeof journalSiteContactItemSchema>;
+
+export const journalSiteContactItemsSchema = z
+  .array(journalSiteContactItemSchema)
+  .length(journalSiteContactKinds.length)
+  .refine(
+    items => items.every((item, index) => item.kind === journalSiteContactKinds[index]),
+    'Site contacts must use the fixed channel order.',
+  );
 
 const journalChannelTagListSchema = z
   .array(z.string()
@@ -239,6 +291,8 @@ export const journalSiteProfileSchema = z.object({
   avatarUrl: z.string().min(1),
   weatherEnabled: z.boolean(),
   channelTags: journalChannelTagsSchema,
+  aboutIntro: journalSiteProfileAboutIntroSchema,
+  contactItems: journalSiteContactItemsSchema,
   updatedAt: z.string().datetime(),
 });
 export type JournalSiteProfile = z.infer<typeof journalSiteProfileSchema>;

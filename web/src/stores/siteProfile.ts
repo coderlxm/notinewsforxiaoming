@@ -1,7 +1,7 @@
 import { shallowRef } from 'vue';
 import { defineStore } from 'pinia';
 import { fetchSiteProfile, updateSiteProfile } from '../api';
-import type { ChannelTags, SiteProfile } from '../types';
+import type { ChannelTags, SiteContactItem, SiteProfile } from '../types';
 
 export const useSiteProfileStore = defineStore('siteProfile', () => {
   const profile = shallowRef<SiteProfile | null>(null);
@@ -40,13 +40,15 @@ export const useSiteProfileStore = defineStore('siteProfile', () => {
     await load();
   }
 
-  async function update(
-    bio: string,
-    avatar: File | null,
-    weatherEnabled: boolean,
-    channelTags: ChannelTags,
-  ): Promise<SiteProfile> {
-    const updated = await updateSiteProfile({ bio, avatar, weatherEnabled, channelTags });
+  async function update(input: {
+    bio: string;
+    avatar: File | null;
+    weatherEnabled: boolean;
+    channelTags: ChannelTags;
+    aboutIntro: string;
+    contactItems: SiteContactItem[];
+  }): Promise<SiteProfile> {
+    const updated = await updateSiteProfile(input);
     profile.value = updated;
     return updated;
   }

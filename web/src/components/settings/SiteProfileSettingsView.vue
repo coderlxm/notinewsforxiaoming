@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { useFileDialog, useObjectUrl } from '@vueuse/core';
+import { ElSwitch } from 'element-plus';
+import 'element-plus/es/components/switch/style/css';
 import { storeToRefs } from 'pinia';
 import { computed, onBeforeUnmount, reactive, shallowRef, watch } from 'vue';
 import { useRouter } from 'vue-router';
@@ -7,10 +9,13 @@ import AdminContributionLinkSettings from '../contribution/AdminContributionLink
 import JournalLoading from '../ui/JournalLoading.vue';
 import { useSessionStore } from '../../stores/session';
 import { useSiteProfileStore } from '../../stores/siteProfile';
-import type { ChannelTags, JournalChannel } from '../../types';
+import type { ChannelTags, JournalChannel, SiteContactItem } from '../../types';
 import { showMessage } from '../../utils/message';
 
 const MAX_BIO_LENGTH = 120;
+const MAX_ABOUT_INTRO_LENGTH = 1200;
+const MAX_CONTACT_VALUE_LENGTH = 120;
+const MAX_CONTACT_URL_LENGTH = 500;
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
 const MAX_CHANNEL_TAGS = 8;
 const MAX_CHANNEL_TAG_LENGTH = 32;
@@ -24,6 +29,38 @@ const channelTagGroups: Array<{ key: ChannelTagKey; label: string }> = [
   { key: 'interest', label: '兴趣' },
 ];
 
+const contactMetadata: Record<SiteContactItem['kind'], {
+  description: string;
+  valuePlaceholder: string;
+  urlPlaceholder: string | null;
+}> = {
+  telegram: {
+    description: '公开 Telegram 用户名',
+    valuePlaceholder: '@xiaoming',
+    urlPlaceholder: 'https://t.me/xiaoming',
+  },
+  email: {
+    description: '公开邮箱并支持访客复制',
+    valuePlaceholder: 'name@example.com',
+    urlPlaceholder: 'mailto:name@example.com',
+  },
+  wechat: {
+    description: '公开微信号，访客点击后复制',
+    valuePlaceholder: '微信号',
+    urlPlaceholder: null,
+  },
+  github: {
+    description: '公开 GitHub 主页',
+    valuePlaceholder: 'github.com/xiaoming',
+    urlPlaceholder: 'https://github.com/xiaoming',
+  },
+  website: {
+    description: '公开个人网站或其他个人链接',
+    valuePlaceholder: 'example.com',
+    urlPlaceholder: 'https://example.com',
+  },
+};
+
 const router = useRouter();
 const session = useSessionStore();
 const siteProfile = useSiteProfileStore();
@@ -34,8 +71,10 @@ const {
 } = storeToRefs(session);
 const { profile, loading, loadError } = storeToRefs(siteProfile);
 const draftBio = shallowRef('');
+const draftAboutIntro = shallowRef('');
 const draftAvatarFile = shallowRef<File | null>(null);
 const draftChannelTags = shallowRef<ChannelTags | null>(null);
+const draftContactItems = reactive<SiteContactItem[]>([]);
 const draftTagInputs = reactive<Record<ChannelTagKey, string>>({
   life: '',
   article: '',
@@ -57,13 +96,26 @@ const {
 });
 
 const normalizedDraftBio = computed(() => draftBio.value.trim());
+const normalizedDraftAboutIntro = computed(() => draftAboutIntro.value.trim());
 const bioLength = computed(() => normalizedDraftBio.value.length);
+const aboutIntroLength = computed(() => normalizedDraftAboutIntro.value.length);
 const previewAvatarUrl = computed(() =>
   draftAvatarPreviewUrl.value ?? profile.value?.avatarUrl ?? null,
 );
-const validationError = computed(() =>
-  bioLength.value > MAX_BIO_LENGTH ? `Bio 不能超过 ${MAX_BIO_LENGTH} 个字符。` : null,
-);
+const incompleteContact = computed(() => draftContactItems.find(item =>
+  item.enabled
+  && (!item.value.trim() || (item.kind !== 'wechat' && !item.url?.trim())),
+));
+const validationError = computed(() => {
+  if (bioLength.value > MAX_BIO_LENGTH) return `Bio 不能超过 ${MAX_BIO_LENGTH} 个字符。`;
+  if (aboutIntroLength.value > MAX_ABOUT_INTRO_LENGTH) {
+    return `自我介绍不能超过 ${MAX_ABOUT_INTRO_LENGTH} 个字符。`;
+  }
+  if (incompleteContact.value) {
+    return `${incompleteContact.value.label}已启用，请补充完整的展示内容和跳转链接。`;
+  }
+  return null;
+});
 const accessError = computed(() => authenticationError.value
   ?? (authenticationChecked.value && !ownerAuthenticated.value
     ? '请先返回“我的资产”登录后再修改公开资料。'
@@ -86,6 +138,8 @@ const canSubmit = computed(() =>
 watch(profile, (value) => {
   if (!value || initialized.value) return;
   draftBio.value = value.bio;
+  draftAboutIntro.value = value.aboutIntro;
+  draftContactItems.splice(0, draftContactItems.length, ...value.contactItems.map(item => ({ ...item })));
   initialized.value = true;
 }, { immediate: true });
 
@@ -188,13 +242,21 @@ async function save(): Promise<void> {
   formError.value = null;
   submitting.value = true;
   try {
-    const updated = await siteProfile.update(
-      normalizedDraftBio.value,
-      draftAvatarFile.value,
-      profile.value!.weatherEnabled,
-      editableChannelTags(),
-    );
+    const updated = await siteProfile.update({
+      bio: normalizedDraftBio.value,
+      avatar: draftAvatarFile.value,
+      weatherEnabled: profile.value!.weatherEnabled,
+      channelTags: editableChannelTags(),
+      aboutIntro: normalizedDraftAboutIntro.value,
+      contactItems: draftContactItems.map(item => ({
+        ...item,
+        value: item.value.trim(),
+        url: item.url?.trim() || null,
+      })),
+    });
     draftBio.value = updated.bio;
+    draftAboutIntro.value = updated.aboutIntro;
+    draftContactItems.splice(0, draftContactItems.length, ...updated.contactItems.map(item => ({ ...item })));
     draftAvatarFile.value = null;
     draftChannelTags.value = null;
     resetFileDialog();
@@ -255,12 +317,86 @@ async function save(): Promise<void> {
             v-model="draftBio"
             rows="4"
             :disabled="submitting"
-            :aria-invalid="validationError !== null"
+            :aria-invalid="bioLength > MAX_BIO_LENGTH"
           />
-          <span class="settings-view__counter" :class="{ 'settings-view__counter--invalid': validationError }">
+          <span class="settings-view__counter" :class="{ 'settings-view__counter--invalid': bioLength > MAX_BIO_LENGTH }">
             {{ bioLength }} / {{ MAX_BIO_LENGTH }}
           </span>
         </label>
+
+        <label class="field">
+          <span class="field__label">关于我的自我介绍</span>
+          <textarea
+            v-model="draftAboutIntro"
+            rows="7"
+            :maxlength="MAX_ABOUT_INTRO_LENGTH"
+            :disabled="submitting"
+            :aria-invalid="validationError?.startsWith('自我介绍')"
+            placeholder="补充一段比 Bio 更完整的自我介绍"
+          />
+          <span class="settings-view__counter" :class="{ 'settings-view__counter--invalid': aboutIntroLength > MAX_ABOUT_INTRO_LENGTH }">
+            {{ aboutIntroLength }} / {{ MAX_ABOUT_INTRO_LENGTH }}
+          </span>
+        </label>
+
+        <section class="contact-settings" aria-labelledby="contact-settings-title">
+          <div class="contact-settings__heading">
+            <h2 id="contact-settings-title">联系方式</h2>
+            <p>启用后会公开展示在「关于我」页面，保存前请确认内容和链接。</p>
+          </div>
+
+          <div class="contact-settings__list">
+            <article
+              v-for="item in draftContactItems"
+              :key="item.kind"
+              class="contact-settings__item"
+            >
+              <div class="contact-settings__item-heading">
+                <div>
+                  <h3>{{ item.label }}</h3>
+                  <p>{{ contactMetadata[item.kind].description }}</p>
+                </div>
+                <ElSwitch
+                  v-model="item.enabled"
+                  class="contact-settings__switch"
+                  :disabled="submitting"
+                  :aria-label="`${item.enabled ? '关闭' : '启用'}${item.label}`"
+                />
+              </div>
+
+              <div
+                class="contact-settings__fields"
+                :class="{ 'contact-settings__fields--single': item.kind === 'wechat' }"
+              >
+                <label class="field">
+                  <span class="field__label">展示内容</span>
+                  <input
+                    v-model="item.value"
+                    type="text"
+                    :maxlength="MAX_CONTACT_VALUE_LENGTH"
+                    :required="item.enabled"
+                    :disabled="submitting"
+                    :aria-invalid="item.enabled && !item.value.trim()"
+                    :placeholder="contactMetadata[item.kind].valuePlaceholder"
+                  >
+                </label>
+
+                <label v-if="item.kind !== 'wechat'" class="field">
+                  <span class="field__label">跳转链接</span>
+                  <input
+                    v-model="item.url"
+                    type="url"
+                    :maxlength="MAX_CONTACT_URL_LENGTH"
+                    :required="item.enabled"
+                    :disabled="submitting"
+                    :aria-invalid="item.enabled && !item.url?.trim()"
+                    :placeholder="contactMetadata[item.kind].urlPlaceholder ?? ''"
+                  >
+                </label>
+              </div>
+            </article>
+          </div>
+        </section>
 
         <section class="channel-tags" aria-labelledby="channel-tags-title">
           <div class="channel-tags__heading">
@@ -504,6 +640,74 @@ async function save(): Promise<void> {
   color: var(--danger);
 }
 
+.contact-settings {
+  display: grid;
+  gap: 0.8rem;
+  padding-top: 0.3rem;
+}
+
+.contact-settings__heading h2,
+.contact-settings__item-heading h3 {
+  margin: 0;
+}
+
+.contact-settings__heading h2 {
+  font-family: var(--font-serif);
+  font-size: 1rem;
+}
+
+.contact-settings__heading p,
+.contact-settings__item-heading p {
+  margin: 0.2rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+.contact-settings__list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.contact-settings__item {
+  display: grid;
+  grid-template-columns: minmax(10rem, 0.42fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 1rem;
+  padding: 0.85rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  background: var(--surface-page);
+}
+
+.contact-settings__item-heading {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.contact-settings__item-heading h3 {
+  font-size: 0.82rem;
+}
+
+.contact-settings__switch {
+  --el-switch-on-color: var(--accent);
+  --el-switch-off-color: var(--border-strong);
+
+  flex: none;
+}
+
+.contact-settings__fields {
+  display: grid;
+  grid-template-columns: minmax(0, 0.72fr) minmax(0, 1.28fr);
+  gap: 0.65rem;
+}
+
+.contact-settings__fields--single {
+  grid-template-columns: 1fr;
+}
+
 .channel-tags {
   display: grid;
   gap: 0.8rem;
@@ -665,9 +869,18 @@ async function save(): Promise<void> {
   .channel-tags__groups {
     grid-template-columns: 1fr;
   }
+
+  .contact-settings__item,
+  .contact-settings__fields {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (min-width: 600px) and (max-width: 900px) {
+  .contact-settings__item {
+    grid-template-columns: 1fr;
+  }
+
   .channel-tags__groups {
     grid-template-columns: 1fr;
   }

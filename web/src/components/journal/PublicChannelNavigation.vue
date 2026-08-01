@@ -3,28 +3,42 @@ import { journalChannels } from '../../journalChannels';
 import type { JournalChannel } from '../../types';
 
 defineProps<{
-  channel: JournalChannel;
+  channel: JournalChannel | null;
+  aboutActive: boolean;
 }>();
 
 const emit = defineEmits<{
   select: [channel: JournalChannel];
+  selectAbout: [];
 }>();
 </script>
 
 <template>
   <aside class="channel-sidebar">
-    <nav class="channel-sidebar__navigation" aria-label="公开内容频道">
+    <nav class="channel-sidebar__navigation" aria-label="公开页面导航">
+      <div class="channel-sidebar__channels">
+        <button
+          v-for="item in journalChannels"
+          :key="item.value"
+          class="channel-sidebar__item"
+          :class="{ 'channel-sidebar__item--active': channel === item.value && !aboutActive }"
+          type="button"
+          :aria-current="channel === item.value && !aboutActive ? 'page' : undefined"
+          @click="emit('select', item.value)"
+        >
+          <span class="channel-sidebar__marker" aria-hidden="true" />
+          <span>{{ item.label }}</span>
+        </button>
+      </div>
       <button
-        v-for="item in journalChannels"
-        :key="item.value"
-        class="channel-sidebar__item"
-        :class="{ 'channel-sidebar__item--active': channel === item.value }"
+        class="channel-sidebar__item channel-sidebar__about"
+        :class="{ 'channel-sidebar__item--active': aboutActive }"
         type="button"
-        :aria-current="channel === item.value ? 'page' : undefined"
-        @click="emit('select', item.value)"
+        :aria-current="aboutActive ? 'page' : undefined"
+        @click="emit('selectAbout')"
       >
         <span class="channel-sidebar__marker" aria-hidden="true" />
-        <span>{{ item.label }}</span>
+        <span>关于我</span>
       </button>
     </nav>
   </aside>
@@ -33,12 +47,23 @@ const emit = defineEmits<{
 <style scoped>
 .channel-sidebar {
   min-width: 0;
+  min-height: 0;
   padding: 1.3rem 0 2rem;
 }
 
 .channel-sidebar__navigation {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+}
+
+.channel-sidebar__channels {
   display: grid;
   gap: 0.35rem;
+}
+
+.channel-sidebar__about {
+  margin-top: auto;
 }
 
 .channel-sidebar__item {
@@ -97,8 +122,17 @@ const emit = defineEmits<{
   .channel-sidebar__navigation {
     display: grid;
     width: 100%;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    height: auto;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 0.18rem;
+  }
+
+  .channel-sidebar__channels {
+    display: contents;
+  }
+
+  .channel-sidebar__about {
+    margin-top: 0;
   }
 
   .channel-sidebar__item {

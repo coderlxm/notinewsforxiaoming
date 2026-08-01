@@ -17,10 +17,15 @@ import type {
   JournalPublicationStatus,
   JournalPlainChannel,
   JournalRichDocument,
+  JournalSiteContactItem,
   JournalSourceKind,
   JournalVisibility,
 } from '../shared/journalProtocol.js';
-import { journalChannelTagsSchema, journalRichDocumentSchema } from '../shared/journalProtocol.js';
+import {
+  journalChannelTagsSchema,
+  journalRichDocumentSchema,
+  journalSiteContactItemsSchema,
+} from '../shared/journalProtocol.js';
 import type {
   CreateJournalEntryInput,
   JournalAssetAccess,
@@ -145,6 +150,8 @@ export interface JournalSiteProfileRecord {
   avatarRevision: number;
   weatherEnabled: boolean;
   channelTags: JournalChannelTags;
+  aboutIntro: string;
+  contactItems: JournalSiteContactItem[];
   updatedAt: string;
 }
 
@@ -154,6 +161,8 @@ interface SiteProfileRow {
   avatar_revision: number;
   weather_enabled: 0 | 1;
   channel_tags_json: string;
+  about_intro: string;
+  contact_items_json: string;
   updated_at: string;
 }
 
@@ -1181,7 +1190,8 @@ export class JournalRepository {
 
   getSiteProfileOrNull(): JournalSiteProfileRecord | null {
     const row = this.database.prepare(`
-      SELECT bio, avatar_webp, avatar_revision, weather_enabled, channel_tags_json, updated_at
+      SELECT bio, avatar_webp, avatar_revision, weather_enabled, channel_tags_json,
+             about_intro, contact_items_json, updated_at
       FROM journal_site_profile
       WHERE id = 1
     `).get() as SiteProfileRow | undefined;
@@ -1201,18 +1211,23 @@ export class JournalRepository {
     avatarWebp: Buffer | null;
     weatherEnabled: boolean;
     channelTags: JournalChannelTags;
+    aboutIntro: string;
+    contactItems: JournalSiteContactItem[];
     updatedAt: string;
   }): JournalSiteProfileRecord {
     const update = this.database.transaction(() => {
       const result = input.avatarWebp === null
         ? this.database.prepare(`
             UPDATE journal_site_profile
-            SET bio = ?, weather_enabled = ?, channel_tags_json = ?, updated_at = ?
+            SET bio = ?, weather_enabled = ?, channel_tags_json = ?,
+                about_intro = ?, contact_items_json = ?, updated_at = ?
             WHERE id = 1
           `).run(
             input.bio,
             Number(input.weatherEnabled),
             JSON.stringify(input.channelTags),
+            input.aboutIntro,
+            JSON.stringify(input.contactItems),
             input.updatedAt,
           )
         : this.database.prepare(`
@@ -1222,6 +1237,8 @@ export class JournalRepository {
                 avatar_revision = avatar_revision + 1,
                 weather_enabled = ?,
                 channel_tags_json = ?,
+                about_intro = ?,
+                contact_items_json = ?,
                 updated_at = ?
             WHERE id = 1
           `).run(
@@ -1229,6 +1246,8 @@ export class JournalRepository {
             input.avatarWebp,
             Number(input.weatherEnabled),
             JSON.stringify(input.channelTags),
+            input.aboutIntro,
+            JSON.stringify(input.contactItems),
             input.updatedAt,
           );
       if (result.changes !== 1) {
@@ -1536,6 +1555,8 @@ export class JournalRepository {
       avatarRevision: row.avatar_revision,
       weatherEnabled: row.weather_enabled === 1,
       channelTags: journalChannelTagsSchema.parse(JSON.parse(row.channel_tags_json)),
+      aboutIntro: row.about_intro,
+      contactItems: journalSiteContactItemsSchema.parse(JSON.parse(row.contact_items_json)),
       updatedAt: row.updated_at,
     };
   }

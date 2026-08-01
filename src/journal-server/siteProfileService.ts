@@ -1,7 +1,15 @@
 import fs from 'node:fs';
 import sharp from 'sharp';
-import type { JournalChannelTags, JournalSiteProfile } from '../shared/journalProtocol.js';
-import { journalSiteProfileBioSchema } from '../shared/journalProtocol.js';
+import type {
+  JournalChannelTags,
+  JournalSiteContactItem,
+  JournalSiteProfile,
+} from '../shared/journalProtocol.js';
+import {
+  journalSiteContactItemsSchema,
+  journalSiteProfileAboutIntroSchema,
+  journalSiteProfileBioSchema,
+} from '../shared/journalProtocol.js';
 import type { JournalRepository, JournalSiteProfileRecord } from './repository.js';
 
 export const maxSiteProfileAvatarBytes = 5 * 1024 * 1024;
@@ -42,8 +50,12 @@ export class JournalSiteProfileService {
     avatar: JournalSiteProfileAvatarUpload | null;
     weatherEnabled: boolean;
     channelTags: JournalChannelTags;
+    aboutIntro: string;
+    contactItems: JournalSiteContactItem[];
   }): Promise<JournalSiteProfile> {
     const bio = journalSiteProfileBioSchema.parse(input.bio);
+    const aboutIntro = journalSiteProfileAboutIntroSchema.parse(input.aboutIntro);
+    const contactItems = journalSiteContactItemsSchema.parse(input.contactItems);
     const avatarWebp = input.avatar === null
       ? null
       : await this.processAvatarUpload(input.avatar);
@@ -52,6 +64,8 @@ export class JournalSiteProfileService {
       avatarWebp,
       weatherEnabled: input.weatherEnabled,
       channelTags: input.channelTags,
+      aboutIntro,
+      contactItems,
       updatedAt: new Date().toISOString(),
     });
     return this.toPublicProfile(profile);
@@ -104,6 +118,8 @@ export class JournalSiteProfileService {
       avatarUrl: `/api/site-profile/avatar?v=${profile.avatarRevision}`,
       weatherEnabled: profile.weatherEnabled,
       channelTags: profile.channelTags,
+      aboutIntro: profile.aboutIntro,
+      contactItems: profile.contactItems,
       updatedAt: profile.updatedAt,
     };
   }

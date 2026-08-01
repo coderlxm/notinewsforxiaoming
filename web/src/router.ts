@@ -4,6 +4,7 @@ export const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', name: 'public' },
+    { path: '/about', name: 'about' },
     { path: '/me', name: 'private' },
     { path: '/me/settings', name: 'settings' },
     { path: '/me/contributions', name: 'contribution-inbox' },
@@ -15,4 +16,8 @@ export const router = createRouter({
     { path: '/p/:publicId', name: 'detail' },
     { path: '/:pathMatch(.*)*', name: 'not-found' },
   ],
+});
+
+router.afterEach((to) => {
+  document.title = to.name === 'about' ? '关于我 · 小明同学' : '小明同学';
 });

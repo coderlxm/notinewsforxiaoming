@@ -11,6 +11,7 @@ import {
   watch,
 } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import AboutView from './components/about/AboutView.vue';
 import ArticleEditorView from './components/article/ArticleEditorView.vue';
 import FeedView from './components/journal/FeedView.vue';
 import PublicChannelNavigation from './components/journal/PublicChannelNavigation.vue';
@@ -25,6 +26,7 @@ import { showMessage } from './utils/message';
 
 type AppRoute =
   | { name: 'public'; key: string; channel: JournalChannel; tag: string }
+  | { name: 'about'; key: string }
   | { name: 'detail'; key: string; publicId: string }
   | { name: 'private'; key: string; entryId: number | null; assetView: AssetView }
   | { name: 'entry-new'; key: string }
@@ -117,6 +119,9 @@ const route = computed<AppRoute>(() => {
       assetView: view ?? defaultAssetView.value,
     };
   }
+  if (currentRoute.name === 'about') {
+    return { name: 'about', key: 'about' };
+  }
   if (currentRoute.name === 'article-new') {
     return { name: 'article-new', key: 'article-new' };
   }
@@ -189,6 +194,9 @@ const publicFeedRoute = computed(() => {
   const background = backgroundFeedRoute.value;
   return background?.name === 'public' ? background : null;
 });
+const publicShellActive = computed(() =>
+  publicFeedRoute.value !== null || route.value.name === 'about',
+);
 
 const overlayEntryId = computed(() => {
   if (activeOverlayContext.value) return activeOverlayContext.value.entry.id;
@@ -418,6 +426,10 @@ function changePublicChannel(channel: JournalChannel): void {
   void navigate(publicFeedPath(channel));
 }
 
+function openAbout(): void {
+  void navigate('/about');
+}
+
 function closeOverlay(): void {
   if (activeOverlayContext.value) {
     router.back();
@@ -562,11 +574,13 @@ onUnmounted(() => {
       </header>
     </div>
 
-    <div class="app-main" :class="{ 'app-main--public': publicFeedRoute }">
+    <div class="app-main" :class="{ 'app-main--public': publicShellActive }">
       <PublicChannelNavigation
-        v-if="publicFeedRoute"
-        :channel="publicFeedRoute.channel"
+        v-if="publicShellActive"
+        :channel="publicFeedRoute?.channel ?? null"
+        :about-active="route.name === 'about'"
         @select="changePublicChannel"
+        @select-about="openAbout"
       />
 
       <div ref="contentScroll" class="app-scroll">
@@ -610,6 +624,10 @@ onUnmounted(() => {
           :detail-id="route.publicId"
           @detail-loaded="handlePublicDetailLoaded"
           @return-to-feed="returnFromDetail"
+        />
+        <AboutView
+          v-else-if="route.name === 'about'"
+          :key="route.key"
         />
         <ArticleEditorView
           v-else-if="route.name === 'article-new'"

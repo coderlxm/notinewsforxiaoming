@@ -624,6 +624,20 @@ const migrations: JournalMigration[] = [
       `);
     },
   },
+  {
+    version: 11,
+    up(database) {
+      database.exec(`
+        ALTER TABLE journal_site_profile
+        ADD COLUMN about_intro TEXT NOT NULL DEFAULT ''
+          CHECK (length(about_intro) <= 1200);
+
+        ALTER TABLE journal_site_profile
+        ADD COLUMN contact_items_json TEXT NOT NULL
+          DEFAULT '[{"kind":"telegram","label":"Telegram","value":"@example","url":"https://t.me/example","enabled":true},{"kind":"email","label":"Email","value":"example@example.com","url":"mailto:example@example.com","enabled":true},{"kind":"wechat","label":"微信","value":"xiaoming","url":null,"enabled":true},{"kind":"github","label":"GitHub","value":"github.com/example","url":"https://github.com/example","enabled":true},{"kind":"website","label":"个人网站","value":"example.com","url":"https://example.com","enabled":true}]';
+      `);
+    },
+  },
 ];
 
 export function runJournalMigrations(database: Database.Database): void {
