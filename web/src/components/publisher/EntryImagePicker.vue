@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { useDropZone, useEventListener, useFileDialog } from '@vueuse/core';
+import { InfoFilled } from '@element-plus/icons-vue';
+import { ElTooltip } from 'element-plus';
 import { computed, onBeforeUnmount, shallowRef, useTemplateRef, watch } from 'vue';
 import type { JournalAsset } from '../../types';
 import { showMessage } from '../../utils/message';
@@ -136,10 +138,22 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="image-picker" aria-labelledby="entry-images-label">
-    <div class="image-picker__heading">
-      <h2 id="entry-images-label" class="image-picker__label">图片与视频</h2>
-      <p id="entry-images-hint" class="image-picker__hint">图片支持 JPEG、PNG、WebP、GIF；视频支持 MP4、MOV。最多 10 项，其中视频最多 5 段；可使用 Ctrl / Command + V 粘贴图片。</p>
-    </div>
+      <div class="image-picker__heading">
+        <h2 id="entry-images-label" class="image-picker__label">图片与视频</h2>
+        <ElTooltip
+          effect="light"
+          placement="top"
+          :show-arrow="false"
+          popper-class="image-picker__tooltip"
+        >
+          <template #content>
+            图片支持 JPEG、PNG、WebP、GIF；视频支持 MP4、MOV。最多 10 项，其中视频最多 5 段；可使用 Ctrl / Command + V 粘贴图片。
+          </template>
+          <button class="image-picker__hint-trigger" type="button" aria-label="查看图片与视频上传说明">
+            <InfoFilled aria-hidden="true" />
+          </button>
+        </ElTooltip>
+      </div>
 
     <button
       ref="dropZone"
@@ -208,12 +222,12 @@ onBeforeUnmount(() => {
 }
 
 .image-picker__heading {
-  display: grid;
-  gap: 0.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
 }
 
-.image-picker__label,
-.image-picker__hint {
+.image-picker__label {
   margin: 0;
 }
 
@@ -223,10 +237,35 @@ onBeforeUnmount(() => {
   font-weight: 650;
 }
 
-.image-picker__hint {
+.image-picker__hint-trigger {
+  display: grid;
+  width: 1.15rem;
+  height: 1.15rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  place-items: center;
+  background: transparent;
   color: var(--text-muted);
-  font-size: 0.74rem;
-  line-height: 1.5;
+  cursor: help;
+}
+
+.image-picker__hint-trigger:hover,
+.image-picker__hint-trigger:focus-visible {
+  color: var(--accent-strong);
+}
+
+.image-picker__hint-trigger:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 2px;
+}
+
+.image-picker__hint-trigger svg {
+  width: 0.95rem;
+  height: 0.95rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.35;
 }
 
 .image-picker__drop-zone {

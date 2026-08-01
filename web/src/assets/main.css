@@ -202,6 +202,17 @@ a {
   --el-message-text-color: var(--danger);
 }
 
+.image-picker__tooltip.el-popper.is-light {
+  max-width: min(20rem, calc(100vw - 2rem));
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
+  color: var(--text-primary);
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--ink) 12%, transparent);
+  font: 0.76rem/1.55 var(--font-sans);
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --paper: #1d1d1b;

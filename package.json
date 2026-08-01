@@ -48,6 +48,7 @@
   "dependencies": {
     "@dietime/telegraf-media-group": "1.0.5",
     "@egjs/grid": "^1.18.0",
+    "@element-plus/icons-vue": "^2.3.2",
     "@fastify/cookie": "^11.1.2",
     "@fastify/multipart": "^10.1.0",
     "@fastify/static": "^10.1.0",
