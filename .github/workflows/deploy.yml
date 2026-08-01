@@ -35,13 +35,13 @@ jobs:
       bot: ${{ steps.scope.outputs.bot }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 2
 
       - name: Detect changed deployment scope
         id: paths
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@v4
         with:
           filters: |
             journal:
@@ -111,7 +111,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Validate Journal secrets
         run: |
@@ -135,7 +135,7 @@ jobs:
             deploy/journal/journal-backup.timer
 
       - name: Setup Journal SSH agent
-        uses: webfactory/ssh-agent@v0.9.0
+        uses: webfactory/ssh-agent@v0.10.0
         with:
           ssh-private-key: ${{ secrets.JOURNAL_SERVER_SSH_KEY }}
 
@@ -191,7 +191,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Validate bot secrets
         run: |
@@ -200,7 +200,7 @@ jobs:
           test -n "$SERVER_PROJECT_DIR"
 
       - name: Setup bot SSH agent
-        uses: webfactory/ssh-agent@v0.9.0
+        uses: webfactory/ssh-agent@v0.10.0
         with:
           ssh-private-key: ${{ secrets.SERVER_SSH_KEY }}
 
