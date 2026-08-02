@@ -18,6 +18,7 @@ interface VideoDownloadRunnerOptions {
   rcloneRemote: string;
   workRoot: string;
   nodePath: string;
+  cookiesFile?: string;
   onStage: (stage: VideoDownloadStage) => void | Promise<void>;
 }
 
@@ -45,6 +46,7 @@ export async function runLocalVideoDownload(
       '--no-progress',
       '--no-warnings',
       '--js-runtimes', `node:${options.nodePath}`,
+      ...(options.cookiesFile ? ['--cookies', options.cookiesFile] : []),
       '--print-to-file', 'after_move:filepath', downloadedPathFile,
       '--paths', taskDirectory,
       '--output', '%(title).150B [%(id)s].%(ext)s',

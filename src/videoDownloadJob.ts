@@ -21,6 +21,7 @@ const result = isBilibiliHost(url.hostname)
       rcloneRemote: 'notinews-drive',
       workRoot: '/var/lib/notinews-downloads',
       nodePath: '/usr/bin/node',
+      cookiesFile: '/root/.config/yt-dlp/youtube-cookies.txt',
       onStage(stage) {
         writeVideoDownloadEvent({ type: 'stage', stage });
       },
