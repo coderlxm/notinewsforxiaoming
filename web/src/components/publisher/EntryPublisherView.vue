@@ -26,6 +26,7 @@ const visibility = shallowRef<JournalVisibility>('public');
 const newMedia = shallowRef<File[]>([]);
 const removedAssetIds = shallowRef<ReadonlySet<number>>(new Set());
 const initializedEntryId = shallowRef<number | null>(null);
+const initialEntryPublished = shallowRef(false);
 const mediaSubmit = useEntryMediaSubmit();
 let terminalErrorMessage: ReturnType<typeof showMessage> | null = null;
 
@@ -46,7 +47,7 @@ const hasContent = computed(() =>
 const canSubmit = computed(() => formAvailable.value && hasContent.value && !busy.value);
 const routeError = computed(() => {
   if (publisher.error.value) return publisher.error.value;
-  if (publisher.entry.value && !isDraft.value) return '这条记录已经发布，不能再作为草稿编辑。';
+  if (initialEntryPublished.value) return '这条记录已经发布，不能再作为草稿编辑。';
   return null;
 });
 
@@ -77,8 +78,10 @@ watch(() => mediaSubmit.error.value, (error) => {
   if (error) showMessage({ message: error, type: 'error' });
 });
 
-onMounted(() => {
-  if (props.entryId !== undefined) void publisher.load(props.entryId);
+onMounted(async () => {
+  if (props.entryId === undefined) return;
+  await publisher.load(props.entryId);
+  initialEntryPublished.value = publisher.entry.value?.publicationStatus === 'published';
 });
 
 onBeforeUnmount(() => terminalErrorMessage?.close());
