@@ -8,12 +8,14 @@ const props = withDefaults(defineProps<{
   visibility?: JournalVisibility;
   publicationStatus?: JournalPublicationStatus;
   showStatus?: boolean;
+  showYear?: boolean;
   linkable?: boolean;
 }>(), {
   pinned: false,
   visibility: 'private',
   publicationStatus: 'published',
   showStatus: false,
+  showYear: false,
   linkable: false,
 });
 
@@ -29,6 +31,10 @@ const month = computed(() => new Intl.DateTimeFormat('en-US', {
 const day = computed(() => new Intl.DateTimeFormat('zh-CN', {
   timeZone: 'Asia/Shanghai',
   day: '2-digit',
+}).format(date.value));
+const year = computed(() => new Intl.DateTimeFormat('zh-CN', {
+  timeZone: 'Asia/Shanghai',
+  year: 'numeric',
 }).format(date.value));
 const time = computed(() => new Intl.DateTimeFormat('zh-CN', {
   timeZone: 'Asia/Shanghai',
@@ -62,7 +68,14 @@ const fullDateTime = computed(() => new Intl.DateTimeFormat('zh-CN', {
     </component>
 
     <div class="date-spine__meta">
-      <time :datetime="sourceCreatedAt" :title="fullDateTime">{{ time }}</time>
+      <span v-if="showYear" class="date-spine__year">{{ year }}</span>
+      <time
+        :class="{ 'date-spine__time--with-year': showYear }"
+        :datetime="sourceCreatedAt"
+        :title="fullDateTime"
+      >
+        {{ time }}
+      </time>
       <span v-if="pinned" class="date-spine__pin" title="已置顶" aria-label="已置顶">📌</span>
       <span v-if="showStatus" class="date-spine__status">
         {{ publicationStatus === 'draft' ? '草稿' : (visibility === 'public' ? '公开' : '私有') }}
@@ -133,6 +146,18 @@ const fullDateTime = computed(() => new Intl.DateTimeFormat('zh-CN', {
 
 .date-spine__pin {
   font-size: 0.7rem;
+}
+
+.date-spine__year {
+  color: var(--text-primary);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.date-spine__time--with-year {
+  padding-left: 0.38rem;
+  border-left: 1px solid var(--border-subtle);
 }
 
 .date-spine__status {

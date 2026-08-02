@@ -36,6 +36,7 @@ onActivated(() => {
         v-for="entry in entries"
         :key="entry.id"
         :entry="entry"
+        show-year
         @open-entry="emit('openEntry', $event)"
         @select-tag="emit('selectTag', $event)"
       />

@@ -17,12 +17,14 @@ const props = withDefaults(defineProps<{
   linkable?: boolean;
   display?: 'summary' | 'full';
   anchored?: boolean;
+  showYear?: boolean;
 }>(), {
   editable: false,
   busy: false,
   linkable: true,
   display: 'summary',
   anchored: false,
+  showYear: false,
 });
 
 const emit = defineEmits<{
@@ -95,6 +97,7 @@ function handleCardClick(event: MouseEvent): void {
         :visibility="entry.visibility"
         :publication-status="entry.publicationStatus"
         :show-status="editable"
+        :show-year="showYear"
         :linkable="cardLinkable"
         @open="openEntry"
       />

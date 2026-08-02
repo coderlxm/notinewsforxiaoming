@@ -14,11 +14,13 @@ const props = withDefaults(defineProps<{
   busy?: boolean;
   linkable?: boolean;
   channelEditable?: boolean;
+  showYear?: boolean;
 }>(), {
   editable: false,
   busy: false,
   linkable: true,
   channelEditable: false,
+  showYear: false,
 });
 
 const emit = defineEmits<{
@@ -128,6 +130,7 @@ function handleCardClick(event: MouseEvent): void {
         :visibility="entry.visibility"
         :publication-status="entry.publicationStatus"
         :show-status="editable"
+        :show-year="showYear"
         :linkable="cardLinkable"
         @open="openEntry"
       />

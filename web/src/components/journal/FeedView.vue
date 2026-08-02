@@ -517,6 +517,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
             :linkable="false"
             display="full"
             anchored
+            show-year
             @select-tag="selectTag"
           />
           <EntryCard
@@ -524,6 +525,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
             key="entry-detail"
             :entry="journal.detail.value"
             :linkable="false"
+            show-year
             @select-tag="selectTag"
             @open-entry="openEntry"
             @continue-draft="editDraft"
