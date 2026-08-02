@@ -90,7 +90,7 @@ onMounted(() => {
   <section class="link-settings" aria-labelledby="contribution-link-title">
     <div class="link-settings__heading">
       <div>
-        <h2 id="contribution-link-title">朋友投稿链接</h2>
+        <h2 id="contribution-link-title" class="link-settings__title">朋友投稿链接</h2>
         <p>链接有效 72 小时，同一时间只保留一条。</p>
       </div>
       <button
@@ -113,54 +113,57 @@ onMounted(() => {
       <JournalLoading variant="inline" label="正在读取投稿链接…" />
     </div>
     <div v-else-if="contributionLink.link.value" class="link-settings__active">
-      <div class="link-settings__status">
-        <span>当前链接有效</span>
-        <time :datetime="contributionLink.link.value.expiresAt">
-          {{ formatEntryTime(contributionLink.link.value.expiresAt) }} 到期
-        </time>
-      </div>
+      <div class="link-settings__content">
+        <div class="link-settings__status">
+          <span>当前链接有效</span>
+          <time :datetime="contributionLink.link.value.expiresAt">
+            {{ formatEntryTime(contributionLink.link.value.expiresAt) }} 到期
+          </time>
+        </div>
 
-      <template v-if="shareUrl">
-        <div class="link-settings__share">
-          <div class="link-settings__url">
-            <span>{{ shareUrl }}</span>
-            <button class="button button--quiet" type="button" :disabled="busy" @click="copyLink">
-              {{ copied ? '已复制' : '复制' }}
+        <template v-if="shareUrl">
+          <div class="link-settings__share">
+            <div class="link-settings__url">
+              <span :title="shareUrl">{{ shareUrl }}</span>
+              <button class="button button--quiet" type="button" :disabled="busy" @click="copyLink">
+                <span aria-live="polite">{{ copied ? '已复制' : '复制' }}</span>
+              </button>
+            </div>
+            <button
+              v-if="canSystemShare"
+              class="button button--quiet"
+              type="button"
+              :disabled="busy"
+              @click="shareLink"
+            >
+              系统分享
             </button>
           </div>
-          <button
-            v-if="canSystemShare"
-            class="button button--quiet"
-            type="button"
-            :disabled="busy"
-            @click="shareLink"
-          >
-            系统分享
-          </button>
-        </div>
-        <figure v-if="qrCodeUrl" class="link-settings__qr">
-          <img :src="qrCodeUrl" alt="朋友投稿链接二维码">
-          <figcaption>让朋友扫码打开投稿页</figcaption>
-        </figure>
-      </template>
-      <p v-else class="link-settings__lost-url">
-        出于安全考虑，服务端只保存令牌摘要，无法再次读取这条链接。若链接没有保存，请创建新链接。
-      </p>
+        </template>
+        <p v-else class="link-settings__lost-url">
+          出于安全考虑，服务端只保存令牌摘要，无法再次读取这条链接。若链接没有保存，请创建新链接。
+        </p>
 
-      <button
-        class="link-settings__revoke"
-        type="button"
-        :disabled="busy"
-        :aria-busy="contributionLink.mutation.value === 'revoke'"
-        @click="revokeLink"
-      >
-        <JournalLoading
-          v-if="contributionLink.mutation.value === 'revoke'"
-          variant="inline"
-          label="撤销中…"
-        />
-        <template v-else>撤销当前链接</template>
-      </button>
+        <button
+          class="link-settings__revoke"
+          type="button"
+          :disabled="busy"
+          :aria-busy="contributionLink.mutation.value === 'revoke'"
+          @click="revokeLink"
+        >
+          <JournalLoading
+            v-if="contributionLink.mutation.value === 'revoke'"
+            variant="inline"
+            label="撤销中…"
+          />
+          <template v-else>撤销当前链接</template>
+        </button>
+      </div>
+
+      <figure v-if="shareUrl && qrCodeUrl" class="link-settings__qr">
+        <img :src="qrCodeUrl" alt="朋友投稿链接二维码">
+        <figcaption>让朋友扫码打开投稿页</figcaption>
+      </figure>
     </div>
     <p v-else class="link-settings__empty">
       目前没有可用的投稿链接。创建后可以直接分享、复制或让朋友扫描二维码。
@@ -171,9 +174,7 @@ onMounted(() => {
 <style scoped>
 .link-settings {
   display: grid;
-  gap: 1rem;
-  padding-top: 1.35rem;
-  border-top: 1px solid var(--border-subtle);
+  gap: 1.25rem;
 }
 
 .link-settings__heading,
@@ -186,7 +187,7 @@ onMounted(() => {
   gap: 0.8rem;
 }
 
-.link-settings__heading h2 {
+.link-settings__title {
   margin: 0;
   font-family: var(--font-serif);
   font-size: 1.1rem;
@@ -203,15 +204,27 @@ onMounted(() => {
 
 .link-settings__loading {
   min-height: 3rem;
-}
-
-.link-settings__active {
-  display: grid;
-  gap: 0.85rem;
   padding: 1rem;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-card);
   background: var(--surface-card);
+}
+
+.link-settings__active {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 1.25rem;
+  padding: 1.15rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
+}
+
+.link-settings__content {
+  display: grid;
+  min-width: 0;
+  gap: 0.95rem;
 }
 
 .link-settings__status span {
@@ -256,15 +269,17 @@ onMounted(() => {
   display: grid;
   justify-items: center;
   gap: 0.45rem;
+  width: clamp(11rem, 18vw, 13rem);
   margin: 0;
   padding: 0.8rem;
+  border: 1px solid var(--border-subtle);
   border-radius: 10px;
   background: #fff;
 }
 
 .link-settings__qr img {
   display: block;
-  width: min(13rem, 100%);
+  width: 100%;
   aspect-ratio: 1;
 }
 
@@ -283,8 +298,28 @@ onMounted(() => {
   font-size: 0.74rem;
 }
 
+.link-settings__empty {
+  margin-top: 0;
+  padding: 1rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
+}
+
+@media (max-width: 719px) {
+  .link-settings__active {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .link-settings__qr {
+    justify-self: center;
+    width: min(13rem, 100%);
+  }
+}
+
 @media (max-width: 599px) {
   .link-settings__heading,
+  .link-settings__status,
   .link-settings__share {
     align-items: stretch;
     flex-direction: column;
