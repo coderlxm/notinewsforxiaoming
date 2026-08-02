@@ -42,8 +42,8 @@ type FeedRoute = Extract<AppRoute, { name: 'public' | 'private' }>;
 type ScrollDirection = -1 | 0 | 1;
 
 const HEADER_ALWAYS_VISIBLE_TOP = 24;
-const HEADER_HIDE_DISTANCE = 16;
-const HEADER_SHOW_DISTANCE = 8;
+const HEADER_HIDE_DISTANCE = 112;
+const HEADER_SHOW_DISTANCE = 64;
 const PUBLIC_FEED_CACHE_LIMIT = 30;
 
 interface OverlayContext {
