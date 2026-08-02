@@ -32,7 +32,7 @@ const day = computed(() => new Intl.DateTimeFormat('zh-CN', {
   timeZone: 'Asia/Shanghai',
   day: '2-digit',
 }).format(date.value));
-const year = computed(() => new Intl.DateTimeFormat('zh-CN', {
+const year = computed(() => new Intl.DateTimeFormat('en-US', {
   timeZone: 'Asia/Shanghai',
   year: 'numeric',
 }).format(date.value));
@@ -149,15 +149,19 @@ const fullDateTime = computed(() => new Intl.DateTimeFormat('zh-CN', {
 }
 
 .date-spine__year {
+  flex: none;
   color: var(--text-primary);
   font-size: 0.76rem;
   font-weight: 800;
   letter-spacing: 0.06em;
+  white-space: nowrap;
 }
 
 .date-spine__time--with-year {
+  flex: none;
   padding-left: 0.38rem;
   border-left: 1px solid var(--border-subtle);
+  white-space: nowrap;
 }
 
 .date-spine__status {
@@ -172,7 +176,12 @@ const fullDateTime = computed(() => new Intl.DateTimeFormat('zh-CN', {
   }
 
   .date-spine__meta {
+    gap: 0.28rem;
     font-size: 0.65rem;
+  }
+
+  .date-spine__time--with-year {
+    padding-left: 0.28rem;
   }
 
   .date-spine--with-status .date-spine__meta time {
