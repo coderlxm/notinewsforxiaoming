@@ -281,8 +281,8 @@ Multi-column 的阅读方向是先纵向、再横向。如果页面必须严格�
 
 相关文档：
 
-- [Journal 瀑布流视觉重构主方案](../journal-waterfall-layout-redesign.md)
-- [Journal MasonryGrid 备用方案](../journal-waterfall-layout-vue-masonry-alternative.md)
+- [Journal 瀑布流视觉重构主方案](../journal/journal-waterfall-layout-redesign.md)
+- [Journal MasonryGrid 备用方案](../journal/journal-waterfall-layout-vue-masonry-alternative.md)
 
 ## 9. 最后复习
 

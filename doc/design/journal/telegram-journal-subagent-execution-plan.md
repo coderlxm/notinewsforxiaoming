@@ -2,7 +2,7 @@
 
 状态：待确认  
 日期：2026-07-19  
-依据：`doc/design/telegram-journal-personal-feed.md`  
+依据：`doc/design/journal/telegram-journal-personal-feed.md`  
 范围：实现任务、文件所有权、并行顺序与集成边界；本文不代表已经开始编码或部署
 
 ## 1. 拆分结论
@@ -79,7 +79,7 @@ src/reminders/migrations.ts
 .github/workflows/deploy.yml
 Dockerfile
 docker-compose.yml
-doc/design/telegram-journal-*.md
+doc/design/journal/telegram-journal-*.md
 ```
 
 上述文件在整个并行阶段默认禁止 subagent 修改。确需变更时，subagent 只说明需求，由主 agent 统一落盘。

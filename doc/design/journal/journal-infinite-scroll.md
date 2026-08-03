@@ -273,8 +273,8 @@ const infiniteFinished = computed(() =>
 
 本方案通过 Review 并实施后，应覆盖以下既有文档中“保留明确点击加载”和“加载按钮位于 masonry 之后”的旧结论：
 
-- `doc/design/journal-waterfall-layout-redesign.md`
-- `doc/design/journal-waterfall-layout-vue-masonry-alternative.md`
+- `doc/design/journal/journal-waterfall-layout-redesign.md`
+- `doc/design/journal/journal-waterfall-layout-vue-masonry-alternative.md`
 - `doc/recommend/frontend-vueuse-adoption-review-2026-07.md`
 
 它不改变这些文档中的 cursor 分页、稳定 key、尾部追加动画、下拉刷新和 masonry 生命周期设计。

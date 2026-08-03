@@ -4,10 +4,10 @@
 - 日期：2026-07-20
 - 适用范围：Journal 公开主页、公开分类页、Telegram Journal 保存结果卡片
 - 关联文档：
-  - `doc/design/telegram-journal-personal-feed.md`
-  - `doc/design/telegram-journal-rich-blog.md`
-  - `doc/design/journal-waterfall-layout-redesign.md`
-  - `doc/design/journal-waterfall-layout-vue-masonry-alternative.md`
+  - `doc/design/journal/telegram-journal-personal-feed.md`
+  - `doc/design/journal/telegram-journal-rich-blog.md`
+  - `doc/design/journal/journal-waterfall-layout-redesign.md`
+  - `doc/design/journal/journal-waterfall-layout-vue-masonry-alternative.md`
 
 ## 1. 结论
 

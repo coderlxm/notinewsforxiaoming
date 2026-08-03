@@ -207,7 +207,7 @@ Web 管理台第一阶段是“个人 bot 的管理后台”，不是一个产�
 │   ├── scheduled/
 │   ├── services/
 │   └── resident.ts
-└── doc/design/web-admin-console.md
+└── doc/design/architecture/web-admin-console.md
 ```
 
 几个边界说明：

@@ -3,7 +3,7 @@
 ## 1. 文档状态
 
 - 状态：已确认并实施
-- 需求依据：`doc/design/journal-home-fixed-sidebar-prd.md`
+- 需求依据：`doc/design/journal/journal-home-fixed-sidebar-prd.md`
 - 实施范围：Journal 服务端、公开信息流、普通内容发布与管理、公开首页外壳
 - 首版频道：`life`、`article`、`interest`
 - 发布阶段：已纳入本次正式发布
