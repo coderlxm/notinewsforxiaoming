@@ -47,10 +47,13 @@ const busy = computed(() => publisher.submitting.value !== null || mediaSubmit.b
 const hasContent = computed(() =>
   contentText.value.trim().length > 0 || existingAssets.value.length + newMedia.value.length > 0,
 );
-const canSubmit = computed(() =>
+const canSaveDraft = computed(() =>
   formAvailable.value
   && hasContent.value
-  && !busy.value
+  && !busy.value,
+);
+const canPublish = computed(() =>
+  canSaveDraft.value
   && (!specifyTime.value || specifiedTime.value !== ''),
 );
 const routeError = computed(() => {
@@ -186,7 +189,7 @@ async function publish(): Promise<void> {
             <button
               class="button button--quiet"
               type="button"
-              :disabled="!canSubmit"
+              :disabled="!canSaveDraft"
               :aria-busy="publisher.submitting.value === 'draft'"
               @click="saveDraft"
             >
@@ -196,7 +199,7 @@ async function publish(): Promise<void> {
             <button
               class="button button--primary"
               type="submit"
-              :disabled="!canSubmit"
+              :disabled="!canPublish"
               :aria-busy="publisher.submitting.value === 'publish'"
             >
               <JournalLoading v-if="publisher.submitting.value === 'publish'" variant="inline" label="发布中…" />

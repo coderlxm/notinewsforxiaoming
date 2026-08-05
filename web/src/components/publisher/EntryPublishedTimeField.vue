@@ -2,7 +2,7 @@
 import dayjs from 'dayjs';
 import timezone from 'dayjs/plugin/timezone';
 import utc from 'dayjs/plugin/utc';
-import { shallowRef, watch } from 'vue';
+import { shallowRef } from 'vue';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -33,27 +33,38 @@ function fillNow(): void {
   value.value = combine();
 }
 
-watch(enabled, (on) => {
-  if (on) {
+function updateEnabled(event: Event): void {
+  enabled.value = (event.target as HTMLInputElement).checked;
+  if (enabled.value) {
     if (date.value && time.value) value.value = combine();
     else fillNow();
   }
   else {
     value.value = '';
   }
-});
+}
 
-watch([date, time], () => {
+function updateDate(event: Event): void {
+  date.value = (event.target as HTMLInputElement).value;
+  updateValue();
+}
+
+function updateTime(event: Event): void {
+  time.value = (event.target as HTMLInputElement).value;
+  updateValue();
+}
+
+function updateValue(): void {
   if (!enabled.value) return;
   value.value = date.value && time.value ? combine() : '';
-});
+}
 </script>
 
 <template>
   <fieldset class="published-time-field" :disabled="disabled">
     <legend class="published-time-field__label">发布时间</legend>
     <label class="published-time-field__option">
-      <input v-model="enabled" type="checkbox">
+      <input :checked="enabled" type="checkbox" @change="updateEnabled">
       <span>
         <strong>指定发布时间</strong>
         <small>勾选后自定义归档时间，不勾选则按当前时间</small>
@@ -62,11 +73,11 @@ watch([date, time], () => {
     <div v-if="enabled" class="published-time-field__inputs">
       <label class="published-time-field__input">
         <span>日期</span>
-        <input v-model="date" type="date" required :disabled="disabled">
+        <input :value="date" type="date" required :disabled="disabled" @input="updateDate">
       </label>
       <label class="published-time-field__input">
         <span>时间</span>
-        <input v-model="time" type="time" required step="60" :disabled="disabled">
+        <input :value="time" type="time" required step="60" :disabled="disabled" @input="updateTime">
       </label>
     </div>
   </fieldset>

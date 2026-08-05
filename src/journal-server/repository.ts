@@ -378,6 +378,7 @@ export class JournalRepository {
   }
 
   createWebEntry(input: CreateWebEntryInput): JournalEntry {
+    const now = new Date().toISOString();
     const insert = this.database.transaction(() => {
       const result = this.database.prepare(`
         INSERT INTO journal_entries (
@@ -395,8 +396,8 @@ export class JournalRepository {
         input.visibility,
         JSON.stringify(input.tags),
         input.sourceCreatedAt,
-        input.sourceCreatedAt,
-        input.sourceCreatedAt,
+        now,
+        now,
       );
       const entryId = Number(result.lastInsertRowid);
       this.insertWebAttachments(entryId, input.assets, 0);
