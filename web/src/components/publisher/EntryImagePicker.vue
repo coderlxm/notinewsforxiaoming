@@ -2,26 +2,16 @@
 import { useDropZone, useEventListener, useFileDialog } from '@vueuse/core';
 import { InfoFilled } from '@element-plus/icons-vue';
 import { ElTooltip } from 'element-plus';
-import { computed, onBeforeUnmount, shallowRef, useTemplateRef, watch } from 'vue';
+import { computed, useTemplateRef } from 'vue';
 import type { JournalAsset } from '../../types';
 import { showMessage } from '../../utils/message';
-
-interface LocalPreview {
-  file: File;
-  url: string;
-}
 
 const props = defineProps<{
   existingAssets: readonly JournalAsset[];
   disabled: boolean;
 }>();
 
-const emit = defineEmits<{
-  removeExisting: [assetId: number];
-}>();
-
 const files = defineModel<File[]>({ required: true });
-const previews = shallowRef<LocalPreview[]>([]);
 const dropZone = useTemplateRef<HTMLButtonElement>('dropZone');
 const acceptedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'video/mp4', 'video/quicktime'];
 const acceptedTypes = new Set(acceptedMimeTypes);
@@ -53,16 +43,6 @@ const dropZoneActive = computed(() => isOverDropZone.value && !pickerDisabled.va
 function showSelectionError(message: string): void {
   showMessage({ message, type: 'error' });
 }
-
-watch(files, (nextFiles) => {
-  previews.value.forEach((preview) => {
-    if (!nextFiles.includes(preview.file)) URL.revokeObjectURL(preview.url);
-  });
-  previews.value = nextFiles.map((file) => {
-    const existing = previews.value.find(preview => preview.file === file);
-    return existing ?? { file, url: URL.createObjectURL(file) };
-  });
-}, { immediate: true });
 
 function addImages(selected: File[]): void {
   if (selected.length === 0) return;
@@ -127,13 +107,6 @@ function selectImages(): void {
   openFileDialog();
 }
 
-function removeLocal(file: File): void {
-  files.value = files.value.filter(candidate => candidate !== file);
-}
-
-onBeforeUnmount(() => {
-  previews.value.forEach(preview => URL.revokeObjectURL(preview.url));
-});
 </script>
 
 <template>
@@ -170,7 +143,7 @@ onBeforeUnmount(() => {
     >
       <strong v-if="imageLimitReached" class="image-picker__drop-title">已达到 10 项上限</strong>
       <strong v-else-if="disabled" class="image-picker__drop-title">图片选择暂不可用</strong>
-      <strong v-else-if="dropZoneActive" class="image-picker__drop-title">松开以添加图片</strong>
+      <strong v-else-if="dropZoneActive" class="image-picker__drop-title">松开以添加媒体</strong>
       <template v-else>
         <strong class="image-picker__drop-title image-picker__drop-title--desktop">拖拽媒体到这里，点击选择，或直接粘贴图片</strong>
         <strong class="image-picker__drop-title image-picker__drop-title--mobile">点击选择媒体</strong>
@@ -178,40 +151,6 @@ onBeforeUnmount(() => {
       <span class="image-picker__drop-hint">图片将在保存草稿或发布时上传</span>
     </button>
 
-    <div v-if="existingAssets.length || previews.length" class="image-picker__grid">
-      <figure v-for="asset in existingAssets" :key="`asset-${asset.id}`" class="image-picker__item">
-        <video
-          v-if="asset.kind === 'video'"
-          :src="asset.url"
-          :poster="asset.previewUrl ?? undefined"
-          muted
-          preload="metadata"
-        />
-        <img v-else :src="asset.previewUrl ?? asset.url" :alt="asset.originalName ?? '草稿图片'">
-        <button
-          class="image-picker__remove"
-          type="button"
-          :disabled="disabled"
-          :aria-label="`移除 ${asset.originalName ?? '图片'}`"
-          @click="emit('removeExisting', asset.id)"
-        >
-          移除
-        </button>
-      </figure>
-      <figure v-for="preview in previews" :key="preview.url" class="image-picker__item">
-        <video v-if="preview.file.type.startsWith('video/')" :src="preview.url" muted preload="metadata"></video>
-        <img v-else :src="preview.url" :alt="preview.file.name">
-        <button
-          class="image-picker__remove"
-          type="button"
-          :disabled="disabled"
-          :aria-label="`移除 ${preview.file.name}`"
-          @click="removeLocal(preview.file)"
-        >
-          移除
-        </button>
-      </figure>
-    </div>
   </section>
 </template>
 
@@ -320,46 +259,6 @@ onBeforeUnmount(() => {
   line-height: 1.5;
 }
 
-.image-picker__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
-  gap: 0.7rem;
-}
-
-.image-picker__item {
-  display: grid;
-  gap: 0.35rem;
-  min-width: 0;
-  margin: 0;
-}
-
-.image-picker__item img,
-.image-picker__item video {
-  display: block;
-  width: 100%;
-  aspect-ratio: 1;
-  max-height: 12rem;
-  border-radius: var(--radius-media);
-  background: var(--surface-muted);
-  object-fit: cover;
-}
-
-.image-picker__remove {
-  min-height: 2.25rem;
-  padding: 0.35rem;
-  border: 0;
-  background: transparent;
-  color: var(--danger);
-  cursor: pointer;
-  font: inherit;
-  font-size: 0.76rem;
-}
-
-.image-picker__remove:disabled {
-  cursor: wait;
-  opacity: 0.55;
-}
-
 @media (max-width: 599px) {
   .image-picker__drop-zone {
     min-height: 6.5rem;
@@ -374,8 +273,5 @@ onBeforeUnmount(() => {
     display: inline;
   }
 
-  .image-picker__grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 </style>

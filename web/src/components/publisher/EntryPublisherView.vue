@@ -9,6 +9,7 @@ import { plainJournalChannels } from '../../journalChannels';
 import type { JournalAsset, JournalPlainChannel, JournalVisibility } from '../../types';
 import { showMessage } from '../../utils/message';
 import EntryImagePicker from './EntryImagePicker.vue';
+import EntryMediaPreviewGrid from './EntryMediaPreviewGrid.vue';
 import EntryChannelField from './EntryChannelField.vue';
 import EntryVisibilityField from './EntryVisibilityField.vue';
 import EntryPublishedTimeField from './EntryPublishedTimeField.vue';
@@ -158,54 +159,72 @@ async function publish(): Promise<void> {
       <Transition name="publisher-stage" mode="out-in">
         <JournalLoading v-if="deferredLoading.visible.value" key="loading" variant="reading" label="正在打开草稿…" />
         <form v-else-if="formAvailable" key="form" class="publisher-view__form" @submit.prevent="publish">
-          <label class="field">
-            <span class="field__label">正文</span>
-            <textarea
-              v-model="contentText"
-              rows="10"
-              placeholder="写下内容，可直接使用 #标签"
+          <div class="publisher-view__manuscript">
+            <label class="field">
+              <span class="field__label">正文</span>
+              <textarea
+                v-model="contentText"
+                rows="10"
+                placeholder="写下内容，可直接使用 #标签"
+                :disabled="busy"
+              />
+            </label>
+
+            <EntryImagePicker
+              class="publisher-view__media"
+              v-model="newMedia"
+              :existing-assets="existingAssets"
               :disabled="busy"
             />
-          </label>
+          </div>
 
-          <EntryImagePicker
+          <EntryMediaPreviewGrid
+            v-if="existingAssets.length || newMedia.length"
             v-model="newMedia"
+            class="publisher-view__previews"
             :existing-assets="existingAssets"
             :disabled="busy"
             @remove-existing="removeExisting"
           />
 
-          <EntryChannelField v-model="channel" :disabled="busy" />
+          <aside class="publisher-view__sidebar">
+            <h2 class="publisher-view__sidebar-title">发布设置</h2>
+            <div class="publisher-view__settings">
+              <div class="publisher-view__fields-row">
+                <EntryChannelField v-model="channel" :disabled="busy" />
 
-          <EntryVisibilityField v-model="visibility" :disabled="busy" />
+                <EntryVisibilityField v-model="visibility" :disabled="busy" />
+              </div>
 
-          <EntryPublishedTimeField
-            v-model:enabled="specifyTime"
-            v-model:value="specifiedTime"
-            :disabled="busy"
-          />
+              <EntryPublishedTimeField
+                v-model:enabled="specifyTime"
+                v-model:value="specifiedTime"
+                :disabled="busy"
+              />
 
-          <div class="publisher-view__actions">
-            <button
-              class="button button--quiet"
-              type="button"
-              :disabled="!canSaveDraft"
-              :aria-busy="publisher.submitting.value === 'draft'"
-              @click="saveDraft"
-            >
-              <JournalLoading v-if="publisher.submitting.value === 'draft'" variant="inline" label="保存中…" />
-              <template v-else>保存草稿</template>
-            </button>
-            <button
-              class="button button--primary"
-              type="submit"
-              :disabled="!canPublish"
-              :aria-busy="publisher.submitting.value === 'publish'"
-            >
-              <JournalLoading v-if="publisher.submitting.value === 'publish'" variant="inline" label="发布中…" />
-              <template v-else>发布</template>
-            </button>
-          </div>
+              <div class="publisher-view__actions">
+                <button
+                  class="button button--quiet"
+                  type="button"
+                  :disabled="!canSaveDraft"
+                  :aria-busy="publisher.submitting.value === 'draft'"
+                  @click="saveDraft"
+                >
+                  <JournalLoading v-if="publisher.submitting.value === 'draft'" variant="inline" label="保存中…" />
+                  <template v-else>保存草稿</template>
+                </button>
+                <button
+                  class="button button--primary"
+                  type="submit"
+                  :disabled="!canPublish"
+                  :aria-busy="publisher.submitting.value === 'publish'"
+                >
+                  <JournalLoading v-if="publisher.submitting.value === 'publish'" variant="inline" label="发布中…" />
+                  <template v-else>发布</template>
+                </button>
+              </div>
+            </div>
+          </aside>
         </form>
         <div v-else key="reserve" class="publisher-view__reading-reserve" aria-hidden="true"></div>
       </Transition>
@@ -217,7 +236,7 @@ async function publish(): Promise<void> {
 .publisher-view {
   display: grid;
   gap: 1rem;
-  width: min(calc(100% - (var(--page-gutter) * 2)), var(--editor-width));
+  width: min(calc(100% - (var(--page-gutter) * 2)), var(--editor-workspace-width));
   margin: 0 auto;
   padding: 1.3rem 0 4rem;
 }
@@ -231,13 +250,68 @@ async function publish(): Promise<void> {
   font-size: 0.78rem;
 }
 
-.publisher-view__stage,
-.publisher-view__form {
+.publisher-view__stage {
   display: grid;
 }
 
 .publisher-view__form {
+  display: grid;
+  grid-template-columns: minmax(0, var(--editor-width)) minmax(18rem, 1fr);
   gap: 1rem;
+  align-items: stretch;
+}
+
+.publisher-view__manuscript {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-column: 1;
+  grid-row: 1;
+  gap: 1rem;
+  min-width: 0;
+  min-height: 0;
+}
+
+.publisher-view__media {
+  min-height: 0;
+  grid-template-rows: auto minmax(8rem, 1fr);
+}
+
+.publisher-view__sidebar {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-column: 2;
+  grid-row: 1;
+  gap: 0.3rem;
+  min-width: 0;
+  min-height: 0;
+}
+
+.publisher-view__previews {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.publisher-view__sidebar-title {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 650;
+}
+
+.publisher-view__settings {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
+}
+
+.publisher-view__fields-row {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
 }
 
 .publisher-view__form textarea {
@@ -249,13 +323,19 @@ async function publish(): Promise<void> {
 
 .publisher-view__actions {
   display: flex;
-  justify-content: flex-end;
+  align-self: end;
   gap: 0.65rem;
+}
+
+.publisher-view__actions .button {
+  flex: 1 1 0;
 }
 
 .publisher-view__stage--reading,
 .publisher-view__reading-reserve {
+  width: min(100%, var(--editor-width));
   min-height: 50vh;
+  margin: 0 auto;
 }
 
 .publisher-stage-enter-active {
@@ -269,5 +349,29 @@ async function publish(): Promise<void> {
 .publisher-stage-enter-from,
 .publisher-stage-leave-to {
   opacity: 0;
+}
+
+@media (max-width: 1180px) {
+  .publisher-view {
+    width: min(calc(100% - (var(--page-gutter) * 2)), var(--editor-width));
+  }
+
+  .publisher-view__form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .publisher-view__manuscript,
+  .publisher-view__previews,
+  .publisher-view__sidebar {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+}
+
+@media (min-width: 600px) and (max-width: 1180px) {
+  .publisher-view__fields-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 </style>
