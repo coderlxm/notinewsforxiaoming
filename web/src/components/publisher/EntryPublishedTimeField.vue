@@ -46,8 +46,9 @@ onMounted(() => {
 });
 
 function updateEnabled(event: Event): void {
-  enabled.value = (event.target as HTMLInputElement).checked;
-  if (enabled.value) {
+  const nextEnabled = (event.target as HTMLInputElement).checked;
+  enabled.value = nextEnabled;
+  if (nextEnabled) {
     if (date.value && time.value) value.value = combine();
     else fillNow();
   }
