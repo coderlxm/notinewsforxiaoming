@@ -79,4 +79,14 @@ defineProps<{
   font-size: 0.74rem;
   line-height: 1.45;
 }
+
+@media (min-width: 1181px) {
+  .channel-field {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .channel-field__label {
+    grid-column: 1 / -1;
+  }
+}
 </style>

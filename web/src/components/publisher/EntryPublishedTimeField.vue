@@ -86,6 +86,7 @@ function updateValue(): void {
 <style scoped>
 .published-time-field {
   display: grid;
+  align-content: start;
   gap: 0.55rem;
   min-width: 0;
   margin: 0;

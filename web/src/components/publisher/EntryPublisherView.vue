@@ -258,7 +258,7 @@ async function publish(): Promise<void> {
   display: grid;
   grid-template-columns: minmax(0, var(--editor-width)) minmax(18rem, 1fr);
   gap: 1rem;
-  align-items: stretch;
+  align-items: start;
 }
 
 .publisher-view__manuscript {
@@ -268,7 +268,7 @@ async function publish(): Promise<void> {
   grid-row: 1;
   gap: 1rem;
   min-width: 0;
-  min-height: 0;
+  height: 33.4rem;
 }
 
 .publisher-view__media {
@@ -283,7 +283,7 @@ async function publish(): Promise<void> {
   grid-row: 1;
   gap: 0.3rem;
   min-width: 0;
-  min-height: 0;
+  height: 33.4rem;
 }
 
 .publisher-view__previews {
@@ -300,7 +300,7 @@ async function publish(): Promise<void> {
 
 .publisher-view__settings {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 1rem;
   padding: 1rem;
   border: 1px solid var(--border-subtle);
@@ -317,7 +317,7 @@ async function publish(): Promise<void> {
 .publisher-view__form textarea {
   width: 100%;
   min-height: 14rem;
-  resize: vertical;
+  resize: none;
   line-height: 1.7;
 }
 
@@ -365,6 +365,15 @@ async function publish(): Promise<void> {
   .publisher-view__sidebar {
     grid-column: 1;
     grid-row: auto;
+  }
+
+  .publisher-view__manuscript,
+  .publisher-view__sidebar {
+    height: auto;
+  }
+
+  .publisher-view__form textarea {
+    resize: vertical;
   }
 
 }
