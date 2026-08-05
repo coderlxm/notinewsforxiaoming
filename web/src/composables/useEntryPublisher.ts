@@ -12,6 +12,7 @@ interface EntryPublisherInput {
   removedAssetIds: number[];
   channel: JournalPlainChannel;
   visibility?: JournalVisibility;
+  sourceCreatedAt?: string;
 }
 
 export function useEntryPublisher() {
@@ -50,6 +51,7 @@ export function useEntryPublisher() {
             action,
             channel: input.channel,
             visibility: action === 'publish' ? input.visibility : undefined,
+            sourceCreatedAt: action === 'publish' ? input.sourceCreatedAt : undefined,
           })
         : await updateDraftRequest(entry.value.id, {
             contentText: input.contentText,
@@ -58,6 +60,7 @@ export function useEntryPublisher() {
             action,
             channel: input.channel,
             visibility: action === 'publish' ? input.visibility : undefined,
+            sourceCreatedAt: action === 'publish' ? input.sourceCreatedAt : undefined,
           });
       entry.value = saved;
       return saved;

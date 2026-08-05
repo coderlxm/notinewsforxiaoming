@@ -132,6 +132,7 @@ const journalWebEntryDraftFieldsSchema = z.object({
   uploadId: z.string().uuid(),
   channel: journalPlainChannelSchema,
   visibility: z.never().optional(),
+  sourceCreatedAt: z.never().optional(),
 });
 
 const journalWebEntryPublishFieldsSchema = z.object({
@@ -140,6 +141,7 @@ const journalWebEntryPublishFieldsSchema = z.object({
   uploadId: z.string().uuid(),
   channel: journalPlainChannelSchema,
   visibility: journalVisibilitySchema,
+  sourceCreatedAt: z.string().datetime({ offset: true }).optional(),
 });
 
 export const journalWebEntryCreateFieldsSchema = z.discriminatedUnion('action', [

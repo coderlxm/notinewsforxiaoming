@@ -11,6 +11,7 @@ import { showMessage } from '../../utils/message';
 import EntryImagePicker from './EntryImagePicker.vue';
 import EntryChannelField from './EntryChannelField.vue';
 import EntryVisibilityField from './EntryVisibilityField.vue';
+import EntryPublishedTimeField from './EntryPublishedTimeField.vue';
 
 const props = withDefaults(defineProps<{
   entryId?: number;
@@ -25,6 +26,8 @@ const channel = shallowRef<JournalPlainChannel>('life');
 const visibility = shallowRef<JournalVisibility>('public');
 const newMedia = shallowRef<File[]>([]);
 const removedAssetIds = shallowRef<ReadonlySet<number>>(new Set());
+const specifyTime = shallowRef(false);
+const specifiedTime = shallowRef('');
 const initializedEntryId = shallowRef<number | null>(null);
 const initialEntryPublished = shallowRef(false);
 const mediaSubmit = useEntryMediaSubmit();
@@ -44,7 +47,12 @@ const busy = computed(() => publisher.submitting.value !== null || mediaSubmit.b
 const hasContent = computed(() =>
   contentText.value.trim().length > 0 || existingAssets.value.length + newMedia.value.length > 0,
 );
-const canSubmit = computed(() => formAvailable.value && hasContent.value && !busy.value);
+const canSubmit = computed(() =>
+  formAvailable.value
+  && hasContent.value
+  && !busy.value
+  && (!specifyTime.value || specifiedTime.value !== ''),
+);
 const routeError = computed(() => {
   if (publisher.error.value) return publisher.error.value;
   if (initialEntryPublished.value) return '这条记录已经发布，不能再作为草稿编辑。';
@@ -97,6 +105,7 @@ function buildInput() {
     removedAssetIds: [...removedAssetIds.value],
     channel: channel.value,
     visibility: visibility.value,
+    sourceCreatedAt: specifyTime.value ? specifiedTime.value : undefined,
   };
 }
 
@@ -166,6 +175,12 @@ async function publish(): Promise<void> {
           <EntryChannelField v-model="channel" :disabled="busy" />
 
           <EntryVisibilityField v-model="visibility" :disabled="busy" />
+
+          <EntryPublishedTimeField
+            v-model:enabled="specifyTime"
+            v-model:value="specifiedTime"
+            :disabled="busy"
+          />
 
           <div class="publisher-view__actions">
             <button

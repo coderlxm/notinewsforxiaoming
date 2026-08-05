@@ -201,6 +201,7 @@ export function publishEntry(input: {
   action: 'draft' | 'publish';
   channel: JournalPlainChannel;
   visibility?: JournalVisibility;
+  sourceCreatedAt?: string;
 }): Promise<JournalEntry> {
   return requestJson<JournalEntry>('/api/me/entries', jsonRequest('POST', input));
 }
@@ -212,6 +213,7 @@ export function updateDraft(id: number, input: {
   action: 'draft' | 'publish';
   channel: JournalPlainChannel;
   visibility?: JournalVisibility;
+  sourceCreatedAt?: string;
 }): Promise<JournalEntry> {
   return requestJson<JournalEntry>(`/api/me/entries/${id}/draft`, jsonRequest('PATCH', input));
 }

@@ -19,6 +19,7 @@ export interface CreateWebEntryServiceInput {
   channel: JournalPlainChannel;
   visibility?: JournalVisibility;
   uploadId: string;
+  sourceCreatedAt?: string;
 }
 
 export interface UpdateWebDraftServiceInput {
@@ -62,7 +63,7 @@ export class JournalWebEntryService {
         publicationStatus: input.action === 'draft' ? 'draft' : 'published',
         channel: input.channel,
         visibility: input.action === 'draft' ? 'private' : input.visibility as JournalVisibility,
-        sourceCreatedAt: upload.createdAt,
+        sourceCreatedAt: input.sourceCreatedAt ?? upload.createdAt,
         assets: upload.assets,
       });
     } catch (error) {
@@ -78,6 +79,7 @@ export class JournalWebEntryService {
     input: Omit<UpdateWebDraftServiceInput, 'uploadId'>,
     upload: PreparedWebEntryUpload,
     publishVisibility: JournalVisibility | null,
+    sourceCreatedAt?: string,
   ): Promise<JournalEntry> {
     const draft = this.getDraft(id);
     const storedAssets = this.repository.listWebDraftAssets(id);
@@ -117,7 +119,7 @@ export class JournalWebEntryService {
             removedAssetIds: input.removedAssetIds,
             newAssets,
             visibility: publishVisibility,
-            sourceCreatedAt: updatedAt,
+            sourceCreatedAt: sourceCreatedAt ?? updatedAt,
           });
     } catch (error) {
       for (const asset of newAssets) {

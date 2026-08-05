@@ -149,7 +149,7 @@ export async function registerPrivateEntryRoutes(
       };
       return fields.action === 'draft'
         ? await webEntryService.updatePreparedDraft(id, input, webEntryUploads.take(uploadId), null)
-        : await webEntryService.updatePreparedDraft(id, input, webEntryUploads.take(uploadId), fields.visibility);
+        : await webEntryService.updatePreparedDraft(id, input, webEntryUploads.take(uploadId), fields.visibility, fields.sourceCreatedAt);
     } catch (error) {
       if (error instanceof Error && error.message.includes('was not found')) {
         return reply.code(404).send({ error: error.message });
