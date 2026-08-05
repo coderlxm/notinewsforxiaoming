@@ -2,7 +2,7 @@
 import dayjs from 'dayjs';
 import timezone from 'dayjs/plugin/timezone';
 import utc from 'dayjs/plugin/utc';
-import { shallowRef } from 'vue';
+import { onMounted, shallowRef } from 'vue';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -32,6 +32,18 @@ function fillNow(): void {
   time.value = now.format('HH:mm');
   value.value = combine();
 }
+
+function fillPublishedTime(): void {
+  const publishedTime = dayjs(value.value).tz(timeZone);
+  date.value = publishedTime.format('YYYY-MM-DD');
+  time.value = publishedTime.format('HH:mm');
+}
+
+onMounted(() => {
+  if (!enabled.value) return;
+  if (value.value) fillPublishedTime();
+  else fillNow();
+});
 
 function updateEnabled(event: Event): void {
   enabled.value = (event.target as HTMLInputElement).checked;
