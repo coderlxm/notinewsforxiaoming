@@ -27,7 +27,7 @@ export function formatHelpMessage(): string {
     '• <code>/fetchav</code> - 手动检查一次 AV 更新（<code>/fetchav force</code> 强制重发）',
     '• <code>/avsub</code> - 管理 AV 订阅（<code>add/list/remove</code>）',
     '• <code>/syncx</code> - 手动同步 X 点赞视频到 Google Drive',
-    '• <code>/download &lt;URL&gt;</code> - 下载视频并上传到 Google Drive',
+    '• <code>/dld &lt;URL&gt;</code> - 下载视频并上传到 Google Drive',
     '• <code>/startgg</code> - 打开 start.gg 配置引导',
     '• <code>/watch Tokido</code> - 按选手名添加监控',
     '• <code>/watch https://www.start.gg/user/xxxx</code> - 按用户页添加监控',

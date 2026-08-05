@@ -348,12 +348,12 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     }
   });
 
-  bot.command('download', async (ctx) => {
+  bot.command('dld', async (ctx) => {
     if (!isAuthorized(ctx)) return;
     const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
-    const url = text.replace(/^\/download(?:@\S+)?\s*/i, '').trim();
+    const url = text.replace(/^\/dld(?:@\S+)?\s*/i, '').trim();
     if (!url) {
-      await ctx.reply('用法：/download <视频链接>');
+      await ctx.reply('用法：/dld <视频链接>');
       return;
     }
     if (isVideoDownloadRunning()) {
