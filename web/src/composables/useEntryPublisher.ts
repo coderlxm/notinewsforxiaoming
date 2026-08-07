@@ -8,7 +8,7 @@ import type { JournalEntry, JournalPlainChannel, JournalVisibility } from '../ty
 
 interface EntryPublisherInput {
   contentText: string;
-  uploadId?: string;
+  uploadId: string;
   removedAssetIds: number[];
   channel: JournalPlainChannel;
   visibility?: JournalVisibility;

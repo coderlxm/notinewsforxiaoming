@@ -197,7 +197,7 @@ export function fetchPrivateEntry(id: number): Promise<JournalEntry> {
 
 export function publishEntry(input: {
   contentText: string;
-  uploadId?: string;
+  uploadId: string;
   action: 'draft' | 'publish';
   channel: JournalPlainChannel;
   visibility?: JournalVisibility;
@@ -208,7 +208,7 @@ export function publishEntry(input: {
 
 export function updateDraft(id: number, input: {
   contentText: string;
-  uploadId?: string;
+  uploadId: string;
   removedAssetIds: number[];
   action: 'draft' | 'publish';
   channel: JournalPlainChannel;

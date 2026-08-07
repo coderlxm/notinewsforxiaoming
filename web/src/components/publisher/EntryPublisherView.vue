@@ -105,6 +105,7 @@ function removeExisting(assetId: number): void {
 function buildInput() {
   return {
     contentText: contentText.value,
+    uploadId: '',
     removedAssetIds: [...removedAssetIds.value],
     channel: channel.value,
     visibility: visibility.value,
@@ -117,10 +118,8 @@ function channelLabel(value: JournalPlainChannel): string {
 }
 
 async function saveDraft(): Promise<void> {
-  const uploadId = newMedia.value.length
-    ? await mediaSubmit.submit(newMedia.value, publisher.entry.value?.id)
-    : undefined;
-  if (newMedia.value.length && !uploadId) return;
+  const uploadId = await mediaSubmit.submit(newMedia.value, publisher.entry.value?.id);
+  if (!uploadId) return;
   const saved = await publisher.saveDraft({ ...buildInput(), uploadId });
   if (!saved) return;
   initializedEntryId.value = saved.id;
@@ -137,10 +136,8 @@ async function saveDraft(): Promise<void> {
 }
 
 async function publish(): Promise<void> {
-  const uploadId = newMedia.value.length
-    ? await mediaSubmit.submit(newMedia.value, publisher.entry.value?.id)
-    : undefined;
-  if (newMedia.value.length && !uploadId) return;
+  const uploadId = await mediaSubmit.submit(newMedia.value, publisher.entry.value?.id);
+  if (!uploadId) return;
   const published = await publisher.publish({ ...buildInput(), uploadId });
   if (!published) return;
   showMessage({

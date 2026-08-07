@@ -99,10 +99,8 @@ export async function registerPrivateEntryRoutes(
 
   server.post('/api/me/entries', { preHandler: auth.requireAdmin }, async (request) => {
     const fields = journalWebEntryCreateFieldsSchema.parse(request.body);
-    const upload = fields.uploadId === undefined
-      ? undefined
-      : webEntryUploads.take(fields.uploadId);
-    return await webEntryService.createPrepared(fields, upload);
+    const { uploadId } = uploadParamsSchema.parse(request.body);
+    return await webEntryService.createPrepared(fields, webEntryUploads.take(uploadId));
   });
 
   server.post('/api/me/entry-uploads', { preHandler: auth.requireAdmin }, async (request) => {
@@ -142,18 +140,16 @@ export async function registerPrivateEntryRoutes(
   }, async (request, reply) => {
     const { id } = idParamsSchema.parse(request.params);
     const fields = journalWebDraftUpdateFieldsSchema.parse(request.body);
+    const { uploadId } = uploadParamsSchema.parse(request.body);
     try {
-      const upload = fields.uploadId === undefined
-        ? undefined
-        : webEntryUploads.take(fields.uploadId);
       const input = {
         contentText: fields.contentText,
         channel: fields.channel,
         removedAssetIds: fields.removedAssetIds,
       };
       return fields.action === 'draft'
-        ? await webEntryService.updatePreparedDraft(id, input, upload, null)
-        : await webEntryService.updatePreparedDraft(id, input, upload, fields.visibility, fields.sourceCreatedAt);
+        ? await webEntryService.updatePreparedDraft(id, input, webEntryUploads.take(uploadId), null)
+        : await webEntryService.updatePreparedDraft(id, input, webEntryUploads.take(uploadId), fields.visibility, fields.sourceCreatedAt);
     } catch (error) {
       if (error instanceof Error && error.message.includes('was not found')) {
         return reply.code(404).send({ error: error.message });
