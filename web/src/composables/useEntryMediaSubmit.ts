@@ -63,15 +63,17 @@ export function useEntryMediaSubmit() {
     uploading.value = true;
     progress.value = 0;
     error.value = null;
-    markPublishProbe('UPLOAD_REQUEST_STARTED');
-    const { uploadId, token } = await createEntryUpload(entryId);
-    markPublishProbe('UPLOAD_REQUEST_COMPLETED');
-    activeUploadId = uploadId;
+    let uploadId: string | null = null;
     try {
+      markPublishProbe('UPLOAD_REQUEST_STARTED');
+      const upload = await createEntryUpload(entryId);
+      markPublishProbe('UPLOAD_REQUEST_COMPLETED');
+      uploadId = upload.uploadId;
+      activeUploadId = uploadId;
       const totalBytes = files.reduce((total, file) => total + file.size, 0);
       let completedBytes = 0;
       for (const [position, file] of files.entries()) {
-        const assetUploadId = await uploadFile(file, uploadId, token, position, completedBytes, totalBytes || 1);
+        const assetUploadId = await uploadFile(file, uploadId, upload.token, position, completedBytes, totalBytes || 1);
         await processEntryUpload(uploadId, assetUploadId);
         completedBytes += file.size;
         progress.value = totalBytes ? Math.round((completedBytes / totalBytes) * 100) : 100;
@@ -80,7 +82,7 @@ export function useEntryMediaSubmit() {
       return uploadId;
     } catch (reason) {
       error.value = reason instanceof Error ? reason.message : String(reason);
-      await discardEntryUpload(uploadId);
+      if (uploadId) await discardEntryUpload(uploadId);
       activeUploadId = null;
       return null;
     } finally {

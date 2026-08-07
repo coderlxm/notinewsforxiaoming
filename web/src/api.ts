@@ -58,6 +58,18 @@ async function requestWithoutResponse(path: string, init?: RequestInit): Promise
   }
 }
 
+const mutationTimeoutMs = 15_000;
+
+async function requestMutationWithTimeout<T>(path: string, init: RequestInit): Promise<T> {
+  const signal = AbortSignal.timeout(mutationTimeoutMs);
+  try {
+    return await requestJson<T>(path, { ...init, signal });
+  } catch (reason) {
+    if (signal.aborted) throw new Error('网络请求长时间没有响应。');
+    throw reason;
+  }
+}
+
 function jsonRequest(method: string, body: unknown): RequestInit {
   return {
     method,
@@ -219,7 +231,7 @@ export function updateDraft(id: number, input: {
 }
 
 export function createEntryUpload(entryId?: number): Promise<{ uploadId: string; token: string }> {
-  return requestJson<{ uploadId: string; token: string }>(
+  return requestMutationWithTimeout<{ uploadId: string; token: string }>(
     '/api/me/entry-uploads',
     jsonRequest('POST', entryId === undefined ? {} : { entryId }),
   );
@@ -241,7 +253,7 @@ export function fetchOnThisDay(): Promise<OnThisDayResponse> {
 }
 
 export function updateEntryContent(id: number, contentText: string): Promise<JournalEntry> {
-  return requestJson<JournalEntry>(
+  return requestMutationWithTimeout<JournalEntry>(
     `/api/me/entries/${id}/content`,
     jsonRequest('PATCH', { contentText }),
   );
