@@ -1,6 +1,7 @@
 import { computed, onBeforeUnmount, readonly, shallowRef } from 'vue';
 import { Upload } from 'tus-js-client';
 import { createEntryUpload, discardEntryUpload, processEntryUpload } from '../api';
+import { markPublishProbe } from '../utils/publishProbe';
 
 const chunkSize = 32 * 1024 * 1024;
 
@@ -62,7 +63,9 @@ export function useEntryMediaSubmit() {
     uploading.value = true;
     progress.value = 0;
     error.value = null;
+    markPublishProbe('UPLOAD_REQUEST_STARTED');
     const { uploadId, token } = await createEntryUpload(entryId);
+    markPublishProbe('UPLOAD_REQUEST_COMPLETED');
     activeUploadId = uploadId;
     try {
       const totalBytes = files.reduce((total, file) => total + file.size, 0);

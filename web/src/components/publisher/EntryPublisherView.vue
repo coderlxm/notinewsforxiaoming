@@ -8,6 +8,12 @@ import { useEntryMediaSubmit } from '../../composables/useEntryMediaSubmit';
 import { plainJournalChannels } from '../../journalChannels';
 import type { JournalAsset, JournalPlainChannel, JournalVisibility } from '../../types';
 import { showMessage } from '../../utils/message';
+import {
+  beginPublishProbe,
+  clearPublishProbe,
+  markPublishProbe,
+  previousPublishProbe,
+} from '../../utils/publishProbe';
 import EntryImagePicker from './EntryImagePicker.vue';
 import EntryMediaPreviewGrid from './EntryMediaPreviewGrid.vue';
 import EntryChannelField from './EntryChannelField.vue';
@@ -31,6 +37,7 @@ const specifyTime = shallowRef(false);
 const specifiedTime = shallowRef('');
 const initializedEntryId = shallowRef<number | null>(null);
 const initialEntryPublished = shallowRef(false);
+const stalledPublishProbe = shallowRef(previousPublishProbe());
 const mediaSubmit = useEntryMediaSubmit();
 let terminalErrorMessage: ReturnType<typeof showMessage> | null = null;
 
@@ -117,6 +124,18 @@ function channelLabel(value: JournalPlainChannel): string {
   return plainJournalChannels.find(option => option.value === value)!.label;
 }
 
+function formatProbeTime(timestamp: number): string {
+  return new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).format(timestamp);
+}
+
 async function saveDraft(): Promise<void> {
   const uploadId = await mediaSubmit.submit(newMedia.value, publisher.entry.value?.id);
   if (!uploadId) return;
@@ -136,15 +155,25 @@ async function saveDraft(): Promise<void> {
 }
 
 async function publish(): Promise<void> {
+  beginPublishProbe();
   const uploadId = await mediaSubmit.submit(newMedia.value, publisher.entry.value?.id);
-  if (!uploadId) return;
+  if (!uploadId) {
+    clearPublishProbe();
+    return;
+  }
   const published = await publisher.publish({ ...buildInput(), uploadId });
-  if (!published) return;
+  if (!published) {
+    clearPublishProbe();
+    return;
+  }
   showMessage({
     message: `已发布到“${channelLabel(channel.value)}”频道`,
     type: 'success',
   });
+  markPublishProbe('NAVIGATION_STARTED');
   await router.push({ name: 'private' });
+  clearPublishProbe();
+  stalledPublishProbe.value = null;
 }
 </script>
 
@@ -154,6 +183,14 @@ async function publish(): Promise<void> {
       <button class="text-button" type="button" @click="router.push({ name: 'private' })">← 返回我的全部记录</button>
       <span>{{ isEditing ? '编辑草稿' : '发布内容' }}</span>
     </div>
+
+    <aside v-if="stalledPublishProbe" class="publisher-view__probe">
+      <span>检测到上次发布在刷新前停留于</span>
+      <code>{{ stalledPublishProbe.stage }}</code>
+      <time :datetime="new Date(stalledPublishProbe.updatedAt).toISOString()">
+        {{ formatProbeTime(stalledPublishProbe.updatedAt) }}
+      </time>
+    </aside>
 
     <div class="publisher-view__stage" :class="{ 'publisher-view__stage--reading': !formAvailable }" :aria-busy="awaitingDraft">
       <Transition name="publisher-stage" mode="out-in">
@@ -248,6 +285,24 @@ async function publish(): Promise<void> {
   padding: 0 0.15rem;
   color: var(--text-muted);
   font-size: 0.78rem;
+}
+
+.publisher-view__probe {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.6rem;
+  align-items: baseline;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.publisher-view__probe code {
+  color: var(--text-primary);
+  font-weight: 650;
 }
 
 .publisher-view__stage {

@@ -5,6 +5,7 @@ import {
   updateDraft as updateDraftRequest,
 } from '../api';
 import type { JournalEntry, JournalPlainChannel, JournalVisibility } from '../types';
+import { markPublishProbe } from '../utils/publishProbe';
 
 interface EntryPublisherInput {
   contentText: string;
@@ -76,8 +77,11 @@ export function useEntryPublisher() {
     return submit('draft', input);
   }
 
-  function publish(input: EntryPublisherInput): Promise<JournalEntry | null> {
-    return submit('publish', input);
+  async function publish(input: EntryPublisherInput): Promise<JournalEntry | null> {
+    markPublishProbe('ENTRY_REQUEST_STARTED');
+    const published = await submit('publish', input);
+    if (published) markPublishProbe('ENTRY_REQUEST_COMPLETED');
+    return published;
   }
 
   return {
