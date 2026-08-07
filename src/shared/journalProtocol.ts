@@ -129,7 +129,7 @@ export type JournalArticleAssetResponse = z.infer<typeof journalArticleAssetResp
 const journalWebEntryDraftFieldsSchema = z.object({
   contentText: z.string(),
   action: z.literal('draft'),
-  uploadId: z.string().uuid(),
+  uploadId: z.string().uuid().optional(),
   channel: journalPlainChannelSchema,
   visibility: z.never().optional(),
   sourceCreatedAt: z.never().optional(),
@@ -138,7 +138,7 @@ const journalWebEntryDraftFieldsSchema = z.object({
 const journalWebEntryPublishFieldsSchema = z.object({
   contentText: z.string(),
   action: z.literal('publish'),
-  uploadId: z.string().uuid(),
+  uploadId: z.string().uuid().optional(),
   channel: journalPlainChannelSchema,
   visibility: journalVisibilitySchema,
   sourceCreatedAt: z.string().datetime({ offset: true }).optional(),

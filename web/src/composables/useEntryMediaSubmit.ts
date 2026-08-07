@@ -62,9 +62,9 @@ export function useEntryMediaSubmit() {
     uploading.value = true;
     progress.value = 0;
     error.value = null;
-    const { uploadId, token } = await createEntryUpload(entryId);
-    activeUploadId = uploadId;
     try {
+      const { uploadId, token } = await createEntryUpload(entryId);
+      activeUploadId = uploadId;
       const totalBytes = files.reduce((total, file) => total + file.size, 0);
       let completedBytes = 0;
       for (const [position, file] of files.entries()) {
@@ -77,7 +77,7 @@ export function useEntryMediaSubmit() {
       return uploadId;
     } catch (reason) {
       error.value = reason instanceof Error ? reason.message : String(reason);
-      await discardEntryUpload(uploadId);
+      if (activeUploadId) await discardEntryUpload(activeUploadId);
       activeUploadId = null;
       return null;
     } finally {

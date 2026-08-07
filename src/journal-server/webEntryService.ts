@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type {
   JournalEntry,
   JournalPlainChannel,
@@ -41,33 +42,37 @@ export class JournalWebEntryService {
 
   async createPrepared(
     input: Omit<CreateWebEntryServiceInput, 'uploadId'>,
-    upload: PreparedWebEntryUpload,
+    upload?: PreparedWebEntryUpload,
   ): Promise<JournalEntry> {
+    const assets = upload?.assets ?? [];
     this.assertActionVisibility(input.action, input.visibility);
-    this.assertContent(input.contentText, upload.assets.length);
+    this.assertContent(input.contentText, assets.length);
     this.assertMediaCount(
-      upload.assets.length,
-      upload.assets.filter((asset) => asset.kind === 'video').length,
+      assets.length,
+      assets.filter((asset) => asset.kind === 'video').length,
     );
 
-    if (upload.assets.length > 0) {
-      await this.storage.finalize(upload.storageSession);
-    } else {
-      await this.storage.discardTemporary(upload.storageSession);
+    if (upload) {
+      if (assets.length > 0) {
+        await this.storage.finalize(upload.storageSession);
+      } else {
+        await this.storage.discardTemporary(upload.storageSession);
+      }
     }
     try {
+      const createdAt = upload?.createdAt ?? new Date().toISOString();
       return this.repository.createWebEntry({
-        publicId: upload.publicId,
+        publicId: upload?.publicId ?? randomUUID(),
         contentText: input.contentText,
         tags: extractJournalTags(input.contentText),
         publicationStatus: input.action === 'draft' ? 'draft' : 'published',
         channel: input.channel,
         visibility: input.action === 'draft' ? 'private' : input.visibility as JournalVisibility,
-        sourceCreatedAt: input.sourceCreatedAt ?? upload.createdAt,
-        assets: upload.assets,
+        sourceCreatedAt: input.sourceCreatedAt ?? createdAt,
+        assets,
       });
     } catch (error) {
-      if (upload.assets.length > 0) {
+      if (upload && assets.length > 0) {
         await this.storage.discardFinal(upload.storageSession);
       }
       throw error;
@@ -77,7 +82,7 @@ export class JournalWebEntryService {
   async updatePreparedDraft(
     id: number,
     input: Omit<UpdateWebDraftServiceInput, 'uploadId'>,
-    upload: PreparedWebEntryUpload,
+    upload: PreparedWebEntryUpload | undefined,
     publishVisibility: JournalVisibility | null,
     sourceCreatedAt?: string,
   ): Promise<JournalEntry> {
@@ -86,7 +91,7 @@ export class JournalWebEntryService {
     this.assertRemovedAssetIds(draft, storedAssets, input.removedAssetIds);
     const removedIds = new Set(input.removedAssetIds);
     const retainedAssets = draft.assets.filter((asset) => !removedIds.has(asset.id));
-    const newAssets = upload.assets;
+    const newAssets = upload?.assets ?? [];
     this.assertContent(input.contentText, retainedAssets.length + newAssets.length);
     this.assertMediaCount(
       retainedAssets.length + newAssets.length,
@@ -94,10 +99,12 @@ export class JournalWebEntryService {
         + newAssets.filter((asset) => asset.kind === 'video').length,
     );
 
-    if (newAssets.length > 0) {
-      await this.storage.appendToFinal(upload.storageSession);
-    } else {
-      await this.storage.discardTemporary(upload.storageSession);
+    if (upload) {
+      if (newAssets.length > 0) {
+        await this.storage.appendToFinal(upload.storageSession);
+      } else {
+        await this.storage.discardTemporary(upload.storageSession);
+      }
     }
     const updatedAt = new Date().toISOString();
     let updated: JournalEntry;
