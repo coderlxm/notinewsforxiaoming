@@ -5,7 +5,6 @@ defineProps<{
   authenticated: boolean;
   refreshing: boolean;
   refreshDisabled: boolean;
-  loggingOut: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -13,7 +12,6 @@ const emit = defineEmits<{
   createEntry: [];
   createArticle: [];
   openSettings: [];
-  logout: [];
 }>();
 </script>
 
@@ -55,16 +53,6 @@ const emit = defineEmits<{
         @click="emit('openSettings')"
       >
         设置
-      </button>
-      <button
-        class="button button--quiet"
-        type="button"
-        :disabled="loggingOut"
-        :aria-busy="loggingOut"
-        @click="emit('logout')"
-      >
-        <JournalLoading v-if="loggingOut" variant="inline" label="退出中…" />
-        <template v-else>退出登录</template>
       </button>
     </div>
   </div>
@@ -115,7 +103,7 @@ const emit = defineEmits<{
   .private-asset-header__actions {
     display: grid;
     width: 100%;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0.4rem;
   }
 

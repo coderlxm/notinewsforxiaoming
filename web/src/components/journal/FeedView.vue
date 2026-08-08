@@ -76,7 +76,6 @@ const session = useSessionStore();
 const siteProfile = useSiteProfileStore();
 const initialLoadPending = shallowRef(true);
 const listReplacing = shallowRef(false);
-const loggingOut = shallowRef(false);
 const refreshing = shallowRef(false);
 const refreshRequestComplete = shallowRef(false);
 const paginationLayoutPending = shallowRef(false);
@@ -145,7 +144,6 @@ const refreshDisabled = computed(() =>
   || journal.loadingMore.value
   || paginationLayoutPending.value
   || (props.mode === 'private' && props.assetView === 'table' && table.loading.value)
-  || loggingOut.value
   || (props.mode === 'private' && journal.authenticationState.value !== 'authenticated'),
 );
 
@@ -368,17 +366,6 @@ async function selectPublicChannelTag(tag: string): Promise<void> {
   await router.push(publicFeedPath(props.channel, tag));
 }
 
-async function logout(): Promise<void> {
-  loggingOut.value = true;
-  try {
-    await journal.logout();
-    waterfallLoaded.value = false;
-    tableLoaded.value = false;
-  } finally {
-    loggingOut.value = false;
-  }
-}
-
 function editArticle(id: number): void {
   void router.push({
     name: 'article-edit',
@@ -527,12 +514,10 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
           :authenticated="journal.authenticationState.value === 'authenticated'"
           :refreshing="refreshing"
           :refresh-disabled="refreshDisabled"
-          :logging-out="loggingOut"
           @refresh="refreshFeed"
           @create-entry="router.push({ name: 'entry-new' })"
           @create-article="router.push({ name: 'article-new' })"
           @open-settings="router.push({ name: 'settings' })"
-          @logout="logout"
         />
       </template>
 

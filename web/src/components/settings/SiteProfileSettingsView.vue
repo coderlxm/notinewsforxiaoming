@@ -8,10 +8,12 @@ import { computed, onBeforeUnmount, shallowRef, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AdminContributionLinkSettings from '../contribution/AdminContributionLinkSettings.vue';
 import JournalLoading from '../ui/JournalLoading.vue';
+import { logout as logoutRequest } from '../../api';
 import { useSessionStore } from '../../stores/session';
 import { useSiteProfileStore } from '../../stores/siteProfile';
 import type { ChannelTags, SiteContactItem } from '../../types';
 import { showMessage } from '../../utils/message';
+import SettingsAccountPanel from './SettingsAccountPanel.vue';
 import SettingsChannelTagsPanel from './SettingsChannelTagsPanel.vue';
 import SettingsContactsPanel from './SettingsContactsPanel.vue';
 import SettingsPublicProfilePanel from './SettingsPublicProfilePanel.vue';
@@ -28,6 +30,7 @@ const settingsSections = [
   { name: 'contacts', label: '联系方式' },
   { name: 'tags', label: '频道标签' },
   { name: 'contribution', label: '投稿链接' },
+  { name: 'account', label: '账户' },
 ] as const;
 
 type SettingsSection = typeof settingsSections[number]['name'];
@@ -50,6 +53,7 @@ const draftChannelTags = shallowRef<ChannelTags | null>(null);
 const draftContactItems = shallowRef<SiteContactItem[]>([]);
 const formError = shallowRef<string | null>(null);
 const submitting = shallowRef(false);
+const loggingOut = shallowRef(false);
 const initialized = shallowRef(false);
 let persistentMessage: ReturnType<typeof showMessage> | null = null;
 const draftAvatarPreviewUrl = useObjectUrl(draftAvatarFile);
@@ -228,6 +232,22 @@ async function save(): Promise<void> {
     submitting.value = false;
   }
 }
+
+async function logout(): Promise<void> {
+  loggingOut.value = true;
+  formError.value = null;
+  try {
+    await logoutRequest();
+    session.setAuthenticated(false);
+    await router.replace({ name: 'private' });
+  }
+  catch (reason) {
+    formError.value = reason instanceof Error ? reason.message : String(reason);
+  }
+  finally {
+    loggingOut.value = false;
+  }
+}
 </script>
 
 <template>
@@ -290,11 +310,19 @@ async function save(): Promise<void> {
               v-model="editableChannelTags"
               :disabled="submitting"
             />
-            <AdminContributionLinkSettings v-else />
+            <AdminContributionLinkSettings v-else-if="section.name === 'contribution'" />
+            <SettingsAccountPanel
+              v-else
+              :logging-out="loggingOut"
+              @logout="logout"
+            />
           </ElTabPane>
         </ElTabs>
 
-        <div v-if="activeSection !== 'contribution'" class="settings-savebar">
+        <div
+          v-if="activeSection !== 'contribution' && activeSection !== 'account'"
+          class="settings-savebar"
+        >
           <p aria-live="polite">
             {{ hasUnsavedChanges ? '有尚未保存的站点设置' : '当前设置已保存' }}
           </p>
