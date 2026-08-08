@@ -6,7 +6,7 @@ const environmentSchema = z.object({
   TG_TOKEN: z.string().min(1),
   TG_CHAT_ID: z.string().min(1),
   JOURNAL_INGEST_TOKEN: z.string().min(32),
-  JOURNAL_ADMIN_PASSWORD: z.string().min(12),
+  JOURNAL_ADMIN_PASSWORD: z.string().min(1),
   JOURNAL_COOKIE_SECRET: z.string().min(32),
   JOURNAL_PUBLIC_BASE_URL: z.url(),
   QWEATHER_API_KEY: z.string().min(1),
