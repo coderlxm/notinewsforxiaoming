@@ -8,6 +8,7 @@ import JournalLoading from '../ui/JournalLoading.vue';
 import JournalPullRefresh from '../ui/JournalPullRefresh.vue';
 import { useDeferredLoading } from '../../composables/useDeferredLoading';
 import { useJournalApi } from '../../composables/useJournalApi';
+import { usePrivateAssetTable } from '../../composables/usePrivateAssetTable';
 import { journalChannels, publicFeedPath } from '../../journalChannels';
 import { useSessionStore } from '../../stores/session';
 import { useSiteProfileStore } from '../../stores/siteProfile';
@@ -21,14 +22,16 @@ import {
   type JournalVisibility,
 } from '../../types';
 import { showMessage } from '../../utils/message';
-import AssetTableView from './AssetTableView.vue';
-import AssetViewSwitch from './AssetViewSwitch.vue';
+import AssetManagementToolbar from './AssetManagementToolbar.vue';
 import EntryCard from './EntryCard.vue';
-import EntryFilters from './EntryFilters.vue';
 import JournalDetailOverlay from './JournalDetailOverlay.vue';
 import LoginView from './LoginView.vue';
 import OnThisDay from './OnThisDay.vue';
+import PrivateAssetHeader from './PrivateAssetHeader.vue';
+import PrivateAssetTableResults from './PrivateAssetTableResults.vue';
+import PrivateWaterfallResults from './PrivateWaterfallResults.vue';
 import PublicChannelTagNavigation from './PublicChannelTagNavigation.vue';
+import PublishedTimeDialog from './PublishedTimeDialog.vue';
 import WaterfallFeed from './WaterfallFeed.vue';
 
 const props = withDefaults(defineProps<{
@@ -40,6 +43,7 @@ const props = withDefaults(defineProps<{
   overlayEntry?: JournalEntry;
   directOverlay?: boolean;
   assetView?: AssetView;
+  page?: number;
 }>(), {
   detailId: undefined,
   initialTag: '',
@@ -48,6 +52,7 @@ const props = withDefaults(defineProps<{
   overlayEntry: undefined,
   directOverlay: false,
   assetView: 'waterfall',
+  page: 1,
 });
 
 const emit = defineEmits<{
@@ -58,6 +63,7 @@ const emit = defineEmits<{
   removeDeletedOverlay: [];
   returnToFeed: [];
   changeAssetView: [view: AssetView];
+  changePage: [page: number];
 }>();
 
 const filters = reactive<FeedFilters>({
@@ -65,6 +71,7 @@ const filters = reactive<FeedFilters>({
   tag: props.initialTag,
 });
 const journal = useJournalApi();
+const table = usePrivateAssetTable();
 const router = useRouter();
 const session = useSessionStore();
 const siteProfile = useSiteProfileStore();
@@ -75,7 +82,10 @@ const refreshing = shallowRef(false);
 const refreshRequestComplete = shallowRef(false);
 const paginationLayoutPending = shallowRef(false);
 const feedLayoutReady = shallowRef(false);
+const tablePublishedTimeEntry = shallowRef<JournalEntry | null>(null);
+const toolbarRevision = shallowRef(0);
 let terminalErrorMessage: ReturnType<typeof showMessage> | null = null;
+let removeRouteAfterEach: (() => void) | null = null;
 
 const isDetail = computed(() => props.mode === 'public' && props.detailId !== undefined);
 const isOverlay = computed(() => props.overlayEntryId !== undefined);
@@ -133,9 +143,17 @@ const refreshDisabled = computed(() =>
   || listReplacing.value
   || journal.loadingMore.value
   || paginationLayoutPending.value
+  || (props.mode === 'private' && props.assetView === 'table' && table.loading.value)
   || loggingOut.value
   || (props.mode === 'private' && journal.authenticationState.value !== 'authenticated'),
 );
+
+async function loadTablePage(page: number): Promise<void> {
+  await table.load({ page, filters });
+  if (table.error.value !== null) return;
+  const lastPage = Math.max(1, Math.ceil(table.total.value / table.pageSize));
+  if (page > lastPage) emit('changePage', lastPage);
+}
 
 watch(() => journal.authenticationState.value, (state) => {
   if (state !== 'checking') session.setAuthenticated(state === 'authenticated');
@@ -170,6 +188,17 @@ async function loadDirectPrivateDetail(): Promise<void> {
 }
 
 onMounted(async () => {
+  if (props.mode === 'private') {
+    removeRouteAfterEach = router.afterEach((to) => {
+      if (to.name !== 'private' || journal.authenticationState.value !== 'authenticated') return;
+      const view = to.query.view === 'table' || to.query.view === 'waterfall'
+        ? to.query.view
+        : props.assetView;
+      const page = typeof to.query.page === 'string' ? Number(to.query.page) : 1;
+      if (view === 'table') void loadTablePage(page);
+      else void journal.refreshPrivateFeed(filters);
+    });
+  }
   try {
     if (isDetail.value) {
       await journal.loadPublicDetail(props.detailId as string);
@@ -180,7 +209,11 @@ onMounted(async () => {
       await journal.loadPublic({ channel: props.channel, tag: props.initialTag });
       return;
     }
-    await journal.loadPrivate(filters);
+    await journal.loadPrivateContext();
+    if (journal.authenticationState.value === 'authenticated') {
+      if (props.assetView === 'table') await loadTablePage(props.page);
+      else await journal.refreshPrivateFeed(filters);
+    }
     await loadDirectPrivateDetail();
   } finally {
     initialLoadPending.value = false;
@@ -193,18 +226,24 @@ onActivated(async () => {
     || props.mode !== 'private'
     || journal.authenticationState.value !== 'authenticated'
   ) return;
-  await journal.refreshPrivateFeed(filters);
   await loadDirectPrivateDetail();
 });
 
-onBeforeUnmount(() => terminalErrorMessage?.close());
+onBeforeUnmount(() => {
+  terminalErrorMessage?.close();
+  removeRouteAfterEach?.();
+});
 
 async function applyFilters(nextFilters: FeedFilters): Promise<void> {
   Object.assign(filters, nextFilters);
   feedLayoutReady.value = false;
   listReplacing.value = true;
   try {
-    await journal.refreshPrivateFeed(filters);
+    if (props.assetView === 'table') {
+      if (props.page !== 1) emit('changePage', 1);
+      else await loadTablePage(1);
+    }
+    else await journal.refreshPrivateFeed(filters);
   } finally {
     listReplacing.value = false;
   }
@@ -244,11 +283,16 @@ async function refreshFeed(): Promise<void> {
   if (props.mode === 'public') {
     await journal.loadPublic({ channel: props.channel, tag: props.initialTag });
   }
-  else {
-    await journal.refreshPrivateFeed(filters);
-  }
+  else if (props.assetView === 'table') await loadTablePage(props.page);
+  else await journal.refreshPrivateFeed(filters);
+
+  if (props.mode === 'private') await journal.refreshOnThisDay();
 
   refreshRequestComplete.value = true;
+  if (props.mode === 'private' && props.assetView === 'table') {
+    finishRefresh();
+    return;
+  }
   if (journal.error.value || journal.entries.value.length === 0) {
     finishRefresh();
     return;
@@ -272,7 +316,11 @@ async function authenticate(password: string): Promise<void> {
   feedLayoutReady.value = false;
   listReplacing.value = true;
   try {
-    await journal.authenticate(password, filters);
+    await journal.authenticate(password);
+    if (journal.authenticationState.value === 'authenticated') {
+      if (props.assetView === 'table') await loadTablePage(props.page);
+      else await journal.refreshPrivateFeed(filters);
+    }
     await loadDirectPrivateDetail();
   } finally {
     listReplacing.value = false;
@@ -285,6 +333,7 @@ async function selectTag(tag: string): Promise<void> {
     await router.push(publicFeedPath(channel, tag));
     return;
   }
+  toolbarRevision.value += 1;
   await applyFilters({ ...filters, tag });
 }
 
@@ -303,11 +352,24 @@ async function logout(): Promise<void> {
 }
 
 function editArticle(id: number): void {
-  void router.push({ name: 'article-edit', params: { articleId: id } });
+  void router.push({
+    name: 'article-edit',
+    params: { articleId: id },
+    state: { journalReturnPath: router.currentRoute.value.fullPath },
+  });
 }
 
 function editDraft(entry: JournalEntry): void {
-  void router.push({ name: 'entry-edit', params: { entryId: entry.id } });
+  void router.push({
+    name: 'entry-edit',
+    params: { entryId: entry.id },
+    state: { journalReturnPath: router.currentRoute.value.fullPath },
+  });
+}
+
+function editEntry(entry: JournalEntry): void {
+  if (isArticleEntry(entry)) editArticle(entry.id);
+  else editDraft(entry);
 }
 
 function openEntry(entry: JournalEntry): void {
@@ -332,6 +394,21 @@ function changeAssetView(view: AssetView): void {
   emit('changeAssetView', view);
 }
 
+function changeTablePage(page: number): void {
+  emit('changePage', page);
+}
+
+function editTablePublishedTime(entry: JournalEntry): void {
+  tablePublishedTimeEntry.value = entry;
+}
+
+async function saveTablePublishedTime(sourceCreatedAt: string): Promise<void> {
+  const entry = tablePublishedTimeEntry.value;
+  if (!entry) return;
+  await setPublishedTime(entry, sourceCreatedAt);
+  if (journal.error.value === null) tablePublishedTimeEntry.value = null;
+}
+
 function isArticleEntry(entry: JournalEntry): boolean {
   return entry.bodyFormat === 'rich';
 }
@@ -340,7 +417,8 @@ async function saveContent(entry: JournalEntry, contentText: string): Promise<vo
   await journal.saveContent(entry, contentText);
   if (journal.error.value === null) {
     feedLayoutReady.value = false;
-    await journal.loadPrivate(filters);
+    if (props.assetView === 'table') await loadTablePage(props.page);
+    else await journal.refreshPrivateFeed(filters);
   }
 }
 
@@ -348,7 +426,8 @@ async function setPublishedTime(entry: JournalEntry, sourceCreatedAt: string): P
   await journal.setPublishedTime(entry, sourceCreatedAt);
   if (journal.error.value === null) {
     feedLayoutReady.value = false;
-    await journal.loadPrivate(filters);
+    if (props.assetView === 'table') await loadTablePage(props.page);
+    else await journal.refreshPrivateFeed(filters);
   }
 }
 
@@ -356,7 +435,8 @@ async function setVisibility(entry: JournalEntry, visibility: JournalVisibility)
   await journal.setVisibility(entry, visibility);
   if (journal.error.value === null) {
     feedLayoutReady.value = false;
-    await journal.loadPrivate(filters);
+    if (props.assetView === 'table') await loadTablePage(props.page);
+    else await journal.refreshPrivateFeed(filters);
   }
 }
 
@@ -364,7 +444,8 @@ async function setPinned(entry: JournalEntry, pinned: boolean): Promise<void> {
   await journal.setPinned(entry, pinned);
   if (journal.error.value === null) {
     feedLayoutReady.value = false;
-    await journal.loadPrivate(filters);
+    if (props.assetView === 'table') await loadTablePage(props.page);
+    else await journal.refreshPrivateFeed(filters);
   }
 }
 
@@ -373,11 +454,15 @@ async function setChannel(entry: JournalEntry, channel: JournalPlainChannel): Pr
   if (journal.error.value === null) {
     const target = journalChannels.find(item => item.value === channel)!;
     showMessage({ message: `已移动到“${target.label}”频道`, type: 'success' });
+    if (props.assetView === 'table') await loadTablePage(props.page);
   }
 }
 
 async function deleteEntry(entry: JournalEntry): Promise<void> {
   await journal.deleteEntry(entry);
+  if (journal.error.value === null && props.assetView === 'table') {
+    await loadTablePage(props.page);
+  }
   if (journal.error.value === null && props.overlayEntryId === entry.id) emit('removeDeletedOverlay');
 }
 </script>
@@ -402,60 +487,17 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
       </div>
 
       <template v-else-if="mode === 'private'">
-        <div class="feed__private-heading">
-          <div>
-            <span class="feed__eyebrow">PERSONAL ARCHIVE</span>
-            <h1 class="feed__title">我的全部记录</h1>
-          </div>
-          <div class="feed__private-actions">
-            <button
-              v-if="journal.authenticationState.value === 'authenticated'"
-              class="button button--quiet"
-              type="button"
-              :disabled="refreshDisabled || refreshing"
-              :aria-busy="refreshing"
-              @click="refreshFeed"
-            >
-              <JournalLoading v-if="refreshing" variant="inline" label="刷新中…" />
-              <template v-else>刷新</template>
-            </button>
-            <button
-              v-if="journal.authenticationState.value === 'authenticated'"
-              class="button button--quiet"
-              type="button"
-              @click="router.push({ name: 'entry-new' })"
-            >
-              发布内容
-            </button>
-            <button
-              v-if="journal.authenticationState.value === 'authenticated'"
-              class="button button--quiet"
-              type="button"
-              @click="router.push({ name: 'article-new' })"
-            >
-              写文章
-            </button>
-            <button
-              v-if="journal.authenticationState.value === 'authenticated'"
-              class="button button--quiet"
-              type="button"
-              @click="router.push({ name: 'settings' })"
-            >
-              设置
-            </button>
-            <button
-              v-if="journal.authenticationState.value === 'authenticated'"
-              class="button button--quiet"
-              type="button"
-              :disabled="journal.loading.value"
-              :aria-busy="loggingOut"
-              @click="logout"
-            >
-              <JournalLoading v-if="loggingOut" variant="inline" label="退出中…" />
-              <template v-else>退出登录</template>
-            </button>
-          </div>
-        </div>
+        <PrivateAssetHeader
+          :authenticated="journal.authenticationState.value === 'authenticated'"
+          :refreshing="refreshing"
+          :refresh-disabled="refreshDisabled"
+          :logging-out="loggingOut"
+          @refresh="refreshFeed"
+          @create-entry="router.push({ name: 'entry-new' })"
+          @create-article="router.push({ name: 'article-new' })"
+          @open-settings="router.push({ name: 'settings' })"
+          @logout="logout"
+        />
       </template>
 
       <div
@@ -490,7 +532,6 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
       />
 
       <template v-else-if="mode === 'private' && journal.authenticationState.value === 'authenticated'">
-        <EntryFilters :filters="filters" @apply="applyFilters" />
         <OnThisDay
           :entries="journal.onThisDayEntries.value"
           :mutation-entry-id="journal.mutationEntryId.value"
@@ -504,7 +545,13 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
           @set-channel="setChannel"
           @delete-entry="deleteEntry"
         />
-        <AssetViewSwitch :view="assetView" @change="changeAssetView" />
+        <AssetManagementToolbar
+          :key="toolbarRevision"
+          :filters="filters"
+          :view="assetView"
+          @apply="applyFilters"
+          @change-view="changeAssetView"
+        />
       </template>
 
       <div v-if="isDetail" class="feed__reading-stage" :aria-busy="detailPreparing">
@@ -539,10 +586,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
         </Transition>
       </div>
 
-      <div
-        v-else-if="mode === 'public' || journal.authenticationState.value !== 'anonymous'"
-        class="feed__entries"
-      >
+      <div v-else-if="mode === 'public'" class="feed__entries">
         <List
           class="feed__infinite-list"
           :loading="infiniteLoading"
@@ -561,7 +605,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
             @select-tag="selectTag"
           />
           <WaterfallFeed
-            v-else-if="mode === 'public' || assetView === 'waterfall'"
+            v-else
             :entries="journal.entries.value"
             :loading="entriesLoading"
             :mode="mode"
@@ -578,24 +622,11 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
             @set-channel="setChannel"
             @delete-entry="deleteEntry"
           />
-          <AssetTableView
-            v-else
-            :entries="journal.entries.value"
-            :loading="entriesLoading"
-            :mutation-entry-id="journal.mutationEntryId.value"
-            @layout-ready="handleLayoutReady"
-            @open-entry="openEntry"
-            @select-tag="selectTag"
-            @set-channel="setChannel"
-          />
-
           <p
             v-if="!initialLoadPending && !listReplacing && !journal.entries.value.length && !journal.error.value"
             class="feed__empty"
           >
-            {{ mode === 'private'
-              ? '没有符合当前筛选条件的记录。'
-              : initialTag
+            {{ initialTag
                 ? '这个标签下还没有公开内容。'
                 : '这里还没有公开记录。' }}
           </p>
@@ -616,6 +647,52 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
           </template>
         </List>
       </div>
+
+      <div
+        v-else-if="journal.authenticationState.value === 'authenticated'"
+        class="feed__entries"
+      >
+        <PrivateWaterfallResults
+          v-if="assetView === 'waterfall'"
+          :entries="journal.entries.value"
+          :loading="entriesLoading"
+          :loading-more="paginationLoading"
+          :finished="infiniteFinished"
+          :disabled="infiniteDisabled"
+          :mutation-entry-id="journal.mutationEntryId.value"
+          @load="loadMore"
+          @layout-ready="handleLayoutReady"
+          @open-entry="openEntry"
+          @continue-draft="editDraft"
+          @select-tag="selectTag"
+          @edit-article="editArticle"
+          @save-content="saveContent"
+          @set-published-time="setPublishedTime"
+          @set-visibility="setVisibility"
+          @set-pinned="setPinned"
+          @set-channel="setChannel"
+          @delete-entry="deleteEntry"
+        />
+        <PrivateAssetTableResults
+          v-else
+          :entries="table.entries.value"
+          :page="table.page.value"
+          :page-size="table.pageSize"
+          :total="table.total.value"
+          :loading="table.loading.value"
+          :error="table.error.value"
+          :mutation-entry-id="journal.mutationEntryId.value"
+          @change-page="changeTablePage"
+          @view="openEntry"
+          @edit="editEntry"
+          @edit-published-time="editTablePublishedTime"
+          @set-pinned="setPinned"
+          @set-visibility="setVisibility"
+          @delete-entry="deleteEntry"
+          @select-tag="selectTag"
+          @set-channel="setChannel"
+        />
+      </div>
     </main>
   </JournalPullRefresh>
 
@@ -635,6 +712,14 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
     @set-pinned="setPinned"
     @set-channel="setChannel"
     @delete-entry="deleteEntry"
+  />
+
+  <PublishedTimeDialog
+    v-if="tablePublishedTimeEntry"
+    :source-created-at="tablePublishedTimeEntry.sourceCreatedAt"
+    :busy="journal.mutationEntryId.value === tablePublishedTimeEntry.id"
+    @close="tablePublishedTimeEntry = null"
+    @save="saveTablePublishedTime"
   />
 </template>
 

@@ -160,11 +160,28 @@ export const journalWebDraftUpdateFieldsSchema = z.discriminatedUnion('action', 
 ]);
 export type JournalWebDraftUpdateFields = z.infer<typeof journalWebDraftUpdateFieldsSchema>;
 
+export const journalPublishedWebEntryUpdateFieldsSchema = z.object({
+  contentText: z.string(),
+  uploadId: z.string().uuid(),
+  removedAssetIds: z.array(z.number().int().positive()),
+  channel: journalPlainChannelSchema,
+  visibility: journalVisibilitySchema,
+  sourceCreatedAt: z.string().datetime({ offset: true }),
+});
+
 export const journalFeedSchema = z.object({
   entries: z.array(journalEntrySchema),
   nextCursor: z.string().nullable(),
 });
 export type JournalFeed = z.infer<typeof journalFeedSchema>;
+
+export const journalPageSchema = z.object({
+  entries: z.array(journalEntrySchema),
+  page: z.number().int().positive(),
+  pageSize: z.number().int().positive(),
+  total: z.number().int().nonnegative(),
+});
+export type JournalPage = z.infer<typeof journalPageSchema>;
 
 export const journalIngestRequestSchema = z.object({
   requestId: z.string().min(3),

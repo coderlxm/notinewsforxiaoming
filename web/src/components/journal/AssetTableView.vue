@@ -1,22 +1,25 @@
 <script setup lang="ts">
-import { ArrowRight, Connection, Document, Lock, Top } from '@element-plus/icons-vue';
+import { Connection, Document, Lock, Top } from '@element-plus/icons-vue';
 import { ElTable, ElTableColumn } from 'element-plus';
-import { computed, onMounted, onUpdated } from 'vue';
-import type { JournalEntry, JournalPlainChannel } from '../../types';
+import { computed } from 'vue';
+import type { JournalEntry, JournalPlainChannel, JournalVisibility } from '../../types';
 import { formatEntryTime, formatFileSize } from '../../utils/formatters';
+import AssetTableActions from './AssetTableActions.vue';
 import AssetTableChannelCell from './AssetTableChannelCell.vue';
 import AssetTableContentCell from './AssetTableContentCell.vue';
-import JournalAssetTablePlaceholder from './JournalAssetTablePlaceholder.vue';
 
 const props = defineProps<{
-  entries: JournalEntry[];
-  loading: boolean;
+  entries: readonly JournalEntry[];
   mutationEntryId: number | null;
 }>();
 
 const emit = defineEmits<{
-  layoutReady: [];
-  openEntry: [entry: JournalEntry];
+  view: [entry: JournalEntry];
+  edit: [entry: JournalEntry];
+  editPublishedTime: [entry: JournalEntry];
+  setPinned: [entry: JournalEntry, pinned: boolean];
+  setVisibility: [entry: JournalEntry, visibility: JournalVisibility];
+  deleteEntry: [entry: JournalEntry];
   selectTag: [tag: string];
   setChannel: [entry: JournalEntry, channel: JournalPlainChannel];
 }>();
@@ -66,13 +69,17 @@ const rows = computed(() => props.entries.map((entry) => {
   };
 }));
 
-onMounted(() => emit('layoutReady'));
-onUpdated(() => emit('layoutReady'));
+function forwardSetPinned(entry: JournalEntry, pinned: boolean): void {
+  emit('setPinned', entry, pinned);
+}
+
+function forwardSetVisibility(entry: JournalEntry, visibility: JournalVisibility): void {
+  emit('setVisibility', entry, visibility);
+}
 </script>
 
 <template>
-  <JournalAssetTablePlaceholder v-if="loading" />
-  <div v-else-if="rows.length" class="asset-table">
+  <div v-if="rows.length" class="asset-table">
     <ElTable
       :data="rows"
       row-key="id"
@@ -123,15 +130,6 @@ onUpdated(() => emit('layoutReady'));
         </template>
       </ElTableColumn>
 
-      <ElTableColumn label="打开" width="88">
-        <template #default="{ row }">
-          <button class="asset-table__open" type="button" @click="emit('openEntry', row.entry)">
-            打开
-            <ArrowRight aria-hidden="true" />
-          </button>
-        </template>
-      </ElTableColumn>
-
       <ElTableColumn label="类型" width="130">
         <template #default="{ row }">
           <span class="asset-table__type">
@@ -144,6 +142,21 @@ onUpdated(() => emit('layoutReady'));
       <ElTableColumn label="素材" width="120">
         <template #default="{ row }">
           <span class="asset-table__assets">{{ row.assetLabel }}</span>
+        </template>
+      </ElTableColumn>
+
+      <ElTableColumn label="操作" width="180" fixed="right">
+        <template #default="{ row }">
+          <AssetTableActions
+            :entry="row.entry"
+            :busy="mutationEntryId === row.entry.id"
+            @edit="emit('edit', $event)"
+            @view="emit('view', $event)"
+            @edit-published-time="emit('editPublishedTime', $event)"
+            @set-pinned="forwardSetPinned"
+            @set-visibility="forwardSetVisibility"
+            @delete-entry="emit('deleteEntry', $event)"
+          />
         </template>
       </ElTableColumn>
     </ElTable>
@@ -213,8 +226,7 @@ onUpdated(() => emit('layoutReady'));
 }
 
 .asset-table__pinned,
-.asset-table__status,
-.asset-table__open {
+.asset-table__status {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
@@ -225,8 +237,7 @@ onUpdated(() => emit('layoutReady'));
 }
 
 .asset-table__pinned svg,
-.asset-table__status svg,
-.asset-table__open svg {
+.asset-table__status svg {
   width: 0.86rem;
   height: 0.86rem;
 }
@@ -236,18 +247,9 @@ onUpdated(() => emit('layoutReady'));
   white-space: nowrap;
 }
 
-.asset-table__open {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--accent-strong);
-  cursor: pointer;
-  font-size: 0.74rem;
-  font-weight: 700;
-}
-
-.asset-table__open:hover {
-  text-decoration: underline;
+.asset-table :deep(.el-table-fixed-column--right) {
+  background: var(--surface-card);
+  box-shadow: -1px 0 0 0 var(--border-subtle);
 }
 
 .asset-table__assets {

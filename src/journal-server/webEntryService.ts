@@ -33,6 +33,11 @@ export interface PublishWebDraftServiceInput extends UpdateWebDraftServiceInput 
   visibility: JournalVisibility;
 }
 
+export interface UpdatePublishedWebEntryServiceInput extends UpdateWebDraftServiceInput {
+  visibility: JournalVisibility;
+  sourceCreatedAt: string;
+}
+
 export class JournalWebEntryService {
   constructor(
     private readonly repository: JournalRepository,
@@ -135,6 +140,55 @@ export class JournalWebEntryService {
     return updated;
   }
 
+  async updatePreparedPublished(
+    id: number,
+    input: Omit<UpdatePublishedWebEntryServiceInput, 'uploadId'>,
+    upload: PreparedWebEntryUpload,
+  ): Promise<JournalEntry> {
+    const entry = this.getPublishedWebEntry(id);
+    const storedAssets = this.repository.listPublishedWebEntryAssets(id);
+    this.assertRemovedAssetIds(entry, storedAssets, input.removedAssetIds);
+    const removedIds = new Set(input.removedAssetIds);
+    const retainedAssets = entry.assets.filter(asset => !removedIds.has(asset.id));
+    const newAssets = upload.assets;
+    this.assertContent(input.contentText, retainedAssets.length + newAssets.length);
+    this.assertMediaCount(
+      retainedAssets.length + newAssets.length,
+      retainedAssets.filter(asset => asset.kind === 'video').length
+        + newAssets.filter(asset => asset.kind === 'video').length,
+    );
+
+    if (newAssets.length > 0) {
+      await this.storage.appendToFinal(upload.storageSession);
+    } else {
+      await this.storage.discardTemporary(upload.storageSession);
+    }
+    let updated: JournalEntry;
+    try {
+      updated = this.repository.updatePublishedWebEntry(id, {
+        contentText: input.contentText,
+        tags: extractJournalTags(input.contentText),
+        channel: input.channel,
+        visibility: input.visibility,
+        sourceCreatedAt: input.sourceCreatedAt,
+        updatedAt: new Date().toISOString(),
+        removedAssetIds: input.removedAssetIds,
+        newAssets,
+      });
+    } catch (error) {
+      for (const asset of newAssets) {
+        await this.storage.deleteAssetPair(asset.relativePath, asset.previewRelativePath);
+      }
+      throw error;
+    }
+    for (const asset of storedAssets) {
+      if (removedIds.has(asset.id)) {
+        await this.storage.deleteAssetPair(asset.relativePath, asset.previewRelativePath);
+      }
+    }
+    return updated;
+  }
+
   private getDraft(id: number): JournalEntry {
     const entry = this.repository.getByIdOrNull(id);
     if (
@@ -144,6 +198,19 @@ export class JournalWebEntryService {
       || entry.publicationStatus !== 'draft'
     ) {
       throw new Error(`Web entry draft ${id} was not found.`);
+    }
+    return entry;
+  }
+
+  private getPublishedWebEntry(id: number): JournalEntry {
+    const entry = this.repository.getByIdOrNull(id);
+    if (
+      !entry
+      || entry.sourceKind !== 'web'
+      || entry.bodyFormat !== 'plain'
+      || entry.publicationStatus !== 'published'
+    ) {
+      throw new Error(`Published web entry ${id} was not found.`);
     }
     return entry;
   }
@@ -186,7 +253,7 @@ export class JournalWebEntryService {
     const assetIds = new Set(storedAssets.map((asset) => asset.id));
     for (const assetId of removedAssetIds) {
       if (!assetIds.has(assetId)) {
-        throw new Error(`Web entry asset ${assetId} does not belong to draft ${entry.id}.`);
+        throw new Error(`Web entry asset ${assetId} does not belong to entry ${entry.id}.`);
       }
     }
   }

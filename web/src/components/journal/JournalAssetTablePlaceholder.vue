@@ -35,7 +35,7 @@
 .asset-table-placeholder__header,
 .asset-table-placeholder__row {
   display: grid;
-  grid-template-columns: 190px minmax(360px, 1fr) 96px 96px 88px 130px 120px;
+  grid-template-columns: 190px minmax(360px, 1fr) 96px 96px 130px 120px 180px;
   align-items: center;
 }
 

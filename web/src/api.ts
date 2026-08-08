@@ -9,6 +9,7 @@ import type {
   JournalDeletionResult,
   JournalEntry,
   JournalFeed,
+  JournalPage,
   JournalChannel,
   JournalPlainChannel,
   JournalRichDocument,
@@ -207,6 +208,19 @@ export function fetchPrivateEntry(id: number): Promise<JournalEntry> {
   return requestJson<JournalEntry>(`/api/me/entries/${id}`);
 }
 
+export function fetchPrivateTablePage(options: {
+  page: number;
+  pageSize: number;
+  filters: FeedFilters;
+}): Promise<JournalPage> {
+  const params = new URLSearchParams();
+  params.set('page', String(options.page));
+  params.set('pageSize', String(options.pageSize));
+  appendFilterParams(params, options.filters);
+  const query = params.size ? `?${params.toString()}` : '';
+  return requestJson<JournalPage>(`/api/me/entries/page${query}`);
+}
+
 export function publishEntry(input: {
   contentText: string;
   uploadId: string;
@@ -228,6 +242,17 @@ export function updateDraft(id: number, input: {
   sourceCreatedAt?: string;
 }): Promise<JournalEntry> {
   return requestJson<JournalEntry>(`/api/me/entries/${id}/draft`, jsonRequest('PATCH', input));
+}
+
+export function updatePublishedWebEntry(id: number, input: {
+  contentText: string;
+  uploadId: string;
+  removedAssetIds: number[];
+  channel: JournalPlainChannel;
+  visibility: JournalVisibility;
+  sourceCreatedAt: string;
+}): Promise<JournalEntry> {
+  return requestJson<JournalEntry>(`/api/me/entries/${id}`, jsonRequest('PATCH', input));
 }
 
 export function createEntryUpload(entryId?: number): Promise<{ uploadId: string; token: string }> {

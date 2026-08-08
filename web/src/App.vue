@@ -28,7 +28,7 @@ type AppRoute =
   | { name: 'public'; key: string; channel: JournalChannel; tag: string }
   | { name: 'about'; key: string }
   | { name: 'detail'; key: string; publicId: string }
-  | { name: 'private'; key: string; entryId: number | null; assetView: AssetView }
+  | { name: 'private'; key: string; entryId: number | null; assetView: AssetView; page: number }
   | { name: 'entry-new'; key: string }
   | { name: 'entry-edit'; key: string; entryId: number }
   | { name: 'article-new'; key: string }
@@ -106,17 +106,23 @@ const route = computed<AppRoute>(() => {
   if (currentRoute.name === 'private') {
     const entry = currentRoute.query.entry;
     const view = currentRoute.query.view;
+    const page = currentRoute.query.page;
     if (entry !== undefined && (typeof entry !== 'string' || !/^[1-9]\d*$/.test(entry))) {
       return { name: 'not-found', key: currentRoute.fullPath };
     }
     if (view !== undefined && view !== 'table' && view !== 'waterfall') {
       return { name: 'not-found', key: currentRoute.fullPath };
     }
+    if (page !== undefined && (typeof page !== 'string' || !/^[1-9]\d*$/.test(page))) {
+      return { name: 'not-found', key: currentRoute.fullPath };
+    }
+    const assetView = view ?? defaultAssetView.value;
     return {
       name: 'private',
       key: 'private',
       entryId: entry === undefined ? null : Number(entry),
-      assetView: view ?? defaultAssetView.value,
+      assetView,
+      page: assetView === 'table' && page !== undefined ? Number(page) : 1,
     };
   }
   if (currentRoute.name === 'about') {
@@ -320,10 +326,15 @@ async function navigate(path: string): Promise<void> {
   });
 }
 
-function privateFeedPath(assetView: AssetView, entryId?: number): string {
+function privateFeedPath(options: {
+  assetView: AssetView;
+  page: number;
+  entryId?: number;
+}): string {
   const search = new URLSearchParams();
-  search.set('view', assetView);
-  if (entryId !== undefined) search.set('entry', String(entryId));
+  search.set('view', options.assetView);
+  if (options.assetView === 'table' && options.page > 1) search.set('page', String(options.page));
+  if (options.entryId !== undefined) search.set('entry', String(options.entryId));
   const query = search.toString();
   return query ? `/me?${query}` : '/me';
 }
@@ -413,13 +424,22 @@ async function openEntry(entry: JournalEntry): Promise<void> {
   };
   const path = origin.name === 'public'
     ? `/p/${encodeURIComponent(entry.publicId)}`
-    : privateFeedPath(origin.assetView, entry.id);
+    : privateFeedPath({ assetView: origin.assetView, page: origin.page, entryId: entry.id });
   await router.push(path);
 }
 
 function changeAssetView(assetView: AssetView): void {
   if (route.value.name !== 'private') return;
-  void router.push(privateFeedPath(assetView, route.value.entryId ?? undefined));
+  void router.push(privateFeedPath({
+    assetView,
+    page: 1,
+    ...(route.value.entryId === null ? {} : { entryId: route.value.entryId }),
+  }));
+}
+
+function changePrivatePage(page: number): void {
+  if (route.value.name !== 'private') return;
+  void router.push(privateFeedPath({ assetView: 'table', page }));
 }
 
 function changePublicChannel(channel: JournalChannel): void {
@@ -440,14 +460,16 @@ function closeOverlay(): void {
     return;
   }
   if (route.value.name !== 'private' || route.value.entryId === null) return;
-  void router.replace(privateFeedPath(route.value.assetView));
+  void router.replace(privateFeedPath({ assetView: route.value.assetView, page: route.value.page }));
 }
 
 async function removeDeletedOverlay(): Promise<void> {
   const context = activeOverlayContext.value;
   const current = route.value;
   const returnPath = context?.originPath
-    ?? (current.name === 'private' ? privateFeedPath(current.assetView) : '/me');
+    ?? (current.name === 'private'
+      ? privateFeedPath({ assetView: current.assetView, page: current.page })
+      : '/me');
   overlayContext.value = null;
   await router.replace(returnPath);
   if (context) router.back();
@@ -590,11 +612,13 @@ onUnmounted(() => {
             :key="backgroundFeedRoute.key"
             mode="private"
             :asset-view="backgroundFeedRoute.assetView"
+            :page="backgroundFeedRoute.page"
             :overlay-entry-id="overlayEntryId"
             :overlay-entry="overlayEntry"
             :direct-overlay="directPrivateOverlay"
             @layout-ready="restoreFeedScroll"
             @change-asset-view="changeAssetView"
+            @change-page="changePrivatePage"
             @open-entry="openEntry"
             @close-overlay="closeOverlay"
             @remove-deleted-overlay="removeDeletedOverlay"

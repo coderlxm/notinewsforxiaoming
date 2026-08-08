@@ -1,6 +1,7 @@
 import { readonly, ref, shallowReadonly, shallowRef } from 'vue';
 import {
   deleteEntry as deleteEntryRequest,
+  fetchAuthenticationState,
   fetchOnThisDay,
   fetchPrivateEntry,
   fetchPrivateFeed,
@@ -127,6 +128,29 @@ export function useJournalApi() {
     }
   }
 
+  async function loadPrivateContext(): Promise<void> {
+    loading.value = true;
+    error.value = null;
+    try {
+      const session = await fetchAuthenticationState();
+      authenticationState.value = session.authenticated ? 'authenticated' : 'anonymous';
+      if (!session.authenticated) return;
+      const onThisDay = await fetchOnThisDay();
+      onThisDayEntries.value = onThisDay.entries;
+    }
+    catch (reason) {
+      exposeError(reason);
+    }
+    finally {
+      loading.value = false;
+    }
+  }
+
+  async function refreshOnThisDay(): Promise<void> {
+    const onThisDay = await fetchOnThisDay();
+    onThisDayEntries.value = onThisDay.entries;
+  }
+
   async function refreshPrivateFeed(filters: FeedFilters): Promise<void> {
     loading.value = true;
     error.value = null;
@@ -181,16 +205,12 @@ export function useJournalApi() {
     }
   }
 
-  async function authenticate(password: string, filters: FeedFilters): Promise<void> {
+  async function authenticate(password: string): Promise<void> {
     loading.value = true;
     error.value = null;
     try {
       await loginRequest(password);
       authenticationState.value = 'authenticated';
-      const feed = await fetchPrivateFeed({ filters });
-      entries.value = feed.entries;
-      nextCursor.value = feed.nextCursor;
-
       const onThisDay = await fetchOnThisDay();
       onThisDayEntries.value = onThisDay.entries;
     }
@@ -343,6 +363,8 @@ export function useJournalApi() {
     loadPrivateDetail,
     selectDetail,
     loadPrivate,
+    loadPrivateContext,
+    refreshOnThisDay,
     refreshPrivateFeed,
     loadMorePublic,
     loadMorePrivate,

@@ -65,6 +65,13 @@ export interface JournalFeed {
   nextCursor: string | null;
 }
 
+export interface JournalPage {
+  entries: JournalEntry[];
+  page: number;
+  pageSize: number;
+  total: number;
+}
+
 export interface OnThisDayResponse {
   entries: JournalEntry[];
 }

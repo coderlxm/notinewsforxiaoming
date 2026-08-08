@@ -2,6 +2,11 @@ import { readonly, shallowRef } from 'vue';
 import {
   fetchPrivateEntry,
   publishEntry as publishEntryRequest,
+  updateEntryChannel,
+  updateEntryContent,
+  updateEntryPublishedTime,
+  updateEntryVisibility,
+  updatePublishedWebEntry,
   updateDraft as updateDraftRequest,
 } from '../api';
 import type { JournalEntry, JournalPlainChannel, JournalVisibility } from '../types';
@@ -84,6 +89,40 @@ export function useEntryPublisher() {
     return published;
   }
 
+  async function updatePublished(input: EntryPublisherInput): Promise<JournalEntry | null> {
+    const current = entry.value;
+    if (!current) throw new Error('Published entry must be loaded before editing.');
+    submitting.value = 'publish';
+    error.value = null;
+    try {
+      if (current.sourceKind === 'web') {
+        const updated = await updatePublishedWebEntry(current.id, {
+          contentText: input.contentText,
+          uploadId: input.uploadId,
+          removedAssetIds: input.removedAssetIds,
+          channel: input.channel,
+          visibility: input.visibility!,
+          sourceCreatedAt: input.sourceCreatedAt!,
+        });
+        entry.value = updated;
+        return updated;
+      }
+      await updateEntryContent(current.id, input.contentText);
+      await updateEntryChannel(current.id, input.channel);
+      await updateEntryVisibility(current.id, input.visibility!);
+      const updated = await updateEntryPublishedTime(current.id, input.sourceCreatedAt!);
+      entry.value = updated;
+      return updated;
+    }
+    catch (reason) {
+      exposeError(reason);
+      return null;
+    }
+    finally {
+      submitting.value = null;
+    }
+  }
+
   return {
     entry: readonly(entry),
     loading: readonly(loading),
@@ -92,5 +131,6 @@ export function useEntryPublisher() {
     load,
     saveDraft,
     publish,
+    updatePublished,
   };
 }

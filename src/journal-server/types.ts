@@ -68,6 +68,18 @@ export interface JournalListFilters {
   limit: number;
 }
 
+export interface JournalPageFilters {
+  page: number;
+  pageSize: number;
+  visibility?: JournalVisibility;
+  channel?: JournalChannel;
+  tag?: string;
+  query?: string;
+  contentType?: string;
+  from?: string;
+  to?: string;
+}
+
 export interface JournalAssetAccess {
   id: number;
   kind: string;

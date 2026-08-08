@@ -36,7 +36,6 @@ const removedAssetIds = shallowRef<ReadonlySet<number>>(new Set());
 const specifyTime = shallowRef(false);
 const specifiedTime = shallowRef('');
 const initializedEntryId = shallowRef<number | null>(null);
-const initialEntryPublished = shallowRef(false);
 const stalledPublishProbe = shallowRef(previousPublishProbe());
 const mediaSubmit = useEntryMediaSubmit();
 let terminalErrorMessage: ReturnType<typeof showMessage> | null = null;
@@ -46,8 +45,9 @@ const awaitingDraft = computed(() =>
   isEditing.value && publisher.entry.value === null && publisher.error.value === null,
 );
 const deferredLoading = useDeferredLoading(awaitingDraft);
-const isDraft = computed(() => publisher.entry.value?.publicationStatus === 'draft');
-const formAvailable = computed(() => !isEditing.value || isDraft.value);
+const isPublished = computed(() => publisher.entry.value?.publicationStatus === 'published');
+const mediaEditable = computed(() => !isPublished.value || publisher.entry.value?.sourceKind === 'web');
+const formAvailable = computed(() => !isEditing.value || publisher.entry.value !== null);
 const existingAssets = computed<JournalAsset[]>(() =>
   (publisher.entry.value?.assets ?? []).filter(asset => !removedAssetIds.value.has(asset.id)),
 );
@@ -64,17 +64,17 @@ const canPublish = computed(() =>
   canSaveDraft.value
   && (!specifyTime.value || specifiedTime.value !== ''),
 );
-const routeError = computed(() => {
-  if (publisher.error.value) return publisher.error.value;
-  if (initialEntryPublished.value) return '这条记录已经发布，不能再作为草稿编辑。';
-  return null;
-});
+const canSavePublished = computed(() => isPublished.value && hasContent.value && specifiedTime.value !== '' && !busy.value);
+const routeError = computed(() => publisher.error.value);
 
 watch(() => publisher.entry.value, (entry) => {
   if (!entry || initializedEntryId.value === entry.id) return;
   initializedEntryId.value = entry.id;
   contentText.value = entry.contentText;
   channel.value = entry.channel as JournalPlainChannel;
+  visibility.value = entry.visibility;
+  specifyTime.value = true;
+  specifiedTime.value = entry.sourceCreatedAt;
   newMedia.value = [];
   removedAssetIds.value = new Set();
 });
@@ -100,13 +100,18 @@ watch(() => mediaSubmit.error.value, (error) => {
 onMounted(async () => {
   if (props.entryId === undefined) return;
   await publisher.load(props.entryId);
-  initialEntryPublished.value = publisher.entry.value?.publicationStatus === 'published';
 });
 
 onBeforeUnmount(() => terminalErrorMessage?.close());
 
 function removeExisting(assetId: number): void {
+  if (!mediaEditable.value) return;
   removedAssetIds.value = new Set([...removedAssetIds.value, assetId]);
+}
+
+function returnToAssets(): void {
+  const state = router.currentRoute.value.state as { journalReturnPath?: string };
+  void router.push(state.journalReturnPath ?? '/me');
 }
 
 function buildInput() {
@@ -171,17 +176,38 @@ async function publish(): Promise<void> {
     type: 'success',
   });
   markPublishProbe('NAVIGATION_STARTED');
-  await router.push({ name: 'private' });
+  returnToAssets();
   clearPublishProbe();
   stalledPublishProbe.value = null;
+}
+
+async function savePublished(): Promise<void> {
+  const uploadId = publisher.entry.value?.sourceKind === 'web'
+    ? await mediaSubmit.submit(newMedia.value, publisher.entry.value.id)
+    : '';
+  if (publisher.entry.value?.sourceKind === 'web' && !uploadId) return;
+  const saved = await publisher.updatePublished({
+    ...buildInput(),
+    uploadId,
+    sourceCreatedAt: specifiedTime.value,
+  });
+  if (!saved) return;
+  newMedia.value = [];
+  removedAssetIds.value = new Set();
+  showMessage({ message: '记录修改已保存', type: 'success' });
+}
+
+async function submit(): Promise<void> {
+  if (isPublished.value) await savePublished();
+  else await publish();
 }
 </script>
 
 <template>
   <main class="publisher-view">
     <div class="publisher-view__heading">
-      <button class="text-button" type="button" @click="router.push({ name: 'private' })">← 返回我的全部记录</button>
-      <span>{{ isEditing ? '编辑草稿' : '发布内容' }}</span>
+      <button class="text-button" type="button" @click="returnToAssets">← 返回我的全部记录</button>
+      <span>{{ isPublished ? '编辑记录' : isEditing ? '编辑草稿' : '发布内容' }}</span>
     </div>
 
     <aside v-if="stalledPublishProbe" class="publisher-view__probe">
@@ -195,7 +221,7 @@ async function publish(): Promise<void> {
     <div class="publisher-view__stage" :class="{ 'publisher-view__stage--reading': !formAvailable }" :aria-busy="awaitingDraft">
       <Transition name="publisher-stage" mode="out-in">
         <JournalLoading v-if="deferredLoading.visible.value" key="loading" variant="reading" label="正在打开草稿…" />
-        <form v-else-if="formAvailable" key="form" class="publisher-view__form" @submit.prevent="publish">
+        <form v-else-if="formAvailable" key="form" class="publisher-view__form" @submit.prevent="submit">
           <div class="publisher-view__manuscript">
             <label class="field">
               <span class="field__label">正文</span>
@@ -208,6 +234,7 @@ async function publish(): Promise<void> {
             </label>
 
             <EntryImagePicker
+              v-if="mediaEditable"
               class="publisher-view__media"
               v-model="newMedia"
               :existing-assets="existingAssets"
@@ -220,7 +247,7 @@ async function publish(): Promise<void> {
             v-model="newMedia"
             class="publisher-view__previews"
             :existing-assets="existingAssets"
-            :disabled="busy"
+            :disabled="busy || !mediaEditable"
             @remove-existing="removeExisting"
           />
 
@@ -234,6 +261,7 @@ async function publish(): Promise<void> {
               </div>
 
               <EntryPublishedTimeField
+                :key="publisher.entry.value?.updatedAt ?? 'new'"
                 v-model:enabled="specifyTime"
                 v-model:value="specifiedTime"
                 :disabled="busy"
@@ -241,6 +269,7 @@ async function publish(): Promise<void> {
 
               <div class="publisher-view__actions">
                 <button
+                  v-if="!isPublished"
                   class="button button--quiet"
                   type="button"
                   :disabled="!canSaveDraft"
@@ -253,11 +282,11 @@ async function publish(): Promise<void> {
                 <button
                   class="button button--primary"
                   type="submit"
-                  :disabled="!canPublish"
+                  :disabled="isPublished ? !canSavePublished : !canPublish"
                   :aria-busy="publisher.submitting.value === 'publish'"
                 >
-                  <JournalLoading v-if="publisher.submitting.value === 'publish'" variant="inline" label="发布中…" />
-                  <template v-else>发布</template>
+                  <JournalLoading v-if="publisher.submitting.value === 'publish'" variant="inline" :label="isPublished ? '保存中…' : '发布中…'" />
+                  <template v-else>{{ isPublished ? '保存修改' : '发布' }}</template>
                 </button>
               </div>
             </div>

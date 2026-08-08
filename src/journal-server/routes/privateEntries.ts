@@ -5,6 +5,7 @@ import {
   journalLoginRequestSchema,
   journalPinnedUpdateRequestSchema,
   journalPlainChannelRequestSchema,
+  journalPublishedWebEntryUpdateFieldsSchema,
   journalPublishedTimeUpdateRequestSchema,
   journalVisibilityRequestSchema,
   journalWebDraftUpdateFieldsSchema,
@@ -18,6 +19,19 @@ import type { JournalWebEntryUploadService } from '../webEntryUploadService.js';
 
 const privateEntriesQuerySchema = z.object({
   cursor: z.string().min(1).optional(),
+  visibility: z.enum(['private', 'public']).optional(),
+  query: z.string().min(1).optional(),
+  tag: z.string().min(1).optional(),
+  contentType: z.string().min(1).optional(),
+  from: z.string().date().optional(),
+  to: z.string().date().optional(),
+});
+
+const privateEntriesPageQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  pageSize: z.coerce.number().int().positive()
+    .refine((value) => value === 30, { message: 'pageSize must be 30.' })
+    .default(30),
   visibility: z.enum(['private', 'public']).optional(),
   query: z.string().min(1).optional(),
   tag: z.string().min(1).optional(),
@@ -97,6 +111,20 @@ export async function registerPrivateEntryRoutes(
     });
   });
 
+  server.get('/api/me/entries/page', { preHandler: auth.requireAdmin }, async (request) => {
+    const query = privateEntriesPageQuerySchema.parse(request.query);
+    return repository.listPage({
+      page: query.page,
+      pageSize: query.pageSize,
+      ...(query.visibility ? { visibility: query.visibility } : {}),
+      ...(query.query ? { query: query.query } : {}),
+      ...(query.tag ? { tag: query.tag } : {}),
+      ...(query.contentType ? { contentType: query.contentType } : {}),
+      ...(query.from ? { from: shanghaiDayStart(query.from) } : {}),
+      ...(query.to ? { to: shanghaiDayEnd(query.to) } : {}),
+    });
+  });
+
   server.post('/api/me/entries', { preHandler: auth.requireAdmin }, async (request) => {
     const fields = journalWebEntryCreateFieldsSchema.parse(request.body);
     const { uploadId } = uploadParamsSchema.parse(request.body);
@@ -150,6 +178,19 @@ export async function registerPrivateEntryRoutes(
       return fields.action === 'draft'
         ? await webEntryService.updatePreparedDraft(id, input, webEntryUploads.take(uploadId), null)
         : await webEntryService.updatePreparedDraft(id, input, webEntryUploads.take(uploadId), fields.visibility, fields.sourceCreatedAt);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('was not found')) {
+        return reply.code(404).send({ error: error.message });
+      }
+      throw error;
+    }
+  });
+
+  server.patch('/api/me/entries/:id', { preHandler: auth.requireAdmin }, async (request, reply) => {
+    const { id } = idParamsSchema.parse(request.params);
+    const fields = journalPublishedWebEntryUpdateFieldsSchema.parse(request.body);
+    try {
+      return await webEntryService.updatePreparedPublished(id, fields, webEntryUploads.take(fields.uploadId));
     } catch (error) {
       if (error instanceof Error && error.message.includes('was not found')) {
         return reply.code(404).send({ error: error.message });

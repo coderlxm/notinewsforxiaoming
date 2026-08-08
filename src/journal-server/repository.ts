@@ -14,6 +14,7 @@ import type {
   JournalDeletionResult,
   JournalEntry,
   JournalFeed,
+  JournalPage,
   JournalPublicationStatus,
   JournalPlainChannel,
   JournalRichDocument,
@@ -32,6 +33,7 @@ import type {
   JournalDeletionTarget,
   JournalImagePreviewBackfillAsset,
   JournalListFilters,
+  JournalPageFilters,
   JournalVideoPreviewBackfillAsset,
 } from './types.js';
 
@@ -122,6 +124,11 @@ export interface UpdateWebDraftInput {
 }
 
 export interface PublishWebDraftInput extends UpdateWebDraftInput {
+  visibility: JournalVisibility;
+  sourceCreatedAt: string;
+}
+
+export interface UpdatePublishedWebEntryInput extends UpdateWebDraftInput {
   visibility: JournalVisibility;
   sourceCreatedAt: string;
 }
@@ -408,7 +415,7 @@ export class JournalRepository {
 
   updateWebDraft(id: number, input: UpdateWebDraftInput): JournalEntry {
     const update = this.database.transaction(() => {
-      const assets = this.replaceWebDraftAssets(id, input.removedAssetIds, input.newAssets);
+      const assets = this.replaceWebEntryAssets(id, 'draft', input.removedAssetIds, input.newAssets);
       const result = this.database.prepare(`
         UPDATE journal_entries
         SET content_type = ?, content_text = ?, tags_json = ?, channel = ?, updated_at = ?
@@ -434,7 +441,7 @@ export class JournalRepository {
 
   publishWebDraft(id: number, input: PublishWebDraftInput): JournalEntry {
     const publish = this.database.transaction(() => {
-      const assets = this.replaceWebDraftAssets(id, input.removedAssetIds, input.newAssets);
+      const assets = this.replaceWebEntryAssets(id, 'draft', input.removedAssetIds, input.newAssets);
       const result = this.database.prepare(`
         UPDATE journal_entries
         SET content_type = ?, content_text = ?, tags_json = ?,
@@ -462,6 +469,31 @@ export class JournalRepository {
     return this.getById(id);
   }
 
+  updatePublishedWebEntry(id: number, input: UpdatePublishedWebEntryInput): JournalEntry {
+    const update = this.database.transaction(() => {
+      const assets = this.replaceWebEntryAssets(id, 'published', input.removedAssetIds, input.newAssets);
+      const result = this.database.prepare(`
+        UPDATE journal_entries
+        SET content_type = ?, content_text = ?, tags_json = ?, channel = ?,
+            visibility = ?, source_created_at = ?, updated_at = ?
+        WHERE id = ? AND source_kind = 'web' AND body_format = 'plain'
+          AND publication_status = 'published'
+      `).run(
+        contentTypeOf(assets),
+        input.contentText,
+        JSON.stringify(input.tags),
+        input.channel,
+        input.visibility,
+        input.sourceCreatedAt,
+        input.updatedAt,
+        id,
+      );
+      if (result.changes === 0) throw new Error(`Published web entry ${id} was not found.`);
+    });
+    update();
+    return this.getById(id);
+  }
+
   listWebDraftAssets(id: number): WebDraftAssetRecord[] {
     const rows = this.database.prepare(`
       SELECT a.id, a.relative_path, a.preview_relative_path
@@ -480,6 +512,23 @@ export class JournalRepository {
       preview_relative_path: string;
     }>;
     return rows.map((row) => ({
+      id: row.id,
+      relativePath: row.relative_path,
+      previewRelativePath: row.preview_relative_path,
+    }));
+  }
+
+  listPublishedWebEntryAssets(id: number): WebDraftAssetRecord[] {
+    const rows = this.database.prepare(`
+      SELECT a.id, a.relative_path, a.preview_relative_path
+      FROM journal_assets a
+      JOIN journal_entries e ON e.id = a.entry_id
+      WHERE e.id = ? AND e.source_kind = 'web' AND e.body_format = 'plain'
+        AND e.publication_status = 'published'
+        AND a.source_kind = 'web' AND a.role = 'attachment'
+      ORDER BY a.sort_order, a.id
+    `).all(id) as Array<{ id: number; relative_path: string; preview_relative_path: string }>;
+    return rows.map(row => ({
       id: row.id,
       relativePath: row.relative_path,
       previewRelativePath: row.preview_relative_path,
@@ -737,6 +786,75 @@ export class JournalRepository {
   }
 
   list(filters: JournalListFilters): JournalFeed {
+    const { conditions, parameters } = this.listFilterConditions(filters);
+    if (filters.cursor) {
+      const cursor = decodeCursor(filters.cursor);
+      conditions.push(`(
+        e.pinned < ? OR
+        (e.pinned = ? AND e.source_created_at < ?) OR
+        (e.pinned = ? AND e.source_created_at = ? AND e.id < ?)
+      )`);
+      parameters.push(
+        cursor.pinned,
+        cursor.pinned,
+        cursor.sourceCreatedAt,
+        cursor.pinned,
+        cursor.sourceCreatedAt,
+        cursor.id,
+      );
+    }
+
+    const rows = this.database.prepare(`
+      SELECT e.* FROM journal_entries e
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY e.pinned DESC, e.source_created_at DESC, e.id DESC
+      LIMIT ?
+    `).all(...parameters, filters.limit + 1) as EntryRow[];
+    const hasNext = rows.length > filters.limit;
+    const pageRows = rows.slice(0, filters.limit);
+
+    return {
+      entries: pageRows.map((row) => this.toEntry(row)),
+      nextCursor: hasNext && pageRows.length > 0
+        ? encodeCursor(pageRows[pageRows.length - 1] as EntryRow)
+        : null,
+    };
+  }
+
+  listPage(filters: JournalPageFilters): JournalPage {
+    const { conditions, parameters } = this.listFilterConditions(filters);
+    const offset = (filters.page - 1) * filters.pageSize;
+
+    const totalRow = this.database.prepare(`
+      SELECT COUNT(*) AS count
+      FROM journal_entries e
+      WHERE ${conditions.join(' AND ')}
+    `).get(...parameters) as { count: number };
+
+    const rows = this.database.prepare(`
+      SELECT e.* FROM journal_entries e
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY e.pinned DESC, e.source_created_at DESC, e.id DESC
+      LIMIT ? OFFSET ?
+    `).all(...parameters, filters.pageSize, offset) as EntryRow[];
+
+    return {
+      entries: rows.map((row) => this.toEntry(row)),
+      page: filters.page,
+      pageSize: filters.pageSize,
+      total: totalRow.count,
+    };
+  }
+
+  private listFilterConditions(filters: {
+    visibility?: JournalVisibility;
+    channel?: JournalChannel;
+    tag?: string;
+    query?: string;
+    contentType?: string;
+    from?: string;
+    to?: string;
+  }): { conditions: string[]; parameters: unknown[] } {
     const conditions = [this.groupRepresentativeCondition('e')];
     const parameters: unknown[] = [];
 
@@ -772,38 +890,8 @@ export class JournalRepository {
       conditions.push('e.source_created_at <= ?');
       parameters.push(filters.to);
     }
-    if (filters.cursor) {
-      const cursor = decodeCursor(filters.cursor);
-      conditions.push(`(
-        e.pinned < ? OR
-        (e.pinned = ? AND e.source_created_at < ?) OR
-        (e.pinned = ? AND e.source_created_at = ? AND e.id < ?)
-      )`);
-      parameters.push(
-        cursor.pinned,
-        cursor.pinned,
-        cursor.sourceCreatedAt,
-        cursor.pinned,
-        cursor.sourceCreatedAt,
-        cursor.id,
-      );
-    }
 
-    const rows = this.database.prepare(`
-      SELECT e.* FROM journal_entries e
-      WHERE ${conditions.join(' AND ')}
-      ORDER BY e.pinned DESC, e.source_created_at DESC, e.id DESC
-      LIMIT ?
-    `).all(...parameters, filters.limit + 1) as EntryRow[];
-    const hasNext = rows.length > filters.limit;
-    const pageRows = rows.slice(0, filters.limit);
-
-    return {
-      entries: pageRows.map((row) => this.toEntry(row)),
-      nextCursor: hasNext && pageRows.length > 0
-        ? encodeCursor(pageRows[pageRows.length - 1] as EntryRow)
-        : null,
-    };
+    return { conditions, parameters };
   }
 
   listOnThisDay(monthDay: string, currentYear: string): JournalEntry[] {
@@ -1291,8 +1379,9 @@ export class JournalRepository {
     `).run(...parameters, row.chat_id, row.media_group_id);
   }
 
-  private replaceWebDraftAssets(
+  private replaceWebEntryAssets(
     id: number,
+    publicationStatus: JournalPublicationStatus,
     removedAssetIds: number[],
     newAssets: WebEntryAssetInput[],
   ): Array<{ kind: string }> {
@@ -1310,9 +1399,9 @@ export class JournalRepository {
             WHERE e.id = journal_assets.entry_id
               AND e.source_kind = 'web'
               AND e.body_format = 'plain'
-              AND e.publication_status = 'draft'
+              AND e.publication_status = ?
           )
-      `).run(...removedAssetIds, id);
+      `).run(...removedAssetIds, id, publicationStatus);
       if (result.changes !== removedAssetIds.length) {
         throw new Error(`One or more assets do not belong to web draft ${id}.`);
       }
@@ -1327,9 +1416,9 @@ export class JournalRepository {
         AND a.role = 'attachment'
         AND e.source_kind = 'web'
         AND e.body_format = 'plain'
-        AND e.publication_status = 'draft'
+        AND e.publication_status = ?
       ORDER BY a.sort_order, a.id
-    `).all(id) as Array<{ id: number; kind: string }>;
+    `).all(id, publicationStatus) as Array<{ id: number; kind: string }>;
     const updateSortOrder = this.database.prepare(`
       UPDATE journal_assets SET sort_order = ? WHERE id = ?
     `);

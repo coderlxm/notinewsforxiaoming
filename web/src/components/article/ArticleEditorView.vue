@@ -175,12 +175,17 @@ function viewArticle(entry: JournalEntry): void {
 function viewCurrentArticle(): void {
   if (article.value) viewArticle(article.value);
 }
+
+function returnToAssets(): void {
+  const state = router.currentRoute.value.state as { journalReturnPath?: string };
+  void router.push(state.journalReturnPath ?? '/me');
+}
 </script>
 
 <template>
   <main class="editor-view">
     <div class="editor-view__heading">
-      <button class="text-button" type="button" @click="router.push({ name: 'private' })">← 返回我的资产</button>
+      <button class="text-button" type="button" @click="returnToAssets">← 返回我的资产</button>
       <span>{{ isEditing ? '编辑文章' : '写文章' }}</span>
     </div>
 
