@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, shallowRef, watch } from 'vue';
+import { vLoading } from 'element-plus';
 import { useRouter } from 'vue-router';
 import JournalLoading from '../ui/JournalLoading.vue';
-import { useDeferredLoading } from '../../composables/useDeferredLoading';
 import { useEntryPublisher } from '../../composables/useEntryPublisher';
 import { useEntryMediaSubmit } from '../../composables/useEntryMediaSubmit';
 import { plainJournalChannels } from '../../journalChannels';
@@ -36,22 +36,24 @@ const removedAssetIds = shallowRef<ReadonlySet<number>>(new Set());
 const specifyTime = shallowRef(false);
 const specifiedTime = shallowRef('');
 const initializedEntryId = shallowRef<number | null>(null);
+const assetChanged = shallowRef(false);
 const stalledPublishProbe = shallowRef(previousPublishProbe());
 const mediaSubmit = useEntryMediaSubmit();
 let terminalErrorMessage: ReturnType<typeof showMessage> | null = null;
 
 const isEditing = computed(() => props.entryId !== undefined);
-const awaitingDraft = computed(() =>
-  isEditing.value && publisher.entry.value === null && publisher.error.value === null,
-);
-const deferredLoading = useDeferredLoading(awaitingDraft);
 const isPublished = computed(() => publisher.entry.value?.publicationStatus === 'published');
 const mediaEditable = computed(() => !isPublished.value || publisher.entry.value?.sourceKind === 'web');
 const formAvailable = computed(() => !isEditing.value || publisher.entry.value !== null);
 const existingAssets = computed<JournalAsset[]>(() =>
   (publisher.entry.value?.assets ?? []).filter(asset => !removedAssetIds.value.has(asset.id)),
 );
-const busy = computed(() => publisher.submitting.value !== null || mediaSubmit.busy.value);
+const busy = computed(() =>
+  publisher.loading.value
+  || (isEditing.value && publisher.entry.value === null)
+  || publisher.submitting.value !== null
+  || mediaSubmit.busy.value,
+);
 const hasContent = computed(() =>
   contentText.value.trim().length > 0 || existingAssets.value.length + newMedia.value.length > 0,
 );
@@ -111,7 +113,10 @@ function removeExisting(assetId: number): void {
 
 function returnToAssets(): void {
   const state = window.history.state as { journalReturnPath?: string } | null;
-  void router.push(state?.journalReturnPath ?? '/me');
+  void router.push({
+    path: state?.journalReturnPath ?? '/me',
+    state: { journalAssetChanged: assetChanged.value },
+  });
 }
 
 function buildInput() {
@@ -147,6 +152,7 @@ async function saveDraft(): Promise<void> {
   const saved = await publisher.saveDraft({ ...buildInput(), uploadId });
   if (!saved) return;
   initializedEntryId.value = saved.id;
+  assetChanged.value = true;
   contentText.value = saved.contentText;
   newMedia.value = [];
   removedAssetIds.value = new Set();
@@ -175,6 +181,7 @@ async function publish(): Promise<void> {
     message: `已发布到“${channelLabel(channel.value)}”频道`,
     type: 'success',
   });
+  assetChanged.value = true;
   markPublishProbe('NAVIGATION_STARTED');
   returnToAssets();
   clearPublishProbe();
@@ -192,6 +199,7 @@ async function savePublished(): Promise<void> {
     sourceCreatedAt: specifiedTime.value,
   });
   if (!saved) return;
+  assetChanged.value = true;
   newMedia.value = [];
   removedAssetIds.value = new Set();
   showMessage({ message: '记录修改已保存', type: 'success' });
@@ -207,7 +215,7 @@ async function submit(): Promise<void> {
   <main class="publisher-view">
     <div class="publisher-view__heading">
       <button class="text-button" type="button" @click="returnToAssets">← 返回我的全部记录</button>
-      <span>{{ isPublished ? '编辑记录' : isEditing ? '编辑草稿' : '发布内容' }}</span>
+      <span>{{ isEditing ? '编辑记录' : '发布内容' }}</span>
     </div>
 
     <aside v-if="stalledPublishProbe" class="publisher-view__probe">
@@ -218,10 +226,8 @@ async function submit(): Promise<void> {
       </time>
     </aside>
 
-    <div class="publisher-view__stage" :class="{ 'publisher-view__stage--reading': !formAvailable }" :aria-busy="awaitingDraft">
-      <Transition name="publisher-stage" mode="out-in">
-        <JournalLoading v-if="deferredLoading.visible.value" key="loading" variant="reading" label="正在打开草稿…" />
-        <form v-else-if="formAvailable" key="form" class="publisher-view__form" @submit.prevent="submit">
+    <div class="publisher-view__stage" :aria-busy="publisher.loading.value">
+        <form v-loading="publisher.loading.value" class="publisher-view__form" @submit.prevent="submit">
           <div class="publisher-view__manuscript">
             <label class="field">
               <span class="field__label">正文</span>
@@ -292,8 +298,6 @@ async function submit(): Promise<void> {
             </div>
           </aside>
         </form>
-        <div v-else key="reserve" class="publisher-view__reading-reserve" aria-hidden="true"></div>
-      </Transition>
     </div>
   </main>
 </template>
@@ -339,10 +343,15 @@ async function submit(): Promise<void> {
 }
 
 .publisher-view__form {
+  --el-color-primary: var(--accent-strong);
   display: grid;
   grid-template-columns: minmax(0, var(--editor-width)) minmax(18rem, 1fr);
   gap: 1rem;
   align-items: start;
+}
+
+.publisher-view__form :deep(.el-loading-mask) {
+  background: color-mix(in srgb, var(--surface-page) 82%, transparent);
 }
 
 .publisher-view__manuscript {
@@ -413,26 +422,6 @@ async function submit(): Promise<void> {
 
 .publisher-view__actions .button {
   flex: 1 1 0;
-}
-
-.publisher-view__stage--reading,
-.publisher-view__reading-reserve {
-  width: min(100%, var(--editor-width));
-  min-height: 50vh;
-  margin: 0 auto;
-}
-
-.publisher-stage-enter-active {
-  transition: opacity var(--dur-loading-enter) var(--ease-card);
-}
-
-.publisher-stage-leave-active {
-  transition: opacity var(--dur-loading-exit) var(--ease-card);
-}
-
-.publisher-stage-enter-from,
-.publisher-stage-leave-to {
-  opacity: 0;
 }
 
 @media (max-width: 1180px) {

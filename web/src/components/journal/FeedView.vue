@@ -204,6 +204,10 @@ onMounted(async () => {
       const page = typeof to.query.page === 'string' ? Number(to.query.page) : 1;
       const previousPage = typeof from.query.page === 'string' ? Number(from.query.page) : 1;
       if (from.name === 'private' && view === previousView && page === previousPage) return;
+      if (
+        from.name === 'entry-edit'
+        && !(window.history.state as { journalAssetChanged?: boolean } | null)?.journalAssetChanged
+      ) return;
       if (view === 'table') void loadTablePage(page);
       else void journal.refreshPrivateFeed(filters);
     });
