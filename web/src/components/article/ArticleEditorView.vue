@@ -177,8 +177,8 @@ function viewCurrentArticle(): void {
 }
 
 function returnToAssets(): void {
-  const state = router.currentRoute.value.state as { journalReturnPath?: string };
-  void router.push(state.journalReturnPath ?? '/me');
+  const state = window.history.state as { journalReturnPath?: string } | null;
+  void router.push(state?.journalReturnPath ?? '/me');
 }
 </script>
 

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ElPagination } from 'element-plus';
 import type { JournalEntry, JournalPlainChannel, JournalVisibility } from '../../types';
-import JournalLoading from '../ui/JournalLoading.vue';
 import AssetTableView from './AssetTableView.vue';
 import JournalAssetTablePlaceholder from './JournalAssetTablePlaceholder.vue';
 
@@ -60,13 +59,10 @@ function forwardSetChannel(entry: JournalEntry, channel: JournalPlainChannel): v
     </div>
 
     <div class="private-asset-table-results__result">
-      <div v-if="loading" class="private-asset-table-results__status">
-        <JournalLoading variant="inline" label="正在读取记录…" />
-      </div>
-      <p v-else-if="error" class="private-asset-table-results__error" role="alert">
+      <p v-if="error" class="private-asset-table-results__error" role="alert">
         {{ error }}
       </p>
-      <p v-else-if="!entries.length" class="private-asset-table-results__empty">
+      <p v-else-if="!loading && !entries.length" class="private-asset-table-results__empty">
         没有符合当前筛选条件的记录。
       </p>
 
@@ -78,6 +74,7 @@ function forwardSetChannel(entry: JournalEntry, channel: JournalPlainChannel): v
         :total="total"
         :disabled="loading"
         :pager-count="7"
+        background
         layout="total, prev, pager, next, jumper"
         @current-change="emit('changePage', $event)"
       />
@@ -100,10 +97,6 @@ function forwardSetChannel(entry: JournalEntry, channel: JournalPlainChannel): v
   min-height: 2.5rem;
 }
 
-.private-asset-table-results__status {
-  display: inline-flex;
-}
-
 .private-asset-table-results__empty,
 .private-asset-table-results__error {
   margin: 0;
@@ -117,8 +110,67 @@ function forwardSetChannel(entry: JournalEntry, channel: JournalPlainChannel): v
 }
 
 .private-asset-table-results__pagination {
+  --el-color-primary: var(--accent-strong);
+  --el-pagination-bg-color: transparent;
+  --el-pagination-text-color: var(--text-muted);
+  --el-pagination-button-color: var(--text-primary);
+  --el-pagination-button-bg-color: var(--surface-card);
+  --el-pagination-button-disabled-color: var(--text-muted);
+  --el-pagination-button-disabled-bg-color: var(--surface-muted);
+  --el-pagination-hover-color: var(--accent-strong);
+  --el-pagination-border-radius: 8px;
+  --el-pagination-item-gap: 12px;
   flex-wrap: wrap;
   justify-content: center;
   row-gap: 0.5rem;
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.private-asset-table-results__pagination :deep(.btn-prev),
+.private-asset-table-results__pagination :deep(.btn-next),
+.private-asset-table-results__pagination :deep(.el-pager li) {
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-card);
+  transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease;
+}
+
+.private-asset-table-results__pagination :deep(.btn-prev:hover:not(:disabled)),
+.private-asset-table-results__pagination :deep(.btn-next:hover:not(:disabled)),
+.private-asset-table-results__pagination :deep(.el-pager li:hover:not(.is-active)) {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border-subtle));
+  background: var(--accent-soft);
+}
+
+.private-asset-table-results__pagination :deep(.el-pager li.is-active) {
+  border-color: var(--accent-strong);
+  background: var(--accent-strong);
+  color: #fff;
+}
+
+.private-asset-table-results__pagination :deep(.btn-prev:disabled),
+.private-asset-table-results__pagination :deep(.btn-next:disabled) {
+  border-color: transparent;
+  opacity: 0.55;
+}
+
+.private-asset-table-results__pagination :deep(.el-pagination__total),
+.private-asset-table-results__pagination :deep(.el-pagination__jump) {
+  color: var(--text-muted);
+}
+
+.private-asset-table-results__pagination :deep(.el-pagination__editor.el-input) {
+  --el-input-bg-color: var(--surface-card);
+  --el-input-border-color: var(--border-subtle);
+  --el-input-hover-border-color: var(--border-strong);
+  --el-input-focus-border-color: var(--accent);
+  --el-input-text-color: var(--text-primary);
+}
+
+.private-asset-table-results__pagination :deep(.el-input__wrapper) {
+  border-radius: 8px;
+  box-shadow: 0 0 0 1px var(--border-subtle) inset;
 }
 </style>
