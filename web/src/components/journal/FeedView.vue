@@ -26,7 +26,6 @@ import AssetManagementToolbar from './AssetManagementToolbar.vue';
 import EntryCard from './EntryCard.vue';
 import JournalDetailOverlay from './JournalDetailOverlay.vue';
 import LoginView from './LoginView.vue';
-import OnThisDay from './OnThisDay.vue';
 import PrivateAssetHeader from './PrivateAssetHeader.vue';
 import PrivateAssetTableResults from './PrivateAssetTableResults.vue';
 import PrivateWaterfallResults from './PrivateWaterfallResults.vue';
@@ -155,6 +154,11 @@ async function loadTablePage(page: number): Promise<void> {
   if (page > lastPage) emit('changePage', lastPage);
 }
 
+async function loadPrivateResults(): Promise<void> {
+  if (props.assetView === 'table') await loadTablePage(props.page);
+  else await journal.refreshPrivateFeed(filters);
+}
+
 watch(() => journal.authenticationState.value, (state) => {
   if (state !== 'checking') session.setAuthenticated(state === 'authenticated');
 });
@@ -211,8 +215,7 @@ onMounted(async () => {
     }
     await journal.loadPrivateContext();
     if (journal.authenticationState.value === 'authenticated') {
-      if (props.assetView === 'table') await loadTablePage(props.page);
-      else await journal.refreshPrivateFeed(filters);
+      await loadPrivateResults();
     }
     await loadDirectPrivateDetail();
   } finally {
@@ -286,8 +289,6 @@ async function refreshFeed(): Promise<void> {
   else if (props.assetView === 'table') await loadTablePage(props.page);
   else await journal.refreshPrivateFeed(filters);
 
-  if (props.mode === 'private') await journal.refreshOnThisDay();
-
   refreshRequestComplete.value = true;
   if (props.mode === 'private' && props.assetView === 'table') {
     finishRefresh();
@@ -318,8 +319,7 @@ async function authenticate(password: string): Promise<void> {
   try {
     await journal.authenticate(password);
     if (journal.authenticationState.value === 'authenticated') {
-      if (props.assetView === 'table') await loadTablePage(props.page);
-      else await journal.refreshPrivateFeed(filters);
+      await loadPrivateResults();
     }
     await loadDirectPrivateDetail();
   } finally {
@@ -531,28 +531,14 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
         @login="authenticate"
       />
 
-      <template v-else-if="mode === 'private' && journal.authenticationState.value === 'authenticated'">
-        <OnThisDay
-          :entries="journal.onThisDayEntries.value"
-          :mutation-entry-id="journal.mutationEntryId.value"
-          @open-entry="openEntry"
-          @edit-article="editArticle"
-          @select-tag="selectTag"
-          @save-content="saveContent"
-          @set-published-time="setPublishedTime"
-          @set-visibility="setVisibility"
-          @set-pinned="setPinned"
-          @set-channel="setChannel"
-          @delete-entry="deleteEntry"
-        />
-        <AssetManagementToolbar
-          :key="toolbarRevision"
-          :filters="filters"
-          :view="assetView"
-          @apply="applyFilters"
-          @change-view="changeAssetView"
-        />
-      </template>
+      <AssetManagementToolbar
+        v-if="mode === 'private' && journal.authenticationState.value !== 'anonymous'"
+        :key="toolbarRevision"
+        :filters="filters"
+        :view="assetView"
+        @apply="applyFilters"
+        @change-view="changeAssetView"
+      />
 
       <div v-if="isDetail" class="feed__reading-stage" :aria-busy="detailPreparing">
         <Transition name="feed-stage" mode="out-in">
@@ -649,7 +635,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
       </div>
 
       <div
-        v-else-if="journal.authenticationState.value === 'authenticated'"
+        v-else-if="journal.authenticationState.value !== 'anonymous'"
         class="feed__entries"
       >
         <PrivateWaterfallResults
@@ -679,7 +665,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
           :page="table.page.value"
           :page-size="table.pageSize"
           :total="table.total.value"
-          :loading="table.loading.value"
+          :loading="entriesLoading || table.loading.value"
           :error="table.error.value"
           :mutation-entry-id="journal.mutationEntryId.value"
           @change-page="changeTablePage"

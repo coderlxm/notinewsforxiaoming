@@ -2,7 +2,6 @@
 import { ElPagination } from 'element-plus';
 import type { JournalEntry, JournalPlainChannel, JournalVisibility } from '../../types';
 import AssetTableView from './AssetTableView.vue';
-import JournalAssetTablePlaceholder from './JournalAssetTablePlaceholder.vue';
 
 defineProps<{
   entries: readonly JournalEntry[];
@@ -42,10 +41,9 @@ function forwardSetChannel(entry: JournalEntry, channel: JournalPlainChannel): v
 <template>
   <section class="private-asset-table-results">
     <div class="private-asset-table-results__table">
-      <JournalAssetTablePlaceholder v-if="loading" />
       <AssetTableView
-        v-else-if="entries.length"
         :entries="entries"
+        :loading="loading"
         :mutation-entry-id="mutationEntryId"
         @view="emit('view', $event)"
         @edit="emit('edit', $event)"

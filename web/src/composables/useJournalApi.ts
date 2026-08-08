@@ -134,9 +134,6 @@ export function useJournalApi() {
     try {
       const session = await fetchAuthenticationState();
       authenticationState.value = session.authenticated ? 'authenticated' : 'anonymous';
-      if (!session.authenticated) return;
-      const onThisDay = await fetchOnThisDay();
-      onThisDayEntries.value = onThisDay.entries;
     }
     catch (reason) {
       exposeError(reason);
@@ -147,8 +144,16 @@ export function useJournalApi() {
   }
 
   async function refreshOnThisDay(): Promise<void> {
-    const onThisDay = await fetchOnThisDay();
-    onThisDayEntries.value = onThisDay.entries;
+    try {
+      const onThisDay = await fetchOnThisDay();
+      onThisDayEntries.value = onThisDay.entries;
+    }
+    catch (reason) {
+      if (reason instanceof JournalRequestError && reason.status === 401) {
+        authenticationState.value = 'anonymous';
+      }
+      exposeError(reason);
+    }
   }
 
   async function refreshPrivateFeed(filters: FeedFilters): Promise<void> {
@@ -211,8 +216,6 @@ export function useJournalApi() {
     try {
       await loginRequest(password);
       authenticationState.value = 'authenticated';
-      const onThisDay = await fetchOnThisDay();
-      onThisDayEntries.value = onThisDay.entries;
     }
     catch (reason) {
       if (reason instanceof JournalRequestError && reason.status === 401) {

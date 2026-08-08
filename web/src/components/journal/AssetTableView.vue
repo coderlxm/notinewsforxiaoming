@@ -7,9 +7,11 @@ import { formatEntryTime, formatFileSize } from '../../utils/formatters';
 import AssetTableActions from './AssetTableActions.vue';
 import AssetTableChannelCell from './AssetTableChannelCell.vue';
 import AssetTableContentCell from './AssetTableContentCell.vue';
+import JournalAssetTablePlaceholder from './JournalAssetTablePlaceholder.vue';
 
 const props = defineProps<{
   entries: readonly JournalEntry[];
+  loading: boolean;
   mutationEntryId: number | null;
 }>();
 
@@ -79,11 +81,12 @@ function forwardSetVisibility(entry: JournalEntry, visibility: JournalVisibility
 </script>
 
 <template>
-  <div v-if="rows.length" class="asset-table">
+  <div class="asset-table" :class="{ 'asset-table--loading': loading }" :aria-busy="loading">
     <ElTable
       :data="rows"
       row-key="id"
       table-layout="fixed"
+      empty-text=" "
       aria-label="我的资产表格"
     >
       <ElTableColumn label="时间" width="190">
@@ -160,16 +163,41 @@ function forwardSetVisibility(entry: JournalEntry, visibility: JournalVisibility
         </template>
       </ElTableColumn>
     </ElTable>
+    <div v-if="loading" class="asset-table__loading">
+      <JournalAssetTablePlaceholder />
+    </div>
   </div>
 </template>
 
 <style scoped>
 .asset-table {
+  position: relative;
   min-width: 0;
   overflow: hidden;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-card);
   background: var(--surface-card);
+}
+
+.asset-table--loading {
+  min-height: 32.75rem;
+}
+
+.asset-table__loading {
+  position: absolute;
+  z-index: 3;
+  inset: 2.75rem 0 0;
+  overflow: hidden;
+  background: var(--surface-card);
+}
+
+.asset-table__loading :deep(.asset-table-placeholder) {
+  border: 0;
+  border-radius: 0;
+}
+
+.asset-table__loading :deep(.asset-table-placeholder__header) {
+  display: none;
 }
 
 .asset-table :deep(.el-table) {
