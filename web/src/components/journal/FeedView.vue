@@ -83,6 +83,8 @@ const paginationLayoutPending = shallowRef(false);
 const feedLayoutReady = shallowRef(false);
 const tablePublishedTimeEntry = shallowRef<JournalEntry | null>(null);
 const toolbarRevision = shallowRef(0);
+const waterfallLoaded = shallowRef(false);
+const tableLoaded = shallowRef(false);
 let terminalErrorMessage: ReturnType<typeof showMessage> | null = null;
 let removeRouteAfterEach: (() => void) | null = null;
 
@@ -150,13 +152,24 @@ const refreshDisabled = computed(() =>
 async function loadTablePage(page: number): Promise<void> {
   await table.load({ page, filters });
   if (table.error.value !== null) return;
+  tableLoaded.value = true;
   const lastPage = Math.max(1, Math.ceil(table.total.value / table.pageSize));
   if (page > lastPage) emit('changePage', lastPage);
 }
 
+async function loadWaterfall(): Promise<void> {
+  await journal.refreshPrivateFeed(filters);
+  if (journal.error.value === null) waterfallLoaded.value = true;
+}
+
 async function loadPrivateResults(): Promise<void> {
   if (props.assetView === 'table') await loadTablePage(props.page);
-  else await journal.refreshPrivateFeed(filters);
+  else await loadWaterfall();
+}
+
+function invalidateInactiveView(): void {
+  if (props.assetView === 'table') waterfallLoaded.value = false;
+  else tableLoaded.value = false;
 }
 
 watch(() => journal.authenticationState.value, (state) => {
@@ -208,8 +221,10 @@ onMounted(async () => {
         from.name === 'entry-edit'
         && !(window.history.state as { journalAssetChanged?: boolean } | null)?.journalAssetChanged
       ) return;
-      if (view === 'table') void loadTablePage(page);
-      else void journal.refreshPrivateFeed(filters);
+      if (view === 'table') {
+        if (!tableLoaded.value || table.page.value !== page) void loadTablePage(page);
+      }
+      else if (!waterfallLoaded.value) void loadWaterfall();
     });
   }
   try {
@@ -248,6 +263,8 @@ onBeforeUnmount(() => {
 
 async function applyFilters(nextFilters: FeedFilters): Promise<void> {
   Object.assign(filters, nextFilters);
+  waterfallLoaded.value = false;
+  tableLoaded.value = false;
   feedLayoutReady.value = false;
   listReplacing.value = true;
   try {
@@ -255,7 +272,7 @@ async function applyFilters(nextFilters: FeedFilters): Promise<void> {
       if (props.page !== 1) emit('changePage', 1);
       else await loadTablePage(1);
     }
-    else await journal.refreshPrivateFeed(filters);
+    else await loadWaterfall();
   } finally {
     listReplacing.value = false;
   }
@@ -300,7 +317,7 @@ async function refreshFeed(): Promise<void> {
   if (props.mode === 'public') {
     await journal.loadPublic({ channel: props.channel, tag: props.initialTag });
   }
-  else await journal.refreshPrivateFeed(filters);
+  else await loadWaterfall();
 
   refreshRequestComplete.value = true;
   if (journal.error.value || journal.entries.value.length === 0) {
@@ -355,6 +372,8 @@ async function logout(): Promise<void> {
   loggingOut.value = true;
   try {
     await journal.logout();
+    waterfallLoaded.value = false;
+    tableLoaded.value = false;
   } finally {
     loggingOut.value = false;
   }
@@ -425,42 +444,47 @@ function isArticleEntry(entry: JournalEntry): boolean {
 async function saveContent(entry: JournalEntry, contentText: string): Promise<void> {
   await journal.saveContent(entry, contentText);
   if (journal.error.value === null) {
+    invalidateInactiveView();
     feedLayoutReady.value = false;
     if (props.assetView === 'table') await loadTablePage(props.page);
-    else await journal.refreshPrivateFeed(filters);
+    else await loadWaterfall();
   }
 }
 
 async function setPublishedTime(entry: JournalEntry, sourceCreatedAt: string): Promise<void> {
   await journal.setPublishedTime(entry, sourceCreatedAt);
   if (journal.error.value === null) {
+    invalidateInactiveView();
     feedLayoutReady.value = false;
     if (props.assetView === 'table') await loadTablePage(props.page);
-    else await journal.refreshPrivateFeed(filters);
+    else await loadWaterfall();
   }
 }
 
 async function setVisibility(entry: JournalEntry, visibility: JournalVisibility): Promise<void> {
   await journal.setVisibility(entry, visibility);
   if (journal.error.value === null) {
+    invalidateInactiveView();
     feedLayoutReady.value = false;
     if (props.assetView === 'table') await loadTablePage(props.page);
-    else await journal.refreshPrivateFeed(filters);
+    else await loadWaterfall();
   }
 }
 
 async function setPinned(entry: JournalEntry, pinned: boolean): Promise<void> {
   await journal.setPinned(entry, pinned);
   if (journal.error.value === null) {
+    invalidateInactiveView();
     feedLayoutReady.value = false;
     if (props.assetView === 'table') await loadTablePage(props.page);
-    else await journal.refreshPrivateFeed(filters);
+    else await loadWaterfall();
   }
 }
 
 async function setChannel(entry: JournalEntry, channel: JournalPlainChannel): Promise<void> {
   await journal.setChannel(entry, channel);
   if (journal.error.value === null) {
+    invalidateInactiveView();
     const target = journalChannels.find(item => item.value === channel)!;
     showMessage({ message: `已移动到“${target.label}”频道`, type: 'success' });
     if (props.assetView === 'table') await loadTablePage(props.page);
@@ -469,6 +493,7 @@ async function setChannel(entry: JournalEntry, channel: JournalPlainChannel): Pr
 
 async function deleteEntry(entry: JournalEntry): Promise<void> {
   await journal.deleteEntry(entry);
+  if (journal.error.value === null) invalidateInactiveView();
   if (journal.error.value === null && props.assetView === 'table') {
     await loadTablePage(props.page);
   }
