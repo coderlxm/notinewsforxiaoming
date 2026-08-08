@@ -122,6 +122,11 @@ function forwardSetChannel(entry: JournalEntry, channel: JournalPlainChannel): v
   --el-pagination-hover-color: var(--accent-strong);
   --el-pagination-border-radius: 8px;
   --el-pagination-item-gap: 12px;
+  --el-disabled-bg-color: var(--surface-muted);
+  --el-disabled-text-color: var(--text-muted);
+  --el-fill-color-blank: var(--surface-card);
+  --el-text-color-regular: var(--text-muted);
+  --el-text-color-placeholder: var(--text-muted);
   width: 100%;
   flex-wrap: wrap;
   justify-content: flex-end;
@@ -148,6 +153,12 @@ function forwardSetChannel(entry: JournalEntry, channel: JournalPlainChannel): v
 }
 
 .private-asset-table-results__pagination :deep(.el-pager li.is-active) {
+  border-color: var(--accent-strong);
+  background: var(--accent-strong);
+  color: #fff;
+}
+
+.private-asset-table-results__pagination.is-background :deep(.el-pager li.is-active.is-disabled) {
   border-color: var(--accent-strong);
   background: var(--accent-strong);
   color: #fff;
