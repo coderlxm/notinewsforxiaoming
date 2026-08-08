@@ -13,7 +13,6 @@ import { useSessionStore } from '../../stores/session';
 import { useSiteProfileStore } from '../../stores/siteProfile';
 import type { ChannelTags, SiteContactItem } from '../../types';
 import { showMessage } from '../../utils/message';
-import SettingsAccountPanel from './SettingsAccountPanel.vue';
 import SettingsChannelTagsPanel from './SettingsChannelTagsPanel.vue';
 import SettingsContactsPanel from './SettingsContactsPanel.vue';
 import SettingsPublicProfilePanel from './SettingsPublicProfilePanel.vue';
@@ -30,7 +29,6 @@ const settingsSections = [
   { name: 'contacts', label: '联系方式' },
   { name: 'tags', label: '频道标签' },
   { name: 'contribution', label: '投稿链接' },
-  { name: 'account', label: '账户' },
 ] as const;
 
 type SettingsSection = typeof settingsSections[number]['name'];
@@ -254,7 +252,16 @@ async function logout(): Promise<void> {
   <main class="settings-view">
     <div class="settings-view__heading">
       <button class="text-button" type="button" @click="router.push({ name: 'private' })">← 返回我的资产</button>
-      <span>设置</span>
+      <button
+        class="text-button settings-view__logout"
+        type="button"
+        :disabled="loggingOut"
+        :aria-busy="loggingOut"
+        @click="logout"
+      >
+        <JournalLoading v-if="loggingOut" variant="inline" label="退出中…" />
+        <template v-else>退出登录</template>
+      </button>
     </div>
 
     <section v-if="ownerAuthenticated && profile" class="settings-workspace" aria-labelledby="site-settings-title">
@@ -310,19 +317,11 @@ async function logout(): Promise<void> {
               v-model="editableChannelTags"
               :disabled="submitting"
             />
-            <AdminContributionLinkSettings v-else-if="section.name === 'contribution'" />
-            <SettingsAccountPanel
-              v-else
-              :logging-out="loggingOut"
-              @logout="logout"
-            />
+            <AdminContributionLinkSettings v-else />
           </ElTabPane>
         </ElTabs>
 
-        <div
-          v-if="activeSection !== 'contribution' && activeSection !== 'account'"
-          class="settings-savebar"
-        >
+        <div v-if="activeSection !== 'contribution'" class="settings-savebar">
           <p aria-live="polite">
             {{ hasUnsavedChanges ? '有尚未保存的站点设置' : '当前设置已保存' }}
           </p>
@@ -364,6 +363,14 @@ async function logout(): Promise<void> {
   padding: 0 0.15rem;
   color: var(--text-muted);
   font-size: 0.78rem;
+}
+
+.settings-view__logout {
+  color: var(--text-muted);
+}
+
+.settings-view__logout:hover {
+  color: var(--danger);
 }
 
 .settings-workspace,
