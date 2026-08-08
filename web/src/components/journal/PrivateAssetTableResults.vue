@@ -78,7 +78,9 @@ function forwardSetChannel(entry: JournalEntry, channel: JournalPlainChannel): v
 <style scoped>
 .private-asset-table-results {
   display: grid;
+  width: 100%;
   height: 100%;
+  min-width: 0;
   min-height: 0;
   grid-template-rows: minmax(0, 1fr) auto;
   overflow: hidden;
@@ -88,11 +90,16 @@ function forwardSetChannel(entry: JournalEntry, channel: JournalPlainChannel): v
 }
 
 .private-asset-table-results__table {
+  width: 100%;
+  min-width: 0;
   min-height: 0;
+  overflow: hidden;
 }
 
 .private-asset-table-results__result {
   display: flex;
+  width: 100%;
+  min-width: 0;
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
@@ -127,6 +134,7 @@ function forwardSetChannel(entry: JournalEntry, channel: JournalPlainChannel): v
   --el-text-color-regular: var(--text-muted);
   --el-text-color-placeholder: var(--text-muted);
   width: 100%;
+  min-width: 0;
   flex-wrap: wrap;
   justify-content: flex-end;
   row-gap: 0.5rem;
