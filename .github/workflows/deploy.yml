@@ -120,12 +120,21 @@ jobs:
           test -n "${{ secrets.JOURNAL_SERVER_SSH_KEY }}"
           test -n "${{ secrets.JOURNAL_SERVER_KNOWN_HOSTS }}"
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
       - name: Build immutable Journal image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: deploy/journal/Dockerfile
+          load: true
+          tags: notinews-journal:${{ github.sha }}
+          cache-from: type=gha,scope=journal
+          cache-to: type=gha,mode=max,scope=journal
+
+      - name: Package immutable Journal image
         run: |
-          docker build \
-            --file deploy/journal/Dockerfile \
-            --tag "notinews-journal:$GITHUB_SHA" \
-            .
           docker save "notinews-journal:$GITHUB_SHA" > "/tmp/journal-$GITHUB_SHA.tar"
           tar --create \
             --file "/tmp/journal-host-$GITHUB_SHA.tar" \
