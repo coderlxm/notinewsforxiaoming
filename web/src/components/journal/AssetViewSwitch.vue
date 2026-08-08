@@ -17,7 +17,6 @@ function select(view: AssetView): void {
 
 <template>
   <section class="asset-view-switch" aria-label="资产展示方式">
-    <span class="asset-view-switch__label">当前资产</span>
     <div class="asset-view-switch__options">
       <button
         class="asset-view-switch__option"
@@ -46,21 +45,8 @@ function select(view: AssetView): void {
 <style scoped>
 .asset-view-switch {
   display: flex;
-  min-height: 3.25rem;
+  height: var(--asset-toolbar-control-height, 3rem);
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.55rem 0.7rem 0.55rem 0.85rem;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-card);
-  background: var(--surface-card);
-}
-
-.asset-view-switch__label {
-  color: var(--accent-strong);
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
 }
 
 .asset-view-switch__options {
@@ -98,11 +84,6 @@ function select(view: AssetView): void {
 }
 
 @media (max-width: 599px) {
-  .asset-view-switch {
-    min-height: 3rem;
-    padding-left: 0.75rem;
-  }
-
   .asset-view-switch__option {
     padding-inline: 0.55rem;
   }

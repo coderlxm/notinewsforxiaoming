@@ -93,16 +93,15 @@ function reset(): void {
 <template>
   <section class="toolbar" aria-label="资产管理工具栏">
     <div class="toolbar__main">
+      <AssetViewSwitch :view="view" @change="changeView" />
       <label class="field toolbar__search">
-        <span class="field__label">正文关键词</span>
         <input
           v-model.trim="draft.query"
           type="search"
-          placeholder="搜索记录"
+          placeholder="正文关键词"
           @input="queueApply"
         >
       </label>
-      <AssetViewSwitch :view="view" @change="changeView" />
     </div>
 
     <div
@@ -143,17 +142,16 @@ function reset(): void {
         </div>
 
         <label class="field toolbar__tag">
-          <span class="field__label">标签</span>
           <input
             v-model.trim="draft.tag"
             type="text"
-            placeholder="例如：旅行"
+            placeholder="标签"
+            aria-label="标签"
             @input="queueApply"
           >
         </label>
         <label class="field toolbar__type">
-          <span class="field__label">格式</span>
-          <select v-model="draft.contentType" @change="queueApply">
+          <select v-model="draft.contentType" aria-label="格式" @change="queueApply">
             <option v-for="contentType in contentTypes" :key="contentType.value" :value="contentType.value">
               {{ contentType.label }}
             </option>
@@ -162,12 +160,10 @@ function reset(): void {
 
         <div class="toolbar__date-range" role="group" aria-label="日期范围">
           <label class="field">
-            <span class="field__label">从</span>
-            <input v-model="draft.from" type="date" @change="queueApply">
+            <input v-model="draft.from" type="date" aria-label="开始日期" @change="queueApply">
           </label>
           <label class="field">
-            <span class="field__label">到</span>
-            <input v-model="draft.to" type="date" @change="queueApply">
+            <input v-model="draft.to" type="date" aria-label="结束日期" @change="queueApply">
           </label>
         </div>
         <button
@@ -185,6 +181,7 @@ function reset(): void {
 
 <style scoped>
 .toolbar {
+  --asset-toolbar-control-height: 3rem;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-card);
   background: var(--surface-card);
@@ -193,10 +190,14 @@ function reset(): void {
 
 .toolbar__main {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: end;
   gap: 0.75rem;
   padding: 0.8rem;
+}
+
+.toolbar__search input {
+  height: var(--asset-toolbar-control-height);
 }
 
 .toolbar__details {
@@ -241,17 +242,16 @@ function reset(): void {
 
 .toolbar__panel {
   display: grid;
-  grid-template-columns: minmax(9rem, 1fr) minmax(8rem, 0.8fr) minmax(16rem, 1.4fr) auto;
-  align-items: end;
+  grid-template-columns: auto minmax(8rem, 0.75fr) minmax(8rem, 0.65fr) minmax(19rem, 1.6fr) auto;
+  align-items: center;
   gap: 0.7rem;
   padding: 0.8rem;
 }
 
 .toolbar__visibility {
   display: flex;
-  grid-column: 1 / -1;
   gap: 0.35rem;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .toolbar__choice {
@@ -305,6 +305,11 @@ function reset(): void {
     grid-template-columns: minmax(9rem, 1fr) minmax(8rem, 0.8fr) auto;
   }
 
+  .toolbar__visibility {
+    grid-column: 1 / -1;
+    flex-wrap: wrap;
+  }
+
   .toolbar__date-range {
     grid-column: 1 / 3;
   }
@@ -312,7 +317,7 @@ function reset(): void {
 
 @media (max-width: 759px) {
   .toolbar__main {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: auto minmax(0, 1fr);
     gap: 0.55rem;
     padding: 0.6rem 0.7rem;
   }

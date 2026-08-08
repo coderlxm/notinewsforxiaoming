@@ -10,12 +10,14 @@ export function usePrivateAssetTable() {
   const total = shallowRef(0);
   const loading = shallowRef(false);
   const error = shallowRef<string | null>(null);
+  let latestRequest = 0;
 
   function exposeError(reason: unknown): void {
     error.value = reason instanceof Error ? reason.message : String(reason);
   }
 
   async function load(options: { page: number; filters: FeedFilters }): Promise<void> {
+    const request = ++latestRequest;
     loading.value = true;
     error.value = null;
     try {
@@ -24,15 +26,17 @@ export function usePrivateAssetTable() {
         pageSize: PAGE_SIZE,
         filters: options.filters,
       });
+      if (request !== latestRequest) return;
       entries.value = result.entries;
       page.value = result.page;
       total.value = result.total;
     }
     catch (reason) {
+      if (request !== latestRequest) return;
       exposeError(reason);
     }
     finally {
-      loading.value = false;
+      if (request === latestRequest) loading.value = false;
     }
   }
 

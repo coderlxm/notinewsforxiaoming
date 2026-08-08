@@ -32,7 +32,7 @@ function requestDelete(entry: JournalEntry): void {
       @click="emit('edit', entry)"
     >
       <Edit aria-hidden="true" />
-      {{ entry.publicationStatus === 'draft' ? '继续编辑' : '编辑' }}
+      编辑
     </button>
     <button
       class="asset-table-actions__button"

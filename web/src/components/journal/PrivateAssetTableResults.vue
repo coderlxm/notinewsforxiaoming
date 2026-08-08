@@ -66,7 +66,6 @@ function forwardSetChannel(entry: JournalEntry, channel: JournalPlainChannel): v
         :current-page="page"
         :page-size="pageSize"
         :total="total"
-        :disabled="loading"
         :pager-count="7"
         background
         layout="total, prev, pager, next, jumper"

@@ -125,7 +125,7 @@ function handleCommand(command: string): void {
       <template #dropdown>
         <ElDropdownMenu aria-label="记录管理">
           <ElDropdownItem v-if="editVisible" command="edit">
-            {{ publicationStatus === 'draft' ? '继续编辑' : '编辑' }}
+            编辑
           </ElDropdownItem>
           <ElDropdownItem v-if="publicationStatus === 'published'" command="published-time">
             修改发布时间

@@ -193,12 +193,17 @@ async function loadDirectPrivateDetail(): Promise<void> {
 
 onMounted(async () => {
   if (props.mode === 'private') {
-    removeRouteAfterEach = router.afterEach((to) => {
+    removeRouteAfterEach = router.afterEach((to, from) => {
       if (to.name !== 'private' || journal.authenticationState.value !== 'authenticated') return;
       const view = to.query.view === 'table' || to.query.view === 'waterfall'
         ? to.query.view
         : props.assetView;
+      const previousView = from.query.view === 'table' || from.query.view === 'waterfall'
+        ? from.query.view
+        : props.assetView;
       const page = typeof to.query.page === 'string' ? Number(to.query.page) : 1;
+      const previousPage = typeof from.query.page === 'string' ? Number(from.query.page) : 1;
+      if (from.name === 'private' && view === previousView && page === previousPage) return;
       if (view === 'table') void loadTablePage(page);
       else void journal.refreshPrivateFeed(filters);
     });
@@ -279,6 +284,11 @@ function finishRefreshIfReady(): void {
 }
 
 async function refreshFeed(): Promise<void> {
+  if (props.mode === 'private' && props.assetView === 'table') {
+    await loadTablePage(props.page);
+    return;
+  }
+
   feedLayoutReady.value = false;
   refreshing.value = true;
   refreshRequestComplete.value = false;
@@ -286,14 +296,9 @@ async function refreshFeed(): Promise<void> {
   if (props.mode === 'public') {
     await journal.loadPublic({ channel: props.channel, tag: props.initialTag });
   }
-  else if (props.assetView === 'table') await loadTablePage(props.page);
   else await journal.refreshPrivateFeed(filters);
 
   refreshRequestComplete.value = true;
-  if (props.mode === 'private' && props.assetView === 'table') {
-    finishRefresh();
-    return;
-  }
   if (journal.error.value || journal.entries.value.length === 0) {
     finishRefresh();
     return;
@@ -664,7 +669,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
         <PrivateAssetTableResults
           v-else
           :entries="table.entries.value"
-          :page="table.page.value"
+          :page="page"
           :page-size="table.pageSize"
           :total="table.total.value"
           :loading="entriesLoading || table.loading.value"
