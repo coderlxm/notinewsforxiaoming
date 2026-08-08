@@ -60,10 +60,6 @@ function forwardSetChannel(entry: JournalEntry, channel: JournalPlainChannel): v
       <p v-if="error" class="private-asset-table-results__error" role="alert">
         {{ error }}
       </p>
-      <p v-else-if="!loading && !entries.length" class="private-asset-table-results__empty">
-        没有符合当前筛选条件的记录。
-      </p>
-
       <ElPagination
         v-if="!error"
         class="private-asset-table-results__pagination"
@@ -83,7 +79,17 @@ function forwardSetChannel(entry: JournalEntry, channel: JournalPlainChannel): v
 <style scoped>
 .private-asset-table-results {
   display: grid;
-  gap: 1rem;
+  height: 100%;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr) auto;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
+}
+
+.private-asset-table-results__table {
+  min-height: 0;
 }
 
 .private-asset-table-results__result {
@@ -92,19 +98,17 @@ function forwardSetChannel(entry: JournalEntry, channel: JournalPlainChannel): v
   align-items: center;
   justify-content: center;
   gap: 0.75rem 1rem;
-  min-height: 2.5rem;
+  min-height: 3.75rem;
+  padding: 0.65rem 0.85rem;
+  border-top: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--surface-muted) 22%, var(--surface-card));
 }
 
-.private-asset-table-results__empty,
 .private-asset-table-results__error {
   margin: 0;
-  color: var(--text-muted);
+  color: var(--danger);
   font-size: 0.82rem;
   text-align: center;
-}
-
-.private-asset-table-results__error {
-  color: var(--danger);
 }
 
 .private-asset-table-results__pagination {
@@ -118,8 +122,9 @@ function forwardSetChannel(entry: JournalEntry, channel: JournalPlainChannel): v
   --el-pagination-hover-color: var(--accent-strong);
   --el-pagination-border-radius: 8px;
   --el-pagination-item-gap: 12px;
+  width: 100%;
   flex-wrap: wrap;
-  justify-content: center;
+  justify-content: flex-end;
   row-gap: 0.5rem;
   color: var(--text-muted);
   font-family: var(--font-sans);

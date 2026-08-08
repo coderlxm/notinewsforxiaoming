@@ -470,6 +470,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
 <template>
   <JournalPullRefresh
     v-model="refreshing"
+    :class="{ 'feed__pull-refresh--table': mode === 'private' && assetView === 'table' }"
     :allow-overflow="isDetail"
     :disabled="refreshDisabled"
     @refresh="refreshFeed"
@@ -479,6 +480,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
       :class="{
         'feed--detail': isDetail,
         'feed--public': mode === 'public',
+        'feed--private-table': mode === 'private' && assetView === 'table',
       }"
     >
       <div v-if="isDetail" class="feed__detail-heading">
@@ -716,6 +718,23 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
   width: min(calc(100% - (var(--workspace-gutter) * 2)), var(--workspace-width));
   margin: 0 auto;
   padding: 1.3rem 0 4rem;
+}
+
+.feed__pull-refresh--table {
+  height: 100%;
+  min-height: 0;
+}
+
+.feed--private-table {
+  height: 100%;
+  min-height: 0;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  padding-bottom: 1.3rem;
+  overflow: hidden;
+}
+
+.feed--private-table .feed__entries {
+  min-height: 0;
 }
 
 .feed--detail {

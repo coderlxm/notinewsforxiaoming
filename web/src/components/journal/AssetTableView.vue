@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import { Connection, Document, Lock, Top } from '@element-plus/icons-vue';
-import { ElTable, ElTableColumn } from 'element-plus';
+import { ElTable, ElTableColumn, vLoading } from 'element-plus';
 import { computed } from 'vue';
 import type { JournalEntry, JournalPlainChannel, JournalVisibility } from '../../types';
 import { formatEntryTime, formatFileSize } from '../../utils/formatters';
 import AssetTableActions from './AssetTableActions.vue';
 import AssetTableChannelCell from './AssetTableChannelCell.vue';
 import AssetTableContentCell from './AssetTableContentCell.vue';
-import JournalAssetTablePlaceholder from './JournalAssetTablePlaceholder.vue';
 
 const props = defineProps<{
   entries: readonly JournalEntry[];
@@ -81,12 +80,13 @@ function forwardSetVisibility(entry: JournalEntry, visibility: JournalVisibility
 </script>
 
 <template>
-  <div class="asset-table" :class="{ 'asset-table--loading': loading }" :aria-busy="loading">
+  <div v-loading="loading" class="asset-table" :aria-busy="loading">
     <ElTable
       :data="rows"
       row-key="id"
       table-layout="fixed"
-      empty-text=" "
+      height="100%"
+      empty-text="没有符合当前筛选条件的记录"
       aria-label="我的资产表格"
     >
       <ElTableColumn label="时间" width="190">
@@ -163,41 +163,17 @@ function forwardSetVisibility(entry: JournalEntry, visibility: JournalVisibility
         </template>
       </ElTableColumn>
     </ElTable>
-    <div v-if="loading" class="asset-table__loading">
-      <JournalAssetTablePlaceholder />
-    </div>
   </div>
 </template>
 
 <style scoped>
 .asset-table {
+  --el-color-primary: var(--accent-strong);
   position: relative;
+  height: 100%;
   min-width: 0;
   overflow: hidden;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-card);
   background: var(--surface-card);
-}
-
-.asset-table--loading {
-  min-height: 32.75rem;
-}
-
-.asset-table__loading {
-  position: absolute;
-  z-index: 3;
-  inset: 2.75rem 0 0;
-  overflow: hidden;
-  background: var(--surface-card);
-}
-
-.asset-table__loading :deep(.asset-table-placeholder) {
-  border: 0;
-  border-radius: 0;
-}
-
-.asset-table__loading :deep(.asset-table-placeholder__header) {
-  display: none;
 }
 
 .asset-table :deep(.el-table) {
@@ -210,6 +186,10 @@ function forwardSetVisibility(entry: JournalEntry, visibility: JournalVisibility
   --el-table-header-text-color: var(--text-muted);
   background: var(--surface-card);
   font-size: 0.76rem;
+}
+
+.asset-table :deep(.el-loading-mask) {
+  background: color-mix(in srgb, var(--surface-card) 86%, transparent);
 }
 
 .asset-table :deep(.el-table::before) {
