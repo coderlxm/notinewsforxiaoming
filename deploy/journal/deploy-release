@@ -59,6 +59,7 @@ if [[ ${INSTALL_HOST_ASSETS} == true ]]; then
   tar -xf "${HOST_ASSETS_ARCHIVE}" -C "${HOST_ASSETS_ROOT}"
   install -m 755 "${HOST_ASSETS_ROOT}/scripts/journal-backup" /usr/local/sbin/journal-backup
   install -m 755 "${HOST_ASSETS_ROOT}/deploy/journal/deploy-release" /usr/local/sbin/journal-deploy-release
+  install -m 644 "${HOST_ASSETS_ROOT}/deploy/journal/compose.yaml" "${COMPOSE_FILE}"
   install -m 644 "${HOST_ASSETS_ROOT}/deploy/journal/journal-backup.service" /etc/systemd/system/journal-backup.service
   install -m 644 "${HOST_ASSETS_ROOT}/deploy/journal/journal-backup.timer" /etc/systemd/system/journal-backup.timer
   systemctl daemon-reload

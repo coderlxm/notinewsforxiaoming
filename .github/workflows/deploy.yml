@@ -140,6 +140,7 @@ jobs:
             --file "/tmp/journal-host-$GITHUB_SHA.tar" \
             scripts/journal-backup \
             deploy/journal/deploy-release \
+            deploy/journal/compose.yaml \
             deploy/journal/journal-backup.service \
             deploy/journal/journal-backup.timer
 
