@@ -3,6 +3,7 @@ import { computed, shallowRef, watch } from 'vue';
 import JournalLoading from '../ui/JournalLoading.vue';
 import type { JournalEntry, JournalPlainChannel, JournalVisibility } from '../../types';
 import { formatStructuredValue } from '../../utils/formatters';
+import { stripJournalTags } from '../../utils/journalText';
 import CardActionMenu from './CardActionMenu.vue';
 import CardDateSpine from './CardDateSpine.vue';
 import JournalTextPoster from './JournalTextPoster.vue';
@@ -52,15 +53,18 @@ const hasVisualMedia = computed(() => props.entry.assets.some(asset =>
   || (asset.kind === 'sticker' && asset.mimeType?.startsWith('video/')),
 ));
 const normalizedContent = computed(() => props.entry.contentText.replace(/\s+/g, ' ').trim());
+const normalizedPosterContent = computed(() =>
+  stripJournalTags(props.entry.contentText, props.entry.tags).replace(/\s+/g, ' ').trim(),
+);
 const hasTextPoster = computed(() =>
   props.entry.bodyFormat === 'plain'
   && props.entry.assets.length === 0
-  && normalizedContent.value.length > 0,
+  && normalizedPosterContent.value.length > 0,
 );
 const displayedContent = computed(() => {
-  if (isDetail.value || hasTextPoster.value || normalizedContent.value.length <= 72) return isDetail.value
-    ? props.entry.contentText
-    : normalizedContent.value;
+  if (isDetail.value) return props.entry.contentText;
+  if (hasTextPoster.value) return normalizedPosterContent.value;
+  if (normalizedContent.value.length <= 72) return normalizedContent.value;
   return `${normalizedContent.value.slice(0, 72)}…`;
 });
 const structuredRows = computed(() => Object.entries(props.entry.structuredContent ?? {})

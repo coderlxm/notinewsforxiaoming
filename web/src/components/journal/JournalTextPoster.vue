@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { JournalEntry } from '../../types';
+import { stripJournalTags } from '../../utils/journalText';
 import { resolveTextPosterTemplate } from '../../utils/textPosterTemplate';
 
 const props = withDefaults(defineProps<{
@@ -10,7 +11,7 @@ const props = withDefaults(defineProps<{
   display: 'detail',
 });
 
-const posterText = computed(() => props.entry.contentText.trim());
+const posterText = computed(() => stripJournalTags(props.entry.contentText, props.entry.tags));
 const textLength = computed(() => Array.from(posterText.value).length);
 const textSizeClass = computed(() => {
   if (textLength.value <= 30) return 'text-poster__text--short';
