@@ -75,10 +75,10 @@ const filters = reactive<FeedFilters>({
   ...emptyFeedFilters(),
   tag: props.initialTag,
 });
+const session = useSessionStore();
 const journal = useJournalApi();
 const table = usePrivateAssetTable();
 const router = useRouter();
-const session = useSessionStore();
 const siteProfile = useSiteProfileStore();
 const initialLoadPending = shallowRef(true);
 const listReplacing = shallowRef(false);
@@ -95,7 +95,6 @@ const tableLoaded = shallowRef(false);
 let terminalErrorMessage: ReturnType<typeof showMessage> | null = null;
 let removeRouteAfterEach: (() => void) | null = null;
 let protectedRobotsMeta: HTMLMetaElement | null = null;
-let authenticationRequest: Promise<void> | null = null;
 
 const isDetail = computed(() => props.mode === 'public' && props.detailId !== undefined);
 const isOverlay = computed(() =>
@@ -275,10 +274,9 @@ onMounted(async () => {
       await journal.loadPublic({ channel: props.channel, tag: props.initialTag });
       return;
     }
-    authenticationRequest = journal.loadPrivateContext();
-    await authenticationRequest;
-    authenticationRequest = null;
-    if (journal.authenticationState.value === 'authenticated') {
+    await session.load();
+    journal.setAuthenticationState(session.ownerAuthenticated);
+    if (session.ownerAuthenticated) {
       await loadPrivateResults();
     }
     await loadDirectPrivateDetail();
@@ -385,8 +383,6 @@ async function authenticate(password: string): Promise<void> {
   listReplacing.value = true;
   authenticating.value = true;
   try {
-    await authenticationRequest;
-    if (journal.authenticationState.value === 'authenticated') return;
     await journal.authenticate(password);
     if (journal.authenticationState.value === 'authenticated') {
       await loadPrivateResults();
@@ -598,7 +594,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
 
       <template v-else-if="mode === 'private'">
         <PrivateAssetHeader
-          :authenticated="journal.authenticationState.value === 'authenticated'"
+          :authenticated="session.authenticationChecked && session.ownerAuthenticated"
           :refreshing="refreshing"
           :refresh-disabled="refreshDisabled"
           @refresh="refreshFeed"
@@ -634,13 +630,13 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
       </div>
 
       <LoginView
-        v-if="mode === 'private' && journal.authenticationState.value !== 'authenticated'"
+        v-if="mode === 'private' && session.authenticationChecked && !session.ownerAuthenticated"
         :busy="authenticating"
         @login="authenticate"
       />
 
       <AssetManagementToolbar
-        v-if="mode === 'private' && journal.authenticationState.value === 'authenticated'"
+        v-if="mode === 'private' && session.authenticationChecked && session.ownerAuthenticated"
         :key="toolbarRevision"
         :filters="filters"
         :view="assetView"
@@ -751,7 +747,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
       </div>
 
       <div
-        v-else-if="journal.authenticationState.value === 'authenticated'"
+        v-else-if="session.authenticationChecked && session.ownerAuthenticated"
         class="feed__entries"
       >
         <PrivateWaterfallResults

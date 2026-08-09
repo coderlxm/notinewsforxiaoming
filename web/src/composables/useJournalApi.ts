@@ -1,7 +1,6 @@
 import { readonly, ref, shallowReadonly, shallowRef } from 'vue';
 import {
   deleteEntry as deleteEntryRequest,
-  fetchAuthenticationState,
   fetchOnThisDay,
   fetchPrivateEntry,
   fetchPrivateFeed,
@@ -170,19 +169,8 @@ export function useJournalApi() {
     }
   }
 
-  async function loadPrivateContext(): Promise<void> {
-    loading.value = true;
-    error.value = null;
-    try {
-      const session = await fetchAuthenticationState();
-      authenticationState.value = session.authenticated ? 'authenticated' : 'anonymous';
-    }
-    catch (reason) {
-      exposeError(reason);
-    }
-    finally {
-      loading.value = false;
-    }
+  function setAuthenticationState(authenticated: boolean): void {
+    authenticationState.value = authenticated ? 'authenticated' : 'anonymous';
   }
 
   async function refreshOnThisDay(): Promise<void> {
@@ -425,7 +413,7 @@ export function useJournalApi() {
     selectDetail,
     selectProtectedDetail,
     loadPrivate,
-    loadPrivateContext,
+    setAuthenticationState,
     refreshOnThisDay,
     refreshPrivateFeed,
     loadMorePublic,
