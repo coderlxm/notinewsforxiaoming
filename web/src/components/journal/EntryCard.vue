@@ -42,6 +42,25 @@ const confirmingDeletion = shallowRef(false);
 const editingPublishedTime = shallowRef(false);
 const draft = shallowRef(props.entry.contentText);
 const hiddenStructuredKeys = new Set(['entities', 'caption_entities']);
+const cardDateFormatter = new Intl.DateTimeFormat('zh-CN', {
+  timeZone: 'Asia/Shanghai',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+const cardTimeFormatter = new Intl.DateTimeFormat('zh-CN', {
+  timeZone: 'Asia/Shanghai',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+});
+
+function formatCardDate(date: Date): string {
+  return cardDateFormatter.formatToParts(date)
+    .filter(part => part.type === 'year' || part.type === 'month' || part.type === 'day')
+    .map(part => `${part.value}${part.type === 'year' ? '年' : (part.type === 'month' ? '月' : '日')}`)
+    .join('');
+}
 
 const isDetail = computed(() => !props.linkable);
 const isDraft = computed(() => props.entry.publicationStatus === 'draft');
@@ -74,6 +93,12 @@ const displayedStructuredRows = computed(() => isDetail.value
   : structuredRows.value.slice(0, 3));
 const cardVisualLimit = computed(() => props.linkable ? 5 : undefined);
 const cardLinkable = computed(() => props.linkable);
+const sourceCreatedDate = computed(() => new Date(props.entry.sourceCreatedAt));
+const formattedDate = computed(() => formatCardDate(sourceCreatedDate.value));
+const formattedTime = computed(() => cardTimeFormatter.format(sourceCreatedDate.value));
+const statusLabel = computed(() => isDraft.value
+  ? '草稿'
+  : (props.entry.visibility === 'public' ? '公开' : '私有'));
 const canSave = computed(() => draft.value !== props.entry.contentText && !props.busy);
 const deletionMessage = computed(() => {
   if (props.entry.assets.length === 0) return '永久删除这条记录？此操作无法撤销。';
@@ -134,7 +159,7 @@ function handleCardClick(event: MouseEvent): void {
     }"
     @click="handleCardClick"
   >
-    <header class="entry__header">
+    <header v-if="isDetail" class="entry__header">
       <CardDateSpine
         :source-created-at="entry.sourceCreatedAt"
         :pinned="entry.pinned"
@@ -176,68 +201,97 @@ function handleCardClick(event: MouseEvent): void {
       display="card"
     />
 
-    <div v-if="editing" class="entry__editor">
-      <label class="entry__editor-label" :for="`entry-content-${entry.id}`">编辑正文</label>
-      <textarea
-        :id="`entry-content-${entry.id}`"
-        v-model="draft"
-        class="entry__textarea"
-        rows="6"
-        :disabled="busy"
-      />
-      <div class="entry__editor-actions">
-        <button class="button button--quiet" type="button" :disabled="busy" @click="cancelEditing">取消</button>
-        <button
-          class="button button--primary"
-          type="button"
-          :disabled="!canSave"
-          :aria-busy="busy"
-          @click="emit('saveContent', entry, draft)"
-        >
-          <JournalLoading v-if="busy" variant="inline" label="保存中…" />
-          <template v-else>保存正文</template>
-        </button>
-      </div>
-    </div>
-    <p v-else-if="displayedContent" class="entry__content">{{ displayedContent }}</p>
-
-    <dl v-if="displayedStructuredRows.length" class="entry__structured">
-      <div v-for="row in displayedStructuredRows" :key="row[0]" class="entry__structured-row">
-        <dt>{{ row[0] }}</dt>
-        <dd>{{ formatStructuredValue(row[1]) }}</dd>
-      </div>
-    </dl>
-
-    <div v-if="entry.tags.length" class="entry__tags" aria-label="标签">
-      <button
-        v-for="tag in entry.tags"
-        :key="tag"
-        class="entry__tag"
-        type="button"
-        @click="emit('selectTag', tag)"
-      >
-        #{{ tag }}
-      </button>
-    </div>
-
-    <footer v-if="editable && confirmingDeletion" class="entry__delete-confirmation" role="alert">
-      <p class="entry__delete-message">{{ deletionMessage }}</p>
-      <div class="entry__delete-actions">
-        <button class="button button--quiet" type="button" :disabled="busy" @click="confirmingDeletion = false">
-          取消
-        </button>
-        <button
-          class="button entry__delete-button"
-          type="button"
+    <div class="entry__body">
+      <div v-if="editing" class="entry__editor">
+        <label class="entry__editor-label" :for="`entry-content-${entry.id}`">编辑正文</label>
+        <textarea
+          :id="`entry-content-${entry.id}`"
+          v-model="draft"
+          class="entry__textarea"
+          rows="6"
           :disabled="busy"
-          :aria-busy="busy"
-          @click="emit('deleteEntry', entry)"
+        />
+        <div class="entry__editor-actions">
+          <button class="button button--quiet" type="button" :disabled="busy" @click="cancelEditing">取消</button>
+          <button
+            class="button button--primary"
+            type="button"
+            :disabled="!canSave"
+            :aria-busy="busy"
+            @click="emit('saveContent', entry, draft)"
+          >
+            <JournalLoading v-if="busy" variant="inline" label="保存中…" />
+            <template v-else>保存正文</template>
+          </button>
+        </div>
+      </div>
+      <p v-else-if="displayedContent" class="entry__content">{{ displayedContent }}</p>
+
+      <dl v-if="displayedStructuredRows.length" class="entry__structured">
+        <div v-for="row in displayedStructuredRows" :key="row[0]" class="entry__structured-row">
+          <dt>{{ row[0] }}</dt>
+          <dd>{{ formatStructuredValue(row[1]) }}</dd>
+        </div>
+      </dl>
+
+      <div v-if="isDetail && entry.tags.length" class="entry__tags" aria-label="标签">
+        <button
+          v-for="tag in entry.tags"
+          :key="tag"
+          class="entry__tag"
+          type="button"
+          @click="emit('selectTag', tag)"
         >
-          <JournalLoading v-if="busy" variant="inline" label="删除中…" />
-          <template v-else>确认删除</template>
+          #{{ tag }}
         </button>
       </div>
-    </footer>
+
+      <footer v-if="!isDetail" class="entry__meta">
+        <div class="entry__meta-copy">
+          <time :datetime="entry.sourceCreatedAt">{{ formattedDate }}</time>
+          <span v-if="entry.pinned">置顶</span>
+          <span v-if="editable">{{ statusLabel }}</span>
+        </div>
+        <div class="entry__meta-trailing">
+          <CardActionMenu
+            v-if="editable && !confirmingDeletion"
+            :busy="busy"
+            :pinned="entry.pinned"
+            :visibility="entry.visibility"
+            :publication-status="entry.publicationStatus"
+            :channel="plainChannel"
+            :channel-editable="channelEditable"
+            @edit="startEditing"
+            @continue-edit="emit('continueDraft', entry)"
+            @edit-published-time="startPublishedTimeEditing"
+            @set-pinned="emit('setPinned', entry, $event)"
+            @set-visibility="emit('setVisibility', entry, $event)"
+            @set-channel="emit('setChannel', entry, $event)"
+            @request-delete="startDeletion"
+          />
+          <time class="entry__meta-time" :datetime="entry.sourceCreatedAt">{{ formattedTime }}</time>
+        </div>
+      </footer>
+
+      <footer v-if="editable && confirmingDeletion" class="entry__delete-confirmation" role="alert">
+        <p class="entry__delete-message">{{ deletionMessage }}</p>
+        <div class="entry__delete-actions">
+          <button class="button button--quiet" type="button" :disabled="busy" @click="confirmingDeletion = false">
+            取消
+          </button>
+          <button
+            class="button entry__delete-button"
+            type="button"
+            :disabled="busy"
+            :aria-busy="busy"
+            @click="emit('deleteEntry', entry)"
+          >
+            <JournalLoading v-if="busy" variant="inline" label="删除中…" />
+            <template v-else>确认删除</template>
+          </button>
+        </div>
+      </footer>
+    </div>
 
     <PublishedTimeDialog
       v-if="editingPublishedTime && !isDraft"
@@ -252,16 +306,13 @@ function handleCardClick(event: MouseEvent): void {
 <style scoped>
 .entry {
   display: grid;
-  gap: 0.6rem;
-  padding: 0.9rem;
-  border: 1px solid var(--border-subtle);
+  overflow: hidden;
   border-radius: var(--radius-card);
   background: var(--surface-card);
-  transition: border-color 180ms ease, transform 180ms ease;
+  transition: transform 180ms ease;
 }
 
 .entry--linkable:hover {
-  border-color: var(--border-strong);
   transform: translateY(-2px);
 }
 
@@ -269,16 +320,14 @@ function handleCardClick(event: MouseEvent): void {
   cursor: pointer;
 }
 
-.entry--pinned {
-  border-color: color-mix(in srgb, var(--accent) 50%, var(--border-subtle));
-}
-
 .entry--detail {
   gap: 1rem;
   padding: 1.5rem;
+  overflow: visible;
 }
 
 .entry__header,
+.entry__meta,
 .entry__editor-actions,
 .entry__tags,
 .entry__delete-actions {
@@ -290,6 +339,62 @@ function handleCardClick(event: MouseEvent): void {
   min-width: 0;
   justify-content: space-between;
   gap: 0.5rem;
+}
+
+.entry__body {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.8rem 0.9rem 0.65rem;
+}
+
+.entry--detail .entry__body {
+  gap: 1rem;
+  padding: 0;
+}
+
+.entry__meta {
+  min-width: 0;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.entry__meta-copy {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--text-muted);
+  font-family: var(--font-condensed);
+  font-size: 0.68rem;
+  letter-spacing: 0.02em;
+}
+
+.entry__meta-copy span {
+  white-space: nowrap;
+}
+
+.entry__meta-copy span + span {
+  padding-left: 0.45rem;
+  border-left: 1px solid var(--border-subtle);
+}
+
+.entry__meta-trailing {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  margin-left: auto;
+}
+
+.entry__meta-time {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-family: var(--font-condensed);
+  font-size: 0.68rem;
+  letter-spacing: 0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .entry__content {
@@ -417,8 +522,6 @@ function handleCardClick(event: MouseEvent): void {
 
 @media (max-width: 599px) {
   .entry {
-    gap: 0.6rem;
-    padding: 0.65rem 0.65rem 0.35rem;
     border-radius: 0.65rem;
   }
 
@@ -426,6 +529,14 @@ function handleCardClick(event: MouseEvent): void {
     gap: 0.9rem;
     padding: 1rem;
     border-radius: var(--radius-card);
+  }
+
+  .entry__body {
+    padding: 0.65rem;
+  }
+
+  .entry--detail .entry__body {
+    padding: 0;
   }
 
   .entry__structured {

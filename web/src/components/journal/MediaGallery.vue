@@ -231,6 +231,19 @@ function preserveAssetRatio(asset: DisplayAsset): { aspectRatio: string } | unde
   aspect-ratio: 4 / 3;
 }
 
+.media--card {
+  gap: 0;
+}
+
+.media--card .media__visual {
+  border-radius: 0;
+}
+
+.media--card .media__audios,
+.media--card .media__files {
+  gap: 0;
+}
+
 .media--detail .media__visuals {
   grid-template-columns: 1fr;
   gap: 0.8rem;
@@ -271,6 +284,8 @@ function preserveAssetRatio(asset: DisplayAsset): { aspectRatio: string } | unde
 .media--card .media__audio-row {
   gap: 0.45rem;
   padding: 0.65rem;
+  border: 0;
+  border-radius: 0;
 }
 
 .media__audio-copy {
@@ -316,6 +331,14 @@ function preserveAssetRatio(asset: DisplayAsset): { aspectRatio: string } | unde
   gap: 0.55rem;
   min-height: 2.5rem;
   padding: 0.55rem;
+  border: 0;
+  border-radius: 0;
+}
+
+.media--card .media__audio-row + .media__audio-row,
+.media--card .media__file + .media__file,
+.media--card .media__files {
+  border-top: 1px solid var(--border-subtle);
 }
 
 .media__file:hover {

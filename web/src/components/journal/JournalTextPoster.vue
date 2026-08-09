@@ -24,13 +24,9 @@ const posterClass = computed(() => [
   `text-poster--${template.value}`,
 ]);
 const decorativeMark = computed(() => /[?？]/.test(posterText.value) ? '?' : '“');
-const visibilityLabel = computed(() => props.entry.visibility === 'public' ? 'PUBLIC NOTE' : 'PRIVATE NOTE');
-const posterDate = computed(() => new Intl.DateTimeFormat('zh-CN', {
-  timeZone: 'Asia/Shanghai',
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-}).format(new Date(props.entry.sourceCreatedAt)));
+const visibilityLabel = computed(() => props.entry.publicationStatus === 'draft'
+  ? 'DRAFT NOTE'
+  : (props.entry.visibility === 'public' ? 'PUBLIC NOTE' : 'PRIVATE NOTE'));
 </script>
 
 <template>
@@ -45,7 +41,7 @@ const posterDate = computed(() => new Intl.DateTimeFormat('zh-CN', {
 
       <footer class="text-poster__footer">
         <span>小明同学</span>
-        <time :datetime="entry.sourceCreatedAt">{{ posterDate }}</time>
+        <span>NOTE</span>
       </footer>
     </div>
   </section>
@@ -183,7 +179,7 @@ const posterDate = computed(() => new Intl.DateTimeFormat('zh-CN', {
 
 .text-poster--card {
   width: 100%;
-  border-radius: 0.65rem;
+  border-radius: 0;
 }
 
 .text-poster--card .text-poster__sheet {
@@ -322,7 +318,7 @@ const posterDate = computed(() => new Intl.DateTimeFormat('zh-CN', {
   justify-content: center;
 }
 
-.text-poster--cinema .text-poster__footer span {
+.text-poster--cinema .text-poster__footer span:first-child {
   display: none;
 }
 
