@@ -131,9 +131,8 @@ export class JournalWebEntryUploadService {
         !entry
         || entry.sourceKind !== 'web'
         || entry.bodyFormat !== 'plain'
-        || entry.publicationStatus !== 'draft'
       ) {
-        throw new Error(`Web entry draft ${input.entryId} was not found.`);
+        throw new Error(`Web entry ${input.entryId} was not found.`);
       }
       publicId = entry.publicId;
       createdAt = entry.sourceCreatedAt;

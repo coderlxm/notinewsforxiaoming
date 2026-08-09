@@ -131,9 +131,16 @@ export async function registerPrivateEntryRoutes(
     return await webEntryService.createPrepared(fields, webEntryUploads.take(uploadId));
   });
 
-  server.post('/api/me/entry-uploads', { preHandler: auth.requireAdmin }, async (request) => {
+  server.post('/api/me/entry-uploads', { preHandler: auth.requireAdmin }, async (request, reply) => {
     const body = z.object({ entryId: z.number().int().positive().optional() }).parse(request.body);
-    return await webEntryUploads.create(body);
+    try {
+      return await webEntryUploads.create(body);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('was not found')) {
+        return reply.code(404).send({ error: error.message });
+      }
+      throw error;
+    }
   });
 
   server.post('/api/me/entry-uploads/:uploadId/assets/:assetUploadId', {
