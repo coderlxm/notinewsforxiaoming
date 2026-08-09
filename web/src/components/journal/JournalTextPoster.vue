@@ -296,7 +296,7 @@ const visibilityLabel = computed(() => props.entry.publicationStatus === 'draft'
   --poster-muted: #59616d;
   --poster-accent: #973a69;
   --poster-mark: rgb(95 51 94 / 8%);
-  --poster-align: center;
+  --poster-align: left;
   --poster-letter-spacing: 0.015em;
 }
 
@@ -356,7 +356,7 @@ const visibilityLabel = computed(() => props.entry.publicationStatus === 'draft'
   --poster-accent: #8e2932;
   --poster-mark: rgb(33 31 28 / 5%);
   --poster-font: var(--font-serif);
-  --poster-align: center;
+  --poster-align: left;
   --poster-letter-spacing: -0.045em;
 }
 
@@ -417,6 +417,7 @@ const visibilityLabel = computed(() => props.entry.publicationStatus === 'draft'
 
 @media (prefers-color-scheme: dark) {
   .text-poster {
+    --poster-color: #ececec;
     background: #171715;
   }
 
@@ -426,7 +427,6 @@ const visibilityLabel = computed(() => props.entry.publicationStatus === 'draft'
       radial-gradient(circle at 85% 13%, rgb(228 91 102 / 13%), transparent 24%),
       radial-gradient(circle at 12% 88%, rgb(111 143 142 / 12%), transparent 26%),
       #1d201e;
-    --poster-color: #ebe8df;
     --poster-muted: #999a94;
     --poster-accent: #d65c67;
     --poster-mark: rgb(235 232 223 / 5%);
@@ -436,7 +436,6 @@ const visibilityLabel = computed(() => props.entry.publicationStatus === 'draft'
     --poster-background:
       linear-gradient(90deg, rgb(0 0 0 / 24%), transparent 8%, transparent 92%, rgb(0 0 0 / 16%)),
       #211b17;
-    --poster-color: #eee1ca;
     --poster-muted: #aa9a84;
     --poster-accent: #c78758;
     --poster-mark: rgb(214 175 126 / 6%);
@@ -447,7 +446,6 @@ const visibilityLabel = computed(() => props.entry.publicationStatus === 'draft'
       linear-gradient(90deg, #9f2d38 0 8%, transparent 8%),
       linear-gradient(180deg, transparent 0 72%, rgb(255 255 255 / 4%) 72%),
       #202422;
-    --poster-color: #f0f1ed;
     --poster-muted: #a2aaa6;
     --poster-accent: #e45a65;
     --poster-mark: rgb(228 90 101 / 10%);
@@ -457,7 +455,6 @@ const visibilityLabel = computed(() => props.entry.publicationStatus === 'draft'
     --poster-background:
       repeating-linear-gradient(0deg, transparent 0 31px, rgb(205 174 122 / 7%) 31px 32px),
       #25251d;
-    --poster-color: #e7d8b9;
     --poster-muted: #a89b7e;
     --poster-accent: #c86b4e;
     --poster-mark: rgb(207 149 90 / 7%);
@@ -467,7 +464,6 @@ const visibilityLabel = computed(() => props.entry.publicationStatus === 'draft'
     --poster-background:
       radial-gradient(circle at 70% 24%, rgb(171 61 117 / 24%), transparent 30%),
       linear-gradient(160deg, #11151d, #1d2029 58%, #171319);
-    --poster-color: #ececf2;
     --poster-muted: #9da1ad;
     --poster-accent: #d270a3;
     --poster-mark: rgb(210 112 163 / 8%);
@@ -477,7 +473,6 @@ const visibilityLabel = computed(() => props.entry.publicationStatus === 'draft'
     --poster-background:
       linear-gradient(90deg, transparent 0 12%, rgb(183 68 73 / 25%) 12% 12.5%, transparent 12.5%),
       repeating-linear-gradient(0deg, #202827 0 29px, #34403d 29px 30px);
-    --poster-color: #e5e1ce;
     --poster-muted: #a5aa9e;
     --poster-accent: #d36769;
     --poster-mark: rgb(203 214 189 / 5%);
@@ -491,7 +486,6 @@ const visibilityLabel = computed(() => props.entry.publicationStatus === 'draft'
     --poster-background:
       repeating-linear-gradient(90deg, transparent 0 49.8%, rgb(238 235 226 / 4%) 49.8% 50.2%, transparent 50.2% 100%),
       #1d1c1a;
-    --poster-color: #ebe8df;
     --poster-muted: #aaa69d;
     --poster-accent: #ce5a63;
     --poster-mark: rgb(235 232 223 / 5%);
