@@ -105,7 +105,7 @@ function forwardPinned(entry: JournalEntry, pinned: boolean): void {
       :assets="visualAssets"
       @aspect-ratio-change="emit('stageAspectRatioChange', $event)"
     />
-    <JournalTextPoster v-else-if="hasTextPoster" :entry="entry" />
+    <JournalTextPoster v-else-if="hasTextPoster" :entry="entry" display="detail" />
     <div ref="content" class="detail-layout__content">
       <JournalDetailContent
         :entry="entry"

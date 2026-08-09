@@ -5,6 +5,7 @@ import type { JournalEntry, JournalPlainChannel, JournalVisibility } from '../..
 import { formatStructuredValue } from '../../utils/formatters';
 import CardActionMenu from './CardActionMenu.vue';
 import CardDateSpine from './CardDateSpine.vue';
+import JournalTextPoster from './JournalTextPoster.vue';
 import MediaGallery from './MediaGallery.vue';
 import PublishedTimeDialog from './PublishedTimeDialog.vue';
 
@@ -51,18 +52,17 @@ const hasVisualMedia = computed(() => props.entry.assets.some(asset =>
   || (asset.kind === 'sticker' && asset.mimeType?.startsWith('video/')),
 ));
 const normalizedContent = computed(() => props.entry.contentText.replace(/\s+/g, ' ').trim());
+const hasTextPoster = computed(() =>
+  props.entry.bodyFormat === 'plain'
+  && props.entry.assets.length === 0
+  && normalizedContent.value.length > 0,
+);
 const displayedContent = computed(() => {
-  if (isDetail.value || normalizedContent.value.length <= 72) return isDetail.value
+  if (isDetail.value || hasTextPoster.value || normalizedContent.value.length <= 72) return isDetail.value
     ? props.entry.contentText
     : normalizedContent.value;
   return `${normalizedContent.value.slice(0, 72)}…`;
 });
-const isShortText = computed(() =>
-  !isDetail.value
-  && props.entry.assets.length === 0
-  && normalizedContent.value.length > 0
-  && normalizedContent.value.length <= 36,
-);
 const structuredRows = computed(() => Object.entries(props.entry.structuredContent ?? {})
   .filter(([key]) => !hiddenStructuredKeys.has(key)));
 const displayedStructuredRows = computed(() => isDetail.value
@@ -124,8 +124,8 @@ function handleCardClick(event: MouseEvent): void {
     :class="{
       'entry--pinned': entry.pinned,
       'entry--detail': isDetail,
-      'entry--short': isShortText,
       'entry--visual': hasVisualMedia,
+      'entry--poster': hasTextPoster,
       'entry--linkable': cardLinkable && !editing && !confirmingDeletion,
     }"
     @click="handleCardClick"
@@ -165,6 +165,11 @@ function handleCardClick(event: MouseEvent): void {
       :display="isDetail ? 'detail' : 'card'"
       :max-visuals="cardVisualLimit"
       @open="openEntry"
+    />
+    <JournalTextPoster
+      v-else-if="hasTextPoster && !editing"
+      :entry="entry"
+      display="card"
     />
 
     <div v-if="editing" class="entry__editor">
@@ -264,10 +269,6 @@ function handleCardClick(event: MouseEvent): void {
   border-color: color-mix(in srgb, var(--accent) 50%, var(--border-subtle));
 }
 
-.entry--short {
-  background: color-mix(in srgb, var(--accent-soft) 42%, var(--surface-card));
-}
-
 .entry--detail {
   gap: 1rem;
   padding: 1.5rem;
@@ -296,19 +297,13 @@ function handleCardClick(event: MouseEvent): void {
   white-space: pre-wrap;
 }
 
-.entry--visual:not(.entry--detail) .entry__content {
+.entry--visual:not(.entry--detail) .entry__content,
+.entry--poster:not(.entry--detail) .entry__content {
   display: -webkit-box;
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   white-space: normal;
-}
-
-.entry--short .entry__content {
-  font-family: var(--font-serif);
-  font-size: clamp(1.08rem, 1.4vw, 1.3rem);
-  font-weight: 650;
-  line-height: 1.55;
 }
 
 .entry--detail .entry__content {
@@ -418,7 +413,7 @@ function handleCardClick(event: MouseEvent): void {
 
 @media (max-width: 599px) {
   .entry {
-    gap: 0;
+    gap: 0.6rem;
     padding: 0.65rem 0.65rem 0.35rem;
     border-radius: 0.65rem;
   }
@@ -440,7 +435,6 @@ function handleCardClick(event: MouseEvent): void {
 
   .entry__tags {
     gap: 0;
-    margin-top: 0;
   }
 }
 
