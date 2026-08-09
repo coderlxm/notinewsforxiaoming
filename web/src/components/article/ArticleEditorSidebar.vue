@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { shallowRef, watch } from 'vue';
+import { computed, shallowRef, watch } from 'vue';
 import type { JournalAsset, JournalEntry, JournalVisibility } from '../../types';
 import { parseTagsInput, tagsInputToString } from '../../types';
 import { copyEntryAccessLink } from '../../utils/accessLink';
 import { showMessage } from '../../utils/message';
+import AiTagSuggestionButton from '../ui/AiTagSuggestionButton.vue';
 import JournalLoading from '../ui/JournalLoading.vue';
 import EntryVisibilityField from '../publisher/EntryVisibilityField.vue';
 import ArticleMediaPanel from './ArticleMediaPanel.vue';
@@ -16,15 +17,18 @@ const props = defineProps<{
   assets: readonly JournalAsset[];
   canSave: boolean;
   canSaveAccess: boolean;
+  canGenerateTags: boolean;
   hasExistingPassword: boolean;
   isEditing: boolean;
   mediaBusy: boolean;
   mediaBusyLabel: string | null;
   previewing: boolean;
   savingAction: SavingAction;
+  tagSuggestionBusy: boolean;
 }>();
 
 const emit = defineEmits<{
+  generateTags: [];
   saveAccessSettings: [];
   removeAsset: [asset: JournalAsset];
   uploadCover: [file: File];
@@ -35,14 +39,22 @@ const tags = defineModel<string[]>('tags', { default: () => [] });
 const visibility = defineModel<JournalVisibility>('visibility', { required: true });
 const accessPassword = defineModel<string>('accessPassword', { default: '' });
 const tagsInput = shallowRef(tagsInputToString(tags.value));
+const tagInputFull = computed(() => parseTagsInput(tagsInput.value).length === 20);
 
 watch(tags, (next) => {
   const text = tagsInputToString(next);
   if (text !== tagsInput.value) tagsInput.value = text;
 });
 
-function commitTagsInput(): void {
-  tags.value = parseTagsInput(tagsInput.value);
+function commitTagsInput(): string[] {
+  const committedTags = parseTagsInput(tagsInput.value);
+  tags.value = committedTags;
+  return committedTags;
+}
+
+function requestTagSuggestions(): void {
+  if (commitTagsInput().length === 20) return;
+  emit('generateTags');
 }
 
 async function copyAccessLink(): Promise<void> {
@@ -66,16 +78,24 @@ async function copyAccessLink(): Promise<void> {
       <h2 class="editor-sidebar__title">文章设置</h2>
 
       <div class="editor-sidebar__settings">
-        <label class="field">
-          <span class="field__label">标签（逗号分隔，最多 20 个）</span>
+        <div class="field">
+          <div class="editor-sidebar__field-heading">
+            <label class="field__label" for="article-editor-tags">标签（逗号分隔，最多 20 个）</label>
+            <AiTagSuggestionButton
+              :disabled="!canGenerateTags || tagInputFull"
+              :busy="tagSuggestionBusy"
+              @generate="requestTagSuggestions"
+            />
+          </div>
           <input
+            id="article-editor-tags"
             v-model="tagsInput"
             type="text"
             placeholder="例如：生活, 随笔"
             @blur="commitTagsInput"
             @keydown.enter.prevent="commitTagsInput"
           >
-        </label>
+        </div>
 
         <EntryVisibilityField
           v-if="article"
@@ -184,6 +204,13 @@ async function copyAccessLink(): Promise<void> {
   gap: 1rem;
   color: var(--text-muted);
   font-size: 0.8rem;
+}
+
+.editor-sidebar__field-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
 }
 
 .editor-sidebar__visibility-value {

@@ -22,6 +22,23 @@ import type {
   SiteProfile,
 } from './types';
 
+export type JournalTagSuggestionRequest =
+  | {
+      kind: 'entry';
+      title: string | null;
+      contentText: string;
+    }
+  | {
+      kind: 'article';
+      title: string;
+      richBody: JournalRichDocument;
+      existingTags: string[];
+    };
+
+export interface JournalTagSuggestionResponse {
+  tags: string[];
+}
+
 export class JournalRequestError extends Error {
   readonly status: number;
 
@@ -89,6 +106,15 @@ function appendFilterParams(params: URLSearchParams, filters: FeedFilters): void
   if (filters.contentType) params.set('contentType', filters.contentType);
   if (filters.from) params.set('from', filters.from);
   if (filters.to) params.set('to', filters.to);
+}
+
+export function requestTagSuggestions(
+  input: JournalTagSuggestionRequest,
+): Promise<JournalTagSuggestionResponse> {
+  return requestJson<JournalTagSuggestionResponse>(
+    '/api/me/tag-suggestions',
+    jsonRequest('POST', input),
+  );
 }
 
 export function fetchPublicFeed(options: {

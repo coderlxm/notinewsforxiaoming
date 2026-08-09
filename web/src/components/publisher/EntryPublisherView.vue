@@ -2,13 +2,16 @@
 import { computed, onBeforeUnmount, onMounted, shallowRef, watch } from 'vue';
 import { vLoading } from 'element-plus';
 import { useRouter } from 'vue-router';
+import AiTagSuggestionButton from '../ui/AiTagSuggestionButton.vue';
 import JournalLoading from '../ui/JournalLoading.vue';
 import { useEntryPublisher } from '../../composables/useEntryPublisher';
 import { useEntryMediaSubmit } from '../../composables/useEntryMediaSubmit';
+import { useTagSuggestions } from '../../composables/useTagSuggestions';
 import { plainJournalChannels } from '../../journalChannels';
 import type { JournalAsset, JournalPlainChannel, JournalVisibility } from '../../types';
 import { showMessage } from '../../utils/message';
 import { copyEntryAccessLink } from '../../utils/accessLink';
+import { appendJournalTags } from '../../utils/journalTags';
 import {
   beginPublishProbe,
   clearPublishProbe,
@@ -30,6 +33,7 @@ const props = withDefaults(defineProps<{
 
 const router = useRouter();
 const publisher = useEntryPublisher();
+const tagSuggestions = useTagSuggestions();
 const title = shallowRef('');
 const contentText = shallowRef('');
 const channel = shallowRef<JournalPlainChannel>('life');
@@ -88,6 +92,9 @@ const canSavePublished = computed(() =>
   && !busy.value,
 );
 const routeError = computed(() => publisher.error.value);
+const tagSuggestionInputAvailable = computed(() =>
+  title.value.trim().length > 0 || contentText.value.trim().length > 0,
+);
 
 watch(() => publisher.entry.value, (entry) => {
   if (!entry || initializedEntryId.value === entry.id) return;
@@ -252,6 +259,29 @@ async function copyAccessLink(): Promise<void> {
     });
   }
 }
+
+async function generateTags(): Promise<void> {
+  try {
+    const tags = await tagSuggestions.generate({
+      kind: 'entry',
+      title: title.value.trim() || null,
+      contentText: contentText.value,
+    });
+    const result = appendJournalTags(contentText.value, tags);
+    if (result.addedTags.length === 0) {
+      showMessage({ message: '没有新的标签可补充', type: 'info' });
+      return;
+    }
+    contentText.value = result.contentText;
+    showMessage({ message: `已补充 ${result.addedTags.length} 个标签`, type: 'success' });
+  }
+  catch (reason) {
+    showMessage({
+      message: reason instanceof Error ? reason.message : String(reason),
+      type: 'error',
+    });
+  }
+}
 </script>
 
 <template>
@@ -275,15 +305,23 @@ async function copyAccessLink(): Promise<void> {
             <div class="publisher-view__copy">
               <EntryTopicField v-if="topicEditable" v-model="title" :disabled="busy" />
 
-              <label class="field">
-                <span class="field__label">正文</span>
+              <div class="field">
+                <div class="publisher-view__field-heading">
+                  <label class="field__label" for="entry-content">正文</label>
+                  <AiTagSuggestionButton
+                    :disabled="!tagSuggestionInputAvailable"
+                    :busy="tagSuggestions.busy.value"
+                    @generate="generateTags"
+                  />
+                </div>
                 <textarea
+                  id="entry-content"
                   v-model="contentText"
                   rows="10"
                   placeholder="写下内容，可直接使用 #标签"
                   :disabled="busy"
                 />
-              </label>
+              </div>
             </div>
 
             <EntryImagePicker
@@ -428,6 +466,14 @@ async function copyAccessLink(): Promise<void> {
 
 .publisher-view__copy {
   display: grid;
+  gap: 0.75rem;
+}
+
+.publisher-view__field-heading {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
   gap: 0.75rem;
 }
 

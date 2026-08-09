@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router';
 import JournalLoading from '../ui/JournalLoading.vue';
 import { useDeferredLoading } from '../../composables/useDeferredLoading';
 import { useArticleEditor } from '../../composables/useArticleEditor';
+import { useTagSuggestions } from '../../composables/useTagSuggestions';
 import type { JournalAsset, JournalEntry, JournalRichDocument, JournalVisibility } from '../../types';
 import { showMessage } from '../../utils/message';
 import ArticleCardContent from './ArticleCardContent.vue';
@@ -18,6 +19,7 @@ const props = withDefaults(defineProps<{
 });
 
 const editor = useArticleEditor();
+const tagSuggestions = useTagSuggestions();
 const router = useRouter();
 
 const title = shallowRef('');
@@ -65,12 +67,27 @@ function hasArticleBody(document: JournalRichDocument): boolean {
   return visit(document.content);
 }
 
+function hasArticleText(document: JournalRichDocument): boolean {
+  const visit = (nodes: JournalRichDocument['content']): boolean => nodes.some((node) => {
+    if (node.text?.trim()) return true;
+    return node.content ? visit(node.content) : false;
+  });
+  return visit(document.content);
+}
+
 const canSave = computed(() => {
   if (isEditing.value && article.value === null) return false;
   const trimmed = title.value.trim();
   if (trimmed.length < 1 || trimmed.length > 120) return false;
   if (!hasArticleBody(richBody.value)) return false;
   return !editor.saving.value && !editor.uploading.value;
+});
+const canGenerateTags = computed(() => {
+  const titleLength = title.value.trim().length;
+  return titleLength > 0
+    && titleLength <= 120
+    && hasArticleText(richBody.value)
+    && tags.value.length < 20;
 });
 const hasExistingPassword = computed(() => article.value?.visibility === 'protected');
 const accessSettingsValid = computed(() =>
@@ -179,6 +196,38 @@ async function saveAccessSettings(): Promise<void> {
   }
 }
 
+async function generateTags(): Promise<void> {
+  try {
+    const suggestions = await tagSuggestions.generate({
+      kind: 'article',
+      title: title.value.trim(),
+      richBody: richBody.value,
+      existingTags: [...tags.value],
+    });
+    const mergedTags = [...tags.value];
+    const existingTags = new Set(mergedTags);
+    for (const tag of suggestions) {
+      if (mergedTags.length === 20) break;
+      if (existingTags.has(tag)) continue;
+      existingTags.add(tag);
+      mergedTags.push(tag);
+    }
+    const addedCount = mergedTags.length - tags.value.length;
+    if (addedCount === 0) {
+      showMessage({ message: '没有新的标签可补充', type: 'info' });
+      return;
+    }
+    tags.value = mergedTags;
+    showMessage({ message: `已补充 ${addedCount} 个标签`, type: 'success' });
+  }
+  catch (reason) {
+    showMessage({
+      message: reason instanceof Error ? reason.message : String(reason),
+      type: 'error',
+    });
+  }
+}
+
 function viewArticle(entry: JournalEntry): void {
   if (entry.visibility !== 'private') {
     void router.push({ name: 'detail', params: { publicId: entry.publicId } });
@@ -227,12 +276,15 @@ function returnToAssets(): void {
             :assets="assets"
             :can-save="canSave"
             :can-save-access="canSaveAccess"
+            :can-generate-tags="canGenerateTags"
             :has-existing-password="hasExistingPassword"
             :is-editing="isEditing"
             :media-busy="editor.uploading.value"
             :media-busy-label="mediaPanelBusyLabel"
             :previewing="previewing"
             :saving-action="savingAction"
+            :tag-suggestion-busy="tagSuggestions.busy.value"
+            @generate-tags="generateTags"
             @save-access-settings="saveAccessSettings"
             @remove-asset="removeAsset"
             @upload-cover="uploadCover"

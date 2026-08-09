@@ -7,6 +7,7 @@ export interface JournalServerConfig {
   adminPassword: string;
   cookieSecret: string;
   publicBaseUrl: string;
+  deepseekApiKey: string;
   qweatherApiKey: string;
   qweatherCityId: string;
   port: number;

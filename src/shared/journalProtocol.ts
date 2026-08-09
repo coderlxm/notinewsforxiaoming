@@ -279,6 +279,57 @@ export const journalUnlockRequestSchema = z.object({
 });
 export type JournalUnlockRequest = z.infer<typeof journalUnlockRequestSchema>;
 
+const journalSuggestedTagSchema = z.string().trim().min(1).max(32).refine(
+  (tag) => !tag.includes('#'),
+  { message: 'Suggested tags must not contain #.' },
+).refine(
+  (tag) => /^[\p{L}\p{N}_]+$/u.test(tag),
+  { message: 'Suggested tags may only contain letters, numbers, and underscores.' },
+);
+
+const journalEntryTagSuggestionRequestSchema = z.object({
+  kind: z.literal('entry'),
+  title: journalWebEntryTitleSchema,
+  contentText: z.string(),
+}).strict();
+
+const journalArticleTagSuggestionRequestSchema = z.object({
+  kind: z.literal('article'),
+  title: z.string().trim().min(1).max(120),
+  richBody: journalRichDocumentSchema,
+  existingTags: journalArticleTagsSchema,
+}).strict();
+
+export const journalTagSuggestionRequestSchema = z.discriminatedUnion('kind', [
+  journalEntryTagSuggestionRequestSchema,
+  journalArticleTagSuggestionRequestSchema,
+]).superRefine((request, context) => {
+  if (
+    request.kind === 'entry'
+    && request.title === null
+    && request.contentText.trim() === ''
+  ) {
+    context.addIssue({
+      code: 'custom',
+      message: 'Entry tag suggestions require a title or content text.',
+    });
+  }
+});
+export type JournalTagSuggestionRequest = z.infer<
+  typeof journalTagSuggestionRequestSchema
+>;
+
+export const journalTagSuggestionModelResponseSchema = z.object({
+  tags: z.array(journalSuggestedTagSchema).min(1).max(5),
+}).strict();
+
+export const journalTagSuggestionResponseSchema = z.object({
+  tags: z.array(journalSuggestedTagSchema).max(5),
+}).strict();
+export type JournalTagSuggestionResponse = z.infer<
+  typeof journalTagSuggestionResponseSchema
+>;
+
 export const journalPlainChannelRequestSchema = z.object({
   channel: journalPlainChannelSchema,
 });
