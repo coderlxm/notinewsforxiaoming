@@ -2,6 +2,8 @@
 import JournalLoading from './JournalLoading.vue';
 
 defineProps<{
+  label: string;
+  busyLabel: string;
   disabled: boolean;
   busy: boolean;
 }>();
@@ -13,19 +15,19 @@ const emit = defineEmits<{
 
 <template>
   <button
-    class="ai-tag-button"
+    class="ai-suggestion-button"
     type="button"
     :disabled="disabled || busy"
     :aria-busy="busy"
     @click="emit('generate')"
   >
-    <JournalLoading v-if="busy" variant="inline" label="生成中…" />
-    <template v-else>AI 生成标签</template>
+    <JournalLoading v-if="busy" variant="inline" :label="busyLabel" />
+    <template v-else>{{ label }}</template>
   </button>
 </template>
 
 <style scoped>
-.ai-tag-button {
+.ai-suggestion-button {
   min-height: 1.75rem;
   padding: 0.25rem 0.55rem;
   border: 1px solid var(--border-subtle);
@@ -39,17 +41,17 @@ const emit = defineEmits<{
   white-space: nowrap;
 }
 
-.ai-tag-button:hover:not(:disabled) {
+.ai-suggestion-button:hover:not(:disabled) {
   border-color: var(--accent);
   background: var(--accent-soft);
 }
 
-.ai-tag-button:focus-visible {
+.ai-suggestion-button:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 
-.ai-tag-button:disabled {
+.ai-suggestion-button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
 }

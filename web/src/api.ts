@@ -39,6 +39,14 @@ export interface JournalTagSuggestionResponse {
   tags: string[];
 }
 
+export interface JournalTopicSuggestionRequest {
+  contentText: string;
+}
+
+export interface JournalTopicSuggestionResponse {
+  topic: string;
+}
+
 export class JournalRequestError extends Error {
   readonly status: number;
 
@@ -113,6 +121,15 @@ export function requestTagSuggestions(
 ): Promise<JournalTagSuggestionResponse> {
   return requestJson<JournalTagSuggestionResponse>(
     '/api/me/tag-suggestions',
+    jsonRequest('POST', input),
+  );
+}
+
+export function requestTopicSuggestion(
+  input: JournalTopicSuggestionRequest,
+): Promise<JournalTopicSuggestionResponse> {
+  return requestJson<JournalTopicSuggestionResponse>(
+    '/api/me/topic-suggestion',
     jsonRequest('POST', input),
   );
 }

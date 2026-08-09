@@ -1,17 +1,17 @@
 import type { FastifyInstance } from 'fastify';
-import { journalTagSuggestionRequestSchema } from '../../shared/journalProtocol.js';
+import { journalTopicSuggestionRequestSchema } from '../../shared/journalProtocol.js';
 import type { JournalAiSuggestionService } from '../aiSuggestionService.js';
 import type { JournalAuth } from '../auth.js';
 
-export async function registerTagSuggestionRoutes(
+export async function registerTopicSuggestionRoutes(
   server: FastifyInstance,
   auth: JournalAuth,
   aiSuggestions: JournalAiSuggestionService,
 ): Promise<void> {
-  server.post('/api/me/tag-suggestions', {
+  server.post('/api/me/topic-suggestion', {
     preHandler: auth.requireAdmin,
   }, async (request) => {
-    const input = journalTagSuggestionRequestSchema.parse(request.body);
-    return await aiSuggestions.suggestTags(input);
+    const { contentText } = journalTopicSuggestionRequestSchema.parse(request.body);
+    return await aiSuggestions.suggestTopic(contentText);
   });
 }

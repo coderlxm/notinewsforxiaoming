@@ -2,11 +2,12 @@
 import { computed, onBeforeUnmount, onMounted, shallowRef, watch } from 'vue';
 import { vLoading } from 'element-plus';
 import { useRouter } from 'vue-router';
-import AiTagSuggestionButton from '../ui/AiTagSuggestionButton.vue';
+import AiSuggestionButton from '../ui/AiSuggestionButton.vue';
 import JournalLoading from '../ui/JournalLoading.vue';
 import { useEntryPublisher } from '../../composables/useEntryPublisher';
 import { useEntryMediaSubmit } from '../../composables/useEntryMediaSubmit';
 import { useTagSuggestions } from '../../composables/useTagSuggestions';
+import { useTopicSuggestion } from '../../composables/useTopicSuggestion';
 import { plainJournalChannels } from '../../journalChannels';
 import type { JournalAsset, JournalPlainChannel, JournalVisibility } from '../../types';
 import { showMessage } from '../../utils/message';
@@ -34,6 +35,7 @@ const props = withDefaults(defineProps<{
 const router = useRouter();
 const publisher = useEntryPublisher();
 const tagSuggestions = useTagSuggestions();
+const topicSuggestion = useTopicSuggestion();
 const title = shallowRef('');
 const contentText = shallowRef('');
 const channel = shallowRef<JournalPlainChannel>('life');
@@ -95,6 +97,7 @@ const routeError = computed(() => publisher.error.value);
 const tagSuggestionInputAvailable = computed(() =>
   title.value.trim().length > 0 || contentText.value.trim().length > 0,
 );
+const topicSuggestionInputAvailable = computed(() => contentText.value.trim().length > 0);
 
 watch(() => publisher.entry.value, (entry) => {
   if (!entry || initializedEntryId.value === entry.id) return;
@@ -282,6 +285,20 @@ async function generateTags(): Promise<void> {
     });
   }
 }
+
+async function generateTopic(): Promise<void> {
+  try {
+    const topic = await topicSuggestion.generate(contentText.value);
+    title.value = topic;
+    showMessage({ message: '主题已生成', type: 'success' });
+  }
+  catch (reason) {
+    showMessage({
+      message: reason instanceof Error ? reason.message : String(reason),
+      type: 'error',
+    });
+  }
+}
 </script>
 
 <template>
@@ -308,11 +325,23 @@ async function generateTags(): Promise<void> {
               <div class="field">
                 <div class="publisher-view__field-heading">
                   <label class="field__label" for="entry-content">正文</label>
-                  <AiTagSuggestionButton
-                    :disabled="!tagSuggestionInputAvailable"
-                    :busy="tagSuggestions.busy.value"
-                    @generate="generateTags"
-                  />
+                  <div class="publisher-view__ai-actions">
+                    <AiSuggestionButton
+                      v-if="topicEditable"
+                      label="AI 生成主题"
+                      busy-label="生成中…"
+                      :disabled="!topicSuggestionInputAvailable || tagSuggestions.busy.value"
+                      :busy="topicSuggestion.busy.value"
+                      @generate="generateTopic"
+                    />
+                    <AiSuggestionButton
+                      label="AI 生成标签"
+                      busy-label="生成中…"
+                      :disabled="!tagSuggestionInputAvailable || topicSuggestion.busy.value"
+                      :busy="tagSuggestions.busy.value"
+                      @generate="generateTags"
+                    />
+                  </div>
                 </div>
                 <textarea
                   id="entry-content"
@@ -475,6 +504,12 @@ async function generateTags(): Promise<void> {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+}
+
+.publisher-view__ai-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 
 .publisher-view__media {

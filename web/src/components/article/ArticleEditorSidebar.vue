@@ -4,7 +4,7 @@ import type { JournalAsset, JournalEntry, JournalVisibility } from '../../types'
 import { parseTagsInput, tagsInputToString } from '../../types';
 import { copyEntryAccessLink } from '../../utils/accessLink';
 import { showMessage } from '../../utils/message';
-import AiTagSuggestionButton from '../ui/AiTagSuggestionButton.vue';
+import AiSuggestionButton from '../ui/AiSuggestionButton.vue';
 import JournalLoading from '../ui/JournalLoading.vue';
 import EntryVisibilityField from '../publisher/EntryVisibilityField.vue';
 import ArticleMediaPanel from './ArticleMediaPanel.vue';
@@ -81,7 +81,9 @@ async function copyAccessLink(): Promise<void> {
         <div class="field">
           <div class="editor-sidebar__field-heading">
             <label class="field__label" for="article-editor-tags">标签（逗号分隔，最多 20 个）</label>
-            <AiTagSuggestionButton
+            <AiSuggestionButton
+              label="AI 生成标签"
+              busy-label="生成中…"
               :disabled="!canGenerateTags || tagInputFull"
               :busy="tagSuggestionBusy"
               @generate="requestTagSuggestions"

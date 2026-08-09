@@ -330,6 +330,32 @@ export type JournalTagSuggestionResponse = z.infer<
   typeof journalTagSuggestionResponseSchema
 >;
 
+export const journalTopicSuggestionRequestSchema = z.object({
+  contentText: z.string().trim().min(1),
+}).strict();
+export type JournalTopicSuggestionRequest = z.infer<
+  typeof journalTopicSuggestionRequestSchema
+>;
+
+const journalSuggestedTopicSchema = z.string().trim().min(1).refine(
+  (topic) => [...topic].length <= 60,
+  { message: 'Suggested topic must not exceed 60 Unicode characters.' },
+).refine(
+  (topic) => !/[\r\n\u2028\u2029]/u.test(topic),
+  { message: 'Suggested topic must be a single line.' },
+);
+
+export const journalTopicSuggestionModelResponseSchema = z.object({
+  topic: journalSuggestedTopicSchema,
+}).strict();
+
+export const journalTopicSuggestionResponseSchema = z.object({
+  topic: journalSuggestedTopicSchema,
+}).strict();
+export type JournalTopicSuggestionResponse = z.infer<
+  typeof journalTopicSuggestionResponseSchema
+>;
+
 export const journalPlainChannelRequestSchema = z.object({
   channel: journalPlainChannelSchema,
 });

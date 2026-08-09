@@ -8,6 +8,7 @@ import Fastify, {
   type FastifyRequest,
 } from 'fastify';
 import { ZodError } from 'zod';
+import { JournalAiSuggestionService } from './aiSuggestionService.js';
 import { JournalArticleService } from './articleService.js';
 import { JournalAuth } from './auth.js';
 import { JournalContributionError } from './contributionError.js';
@@ -33,10 +34,10 @@ import { registerPrivateEntryRoutes } from './routes/privateEntries.js';
 import { registerPublicFeedRoutes } from './routes/publicFeed.js';
 import { registerSiteProfileRoutes } from './routes/siteProfile.js';
 import { registerTagSuggestionRoutes } from './routes/tagSuggestions.js';
+import { registerTopicSuggestionRoutes } from './routes/topicSuggestions.js';
 import { registerWeatherRoutes } from './routes/weather.js';
 import { JournalSiteProfileService } from './siteProfileService.js';
 import { JournalStorage } from './storage.js';
-import { JournalTagSuggestionService } from './tagSuggestionService.js';
 import { TelegramFileDownloader } from './telegramFiles.js';
 import type { JournalServerConfig } from './types.js';
 import { JournalVideoNormalizationService } from './videoNormalization.js';
@@ -58,7 +59,7 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
     config.qweatherCityId,
   );
   const auth = new JournalAuth(config.ingestToken, config.adminPassword);
-  const tagSuggestions = new JournalTagSuggestionService(config.deepseekApiKey);
+  const aiSuggestions = new JournalAiSuggestionService(config.deepseekApiKey);
   const storage = new JournalStorage(config.dataDir);
   await storage.initializeContributionStorage();
   const previews = new JournalImagePreviewService();
@@ -151,7 +152,8 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
     webEntryService,
     webEntryUploads,
   );
-  await registerTagSuggestionRoutes(server, auth, tagSuggestions);
+  await registerTagSuggestionRoutes(server, auth, aiSuggestions);
+  await registerTopicSuggestionRoutes(server, auth, aiSuggestions);
   webEntryUploads.registerRoutes(server);
   await registerArticleRoutes(server, auth, articleService);
   await registerMediaRoutes(server, auth, repository, config.dataDir);
