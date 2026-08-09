@@ -257,10 +257,10 @@ onMounted(async () => {
   }
   try {
     if (isDetail.value) {
-      const routeState = router.currentRoute.value.state as {
+      const routeState = window.history.state as {
         journalProtectedPreview?: ProtectedJournalEntryPreview;
-      };
-      if (routeState.journalProtectedPreview?.publicId === props.detailId) {
+      } | null;
+      if (routeState?.journalProtectedPreview?.publicId === props.detailId) {
         prepareProtectedDetail(routeState.journalProtectedPreview);
         return;
       }
@@ -474,8 +474,8 @@ async function unlockDetail(password: string): Promise<void> {
 function returnFromDetail(): void {
   const protectedChannel = journal.protectedDetail.value?.channel ?? protectedDetailChannel.value;
   if (protectedChannel) {
-    const state = router.currentRoute.value.state as { journalDetailFromFeed?: boolean };
-    if (state.journalDetailFromFeed === true) {
+    const state = window.history.state as { journalDetailFromFeed?: boolean } | null;
+    if (state?.journalDetailFromFeed === true) {
       router.back();
       return;
     }

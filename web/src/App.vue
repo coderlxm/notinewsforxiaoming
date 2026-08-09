@@ -498,7 +498,7 @@ async function removeDeletedOverlay(): Promise<void> {
 }
 
 function returnFromDetail(): void {
-  const state = currentRoute.state as { journalDetailFromFeed?: boolean };
+  const state = window.history.state as { journalDetailFromFeed?: boolean } | null;
   if (state?.journalDetailFromFeed === true) {
     router.back();
     return;

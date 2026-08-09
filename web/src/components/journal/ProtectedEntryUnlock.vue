@@ -50,33 +50,35 @@ function submit(): void {
     </div>
     <form class="protected-access__form" @submit.prevent="submit">
       <label for="protected-entry-password">访问密码</label>
-      <input
-        id="protected-entry-password"
-        :value="password"
-        class="protected-access__input"
-        type="password"
-        inputmode="numeric"
-        pattern="[0-9]*"
-        maxlength="6"
-        autocomplete="off"
-        placeholder="请输入 6 位数字密码"
-        :aria-invalid="visibleError ? 'true' : undefined"
-        :aria-describedby="visibleError ? 'protected-entry-password-error' : undefined"
-        :disabled="busy"
-        @input="updatePassword"
-      >
+      <div class="protected-access__controls">
+        <input
+          id="protected-entry-password"
+          :value="password"
+          class="protected-access__input"
+          type="password"
+          inputmode="numeric"
+          pattern="[0-9]*"
+          maxlength="6"
+          autocomplete="off"
+          placeholder="请输入 6 位数字密码"
+          :aria-invalid="visibleError ? 'true' : undefined"
+          :aria-describedby="visibleError ? 'protected-entry-password-error' : undefined"
+          :disabled="busy"
+          @input="updatePassword"
+        >
+        <button
+          class="button button--primary protected-access__submit"
+          type="submit"
+          :disabled="!canSubmit"
+          :aria-busy="busy"
+        >
+          <JournalLoading v-if="busy" variant="inline" label="正在打开…" />
+          <template v-else>查看内容</template>
+        </button>
+      </div>
       <p v-if="visibleError" id="protected-entry-password-error" class="protected-access__error" role="alert">
         {{ visibleError }}
       </p>
-      <button
-        class="button button--primary protected-access__submit"
-        type="submit"
-        :disabled="!canSubmit"
-        :aria-busy="busy"
-      >
-        <JournalLoading v-if="busy" variant="inline" label="正在打开…" />
-        <template v-else>查看内容</template>
-      </button>
     </form>
   </section>
 </template>
@@ -152,6 +154,8 @@ function submit(): void {
 .protected-access__form {
   display: grid;
   grid-column: 1 / -1;
+  align-content: start;
+  align-self: start;
   gap: 0.55rem;
 }
 
@@ -161,7 +165,14 @@ function submit(): void {
   font-weight: 700;
 }
 
+.protected-access__controls {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
 .protected-access__input {
+  flex: 1 1 auto;
   width: 100%;
   height: 3rem;
   padding: 0 0.95rem;
@@ -191,8 +202,11 @@ function submit(): void {
 }
 
 .protected-access__submit {
-  min-height: 2.8rem;
-  margin-top: 0.25rem;
+  flex: 0 0 auto;
+  height: 3rem;
+  min-width: 7.5rem;
+  min-height: 0;
+  padding: 0 1.25rem;
 }
 
 @media (max-width: 599px) {
@@ -215,6 +229,15 @@ function submit(): void {
 
   .protected-access__form {
     grid-column: 1;
+  }
+
+  .protected-access__controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .protected-access__submit {
+    width: 100%;
   }
 }
 </style>
