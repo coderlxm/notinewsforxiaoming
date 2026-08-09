@@ -148,19 +148,19 @@ const visibilityLabel = computed(() => props.entry.publicationStatus === 'draft'
 
 .text-poster__text--short {
   font-size: clamp(2.25rem, 4.4vw, 4.8rem);
-  line-height: 1.38;
+  line-height: 1.46;
   -webkit-line-clamp: 6;
 }
 
 .text-poster__text--medium {
   font-size: clamp(1.75rem, 3.3vw, 3.6rem);
-  line-height: 1.48;
+  line-height: 1.56;
   -webkit-line-clamp: 8;
 }
 
 .text-poster__text--long {
   font-size: clamp(1.3rem, 2.35vw, 2.55rem);
-  line-height: 1.6;
+  line-height: 1.68;
   -webkit-line-clamp: 10;
 }
 
@@ -181,6 +181,9 @@ const visibilityLabel = computed(() => props.entry.publicationStatus === 'draft'
 
 .text-poster--card .text-poster__sheet {
   height: auto;
+  aspect-ratio: auto;
+  grid-template-rows: auto auto auto;
+  row-gap: clamp(1rem, 6cqw, 2rem);
   padding: clamp(1.15rem, 7cqw, 2rem);
   box-shadow: none;
 }
