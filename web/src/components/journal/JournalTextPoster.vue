@@ -176,6 +176,7 @@ const visibilityLabel = computed(() => props.entry.publicationStatus === 'draft'
 .text-poster--card {
   width: 100%;
   border-radius: 0;
+  background: var(--poster-background);
 }
 
 .text-poster--card .text-poster__sheet {
@@ -199,8 +200,8 @@ const visibilityLabel = computed(() => props.entry.publicationStatus === 'draft'
 }
 
 .text-poster--card .text-poster__text--medium {
-  font-size: clamp(1.3rem, 6.5cqw, 2.1rem);
-  -webkit-line-clamp: 7;
+  font-size: clamp(1.4rem, 7cqw, 2.2rem);
+  -webkit-line-clamp: 5;
 }
 
 .text-poster--card .text-poster__text--long {
