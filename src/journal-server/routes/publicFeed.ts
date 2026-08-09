@@ -19,11 +19,15 @@ export async function registerPublicFeedRoutes(
   auth: JournalAuth,
   repository: JournalRepository,
 ): Promise<void> {
-  server.get('/api/feed', async (request) => {
+  server.get('/api/feed', async (request, reply) => {
     const query = publicFeedQuerySchema.parse(request.query);
+    const includeProtectedContent = auth.isAdmin(request);
+    reply.header('Vary', 'Cookie');
+    if (includeProtectedContent) reply.header('Cache-Control', 'private, no-store');
     return repository.listPublicFeed({
       channel: query.channel,
       limit: 20,
+      includeProtectedContent,
       ...(query.cursor ? { cursor: query.cursor } : {}),
       ...(query.tag ? { tag: query.tag } : {}),
     });

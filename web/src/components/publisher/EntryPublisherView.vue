@@ -427,7 +427,7 @@ async function copyAccessLink(): Promise<void> {
   grid-row: 1;
   gap: 0.3rem;
   min-width: 0;
-  height: 33.4rem;
+  min-height: 33.4rem;
 }
 
 .publisher-view__previews {
@@ -494,6 +494,10 @@ async function copyAccessLink(): Promise<void> {
   .publisher-view__manuscript,
   .publisher-view__sidebar {
     height: auto;
+  }
+
+  .publisher-view__sidebar {
+    min-height: 0;
   }
 
   .publisher-view__form textarea {

@@ -20,6 +20,7 @@ import {
   type JournalChannel,
   type JournalEntry,
   type JournalPlainChannel,
+  type ProtectedJournalEntryPreview,
   type PublicJournalFeedItem,
 } from '../../types';
 import { showMessage } from '../../utils/message';
@@ -43,6 +44,7 @@ const props = withDefaults(defineProps<{
   channel?: JournalChannel;
   overlayEntryId?: number;
   overlayEntry?: JournalEntry;
+  overlayProtectedEntry?: ProtectedJournalEntryPreview;
   directOverlay?: boolean;
   assetView?: AssetView;
   page?: number;
@@ -52,6 +54,7 @@ const props = withDefaults(defineProps<{
   channel: 'life',
   overlayEntryId: undefined,
   overlayEntry: undefined,
+  overlayProtectedEntry: undefined,
   directOverlay: false,
   assetView: 'waterfall',
   page: 1,
@@ -59,7 +62,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   layoutReady: [];
-  openEntry: [entry: JournalEntry];
+  openEntry: [entry: PublicJournalFeedItem];
   detailLoaded: [entry: JournalEntry];
   closeOverlay: [];
   removeDeletedOverlay: [];
@@ -93,8 +96,15 @@ let removeRouteAfterEach: (() => void) | null = null;
 let protectedRobotsMeta: HTMLMetaElement | null = null;
 
 const isDetail = computed(() => props.mode === 'public' && props.detailId !== undefined);
-const isOverlay = computed(() => props.overlayEntryId !== undefined);
+const isOverlay = computed(() =>
+  props.overlayEntryId !== undefined || props.overlayProtectedEntry !== undefined,
+);
 const currentOverlayEntry = computed(() => {
+  if (props.overlayProtectedEntry) {
+    return journal.detail.value?.publicId === props.overlayProtectedEntry.publicId
+      ? journal.detail.value
+      : null;
+  }
   if (props.overlayEntryId === undefined) return null;
   const currentEntry = journal.entries.value.find(entry => entry.id === props.overlayEntryId)
     ?? (journal.detail.value?.id === props.overlayEntryId ? journal.detail.value : null);
@@ -104,6 +114,7 @@ const currentOverlayEntry = computed(() => {
 });
 const overlayVisible = computed(() => isOverlay.value && (
   currentOverlayEntry.value !== null
+  || props.overlayProtectedEntry !== undefined
   || (props.directOverlay && journal.authenticationState.value === 'authenticated')
 ));
 const detailPreparing = computed(() => isDetail.value && initialLoadPending.value);
@@ -405,6 +416,11 @@ function editEntry(entry: JournalEntry): void {
 
 function openEntry(entry: PublicJournalFeedItem): void {
   if (isProtectedJournalEntry(entry)) {
+    if (entry.entryType === 'record') {
+      emit('openEntry', entry);
+      void journal.loadPublicDetail(entry.publicId);
+      return;
+    }
     void router.push({
       name: 'detail',
       params: { publicId: entry.publicId },
@@ -762,10 +778,16 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
   <JournalDetailOverlay
     v-if="overlayVisible"
     :entry="currentOverlayEntry ?? undefined"
+    :protected-entry="overlayProtectedEntry && journal.protectedDetail.value?.publicId === overlayProtectedEntry.publicId
+      ? journal.protectedDetail.value
+      : undefined"
     :mode="mode"
     :busy="currentOverlayEntry !== null && journal.mutationEntryId.value === currentOverlayEntry.id"
-    :loading="directOverlay && journal.loading.value"
+    :loading="(directOverlay || overlayProtectedEntry !== undefined) && journal.loading.value"
+    :unlocking="journal.unlocking.value"
+    :unlock-error="journal.unlockError.value"
     @close="emit('closeOverlay')"
+    @unlock="unlockDetail"
     @select-tag="selectTag"
     @edit="editArticle($event.id)"
     @continue-draft="editDraft"

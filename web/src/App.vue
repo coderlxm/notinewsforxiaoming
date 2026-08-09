@@ -21,7 +21,14 @@ import { useAdminContributions } from './composables/useAdminContributions';
 import { isJournalChannel, publicFeedPath } from './journalChannels';
 import { useSessionStore } from './stores/session';
 import { useSiteProfileStore } from './stores/siteProfile';
-import type { AssetView, JournalChannel, JournalEntry } from './types';
+import {
+  isProtectedJournalEntry,
+  type AssetView,
+  type JournalChannel,
+  type JournalEntry,
+  type ProtectedJournalEntryPreview,
+  type PublicJournalFeedItem,
+} from './types';
 import { showMessage } from './utils/message';
 
 type AppRoute =
@@ -47,7 +54,7 @@ const HEADER_SHOW_DISTANCE = 64;
 const PUBLIC_FEED_CACHE_LIMIT = 30;
 
 interface OverlayContext {
-  entry: JournalEntry;
+  entry: PublicJournalFeedItem;
   origin: FeedRoute;
   originPath: string;
 }
@@ -205,14 +212,21 @@ const publicShellActive = computed(() =>
 );
 
 const overlayEntryId = computed(() => {
-  if (activeOverlayContext.value) return activeOverlayContext.value.entry.id;
+  const contextEntry = activeOverlayContext.value?.entry;
+  if (contextEntry && !isProtectedJournalEntry(contextEntry)) return contextEntry.id;
   if (directPublicOverlayEntry.value) return directPublicOverlayEntry.value.id;
   if (route.value.name === 'private') return route.value.entryId ?? undefined;
   return undefined;
 });
-const overlayEntry = computed(() =>
-  activeOverlayContext.value?.entry ?? directPublicOverlayEntry.value ?? undefined,
-);
+const overlayEntry = computed(() => {
+  const entry = activeOverlayContext.value?.entry;
+  if (entry && !isProtectedJournalEntry(entry)) return entry;
+  return directPublicOverlayEntry.value ?? undefined;
+});
+const overlayProtectedEntry = computed<ProtectedJournalEntryPreview | undefined>(() => {
+  const entry = activeOverlayContext.value?.entry;
+  return entry && isProtectedJournalEntry(entry) ? entry : undefined;
+});
 
 const directPrivateOverlay = computed(() =>
   route.value.name === 'private'
@@ -304,6 +318,9 @@ function pathMatchesOverlayContext(path: string, context: OverlayContext): boole
   const url = new URL(path, window.location.origin);
   if (context.origin.name === 'public') {
     return url.pathname === `/p/${encodeURIComponent(context.entry.publicId)}`;
+  }
+  if (isProtectedJournalEntry(context.entry)) {
+    throw new Error('Protected previews require a public feed origin.');
   }
   return url.pathname === '/me' && url.searchParams.get('entry') === String(context.entry.id);
 }
@@ -413,7 +430,7 @@ function handleRouteChange(nextPath: string, currentPath: string): void {
   }
 }
 
-async function openEntry(entry: JournalEntry): Promise<void> {
+async function openEntry(entry: PublicJournalFeedItem): Promise<void> {
   const origin = backgroundFeedRoute.value;
   if (!origin) throw new Error('Journal overlay requires a visible feed origin.');
 
@@ -422,6 +439,11 @@ async function openEntry(entry: JournalEntry): Promise<void> {
     origin,
     originPath: currentRoute.fullPath,
   };
+  if (isProtectedJournalEntry(entry)) {
+    if (origin.name !== 'public') throw new Error('Protected previews require a public feed origin.');
+    await router.push(`/p/${encodeURIComponent(entry.publicId)}`);
+    return;
+  }
   const path = origin.name === 'public'
     ? `/p/${encodeURIComponent(entry.publicId)}`
     : privateFeedPath({ assetView: origin.assetView, page: origin.page, entryId: entry.id });
@@ -615,6 +637,7 @@ onUnmounted(() => {
             :page="backgroundFeedRoute.page"
             :overlay-entry-id="overlayEntryId"
             :overlay-entry="overlayEntry"
+            :overlay-protected-entry="overlayProtectedEntry"
             :direct-overlay="directPrivateOverlay"
             @layout-ready="restoreFeedScroll"
             @change-asset-view="changeAssetView"
@@ -634,6 +657,7 @@ onUnmounted(() => {
             :initial-tag="backgroundFeedRoute.tag"
             :overlay-entry-id="overlayEntryId"
             :overlay-entry="overlayEntry"
+            :overlay-protected-entry="overlayProtectedEntry"
             @layout-ready="restoreFeedScroll"
             @open-entry="openEntry"
             @close-overlay="closeOverlay"

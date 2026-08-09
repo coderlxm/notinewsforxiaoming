@@ -1,16 +1,19 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { ProtectedJournalEntryPreview } from '../../types';
+import {
+  isProtectedJournalEntry,
+  type PublicJournalFeedItem,
+} from '../../types';
 
 const props = withDefaults(defineProps<{
-  entry: ProtectedJournalEntryPreview;
+  entry: PublicJournalFeedItem;
   display?: 'waterfall' | 'article';
 }>(), {
   display: 'waterfall',
 });
 
 const emit = defineEmits<{
-  open: [entry: ProtectedJournalEntryPreview];
+  open: [entry: PublicJournalFeedItem];
 }>();
 
 const dateFormatter = new Intl.DateTimeFormat('zh-CN', {
@@ -27,7 +30,15 @@ const templateNumber = computed(() => {
   }
   return (hash % 7) + 1;
 });
-const typeLabel = computed(() => props.entry.entryType === 'article' ? '加密文章' : '加密记录');
+const typeLabel = computed(() => {
+  const article = isProtectedJournalEntry(props.entry)
+    ? props.entry.entryType === 'article'
+    : props.entry.bodyFormat === 'rich';
+  return article ? '加密文章' : '加密记录';
+});
+const actionLabel = computed(() =>
+  isProtectedJournalEntry(props.entry) ? '输入密码查看' : '打开查看',
+);
 const formattedDate = computed(() => dateFormatter.format(new Date(props.entry.sourceCreatedAt)));
 </script>
 
@@ -42,7 +53,7 @@ const formattedDate = computed(() => dateFormatter.format(new Date(props.entry.s
     <button
       class="protected-card__button"
       type="button"
-      :aria-label="`${typeLabel}，输入密码查看`"
+      :aria-label="`${typeLabel}，${actionLabel}`"
       @click="emit('open', entry)"
     >
       <span class="protected-card__cover" aria-hidden="true">
@@ -60,7 +71,7 @@ const formattedDate = computed(() => dateFormatter.format(new Date(props.entry.s
       </span>
       <span class="protected-card__body">
         <strong class="protected-card__title">{{ typeLabel }}</strong>
-        <span class="protected-card__action">输入密码查看</span>
+        <span class="protected-card__action">{{ actionLabel }}</span>
         <time class="protected-card__date" :datetime="entry.sourceCreatedAt">{{ formattedDate }}</time>
       </span>
     </button>

@@ -6,19 +6,25 @@ import type {
   JournalAsset,
   JournalEntry,
   JournalPlainChannel,
+  ProtectedJournalEntryPreview,
 } from '../../types';
 import type { AccessSettingsInput } from './accessSettings';
 import JournalDetailLayout from './JournalDetailLayout.vue';
+import ProtectedEntryUnlock from './ProtectedEntryUnlock.vue';
 
 const props = defineProps<{
   entry?: JournalEntry;
+  protectedEntry?: ProtectedJournalEntryPreview;
   mode: 'public' | 'private';
   busy: boolean;
   loading?: boolean;
+  unlocking?: boolean;
+  unlockError?: string | null;
 }>();
 
 const emit = defineEmits<{
   close: [];
+  unlock: [password: string];
   selectTag: [tag: string];
   edit: [entry: JournalEntry];
   continueDraft: [entry: JournalEntry];
@@ -56,7 +62,9 @@ function isAdaptiveImage(asset: JournalAsset): boolean {
   return ratio >= 0.45 && ratio <= 2.2;
 }
 
-const titleId = computed(() => `journal-detail-title-${props.entry?.id ?? 'pending'}`);
+const titleId = computed(() =>
+  `journal-detail-title-${props.entry?.id ?? props.protectedEntry?.publicId ?? 'pending'}`,
+);
 const visualAssets = computed(() => props.entry?.bodyFormat === 'plain'
   ? props.entry.assets.filter(isVisualAsset)
   : []);
@@ -213,6 +221,14 @@ function forwardPinned(entry: JournalEntry, pinned: boolean): void {
           @set-pinned="forwardPinned"
           @delete-entry="emit('deleteEntry', $event)"
         />
+        <div v-else-if="protectedEntry" class="detail-overlay__reading-stage">
+          <ProtectedEntryUnlock
+            :entry="protectedEntry"
+            :busy="unlocking ?? false"
+            :error="unlockError ?? null"
+            @unlock="emit('unlock', $event)"
+          />
+        </div>
         <div v-else class="detail-overlay__reading-stage" :aria-busy="loading">
           <JournalLoading v-if="loading" variant="reading" label="正在展开记录…" />
         </div>
