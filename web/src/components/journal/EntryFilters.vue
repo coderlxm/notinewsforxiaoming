@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Connection, Lock } from '@element-plus/icons-vue';
-import { useDebounceFn } from '@vueuse/core';
 import { computed, reactive, shallowRef, watch } from 'vue';
+import { useImeAwareDebouncedAction } from '../../composables/useImeAwareDebouncedAction';
 import { emptyFeedFilters, type FeedFilters } from '../../types';
 
 const props = defineProps<{
@@ -73,9 +73,12 @@ const hasDraftFilters = computed(() =>
   || draft.to !== '',
 );
 
-const queueApply = useDebounceFn(() => {
-  emit('apply', { ...draft });
-}, 350);
+const {
+  queue: queueApply,
+  handleInput: queueTextApply,
+  handleCompositionStart,
+  handleCompositionEnd,
+} = useImeAwareDebouncedAction(() => emit('apply', { ...draft }), 350);
 
 watch(
   () => [
@@ -142,7 +145,9 @@ function reset(): void {
           v-model.trim="draft.query"
           type="search"
           placeholder="搜索记录"
-          @input="queueApply"
+          @input="queueTextApply"
+          @compositionstart="handleCompositionStart"
+          @compositionend="handleCompositionEnd"
         >
       </label>
       <label class="field filters__tag">
@@ -151,7 +156,9 @@ function reset(): void {
           v-model.trim="draft.tag"
           type="text"
           placeholder="例如：旅行"
-          @input="queueApply"
+          @input="queueTextApply"
+          @compositionstart="handleCompositionStart"
+          @compositionend="handleCompositionEnd"
         >
       </label>
       <label class="field filters__type">

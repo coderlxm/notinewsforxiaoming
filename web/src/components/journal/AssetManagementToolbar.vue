@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Connection, Lock } from '@element-plus/icons-vue';
-import { useDebounceFn } from '@vueuse/core';
 import { computed, reactive, shallowRef } from 'vue';
+import { useImeAwareDebouncedAction } from '../../composables/useImeAwareDebouncedAction';
 import { emptyFeedFilters, type AssetView, type FeedFilters } from '../../types';
 import AssetViewSwitch from './AssetViewSwitch.vue';
 
@@ -76,9 +76,12 @@ const hasDraftFilters = computed(() =>
   || draft.to !== '',
 );
 
-const queueApply = useDebounceFn(() => {
-  emit('apply', { ...draft });
-}, 350);
+const {
+  queue: queueApply,
+  handleInput: queueTextApply,
+  handleCompositionStart,
+  handleCompositionEnd,
+} = useImeAwareDebouncedAction(() => emit('apply', { ...draft }), 350);
 
 function changeView(view: AssetView): void {
   emit('changeView', view);
@@ -99,7 +102,9 @@ function reset(): void {
           v-model.trim="draft.query"
           type="search"
           placeholder="正文关键词"
-          @input="queueApply"
+          @input="queueTextApply"
+          @compositionstart="handleCompositionStart"
+          @compositionend="handleCompositionEnd"
         >
       </label>
     </div>
@@ -147,7 +152,9 @@ function reset(): void {
             type="text"
             placeholder="标签"
             aria-label="标签"
-            @input="queueApply"
+            @input="queueTextApply"
+            @compositionstart="handleCompositionStart"
+            @compositionend="handleCompositionEnd"
           >
         </label>
         <label class="field toolbar__type">
