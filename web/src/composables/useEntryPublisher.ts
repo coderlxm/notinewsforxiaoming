@@ -13,6 +13,7 @@ import type { JournalEntry, JournalPlainChannel, JournalVisibility } from '../ty
 import { markPublishProbe } from '../utils/publishProbe';
 
 interface EntryPublisherInput {
+  title: string | null;
   contentText: string;
   uploadId: string;
   removedAssetIds: number[];
@@ -53,6 +54,7 @@ export function useEntryPublisher() {
     try {
       const saved = entry.value === null
         ? await publishEntryRequest({
+            title: input.title,
             contentText: input.contentText,
             uploadId: input.uploadId,
             action,
@@ -64,6 +66,7 @@ export function useEntryPublisher() {
             sourceCreatedAt: action === 'publish' ? input.sourceCreatedAt : undefined,
           })
         : await updateDraftRequest(entry.value.id, {
+            title: input.title,
             contentText: input.contentText,
             uploadId: input.uploadId,
             removedAssetIds: input.removedAssetIds,
@@ -104,6 +107,7 @@ export function useEntryPublisher() {
     try {
       if (current.sourceKind === 'web') {
         const updated = await updatePublishedWebEntry(current.id, {
+          title: input.title,
           contentText: input.contentText,
           uploadId: input.uploadId,
           removedAssetIds: input.removedAssetIds,

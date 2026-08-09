@@ -234,6 +234,7 @@ export function fetchPrivateTablePage(options: {
 }
 
 export function publishEntry(input: {
+  title: string | null;
   contentText: string;
   uploadId: string;
   action: 'draft' | 'publish';
@@ -246,6 +247,7 @@ export function publishEntry(input: {
 }
 
 export function updateDraft(id: number, input: {
+  title: string | null;
   contentText: string;
   uploadId: string;
   removedAssetIds: number[];
@@ -259,6 +261,7 @@ export function updateDraft(id: number, input: {
 }
 
 export function updatePublishedWebEntry(id: number, input: {
+  title: string | null;
   contentText: string;
   uploadId: string;
   removedAssetIds: number[];

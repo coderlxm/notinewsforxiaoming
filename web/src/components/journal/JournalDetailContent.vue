@@ -49,6 +49,7 @@ const hiddenStructuredKeys = new Set(['entities', 'caption_entities']);
 
 const isPrivateMode = computed(() => props.mode === 'private');
 const isRich = computed(() => props.entry.bodyFormat === 'rich');
+const plainTitle = computed(() => isRich.value ? '' : props.entry.title?.trim() ?? '');
 const plainChannel = computed(() => isRich.value
   ? undefined
   : props.entry.channel as JournalPlainChannel);
@@ -175,6 +176,9 @@ function saveAccessSettings(settings: AccessSettingsInput): void {
     </template>
 
     <template v-else>
+      <h1 v-if="plainTitle" class="detail-content__title detail-content__plain-title">
+        {{ plainTitle }}
+      </h1>
       <div v-if="editing" class="detail-content__editor">
         <label class="detail-content__editor-label" :for="`detail-content-${entry.id}`">编辑正文</label>
         <textarea
@@ -358,6 +362,10 @@ function saveAccessSettings(settings: AccessSettingsInput): void {
   line-height: 1.28;
 }
 
+.detail-content__plain-title {
+  margin-top: 28px;
+}
+
 .detail-content__edit-article {
   flex: none;
   border-color: var(--accent);
@@ -390,6 +398,11 @@ function saveAccessSettings(settings: AccessSettingsInput): void {
   line-height: 1.82;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
+}
+
+.detail-content__plain-title + .detail-content__text,
+.detail-content__plain-title + .detail-content__editor {
+  margin-top: 14px;
 }
 
 .detail-content__structured {

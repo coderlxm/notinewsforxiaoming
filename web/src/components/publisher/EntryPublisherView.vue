@@ -20,6 +20,7 @@ import EntryMediaPreviewGrid from './EntryMediaPreviewGrid.vue';
 import EntryChannelField from './EntryChannelField.vue';
 import EntryVisibilityField from './EntryVisibilityField.vue';
 import EntryPublishedTimeField from './EntryPublishedTimeField.vue';
+import EntryTopicField from './EntryTopicField.vue';
 
 const props = withDefaults(defineProps<{
   entryId?: number;
@@ -29,6 +30,7 @@ const props = withDefaults(defineProps<{
 
 const router = useRouter();
 const publisher = useEntryPublisher();
+const title = shallowRef('');
 const contentText = shallowRef('');
 const channel = shallowRef<JournalPlainChannel>('life');
 const visibility = shallowRef<JournalVisibility>('public');
@@ -45,6 +47,7 @@ let terminalErrorMessage: ReturnType<typeof showMessage> | null = null;
 
 const isEditing = computed(() => props.entryId !== undefined);
 const isPublished = computed(() => publisher.entry.value?.publicationStatus === 'published');
+const topicEditable = computed(() => !isPublished.value || publisher.entry.value?.sourceKind === 'web');
 const mediaEditable = computed(() => !isPublished.value || publisher.entry.value?.sourceKind === 'web');
 const formAvailable = computed(() => !isEditing.value || publisher.entry.value !== null);
 const existingAssets = computed<JournalAsset[]>(() =>
@@ -89,6 +92,7 @@ const routeError = computed(() => publisher.error.value);
 watch(() => publisher.entry.value, (entry) => {
   if (!entry || initializedEntryId.value === entry.id) return;
   initializedEntryId.value = entry.id;
+  title.value = entry.title ?? '';
   contentText.value = entry.contentText;
   channel.value = entry.channel as JournalPlainChannel;
   visibility.value = entry.visibility;
@@ -139,6 +143,7 @@ function returnToAssets(): void {
 
 function buildInput() {
   return {
+    title: title.value.trim() || null,
     contentText: contentText.value,
     uploadId: '',
     removedAssetIds: [...removedAssetIds.value],
@@ -174,6 +179,7 @@ async function saveDraft(): Promise<void> {
   if (!saved) return;
   initializedEntryId.value = saved.id;
   assetChanged.value = true;
+  title.value = saved.title ?? '';
   contentText.value = saved.contentText;
   newMedia.value = [];
   removedAssetIds.value = new Set();
@@ -221,6 +227,7 @@ async function savePublished(): Promise<void> {
   });
   if (!saved) return;
   assetChanged.value = true;
+  title.value = saved.title ?? '';
   newMedia.value = [];
   removedAssetIds.value = new Set();
   showMessage({ message: '记录修改已保存', type: 'success' });
@@ -265,15 +272,19 @@ async function copyAccessLink(): Promise<void> {
     <div class="publisher-view__stage" :aria-busy="publisher.loading.value">
         <form v-loading="publisher.loading.value" class="publisher-view__form" @submit.prevent="submit">
           <div class="publisher-view__manuscript">
-            <label class="field">
-              <span class="field__label">正文</span>
-              <textarea
-                v-model="contentText"
-                rows="10"
-                placeholder="写下内容，可直接使用 #标签"
-                :disabled="busy"
-              />
-            </label>
+            <div class="publisher-view__copy">
+              <EntryTopicField v-if="topicEditable" v-model="title" :disabled="busy" />
+
+              <label class="field">
+                <span class="field__label">正文</span>
+                <textarea
+                  v-model="contentText"
+                  rows="10"
+                  placeholder="写下内容，可直接使用 #标签"
+                  :disabled="busy"
+                />
+              </label>
+            </div>
 
             <EntryImagePicker
               v-if="mediaEditable"
@@ -413,6 +424,11 @@ async function copyAccessLink(): Promise<void> {
   gap: 1rem;
   min-width: 0;
   height: 33.4rem;
+}
+
+.publisher-view__copy {
+  display: grid;
+  gap: 0.75rem;
 }
 
 .publisher-view__media {

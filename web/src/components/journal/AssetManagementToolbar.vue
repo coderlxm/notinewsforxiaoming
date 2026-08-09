@@ -102,7 +102,8 @@ function reset(): void {
         <input
           v-model.trim="draft.query"
           type="search"
-          placeholder="正文关键词"
+          placeholder="主题或正文"
+          aria-label="主题或正文"
           @input="queueTextApply"
           @compositionstart="handleCompositionStart"
           @compositionend="handleCompositionEnd"

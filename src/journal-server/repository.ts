@@ -108,6 +108,7 @@ export interface WebEntryAssetInput {
 
 export interface CreateWebEntryInput {
   publicId: string;
+  title: string | null;
   contentText: string;
   tags: string[];
   publicationStatus: JournalPublicationStatus;
@@ -119,6 +120,7 @@ export interface CreateWebEntryInput {
 }
 
 export interface UpdateWebDraftInput {
+  title: string | null;
   contentText: string;
   tags: string[];
   channel: JournalPlainChannel;
@@ -413,10 +415,11 @@ export class JournalRepository {
           channel, visibility, access_password_hash, access_revision,
           tags_json, structured_content_json, telegram_message_json,
           source_created_at, captured_at, updated_at
-        ) VALUES (?, 'web', NULL, NULL, NULL, ?, NULL, 'plain', NULL, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?)
+        ) VALUES (?, 'web', NULL, NULL, NULL, ?, ?, 'plain', NULL, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?)
       `).run(
         input.publicId,
         contentTypeOf(input.assets),
+        input.title,
         input.contentText,
         input.publicationStatus,
         input.channel,
@@ -440,13 +443,15 @@ export class JournalRepository {
       const assets = this.replaceWebEntryAssets(id, 'draft', input.removedAssetIds, input.newAssets);
       const result = this.database.prepare(`
         UPDATE journal_entries
-        SET content_type = ?, content_text = ?, tags_json = ?, channel = ?, updated_at = ?
+        SET content_type = ?, title = ?, content_text = ?, tags_json = ?,
+            channel = ?, updated_at = ?
         WHERE id = ?
           AND source_kind = 'web'
           AND body_format = 'plain'
           AND publication_status = 'draft'
       `).run(
         contentTypeOf(assets),
+        input.title,
         input.contentText,
         JSON.stringify(input.tags),
         input.channel,
@@ -466,7 +471,7 @@ export class JournalRepository {
       const assets = this.replaceWebEntryAssets(id, 'draft', input.removedAssetIds, input.newAssets);
       const result = this.database.prepare(`
         UPDATE journal_entries
-        SET content_type = ?, content_text = ?, tags_json = ?,
+        SET content_type = ?, title = ?, content_text = ?, tags_json = ?,
             channel = ?, publication_status = 'published', visibility = ?,
             access_password_hash = ?, access_revision = ?,
             source_created_at = ?, updated_at = ?
@@ -476,6 +481,7 @@ export class JournalRepository {
           AND publication_status = 'draft'
       `).run(
         contentTypeOf(assets),
+        input.title,
         input.contentText,
         JSON.stringify(input.tags),
         input.channel,
@@ -508,12 +514,13 @@ export class JournalRepository {
       const assets = this.replaceWebEntryAssets(id, 'published', input.removedAssetIds, input.newAssets);
       const result = this.database.prepare(`
         UPDATE journal_entries
-        SET content_type = ?, content_text = ?, tags_json = ?, channel = ?,
+        SET content_type = ?, title = ?, content_text = ?, tags_json = ?, channel = ?,
             source_created_at = ?, updated_at = ?
         WHERE id = ? AND source_kind = 'web' AND body_format = 'plain'
           AND publication_status = 'published'
       `).run(
         contentTypeOf(assets),
+        input.title,
         input.contentText,
         JSON.stringify(input.tags),
         input.channel,

@@ -131,7 +131,14 @@ export const journalArticleAssetResponseSchema = z.object({
 });
 export type JournalArticleAssetResponse = z.infer<typeof journalArticleAssetResponseSchema>;
 
+export const journalWebEntryTitleSchema = z.string().trim().min(1).refine(
+  (value) => [...value].length <= 60,
+  { message: 'Web entry title must not exceed 60 Unicode characters.' },
+).nullable();
+export type JournalWebEntryTitle = z.infer<typeof journalWebEntryTitleSchema>;
+
 const journalWebEntryDraftFieldsSchema = z.object({
+  title: journalWebEntryTitleSchema,
   contentText: z.string(),
   action: z.literal('draft'),
   uploadId: z.string().uuid(),
@@ -141,6 +148,7 @@ const journalWebEntryDraftFieldsSchema = z.object({
 });
 
 const journalWebEntryPublishFieldsSchema = z.object({
+  title: journalWebEntryTitleSchema,
   contentText: z.string(),
   action: z.literal('publish'),
   uploadId: z.string().uuid(),
@@ -199,6 +207,7 @@ export const journalWebDraftUpdateFieldsSchema = z.discriminatedUnion('action', 
 export type JournalWebDraftUpdateFields = z.infer<typeof journalWebDraftUpdateFieldsSchema>;
 
 export const journalPublishedWebEntryUpdateFieldsSchema = z.object({
+  title: journalWebEntryTitleSchema,
   contentText: z.string(),
   uploadId: z.string().uuid(),
   removedAssetIds: z.array(z.number().int().positive()),

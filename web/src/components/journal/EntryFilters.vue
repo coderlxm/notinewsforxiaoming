@@ -140,11 +140,11 @@ function reset(): void {
       </div>
 
       <label class="field filters__query">
-        <span class="field__label">正文关键词</span>
+        <span class="field__label">主题或正文</span>
         <input
           v-model.trim="draft.query"
           type="search"
-          placeholder="搜索记录"
+          placeholder="主题或正文"
           @input="queueTextApply"
           @compositionstart="handleCompositionStart"
           @compositionend="handleCompositionEnd"

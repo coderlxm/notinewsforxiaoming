@@ -178,6 +178,7 @@ export async function registerPrivateEntryRoutes(
     const { uploadId } = uploadParamsSchema.parse(request.body);
     try {
       const input = {
+        title: fields.title,
         contentText: fields.contentText,
         channel: fields.channel,
         removedAssetIds: fields.removedAssetIds,

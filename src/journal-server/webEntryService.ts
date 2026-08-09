@@ -15,6 +15,7 @@ const maxWebEntryMediaCount = 10;
 const maxWebEntryVideoCount = 5;
 
 export interface CreateWebEntryServiceInput {
+  title: string | null;
   contentText: string;
   action: 'draft' | 'publish';
   channel: JournalPlainChannel;
@@ -25,6 +26,7 @@ export interface CreateWebEntryServiceInput {
 }
 
 export interface UpdateWebDraftServiceInput {
+  title: string | null;
   contentText: string;
   channel: JournalPlainChannel;
   uploadId: string;
@@ -67,6 +69,7 @@ export class JournalWebEntryService {
     try {
       return this.repository.createWebEntry({
         publicId: upload.publicId,
+        title: this.normalizeTitle(input.title),
         contentText: input.contentText,
         tags: extractJournalTags(input.contentText),
         publicationStatus: input.action === 'draft' ? 'draft' : 'published',
@@ -117,6 +120,7 @@ export class JournalWebEntryService {
     try {
       updated = publishVisibility === null
         ? this.repository.updateWebDraft(id, {
+            title: this.normalizeTitle(input.title),
             contentText: input.contentText,
             tags: extractJournalTags(input.contentText),
             channel: input.channel,
@@ -125,6 +129,7 @@ export class JournalWebEntryService {
             newAssets,
           })
         : this.repository.publishWebDraft(id, {
+            title: this.normalizeTitle(input.title),
             contentText: input.contentText,
             tags: extractJournalTags(input.contentText),
             channel: input.channel,
@@ -175,6 +180,7 @@ export class JournalWebEntryService {
     let updated: JournalEntry;
     try {
       updated = this.repository.updatePublishedWebEntry(id, {
+        title: this.normalizeTitle(input.title),
         contentText: input.contentText,
         tags: extractJournalTags(input.contentText),
         channel: input.channel,
@@ -239,6 +245,11 @@ export class JournalWebEntryService {
     if (action === 'draft' && visibility !== undefined) {
       throw new Error('Web content drafts must not specify visibility.');
     }
+  }
+
+  private normalizeTitle(title: string | null): string | null {
+    const normalized = title?.trim() ?? '';
+    return normalized === '' ? null : normalized;
   }
 
   private hashForNewAccess(
