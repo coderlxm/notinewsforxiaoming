@@ -841,7 +841,7 @@ export class JournalRepository {
     channel: JournalChannel;
     tag?: string;
     limit: number;
-    includeProtectedContent: boolean;
+    canReadProtectedContent: (publicId: string, accessRevision: number) => boolean;
   }): JournalFeed {
     const conditions = [
       this.groupRepresentativeCondition('e'),
@@ -881,7 +881,8 @@ export class JournalRepository {
     const hasNext = rows.length > filters.limit;
     const pageRows = rows.slice(0, filters.limit);
     return {
-      entries: pageRows.map((row) => row.visibility === 'protected' && !filters.includeProtectedContent
+      entries: pageRows.map((row) => row.visibility === 'protected'
+        && !filters.canReadProtectedContent(row.public_id, row.access_revision)
         ? this.toProtectedPreview(row)
         : this.toEntry(row)),
       nextCursor: hasNext && pageRows.length > 0

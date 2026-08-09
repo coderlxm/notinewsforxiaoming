@@ -113,7 +113,11 @@ export function useJournalApi() {
     unlocking.value = true;
     unlockError.value = null;
     try {
-      detail.value = await unlockPublicEntry(protectedEntry.publicId, password);
+      const unlockedEntry = await unlockPublicEntry(protectedEntry.publicId, password);
+      detail.value = unlockedEntry;
+      publicEntries.value = publicEntries.value.map(entry =>
+        entry.publicId === unlockedEntry.publicId ? unlockedEntry : entry,
+      );
       protectedDetail.value = null;
     }
     catch (reason) {

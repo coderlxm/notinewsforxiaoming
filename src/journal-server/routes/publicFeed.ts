@@ -21,13 +21,14 @@ export async function registerPublicFeedRoutes(
 ): Promise<void> {
   server.get('/api/feed', async (request, reply) => {
     const query = publicFeedQuerySchema.parse(request.query);
-    const includeProtectedContent = auth.isAdmin(request);
     reply.header('Vary', 'Cookie');
-    if (includeProtectedContent) reply.header('Cache-Control', 'private, no-store');
+    reply.header('Cache-Control', 'private, no-store');
+    const administrator = auth.isAdmin(request);
     return repository.listPublicFeed({
       channel: query.channel,
       limit: 20,
-      includeProtectedContent,
+      canReadProtectedContent: (publicId, accessRevision) => administrator
+        || auth.hasProtectedAccess(request, publicId, accessRevision),
       ...(query.cursor ? { cursor: query.cursor } : {}),
       ...(query.tag ? { tag: query.tag } : {}),
     });
