@@ -18,11 +18,13 @@ const props = withDefaults(defineProps<{
   channelEditable?: boolean;
   teleported?: boolean;
   editVisible?: boolean;
+  compact?: boolean;
 }>(), {
   channel: undefined,
   channelEditable: false,
   teleported: true,
   editVisible: true,
+  compact: false,
 });
 
 const emit = defineEmits<{
@@ -93,7 +95,11 @@ function handleCommand(command: string): void {
 </script>
 
 <template>
-  <div class="action-menu" :aria-busy="busy">
+  <div
+    class="action-menu"
+    :class="{ 'action-menu--compact': compact }"
+    :aria-busy="busy"
+  >
     <JournalLoading
       v-if="busy && pendingLabel"
       class="action-menu__loading"
@@ -194,6 +200,25 @@ function handleCommand(command: string): void {
   min-height: 2.5rem;
   color: var(--text-muted);
   font-size: 0.72rem;
+}
+
+@media (max-width: 599px) {
+  .action-menu--compact {
+    width: 2.5rem;
+    height: 1rem;
+  }
+
+  .action-menu--compact :deep(.el-dropdown) {
+    width: 100%;
+    height: 100%;
+  }
+
+  .action-menu--compact .action-menu__trigger {
+    position: absolute;
+    top: 50%;
+    right: 0;
+    transform: translateY(-50%);
+  }
 }
 
 :global(.journal-action-menu.el-popper) {

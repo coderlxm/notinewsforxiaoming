@@ -155,6 +155,7 @@ function handleCardClick(event: MouseEvent): void {
       'entry--detail': isDetail,
       'entry--visual': hasVisualMedia,
       'entry--poster': hasTextPoster,
+      'entry--editable': editable,
       'entry--linkable': cardLinkable && !editing && !confirmingDeletion,
     }"
     @click="handleCardClick"
@@ -261,6 +262,7 @@ function handleCardClick(event: MouseEvent): void {
             :publication-status="entry.publicationStatus"
             :channel="plainChannel"
             :channel-editable="channelEditable"
+            compact
             @edit="startEditing"
             @continue-edit="emit('continueDraft', entry)"
             @edit-published-time="startPublishedTimeEditing"
@@ -371,6 +373,10 @@ function handleCardClick(event: MouseEvent): void {
 }
 
 .entry__meta-copy span {
+  white-space: nowrap;
+}
+
+.entry__meta-copy time {
   white-space: nowrap;
 }
 
@@ -552,6 +558,11 @@ function handleCardClick(event: MouseEvent): void {
   .entry__tags {
     gap: 0;
   }
+
+  .entry--editable .entry__meta-time {
+    display: none;
+  }
+
 }
 
 @media (prefers-reduced-motion: reduce) {
