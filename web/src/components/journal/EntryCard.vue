@@ -44,6 +44,12 @@ const hiddenStructuredKeys = new Set(['entities', 'caption_entities']);
 const isDetail = computed(() => !props.linkable);
 const isDraft = computed(() => props.entry.publicationStatus === 'draft');
 const plainChannel = computed(() => props.entry.channel as JournalPlainChannel);
+const hasVisualMedia = computed(() => props.entry.assets.some(asset =>
+  asset.kind === 'photo'
+  || ['video', 'video_note', 'animation'].includes(asset.kind)
+  || (asset.kind === 'sticker' && asset.mimeType?.startsWith('image/'))
+  || (asset.kind === 'sticker' && asset.mimeType?.startsWith('video/')),
+));
 const normalizedContent = computed(() => props.entry.contentText.replace(/\s+/g, ' ').trim());
 const displayedContent = computed(() => {
   if (isDetail.value || normalizedContent.value.length <= 72) return isDetail.value
@@ -119,6 +125,7 @@ function handleCardClick(event: MouseEvent): void {
       'entry--pinned': entry.pinned,
       'entry--detail': isDetail,
       'entry--short': isShortText,
+      'entry--visual': hasVisualMedia,
       'entry--linkable': cardLinkable && !editing && !confirmingDeletion,
     }"
     @click="handleCardClick"
@@ -236,7 +243,7 @@ function handleCardClick(event: MouseEvent): void {
 <style scoped>
 .entry {
   display: grid;
-  gap: 0.85rem;
+  gap: 0.6rem;
   padding: 0.9rem;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-card);
@@ -289,6 +296,14 @@ function handleCardClick(event: MouseEvent): void {
   white-space: pre-wrap;
 }
 
+.entry--visual:not(.entry--detail) .entry__content {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+}
+
 .entry--short .entry__content {
   font-family: var(--font-serif);
   font-size: clamp(1.08rem, 1.4vw, 1.3rem);
@@ -335,8 +350,7 @@ function handleCardClick(event: MouseEvent): void {
 }
 
 .entry__tag {
-  min-height: 2.5rem;
-  padding: 0.45rem 0.35rem;
+  padding: 0 0.35rem;
   border: 0;
   background: transparent;
   color: var(--accent-strong);
@@ -404,8 +418,8 @@ function handleCardClick(event: MouseEvent): void {
 
 @media (max-width: 599px) {
   .entry {
-    gap: 0.65rem;
-    padding: 0.65rem;
+    gap: 0;
+    padding: 0.65rem 0.65rem 0.35rem;
     border-radius: 0.65rem;
   }
 
@@ -426,6 +440,7 @@ function handleCardClick(event: MouseEvent): void {
 
   .entry__tags {
     gap: 0;
+    margin-top: 0;
   }
 }
 
