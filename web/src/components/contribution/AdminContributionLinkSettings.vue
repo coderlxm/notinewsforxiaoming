@@ -2,6 +2,7 @@
 import QRCode from 'qrcode';
 import { computed, onMounted, shallowRef, watch } from 'vue';
 import { useAdminContributionLink } from '../../composables/useAdminContributionLink';
+import type { ContributionLinkLifetime } from '../../types';
 import { formatEntryTime } from '../../utils/formatters';
 import { showMessage } from '../../utils/message';
 import JournalLoading from '../ui/JournalLoading.vue';
@@ -9,9 +10,11 @@ import JournalLoading from '../ui/JournalLoading.vue';
 const contributionLink = useAdminContributionLink();
 const qrCodeUrl = shallowRef<string | null>(null);
 const copied = shallowRef(false);
+const selectedLifetime = shallowRef<ContributionLinkLifetime>('temporary');
 let qrSequence = 0;
 
 const shareUrl = computed(() => contributionLink.link.value?.url ?? null);
+const activeExpiresAt = computed(() => contributionLink.link.value?.expiresAt ?? null);
 const busy = computed(() => contributionLink.mutation.value !== null);
 const canSystemShare = computed(() =>
   shareUrl.value !== null && typeof navigator.share === 'function',
@@ -47,7 +50,7 @@ async function createLink(): Promise<void> {
     && !window.confirm('创建新链接会立即使当前分享链接失效，确定继续吗？')
   ) return;
   copied.value = false;
-  await contributionLink.create();
+  await contributionLink.create(selectedLifetime.value);
 }
 
 async function copyLink(): Promise<void> {
@@ -91,22 +94,38 @@ onMounted(() => {
     <div class="link-settings__heading">
       <div>
         <h2 id="contribution-link-title" class="link-settings__title">朋友投稿链接</h2>
-        <p>链接有效 72 小时，同一时间只保留一条。</p>
+        <p>创建时选择有效期，同一时间只保留一条。</p>
       </div>
-      <button
-        class="button button--quiet"
-        type="button"
-        :disabled="busy || contributionLink.loading.value"
-        :aria-busy="contributionLink.mutation.value === 'create'"
-        @click="createLink"
-      >
-        <JournalLoading
-          v-if="contributionLink.mutation.value === 'create'"
-          variant="inline"
-          label="创建中…"
-        />
-        <template v-else>{{ contributionLink.link.value ? '创建新链接' : '创建链接' }}</template>
-      </button>
+      <div class="link-settings__create">
+        <fieldset
+          class="link-settings__lifetime"
+          aria-label="投稿链接有效期"
+          :disabled="busy || contributionLink.loading.value"
+        >
+          <label class="link-settings__choice">
+            <input v-model="selectedLifetime" type="radio" value="temporary">
+            <span>72 小时</span>
+          </label>
+          <label class="link-settings__choice">
+            <input v-model="selectedLifetime" type="radio" value="permanent">
+            <span>长期有效</span>
+          </label>
+        </fieldset>
+        <button
+          class="button button--quiet"
+          type="button"
+          :disabled="busy || contributionLink.loading.value"
+          :aria-busy="contributionLink.mutation.value === 'create'"
+          @click="createLink"
+        >
+          <JournalLoading
+            v-if="contributionLink.mutation.value === 'create'"
+            variant="inline"
+            label="创建中…"
+          />
+          <template v-else>{{ contributionLink.link.value ? '创建新链接' : '创建链接' }}</template>
+        </button>
+      </div>
     </div>
 
     <div v-if="contributionLink.loading.value" class="link-settings__loading">
@@ -115,10 +134,18 @@ onMounted(() => {
     <div v-else-if="contributionLink.link.value" class="link-settings__active">
       <div class="link-settings__content">
         <div class="link-settings__status">
-          <span>当前链接有效</span>
-          <time :datetime="contributionLink.link.value.expiresAt">
-            {{ formatEntryTime(contributionLink.link.value.expiresAt) }} 到期
+          <span class="link-settings__status-label">
+            {{ activeExpiresAt ? '当前链接有效' : '当前链接长期有效' }}
+          </span>
+          <time
+            v-if="activeExpiresAt"
+            :datetime="activeExpiresAt"
+          >
+            {{ formatEntryTime(activeExpiresAt) }} 到期
           </time>
+          <span v-else class="link-settings__status-meta">
+            {{ formatEntryTime(contributionLink.link.value.createdAt) }} 创建
+          </span>
         </div>
 
         <template v-if="shareUrl">
@@ -187,6 +214,62 @@ onMounted(() => {
   gap: 0.8rem;
 }
 
+.link-settings__create,
+.link-settings__lifetime {
+  display: flex;
+  align-items: center;
+}
+
+.link-settings__create {
+  gap: 0.65rem;
+}
+
+.link-settings__lifetime {
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0.2rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--surface-page);
+}
+
+.link-settings__choice {
+  cursor: pointer;
+}
+
+.link-settings__choice input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.link-settings__choice span {
+  display: inline-flex;
+  min-height: 1.85rem;
+  align-items: center;
+  padding: 0.35rem 0.65rem;
+  border-radius: 7px;
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  white-space: nowrap;
+}
+
+.link-settings__choice input:checked + span {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.link-settings__choice input:focus-visible + span {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.link-settings__lifetime:disabled .link-settings__choice {
+  cursor: wait;
+  opacity: 0.55;
+}
+
 .link-settings__title {
   margin: 0;
   font-family: var(--font-serif);
@@ -227,13 +310,14 @@ onMounted(() => {
   gap: 0.95rem;
 }
 
-.link-settings__status span {
+.link-settings__status-label {
   color: var(--accent-strong);
   font-size: 0.78rem;
   font-weight: 700;
 }
 
-.link-settings__status time {
+.link-settings__status time,
+.link-settings__status-meta {
   color: var(--text-muted);
   font-size: 0.7rem;
 }
@@ -328,6 +412,20 @@ onMounted(() => {
   .link-settings__heading .button,
   .link-settings__share > .button {
     width: 100%;
+  }
+
+  .link-settings__create {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .link-settings__lifetime {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .link-settings__choice span {
+    justify-content: center;
   }
 }
 </style>

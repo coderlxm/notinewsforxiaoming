@@ -7,6 +7,13 @@ import type {
 
 const contributionLinkLifetimeMs = 72 * 60 * 60 * 1000;
 
+export type JournalContributionLinkLifetime = 'temporary' | 'permanent';
+
+interface JournalContributionLinkSummary {
+  expiresAt: string | null;
+  createdAt: string;
+}
+
 export class JournalContributionLinkService {
   constructor(
     private readonly repository: JournalRepository,
@@ -22,7 +29,7 @@ export class JournalContributionLinkService {
         401,
       );
     }
-    if (link.expiresAt <= new Date().toISOString()) {
+    if (link.expiresAt !== null && link.expiresAt <= new Date().toISOString()) {
       throw new JournalContributionError(
         'LINK_EXPIRED',
         '这条投稿链接已经过期，请向小明索取新链接。',
@@ -32,7 +39,7 @@ export class JournalContributionLinkService {
     return link;
   }
 
-  current(): { expiresAt: string; createdAt: string } | null {
+  current(): JournalContributionLinkSummary | null {
     const link = this.repository.getActiveContributionLink(new Date().toISOString());
     return link ? {
       expiresAt: link.expiresAt,
@@ -40,10 +47,14 @@ export class JournalContributionLinkService {
     } : null;
   }
 
-  create(): { url: string; expiresAt: string; createdAt: string } {
+  create(lifetime: JournalContributionLinkLifetime): JournalContributionLinkSummary & {
+    url: string;
+  } {
     const token = randomBytes(32).toString('base64url');
     const createdAt = new Date().toISOString();
-    const expiresAt = new Date(Date.now() + contributionLinkLifetimeMs).toISOString();
+    const expiresAt = lifetime === 'temporary'
+      ? new Date(Date.now() + contributionLinkLifetimeMs).toISOString()
+      : null;
     this.repository.createContributionLink(this.hashToken(token), expiresAt, createdAt);
     return {
       url: `${this.publicBaseUrl}/contribute#token=${token}`,

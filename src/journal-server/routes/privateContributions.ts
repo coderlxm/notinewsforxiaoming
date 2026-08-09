@@ -15,6 +15,10 @@ const contributionAssetParamsSchema = contributionParamsSchema.extend({
   assetId: z.coerce.number().int().positive(),
 });
 
+const contributionLinkCreateSchema = z.object({
+  lifetime: z.enum(['temporary', 'permanent']),
+});
+
 export async function registerPrivateContributionRoutes(
   server: FastifyInstance,
   dependencies: {
@@ -31,9 +35,12 @@ export async function registerPrivateContributionRoutes(
     link: dependencies.links.current(),
   }));
 
-  server.post('/api/private/contribution-link', adminOnly, async () => ({
-    link: dependencies.links.create(),
-  }));
+  server.post('/api/private/contribution-link', adminOnly, async (request) => {
+    const { lifetime } = contributionLinkCreateSchema.parse(request.body);
+    return {
+      link: dependencies.links.create(lifetime),
+    };
+  });
 
   server.delete('/api/private/contribution-link', adminOnly, async (_request, reply) => {
     dependencies.links.revoke();

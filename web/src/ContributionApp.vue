@@ -9,7 +9,7 @@ import { showMessage } from './utils/message';
 type LinkState = 'loading' | 'ready' | 'error';
 
 interface ContributionLinkResponse {
-  expiresAt: string;
+  expiresAt: string | null;
   limits: {
     maxAssets: number;
     maxVideos: number;

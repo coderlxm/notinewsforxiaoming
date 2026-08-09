@@ -638,6 +638,34 @@ const migrations: JournalMigration[] = [
       `);
     },
   },
+  {
+    version: 12,
+    up(database) {
+      database.exec(`
+        PRAGMA defer_foreign_keys = ON;
+
+        CREATE TABLE journal_contribution_links_v12 (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          token_hash TEXT NOT NULL UNIQUE,
+          expires_at TEXT,
+          revoked_at TEXT,
+          created_at TEXT NOT NULL
+        );
+
+        INSERT INTO journal_contribution_links_v12 (
+          id, token_hash, expires_at, revoked_at, created_at
+        )
+        SELECT id, token_hash, expires_at, revoked_at, created_at
+        FROM journal_contribution_links;
+
+        DROP TABLE journal_contribution_links;
+        ALTER TABLE journal_contribution_links_v12 RENAME TO journal_contribution_links;
+
+        CREATE INDEX idx_journal_contribution_links_token_hash
+        ON journal_contribution_links(token_hash);
+      `);
+    },
+  },
 ];
 
 export function runJournalMigrations(database: Database.Database): void {

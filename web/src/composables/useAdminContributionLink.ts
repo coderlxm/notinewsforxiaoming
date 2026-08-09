@@ -4,7 +4,7 @@ import {
   fetchAdminContributionLink,
   revokeAdminContributionLink,
 } from '../api';
-import type { AdminContributionLink } from '../types';
+import type { AdminContributionLink, ContributionLinkLifetime } from '../types';
 
 export function useAdminContributionLink() {
   const link = shallowRef<AdminContributionLink | null>(null);
@@ -31,11 +31,11 @@ export function useAdminContributionLink() {
     }
   }
 
-  async function create(): Promise<void> {
+  async function create(lifetime: ContributionLinkLifetime): Promise<void> {
     mutation.value = 'create';
     error.value = null;
     try {
-      const response = await createAdminContributionLink();
+      const response = await createAdminContributionLink(lifetime);
       link.value = response.link;
     }
     catch (reason) {

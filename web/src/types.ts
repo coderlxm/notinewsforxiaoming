@@ -107,9 +107,11 @@ export interface SiteProfile {
 
 export interface AdminContributionLink {
   url?: string;
-  expiresAt: string;
+  expiresAt: string | null;
   createdAt: string;
 }
+
+export type ContributionLinkLifetime = 'temporary' | 'permanent';
 
 export interface AdminContributionAsset {
   id: number;

@@ -1,6 +1,7 @@
 import type {
   AdminContributionDetail,
   AdminContributionLink,
+  ContributionLinkLifetime,
   AdminContributionListResponse,
   ChannelTags,
   FeedFilters,
@@ -135,10 +136,12 @@ export function fetchAdminContributionLink(): Promise<{ link: AdminContributionL
   return requestJson<{ link: AdminContributionLink | null }>('/api/private/contribution-link');
 }
 
-export function createAdminContributionLink(): Promise<{ link: AdminContributionLink }> {
+export function createAdminContributionLink(
+  lifetime: ContributionLinkLifetime,
+): Promise<{ link: AdminContributionLink }> {
   return requestJson<{ link: AdminContributionLink }>(
     '/api/private/contribution-link',
-    { method: 'POST' },
+    jsonRequest('POST', { lifetime }),
   );
 }
 

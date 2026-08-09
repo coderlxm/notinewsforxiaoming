@@ -10,7 +10,7 @@ import ContributionSubmitBar from './ContributionSubmitBar.vue';
 
 const props = defineProps<{
   token: string;
-  expiresAt: string;
+  expiresAt: string | null;
 }>();
 
 const emit = defineEmits<{
@@ -152,13 +152,16 @@ onBeforeUnmount(() => {
       </div>
     </section>
 
-    <p class="contribution-expiry-note">
+    <p v-if="expiresAt" class="contribution-expiry-note">
       这条链接将在 {{ new Date(expiresAt).toLocaleString('zh-CN', {
         month: 'long',
         day: 'numeric',
         hour: '2-digit',
         minute: '2-digit',
       }) }} 到期。
+    </p>
+    <p v-else class="contribution-expiry-note">
+      这是一条长期投稿链接，在创建者主动撤销前持续有效。
     </p>
 
     <ContributionSubmitBar

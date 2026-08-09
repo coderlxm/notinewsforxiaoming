@@ -176,7 +176,7 @@ interface SiteProfileRow {
 interface ContributionLinkRow {
   id: number;
   token_hash: string;
-  expires_at: string;
+  expires_at: string | null;
   revoked_at: string | null;
   created_at: string;
 }
@@ -211,7 +211,7 @@ interface ContributionAssetRow {
 export interface JournalContributionLinkRecord {
   id: number;
   tokenHash: string;
-  expiresAt: string;
+  expiresAt: string | null;
   revokedAt: string | null;
   createdAt: string;
 }
@@ -1013,7 +1013,8 @@ export class JournalRepository {
     const row = this.database.prepare(`
       SELECT id, token_hash, expires_at, revoked_at, created_at
       FROM journal_contribution_links
-      WHERE revoked_at IS NULL AND expires_at > ?
+      WHERE revoked_at IS NULL
+        AND (expires_at IS NULL OR expires_at > ?)
       ORDER BY id DESC
       LIMIT 1
     `).get(now) as ContributionLinkRow | undefined;
@@ -1022,7 +1023,7 @@ export class JournalRepository {
 
   createContributionLink(
     tokenHash: string,
-    expiresAt: string,
+    expiresAt: string | null,
     createdAt: string,
   ): JournalContributionLinkRecord {
     const insert = this.database.transaction(() => {
@@ -1051,7 +1052,8 @@ export class JournalRepository {
     const result = this.database.prepare(`
       UPDATE journal_contribution_links
       SET revoked_at = ?
-      WHERE revoked_at IS NULL AND expires_at > ?
+      WHERE revoked_at IS NULL
+        AND (expires_at IS NULL OR expires_at > ?)
     `).run(revokedAt, revokedAt);
     return result.changes > 0;
   }
