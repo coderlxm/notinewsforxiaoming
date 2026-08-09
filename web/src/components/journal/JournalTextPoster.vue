@@ -54,13 +54,11 @@ const visibilityLabel = computed(() => props.entry.publicationStatus === 'draft'
   --poster-muted: #6f706b;
   --poster-accent: #b4313d;
   --poster-mark: rgb(41 54 56 / 5%);
-  --poster-border: transparent;
   --poster-font: var(--font-serif);
   --poster-align: left;
   --poster-radius: 0;
   --poster-shadow: 0 22px 54px rgb(0 0 0 / 22%);
   --poster-letter-spacing: -0.035em;
-  --poster-frame: rgb(41 54 56 / 9%);
   display: grid;
   min-width: 0;
   min-height: 0;
@@ -80,7 +78,6 @@ const visibilityLabel = computed(() => props.entry.publicationStatus === 'draft'
   grid-template-rows: auto minmax(0, 1fr) auto;
   padding: clamp(28px, 4vw, 56px);
   overflow: hidden;
-  border: 1px solid var(--poster-border);
   border-radius: var(--poster-radius);
   background: var(--poster-background);
   box-shadow: var(--poster-shadow);
@@ -104,7 +101,6 @@ const visibilityLabel = computed(() => props.entry.publicationStatus === 'draft'
 .text-poster__sheet::after {
   position: absolute;
   z-index: -1;
-  border: 1px solid var(--poster-frame);
   content: '';
   inset: 4.5%;
   pointer-events: none;
@@ -228,8 +224,6 @@ const visibilityLabel = computed(() => props.entry.publicationStatus === 'draft'
   --poster-muted: #786b5d;
   --poster-accent: #9b5a36;
   --poster-mark: rgb(116 76 46 / 6%);
-  --poster-border: rgb(94 65 43 / 16%);
-  --poster-frame: rgb(94 65 43 / 16%);
   --poster-letter-spacing: 0.01em;
 }
 
@@ -254,7 +248,6 @@ const visibilityLabel = computed(() => props.entry.publicationStatus === 'draft'
   --poster-muted: #4d5553;
   --poster-accent: #d52f3c;
   --poster-mark: rgb(213 47 60 / 9%);
-  --poster-frame: transparent;
   --poster-font: var(--font-condensed);
   --poster-letter-spacing: -0.015em;
 }
@@ -284,14 +277,8 @@ const visibilityLabel = computed(() => props.entry.publicationStatus === 'draft'
   --poster-muted: #726553;
   --poster-accent: #a84432;
   --poster-mark: rgb(132 83 49 / 7%);
-  --poster-border: rgb(88 68 42 / 30%);
-  --poster-frame: rgb(88 68 42 / 24%);
   --poster-font: var(--font-condensed);
   --poster-letter-spacing: 0.025em;
-}
-
-.text-poster--archive .text-poster__sheet::after {
-  border-style: dashed;
 }
 
 .text-poster--archive .text-poster__sheet::before {
@@ -308,7 +295,6 @@ const visibilityLabel = computed(() => props.entry.publicationStatus === 'draft'
   --poster-muted: #59616d;
   --poster-accent: #973a69;
   --poster-mark: rgb(95 51 94 / 8%);
-  --poster-frame: rgb(39 49 67 / 12%);
   --poster-align: center;
   --poster-letter-spacing: 0.015em;
 }
@@ -337,7 +323,6 @@ const visibilityLabel = computed(() => props.entry.publicationStatus === 'draft'
   --poster-muted: #68746e;
   --poster-accent: #c14d4f;
   --poster-mark: rgb(48 84 75 / 5%);
-  --poster-frame: transparent;
   --poster-letter-spacing: 0.01em;
 }
 
@@ -369,8 +354,6 @@ const visibilityLabel = computed(() => props.entry.publicationStatus === 'draft'
   --poster-muted: #625f58;
   --poster-accent: #8e2932;
   --poster-mark: rgb(33 31 28 / 5%);
-  --poster-border: rgb(33 31 28 / 16%);
-  --poster-frame: rgb(33 31 28 / 18%);
   --poster-font: var(--font-serif);
   --poster-align: center;
   --poster-letter-spacing: -0.045em;
@@ -446,7 +429,6 @@ const visibilityLabel = computed(() => props.entry.publicationStatus === 'draft'
     --poster-muted: #999a94;
     --poster-accent: #d65c67;
     --poster-mark: rgb(235 232 223 / 5%);
-    --poster-frame: rgb(235 232 223 / 8%);
   }
 
   .text-poster--book {
@@ -457,8 +439,6 @@ const visibilityLabel = computed(() => props.entry.publicationStatus === 'draft'
     --poster-muted: #aa9a84;
     --poster-accent: #c78758;
     --poster-mark: rgb(214 175 126 / 6%);
-    --poster-border: rgb(210 171 121 / 16%);
-    --poster-frame: rgb(210 171 121 / 13%);
   }
 
   .text-poster--swiss {
@@ -480,8 +460,6 @@ const visibilityLabel = computed(() => props.entry.publicationStatus === 'draft'
     --poster-muted: #a89b7e;
     --poster-accent: #c86b4e;
     --poster-mark: rgb(207 149 90 / 7%);
-    --poster-border: rgb(209 178 121 / 20%);
-    --poster-frame: rgb(209 178 121 / 16%);
   }
 
   .text-poster--cinema {
@@ -492,7 +470,6 @@ const visibilityLabel = computed(() => props.entry.publicationStatus === 'draft'
     --poster-muted: #9da1ad;
     --poster-accent: #d270a3;
     --poster-mark: rgb(210 112 163 / 8%);
-    --poster-frame: rgb(230 230 242 / 10%);
   }
 
   .text-poster--notebook {
@@ -517,8 +494,6 @@ const visibilityLabel = computed(() => props.entry.publicationStatus === 'draft'
     --poster-muted: #aaa69d;
     --poster-accent: #ce5a63;
     --poster-mark: rgb(235 232 223 / 5%);
-    --poster-border: rgb(235 232 223 / 13%);
-    --poster-frame: rgb(235 232 223 / 12%);
   }
 }
 </style>

@@ -307,7 +307,7 @@ function handleCardClick(event: MouseEvent): void {
 .entry {
   display: grid;
   overflow: hidden;
-  border-radius: var(--radius-card);
+  border-radius: 1.25rem;
   background: var(--surface-card);
   transition: transform 180ms ease;
 }
@@ -324,6 +324,7 @@ function handleCardClick(event: MouseEvent): void {
   gap: 1rem;
   padding: 1.5rem;
   overflow: visible;
+  border-radius: var(--radius-card);
 }
 
 .entry__header,
@@ -522,7 +523,7 @@ function handleCardClick(event: MouseEvent): void {
 
 @media (max-width: 599px) {
   .entry {
-    border-radius: 0.65rem;
+    border-radius: 1.125rem;
   }
 
   .entry--detail {

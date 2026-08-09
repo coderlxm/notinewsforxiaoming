@@ -221,7 +221,7 @@ function handleCardClick(event: MouseEvent): void {
   gap: 0.8rem;
   padding: 0.9rem;
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-card);
+  border-radius: 1.25rem;
   background: var(--surface-card);
   transition: border-color 180ms ease, transform 180ms ease;
 }
@@ -242,6 +242,7 @@ function handleCardClick(event: MouseEvent): void {
 .article-card--full {
   gap: 1rem;
   padding: 1.5rem;
+  border-radius: var(--radius-card);
 }
 
 .article-card__header,
@@ -411,7 +412,7 @@ function handleCardClick(event: MouseEvent): void {
   .article-card {
     gap: 0.65rem;
     padding: 0.65rem;
-    border-radius: 0.65rem;
+    border-radius: 1.125rem;
   }
 
   .article-card--full {
