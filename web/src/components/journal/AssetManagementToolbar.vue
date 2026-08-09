@@ -181,7 +181,6 @@ function reset(): void {
 
 <style scoped>
 .toolbar {
-  --asset-toolbar-control-height: 3rem;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-card);
   background: var(--surface-card);
@@ -191,13 +190,9 @@ function reset(): void {
 .toolbar__main {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  align-items: end;
+  align-items: center;
   gap: 0.75rem;
   padding: 0.8rem;
-}
-
-.toolbar__search input {
-  height: var(--asset-toolbar-control-height);
 }
 
 .toolbar__details {

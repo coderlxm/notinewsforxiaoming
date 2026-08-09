@@ -239,10 +239,6 @@ function handleCardClick(event: MouseEvent): void {
   border-color: color-mix(in srgb, var(--accent) 50%, var(--border-subtle));
 }
 
-.article-card--without-cover:not(.article-card--full) {
-  background: color-mix(in srgb, var(--surface-muted) 42%, var(--surface-card));
-}
-
 .article-card--full {
   gap: 1rem;
   padding: 1.5rem;
