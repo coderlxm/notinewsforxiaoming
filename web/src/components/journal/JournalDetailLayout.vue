@@ -112,6 +112,7 @@ function forwardPinned(entry: JournalEntry, pinned: boolean): void {
         :mode="mode"
         :busy="busy"
         :has-leading-stage="hasLeadingStage"
+        :has-text-poster="hasTextPoster"
         :supplemental-assets="supplementalAssets"
         @select-tag="emit('selectTag', $event)"
         @edit="emit('edit', $event)"

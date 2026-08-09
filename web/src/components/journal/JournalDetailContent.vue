@@ -22,6 +22,7 @@ const props = defineProps<{
   mode: 'public' | 'private';
   busy: boolean;
   hasLeadingStage: boolean;
+  hasTextPoster: boolean;
   supplementalAssets: readonly JournalAsset[];
 }>();
 
@@ -49,7 +50,8 @@ const hiddenStructuredKeys = new Set(['entities', 'caption_entities']);
 
 const isPrivateMode = computed(() => props.mode === 'private');
 const isRich = computed(() => props.entry.bodyFormat === 'rich');
-const plainTitle = computed(() => isRich.value ? '' : props.entry.title?.trim() ?? '');
+const plainTitle = computed(() =>
+  isRich.value || props.hasTextPoster ? '' : props.entry.title?.trim() ?? '');
 const plainChannel = computed(() => isRich.value
   ? undefined
   : props.entry.channel as JournalPlainChannel);
