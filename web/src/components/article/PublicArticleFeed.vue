@@ -1,21 +1,29 @@
 <script setup lang="ts">
 import { computed, onActivated, onMounted, onUpdated } from 'vue';
-import type { JournalEntry } from '../../types';
+import {
+  isProtectedJournalEntry,
+  type PublicJournalFeedItem,
+} from '../../types';
+import ProtectedEntryCard from '../journal/ProtectedEntryCard.vue';
 import ArticleCardContent from './ArticleCardContent.vue';
 import JournalArticleFeedPlaceholder from './JournalArticleFeedPlaceholder.vue';
 
 const props = defineProps<{
-  entries: readonly JournalEntry[];
+  entries: readonly PublicJournalFeedItem[];
   loading: boolean;
 }>();
 
 const emit = defineEmits<{
   layoutReady: [];
-  openEntry: [entry: JournalEntry];
+  openEntry: [entry: PublicJournalFeedItem];
   selectTag: [tag: string];
 }>();
 
 const preparing = computed(() => props.loading && props.entries.length === 0);
+
+function entryKey(entry: PublicJournalFeedItem): string {
+  return isProtectedJournalEntry(entry) ? `protected:${entry.publicId}` : `entry:${entry.id}`;
+}
 
 onMounted(() => {
   if (!preparing.value) emit('layoutReady');
@@ -32,14 +40,21 @@ onActivated(() => {
   <div class="article-feed" :aria-busy="preparing">
     <JournalArticleFeedPlaceholder v-if="preparing" />
     <div v-else class="article-feed__grid">
-      <ArticleCardContent
-        v-for="entry in entries"
-        :key="entry.id"
-        :entry="entry"
-        show-year
-        @open-entry="emit('openEntry', $event)"
-        @select-tag="emit('selectTag', $event)"
-      />
+      <template v-for="entry in entries" :key="entryKey(entry)">
+        <ProtectedEntryCard
+          v-if="isProtectedJournalEntry(entry)"
+          :entry="entry"
+          display="article"
+          @open="emit('openEntry', $event)"
+        />
+        <ArticleCardContent
+          v-else
+          :entry="entry"
+          show-year
+          @open-entry="emit('openEntry', $event)"
+          @select-tag="emit('selectTag', $event)"
+        />
+      </template>
     </div>
   </div>
 </template>

@@ -2,7 +2,6 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import {
   journalIngestRequestSchema,
-  journalVisibilityRequestSchema,
 } from '../../shared/journalProtocol.js';
 import type { JournalAuth } from '../auth.js';
 import type { JournalDeletionService } from '../deletion.js';
@@ -11,6 +10,10 @@ import type { JournalRepository } from '../repository.js';
 
 const publicIdParamsSchema = z.object({
   publicId: z.string().uuid(),
+});
+
+const internalVisibilityRequestSchema = z.object({
+  visibility: z.enum(['private', 'public']),
 });
 
 interface InternalRoutesOptions {
@@ -35,7 +38,7 @@ export async function registerInternalRoutes(
     preHandler: options.auth.requireInternal,
   }, async (request, reply) => {
     const { publicId } = request.params as { publicId: string };
-    const input = journalVisibilityRequestSchema.parse(request.body);
+    const input = internalVisibilityRequestSchema.parse(request.body);
     const entry = options.repository.updateVisibilityByPublicId(publicId, input.visibility);
     if (!entry) return reply.code(404).send({ error: 'Journal entry was not found.' });
     return entry;

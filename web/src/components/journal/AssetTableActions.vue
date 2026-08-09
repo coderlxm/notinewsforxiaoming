@@ -1,25 +1,35 @@
 <script setup lang="ts">
 import { Edit, View } from '@element-plus/icons-vue';
+import { shallowRef } from 'vue';
+import type { JournalEntry } from '../../types';
 import CardActionMenu from './CardActionMenu.vue';
-import type { JournalEntry, JournalVisibility } from '../../types';
+import AccessSettingsDialog from './AccessSettingsDialog.vue';
+import type { AccessSettingsInput } from './accessSettings';
 
-defineProps<{
+const props = defineProps<{
   entry: JournalEntry;
   busy: boolean;
 }>();
+
+const accessSettingsOpen = shallowRef(false);
 
 const emit = defineEmits<{
   edit: [entry: JournalEntry];
   view: [entry: JournalEntry];
   editPublishedTime: [entry: JournalEntry];
   setPinned: [entry: JournalEntry, pinned: boolean];
-  setVisibility: [entry: JournalEntry, visibility: JournalVisibility];
+  saveAccessSettings: [entry: JournalEntry, settings: AccessSettingsInput];
   deleteEntry: [entry: JournalEntry];
 }>();
 
 function requestDelete(entry: JournalEntry): void {
   const subject = entry.bodyFormat === 'rich' ? '这篇文章' : '这条记录';
   if (window.confirm(`永久删除${subject}？此操作无法撤销。`)) emit('deleteEntry', entry);
+}
+
+function saveAccessSettings(settings: AccessSettingsInput): void {
+  accessSettingsOpen.value = false;
+  emit('saveAccessSettings', props.entry, settings);
 }
 </script>
 
@@ -46,6 +56,7 @@ function requestDelete(entry: JournalEntry): void {
     <CardActionMenu
       :busy="busy"
       :pinned="entry.pinned"
+      :public-id="entry.publicId"
       :visibility="entry.visibility"
       :publication-status="entry.publicationStatus"
       :edit-visible="false"
@@ -53,8 +64,15 @@ function requestDelete(entry: JournalEntry): void {
       @continue-edit="emit('edit', entry)"
       @edit-published-time="emit('editPublishedTime', entry)"
       @set-pinned="emit('setPinned', entry, $event)"
-      @set-visibility="emit('setVisibility', entry, $event)"
+      @request-access-settings="accessSettingsOpen = true"
       @request-delete="requestDelete(entry)"
+    />
+    <AccessSettingsDialog
+      v-if="accessSettingsOpen"
+      :visibility="entry.visibility"
+      :busy="busy"
+      @close="accessSettingsOpen = false"
+      @save="saveAccessSettings"
     />
   </div>
 </template>

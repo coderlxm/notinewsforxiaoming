@@ -139,7 +139,7 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
     notifications: contributionNotifications,
     storage,
   });
-  await registerPublicFeedRoutes(server, repository);
+  await registerPublicFeedRoutes(server, auth, repository);
   await registerPrivateEntryRoutes(
     server,
     auth,

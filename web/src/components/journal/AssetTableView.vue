@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { Connection, Document, Lock, Top } from '@element-plus/icons-vue';
+import { Connection, Document, Hide, Lock, Top } from '@element-plus/icons-vue';
 import { ElTable, ElTableColumn, vLoading } from 'element-plus';
 import { computed } from 'vue';
-import type { JournalEntry, JournalPlainChannel, JournalVisibility } from '../../types';
+import type { JournalEntry, JournalPlainChannel } from '../../types';
+import type { AccessSettingsInput } from './accessSettings';
 import { formatEntryTime, formatFileSize } from '../../utils/formatters';
 import AssetTableActions from './AssetTableActions.vue';
 import AssetTableChannelCell from './AssetTableChannelCell.vue';
@@ -19,7 +20,7 @@ const emit = defineEmits<{
   edit: [entry: JournalEntry];
   editPublishedTime: [entry: JournalEntry];
   setPinned: [entry: JournalEntry, pinned: boolean];
-  setVisibility: [entry: JournalEntry, visibility: JournalVisibility];
+  saveAccessSettings: [entry: JournalEntry, settings: AccessSettingsInput];
   deleteEntry: [entry: JournalEntry];
   selectTag: [tag: string];
   setChannel: [entry: JournalEntry, channel: JournalPlainChannel];
@@ -65,7 +66,9 @@ const rows = computed(() => props.entries.map((entry) => {
       : contentTypeLabels[entry.contentType] ?? entry.contentType,
     statusLabel: entry.publicationStatus === 'draft'
       ? '草稿'
-      : entry.visibility === 'public' ? '公开' : '私有',
+      : entry.visibility === 'public'
+        ? '公开'
+        : entry.visibility === 'protected' ? '加密' : '私有',
     assetLabel: `${entry.assets.length} 项${sizeLabel ? ` · ${sizeLabel}` : ''}`,
   };
 }));
@@ -74,8 +77,8 @@ function forwardSetPinned(entry: JournalEntry, pinned: boolean): void {
   emit('setPinned', entry, pinned);
 }
 
-function forwardSetVisibility(entry: JournalEntry, visibility: JournalVisibility): void {
-  emit('setVisibility', entry, visibility);
+function forwardSaveAccessSettings(entry: JournalEntry, settings: AccessSettingsInput): void {
+  emit('saveAccessSettings', entry, settings);
 }
 </script>
 
@@ -127,7 +130,8 @@ function forwardSetVisibility(entry: JournalEntry, visibility: JournalVisibility
           <span class="asset-table__status">
             <Document v-if="row.entry.publicationStatus === 'draft'" aria-hidden="true" />
             <Connection v-else-if="row.entry.visibility === 'public'" aria-hidden="true" />
-            <Lock v-else aria-hidden="true" />
+            <Lock v-else-if="row.entry.visibility === 'protected'" aria-hidden="true" />
+            <Hide v-else aria-hidden="true" />
             {{ row.statusLabel }}
           </span>
         </template>
@@ -157,7 +161,7 @@ function forwardSetVisibility(entry: JournalEntry, visibility: JournalVisibility
             @view="emit('view', $event)"
             @edit-published-time="emit('editPublishedTime', $event)"
             @set-pinned="forwardSetPinned"
-            @set-visibility="forwardSetVisibility"
+            @save-access-settings="forwardSaveAccessSettings"
             @delete-entry="emit('deleteEntry', $event)"
           />
         </template>

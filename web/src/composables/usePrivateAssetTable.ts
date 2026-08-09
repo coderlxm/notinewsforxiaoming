@@ -46,6 +46,7 @@ export function usePrivateAssetTable() {
 
   function removeEntry(id: number): void {
     entries.value = entries.value.filter(item => item.id !== id);
+    total.value = Math.max(0, total.value - 1);
   }
 
   function clear(): void {

@@ -27,8 +27,10 @@ const richBody = shallowRef<JournalRichDocument>({
   content: [{ type: 'paragraph' }],
 });
 const previewing = shallowRef(false);
+const selectedVisibility = shallowRef<JournalVisibility>('private');
+const accessPassword = shallowRef('');
 const initializedArticleId = shallowRef<number | null>(null);
-const savingAction = shallowRef<'content' | 'publish' | 'privatize' | null>(null);
+const savingAction = shallowRef<'content' | 'access' | null>(null);
 const mediaAction = shallowRef<'cover-upload' | 'inline-upload' | 'delete' | null>(null);
 let terminalErrorMessage: ReturnType<typeof showMessage> | null = null;
 
@@ -70,12 +72,17 @@ const canSave = computed(() => {
   if (!hasArticleBody(richBody.value)) return false;
   return !editor.saving.value && !editor.uploading.value;
 });
-const nextVisibility = computed<JournalVisibility>(() =>
-  article.value?.visibility === 'public' ? 'private' : 'public',
+const hasExistingPassword = computed(() => article.value?.visibility === 'protected');
+const accessSettingsValid = computed(() =>
+  selectedVisibility.value !== 'protected'
+  || /^\d{6}$/.test(accessPassword.value)
+  || (hasExistingPassword.value && accessPassword.value === ''),
 );
-const visibilityLoadingLabel = computed(() =>
-  savingAction.value === 'publish' ? '正在设为公开…' : '正在转为私有…',
-);
+const canSaveAccess = computed(() => article.value !== null
+  && accessSettingsValid.value
+  && (selectedVisibility.value !== article.value.visibility || accessPassword.value !== '')
+  && !editor.saving.value
+  && !editor.uploading.value);
 
 watch(article, (entry) => {
   if (!entry) return;
@@ -83,6 +90,8 @@ watch(article, (entry) => {
   initializedArticleId.value = entry.id;
   title.value = entry.title ?? '';
   tags.value = [...entry.tags];
+  selectedVisibility.value = entry.visibility;
+  accessPassword.value = '';
   if (entry.richBody) richBody.value = entry.richBody;
 }, { immediate: true });
 
@@ -153,19 +162,25 @@ async function removeAsset(asset: JournalAsset): Promise<void> {
   }
 }
 
-async function changeVisibility(): Promise<void> {
+async function saveAccessSettings(): Promise<void> {
   if (!article.value) return;
-  const visibility = nextVisibility.value;
-  savingAction.value = visibility === 'public' ? 'publish' : 'privatize';
+  savingAction.value = 'access';
   try {
-    await editor.setVisibility(visibility);
+    const updated = await editor.setVisibility(
+      selectedVisibility.value,
+      accessPassword.value || undefined,
+    );
+    if (!updated) return;
+    selectedVisibility.value = updated.visibility;
+    accessPassword.value = '';
+    showMessage({ message: '访问权限已保存', type: 'success' });
   } finally {
     savingAction.value = null;
   }
 }
 
 function viewArticle(entry: JournalEntry): void {
-  if (entry.visibility === 'public') {
+  if (entry.visibility !== 'private') {
     void router.push({ name: 'detail', params: { publicId: entry.publicId } });
     return;
   }
@@ -205,18 +220,20 @@ function returnToAssets(): void {
           </div>
           <ArticleEditorSidebar
             v-model:tags="tags"
+            v-model:visibility="selectedVisibility"
+            v-model:access-password="accessPassword"
             :article="article"
             :action-busy="editor.saving.value || editor.uploading.value"
             :assets="assets"
             :can-save="canSave"
+            :can-save-access="canSaveAccess"
+            :has-existing-password="hasExistingPassword"
             :is-editing="isEditing"
             :media-busy="editor.uploading.value"
             :media-busy-label="mediaPanelBusyLabel"
-            :next-visibility="nextVisibility"
             :previewing="previewing"
             :saving-action="savingAction"
-            :visibility-loading-label="visibilityLoadingLabel"
-            @change-visibility="changeVisibility"
+            @save-access-settings="saveAccessSettings"
             @remove-asset="removeAsset"
             @upload-cover="uploadCover"
             @view-article="viewCurrentArticle"

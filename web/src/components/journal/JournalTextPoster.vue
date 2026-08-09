@@ -26,7 +26,9 @@ const posterClass = computed(() => [
 const decorativeMark = computed(() => /[?？]/.test(posterText.value) ? '?' : '“');
 const visibilityLabel = computed(() => props.entry.publicationStatus === 'draft'
   ? 'DRAFT NOTE'
-  : (props.entry.visibility === 'public' ? 'PUBLIC NOTE' : 'PRIVATE NOTE'));
+  : (props.entry.visibility === 'public'
+      ? 'PUBLIC NOTE'
+      : (props.entry.visibility === 'protected' ? 'PROTECTED NOTE' : 'PRIVATE NOTE')));
 </script>
 
 <template>

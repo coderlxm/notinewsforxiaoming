@@ -1,7 +1,12 @@
 import { z } from 'zod';
 
-export const journalVisibilitySchema = z.enum(['private', 'public']);
+export const journalVisibilitySchema = z.enum(['private', 'protected', 'public']);
 export type JournalVisibility = z.infer<typeof journalVisibilitySchema>;
+
+export const journalAccessPasswordSchema = z.string().regex(/^\d{6}$/, {
+  message: 'Access password must contain exactly 6 digits.',
+});
+export type JournalAccessPassword = z.infer<typeof journalAccessPasswordSchema>;
 
 export const journalSourceKindSchema = z.enum(['telegram', 'web']);
 export type JournalSourceKind = z.infer<typeof journalSourceKindSchema>;
@@ -141,13 +146,30 @@ const journalWebEntryPublishFieldsSchema = z.object({
   uploadId: z.string().uuid(),
   channel: journalPlainChannelSchema,
   visibility: journalVisibilitySchema,
+  accessPassword: journalAccessPasswordSchema.optional(),
   sourceCreatedAt: z.string().datetime({ offset: true }).optional(),
 });
 
 export const journalWebEntryCreateFieldsSchema = z.discriminatedUnion('action', [
   journalWebEntryDraftFieldsSchema,
   journalWebEntryPublishFieldsSchema,
-]);
+]).superRefine((fields, context) => {
+  if (fields.action !== 'publish') return;
+  if (fields.visibility === 'protected' && fields.accessPassword === undefined) {
+    context.addIssue({
+      code: 'custom',
+      path: ['accessPassword'],
+      message: 'Protected Journal entries require a 6-digit access password.',
+    });
+  }
+  if (fields.visibility !== 'protected' && fields.accessPassword !== undefined) {
+    context.addIssue({
+      code: 'custom',
+      path: ['accessPassword'],
+      message: 'Only protected Journal entries accept an access password.',
+    });
+  }
+});
 export type JournalWebEntryCreateFields = z.infer<typeof journalWebEntryCreateFieldsSchema>;
 
 export const journalWebDraftUpdateFieldsSchema = z.discriminatedUnion('action', [
@@ -157,7 +179,23 @@ export const journalWebDraftUpdateFieldsSchema = z.discriminatedUnion('action', 
   journalWebEntryPublishFieldsSchema.extend({
     removedAssetIds: z.array(z.number().int().positive()),
   }),
-]);
+]).superRefine((fields, context) => {
+  if (fields.action !== 'publish') return;
+  if (fields.visibility === 'protected' && fields.accessPassword === undefined) {
+    context.addIssue({
+      code: 'custom',
+      path: ['accessPassword'],
+      message: 'Protected Journal entries require a 6-digit access password.',
+    });
+  }
+  if (fields.visibility !== 'protected' && fields.accessPassword !== undefined) {
+    context.addIssue({
+      code: 'custom',
+      path: ['accessPassword'],
+      message: 'Only protected Journal entries accept an access password.',
+    });
+  }
+});
 export type JournalWebDraftUpdateFields = z.infer<typeof journalWebDraftUpdateFieldsSchema>;
 
 export const journalPublishedWebEntryUpdateFieldsSchema = z.object({
@@ -166,11 +204,31 @@ export const journalPublishedWebEntryUpdateFieldsSchema = z.object({
   removedAssetIds: z.array(z.number().int().positive()),
   channel: journalPlainChannelSchema,
   visibility: journalVisibilitySchema,
+  accessPassword: journalAccessPasswordSchema.optional(),
   sourceCreatedAt: z.string().datetime({ offset: true }),
+}).superRefine((fields, context) => {
+  if (fields.visibility !== 'protected' && fields.accessPassword !== undefined) {
+    context.addIssue({
+      code: 'custom',
+      path: ['accessPassword'],
+      message: 'Only protected Journal entries accept an access password.',
+    });
+  }
 });
 
+export const journalProtectedEntryPreviewSchema = z.object({
+  kind: z.literal('protected'),
+  publicId: z.string().uuid(),
+  channel: journalChannelSchema,
+  entryType: z.enum(['article', 'record']),
+  sourceCreatedAt: z.string().datetime(),
+});
+export type JournalProtectedEntryPreview = z.infer<
+  typeof journalProtectedEntryPreviewSchema
+>;
+
 export const journalFeedSchema = z.object({
-  entries: z.array(journalEntrySchema),
+  entries: z.array(z.union([journalEntrySchema, journalProtectedEntryPreviewSchema])),
   nextCursor: z.string().nullable(),
 });
 export type JournalFeed = z.infer<typeof journalFeedSchema>;
@@ -185,7 +243,9 @@ export type JournalPage = z.infer<typeof journalPageSchema>;
 
 export const journalIngestRequestSchema = z.object({
   requestId: z.string().min(3),
-  visibility: journalVisibilitySchema,
+  visibility: journalVisibilitySchema.refine((value) => value !== 'protected', {
+    message: 'Telegram ingestion only accepts private or public visibility.',
+  }),
   chatId: z.string().min(1),
   message: z.record(z.string(), z.unknown()),
 });
@@ -193,8 +253,22 @@ export type JournalIngestRequest = z.infer<typeof journalIngestRequestSchema>;
 
 export const journalVisibilityRequestSchema = z.object({
   visibility: journalVisibilitySchema,
+  accessPassword: journalAccessPasswordSchema.optional(),
+}).superRefine((request, context) => {
+  if (request.visibility !== 'protected' && request.accessPassword !== undefined) {
+    context.addIssue({
+      code: 'custom',
+      path: ['accessPassword'],
+      message: 'Only protected Journal entries accept an access password.',
+    });
+  }
 });
 export type JournalVisibilityRequest = z.infer<typeof journalVisibilityRequestSchema>;
+
+export const journalUnlockRequestSchema = z.object({
+  password: journalAccessPasswordSchema,
+});
+export type JournalUnlockRequest = z.infer<typeof journalUnlockRequestSchema>;
 
 export const journalPlainChannelRequestSchema = z.object({
   channel: journalPlainChannelSchema,
@@ -374,7 +448,7 @@ export const journalContributionPublishRequestSchema = z.object({
       message: 'Contribution asset IDs must be unique.',
     }),
   sourceCreatedAt: z.string().datetime({ offset: true }),
-  visibility: journalVisibilitySchema,
+  visibility: z.enum(['private', 'public']),
 }).refine(
   ({ contentText, assetIds }) => contentText.trim() !== '' || assetIds.length > 0,
   { message: 'Published contribution must include text or at least one asset.' },

@@ -21,6 +21,13 @@ export async function registerMediaRoutes(
     if (asset.visibility === 'private' && !auth.isAdmin(request)) {
       return reply.code(401).send({ error: 'Journal administrator login is required.' });
     }
+    if (
+      asset.visibility === 'protected'
+      && !auth.isAdmin(request)
+      && !auth.hasProtectedAccess(request, asset.publicId, asset.accessRevision)
+    ) {
+      return reply.code(401).send({ error: 'Journal access password is required.' });
+    }
     if (asset.previewRelativePath === null) {
       return reply.code(404).send({ error: 'Journal asset preview was not found.' });
     }
@@ -43,6 +50,13 @@ export async function registerMediaRoutes(
     if (!asset) return reply.code(404).send({ error: 'Journal asset was not found.' });
     if (asset.visibility === 'private' && !auth.isAdmin(request)) {
       return reply.code(401).send({ error: 'Journal administrator login is required.' });
+    }
+    if (
+      asset.visibility === 'protected'
+      && !auth.isAdmin(request)
+      && !auth.hasProtectedAccess(request, asset.publicId, asset.accessRevision)
+    ) {
+      return reply.code(401).send({ error: 'Journal access password is required.' });
     }
 
     const filename = asset.originalName ?? `journal-asset-${asset.id}`;

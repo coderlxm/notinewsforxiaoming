@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import type { JournalEntry, JournalPlainChannel, JournalVisibility } from '../../types';
+import type { JournalEntry, JournalPlainChannel } from '../../types';
+import type { AccessSettingsInput } from './accessSettings';
 import ArticleCardContent from '../article/ArticleCardContent.vue';
 import EntryCard from './EntryCard.vue';
 
@@ -14,7 +15,7 @@ const emit = defineEmits<{
   selectTag: [tag: string];
   saveContent: [entry: JournalEntry, contentText: string];
   setPublishedTime: [entry: JournalEntry, sourceCreatedAt: string];
-  setVisibility: [entry: JournalEntry, visibility: JournalVisibility];
+  saveAccessSettings: [entry: JournalEntry, settings: AccessSettingsInput];
   setChannel: [entry: JournalEntry, channel: JournalPlainChannel];
   setPinned: [entry: JournalEntry, pinned: boolean];
   deleteEntry: [entry: JournalEntry];
@@ -28,8 +29,8 @@ function forwardPublishedTime(entry: JournalEntry, sourceCreatedAt: string): voi
   emit('setPublishedTime', entry, sourceCreatedAt);
 }
 
-function forwardVisibility(entry: JournalEntry, visibility: JournalVisibility): void {
-  emit('setVisibility', entry, visibility);
+function forwardAccessSettings(entry: JournalEntry, settings: AccessSettingsInput): void {
+  emit('saveAccessSettings', entry, settings);
 }
 
 function forwardChannel(entry: JournalEntry, channel: JournalPlainChannel): void {
@@ -62,7 +63,7 @@ function forwardDelete(entry: JournalEntry): void {
           @edit="emit('editArticle', $event)"
           @select-tag="emit('selectTag', $event)"
           @set-published-time="forwardPublishedTime"
-          @set-visibility="forwardVisibility"
+          @save-access-settings="forwardAccessSettings"
           @set-pinned="forwardPinned"
           @delete-entry="forwardDelete"
         />
@@ -76,7 +77,7 @@ function forwardDelete(entry: JournalEntry): void {
           @select-tag="emit('selectTag', $event)"
           @save-content="forwardSaveContent"
           @set-published-time="forwardPublishedTime"
-          @set-visibility="forwardVisibility"
+          @save-access-settings="forwardAccessSettings"
           @set-channel="forwardChannel"
           @set-pinned="forwardPinned"
           @delete-entry="forwardDelete"

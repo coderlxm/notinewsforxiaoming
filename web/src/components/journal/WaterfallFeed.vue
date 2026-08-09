@@ -2,12 +2,19 @@
 import { MasonryGrid } from '@egjs/grid';
 import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, shallowRef, useTemplateRef, watch } from 'vue';
 import ArticleCardContent from '../article/ArticleCardContent.vue';
-import type { JournalEntry, JournalPlainChannel, JournalVisibility } from '../../types';
+import {
+  isProtectedJournalEntry,
+  type JournalEntry,
+  type JournalPlainChannel,
+  type PublicJournalFeedItem,
+} from '../../types';
+import type { AccessSettingsInput } from './accessSettings';
 import EntryCard from './EntryCard.vue';
 import JournalWaterfallPlaceholder from './JournalWaterfallPlaceholder.vue';
+import ProtectedEntryCard from './ProtectedEntryCard.vue';
 
 const props = defineProps<{
-  entries: readonly JournalEntry[];
+  entries: readonly PublicJournalFeedItem[];
   loading: boolean;
   mode: 'public' | 'private';
   mutationEntryId: number | null;
@@ -15,13 +22,13 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   layoutReady: [];
-  openEntry: [entry: JournalEntry];
+  openEntry: [entry: PublicJournalFeedItem];
   continueDraft: [entry: JournalEntry];
   selectTag: [tag: string];
   editArticle: [id: number];
   saveContent: [entry: JournalEntry, contentText: string];
   setPublishedTime: [entry: JournalEntry, sourceCreatedAt: string];
-  setVisibility: [entry: JournalEntry, visibility: JournalVisibility];
+  saveAccessSettings: [entry: JournalEntry, settings: AccessSettingsInput];
   setChannel: [entry: JournalEntry, channel: JournalPlainChannel];
   setPinned: [entry: JournalEntry, pinned: boolean];
   deleteEntry: [entry: JournalEntry];
@@ -29,7 +36,7 @@ const emit = defineEmits<{
 
 const gridElement = useTemplateRef<HTMLDivElement>('grid');
 const layoutReady = shallowRef(false);
-const pendingEntryIds = shallowRef<ReadonlySet<number>>(new Set());
+const pendingEntryIds = shallowRef<ReadonlySet<string>>(new Set());
 
 const preparing = computed(() =>
   (props.loading && props.entries.length === 0)
@@ -42,8 +49,21 @@ let animateNextMountedBatch = false;
 let needsActivationLayout = false;
 let active = true;
 
-function isArticleEntry(entry: JournalEntry): boolean {
-  return entry.bodyFormat === 'rich';
+function isArticleEntry(entry: PublicJournalFeedItem): entry is JournalEntry {
+  return !isProtectedJournalEntry(entry) && entry.bodyFormat === 'rich';
+}
+
+function entryKey(entry: PublicJournalFeedItem): string {
+  return isProtectedJournalEntry(entry) ? `protected:${entry.publicId}` : `entry:${entry.id}`;
+}
+
+function sameEntryAt(
+  entry: PublicJournalFeedItem,
+  entries: readonly PublicJournalFeedItem[],
+  index: number,
+): boolean {
+  const comparedEntry = entries[index];
+  return comparedEntry !== undefined && entryKey(entry) === entryKey(comparedEntry);
 }
 
 function forwardSaveContent(entry: JournalEntry, contentText: string): void {
@@ -54,8 +74,8 @@ function forwardPublishedTime(entry: JournalEntry, sourceCreatedAt: string): voi
   emit('setPublishedTime', entry, sourceCreatedAt);
 }
 
-function forwardVisibility(entry: JournalEntry, visibility: JournalVisibility): void {
-  emit('setVisibility', entry, visibility);
+function forwardAccessSettings(entry: JournalEntry, settings: AccessSettingsInput): void {
+  emit('saveAccessSettings', entry, settings);
 }
 
 function forwardChannel(entry: JournalEntry, channel: JournalPlainChannel): void {
@@ -110,19 +130,19 @@ onMounted(() => {
     async (entries, previousEntries) => {
       const hasSameEntrySequence =
         entries.length === previousEntries.length
-        && entries.every((entry, index) => entry.id === previousEntries[index]?.id);
+        && entries.every((entry, index) => sameEntryAt(entry, previousEntries, index));
 
       const appended =
         previousEntries.length > 0
         && entries.length > previousEntries.length
-        && previousEntries.every((entry, index) => entry.id === entries[index]?.id);
+        && previousEntries.every((entry, index) => sameEntryAt(entry, entries, index));
       animateNextMountedBatch = appended;
       if (hasSameEntrySequence) {
         pendingEntryIds.value = new Set();
       }
       else if (appended) {
         pendingEntryIds.value = new Set(
-          entries.slice(previousEntries.length).map(entry => entry.id),
+          entries.slice(previousEntries.length).map(entryKey),
         );
       }
       else {
@@ -172,14 +192,19 @@ onBeforeUnmount(() => {
     >
       <div
         v-for="entry in entries"
-        :key="entry.id"
+        :key="entryKey(entry)"
         class="waterfall__item"
-        :class="{ 'waterfall__item--pending': pendingEntryIds.has(entry.id) }"
+        :class="{ 'waterfall__item--pending': pendingEntryIds.has(entryKey(entry)) }"
         data-grid-skip="true"
       >
         <div class="waterfall__card">
+          <ProtectedEntryCard
+            v-if="isProtectedJournalEntry(entry)"
+            :entry="entry"
+            @open="emit('openEntry', $event)"
+          />
           <ArticleCardContent
-            v-if="isArticleEntry(entry)"
+            v-else-if="isArticleEntry(entry)"
             :entry="entry"
             :editable="mode === 'private'"
             :busy="mutationEntryId === entry.id"
@@ -188,7 +213,7 @@ onBeforeUnmount(() => {
             @select-tag="emit('selectTag', $event)"
             @edit="emit('editArticle', $event)"
             @set-published-time="forwardPublishedTime"
-            @set-visibility="forwardVisibility"
+            @save-access-settings="forwardAccessSettings"
             @set-pinned="forwardPinned"
             @delete-entry="emit('deleteEntry', $event)"
           />
@@ -204,7 +229,7 @@ onBeforeUnmount(() => {
             @select-tag="emit('selectTag', $event)"
             @save-content="forwardSaveContent"
             @set-published-time="forwardPublishedTime"
-            @set-visibility="forwardVisibility"
+            @save-access-settings="forwardAccessSettings"
             @set-channel="forwardChannel"
             @set-pinned="forwardPinned"
             @delete-entry="emit('deleteEntry', $event)"

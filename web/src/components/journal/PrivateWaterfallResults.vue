@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { List } from 'vant';
-import type { JournalEntry, JournalPlainChannel, JournalVisibility } from '../../types';
+import type { JournalEntry, JournalPlainChannel } from '../../types';
+import type { AccessSettingsInput } from './accessSettings';
 import JournalLoading from '../ui/JournalLoading.vue';
 import WaterfallFeed from './WaterfallFeed.vue';
 
@@ -22,7 +23,7 @@ const emit = defineEmits<{
   editArticle: [id: number];
   saveContent: [entry: JournalEntry, contentText: string];
   setPublishedTime: [entry: JournalEntry, sourceCreatedAt: string];
-  setVisibility: [entry: JournalEntry, visibility: JournalVisibility];
+  saveAccessSettings: [entry: JournalEntry, settings: AccessSettingsInput];
   setPinned: [entry: JournalEntry, pinned: boolean];
   setChannel: [entry: JournalEntry, channel: JournalPlainChannel];
   deleteEntry: [entry: JournalEntry];
@@ -36,8 +37,8 @@ function forwardPublishedTime(entry: JournalEntry, sourceCreatedAt: string): voi
   emit('setPublishedTime', entry, sourceCreatedAt);
 }
 
-function forwardVisibility(entry: JournalEntry, visibility: JournalVisibility): void {
-  emit('setVisibility', entry, visibility);
+function forwardAccessSettings(entry: JournalEntry, settings: AccessSettingsInput): void {
+  emit('saveAccessSettings', entry, settings);
 }
 
 function forwardPinned(entry: JournalEntry, pinned: boolean): void {
@@ -72,7 +73,7 @@ function forwardChannel(entry: JournalEntry, channel: JournalPlainChannel): void
         @edit-article="emit('editArticle', $event)"
         @save-content="forwardSaveContent"
         @set-published-time="forwardPublishedTime"
-        @set-visibility="forwardVisibility"
+        @save-access-settings="forwardAccessSettings"
         @set-pinned="forwardPinned"
         @set-channel="forwardChannel"
         @delete-entry="emit('deleteEntry', $event)"

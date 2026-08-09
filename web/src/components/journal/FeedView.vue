@@ -14,21 +14,24 @@ import { useSessionStore } from '../../stores/session';
 import { useSiteProfileStore } from '../../stores/siteProfile';
 import {
   emptyFeedFilters,
+  isProtectedJournalEntry,
   type AssetView,
   type FeedFilters,
   type JournalChannel,
   type JournalEntry,
   type JournalPlainChannel,
-  type JournalVisibility,
+  type PublicJournalFeedItem,
 } from '../../types';
 import { showMessage } from '../../utils/message';
 import AssetManagementToolbar from './AssetManagementToolbar.vue';
+import type { AccessSettingsInput } from './accessSettings';
 import EntryCard from './EntryCard.vue';
 import JournalDetailOverlay from './JournalDetailOverlay.vue';
 import LoginView from './LoginView.vue';
 import PrivateAssetHeader from './PrivateAssetHeader.vue';
 import PrivateAssetTableResults from './PrivateAssetTableResults.vue';
 import PrivateWaterfallResults from './PrivateWaterfallResults.vue';
+import ProtectedEntryUnlock from './ProtectedEntryUnlock.vue';
 import PublicChannelTagNavigation from './PublicChannelTagNavigation.vue';
 import PublishedTimeDialog from './PublishedTimeDialog.vue';
 import WaterfallFeed from './WaterfallFeed.vue';
@@ -81,11 +84,13 @@ const refreshRequestComplete = shallowRef(false);
 const paginationLayoutPending = shallowRef(false);
 const feedLayoutReady = shallowRef(false);
 const tablePublishedTimeEntry = shallowRef<JournalEntry | null>(null);
+const protectedDetailChannel = shallowRef<JournalChannel | null>(null);
 const toolbarRevision = shallowRef(0);
 const waterfallLoaded = shallowRef(false);
 const tableLoaded = shallowRef(false);
 let terminalErrorMessage: ReturnType<typeof showMessage> | null = null;
 let removeRouteAfterEach: (() => void) | null = null;
+let protectedRobotsMeta: HTMLMetaElement | null = null;
 
 const isDetail = computed(() => props.mode === 'public' && props.detailId !== undefined);
 const isOverlay = computed(() => props.overlayEntryId !== undefined);
@@ -102,6 +107,9 @@ const overlayVisible = computed(() => isOverlay.value && (
   || (props.directOverlay && journal.authenticationState.value === 'authenticated')
 ));
 const detailPreparing = computed(() => isDetail.value && initialLoadPending.value);
+const feedEntries = computed(() => props.mode === 'public'
+  ? journal.publicEntries.value
+  : journal.entries.value);
 const deferredDetailLoading = useDeferredLoading(detailPreparing);
 const publicChannelTags = computed<readonly string[]>(() => {
   if (siteProfile.profile === null) return [];
@@ -181,7 +189,7 @@ watch(() => journal.error.value, (error) => {
     return;
   }
   const terminal = isDetail.value
-    || journal.entries.value.length === 0
+    || feedEntries.value.length === 0
     || (isOverlay.value && currentOverlayEntry.value === null);
   if (terminal) {
     terminalErrorMessage?.close();
@@ -229,6 +237,13 @@ onMounted(async () => {
     if (isDetail.value) {
       await journal.loadPublicDetail(props.detailId as string);
       if (journal.detail.value) emit('detailLoaded', journal.detail.value);
+      if (journal.protectedDetail.value) {
+        protectedDetailChannel.value = journal.protectedDetail.value.channel;
+        protectedRobotsMeta = document.createElement('meta');
+        protectedRobotsMeta.name = 'robots';
+        protectedRobotsMeta.content = 'noindex, nofollow';
+        document.head.append(protectedRobotsMeta);
+      }
       return;
     }
     if (props.mode === 'public') {
@@ -257,6 +272,7 @@ onActivated(async () => {
 onBeforeUnmount(() => {
   terminalErrorMessage?.close();
   removeRouteAfterEach?.();
+  protectedRobotsMeta?.remove();
 });
 
 async function applyFilters(nextFilters: FeedFilters): Promise<void> {
@@ -277,7 +293,7 @@ async function applyFilters(nextFilters: FeedFilters): Promise<void> {
 }
 
 async function loadMore(): Promise<void> {
-  const previousEntryCount = journal.entries.value.length;
+  const previousEntryCount = feedEntries.value.length;
   paginationLayoutPending.value = true;
 
   if (props.mode === 'public') {
@@ -287,7 +303,7 @@ async function loadMore(): Promise<void> {
     await journal.loadMorePrivate(filters);
   }
 
-  if (journal.error.value || journal.entries.value.length === previousEntryCount) {
+  if (journal.error.value || feedEntries.value.length === previousEntryCount) {
     paginationLayoutPending.value = false;
   }
 }
@@ -318,7 +334,7 @@ async function refreshFeed(): Promise<void> {
   else await loadWaterfall();
 
   refreshRequestComplete.value = true;
-  if (journal.error.value || journal.entries.value.length === 0) {
+  if (journal.error.value || feedEntries.value.length === 0) {
     finishRefresh();
     return;
   }
@@ -387,7 +403,15 @@ function editEntry(entry: JournalEntry): void {
   else editDraft(entry);
 }
 
-function openEntry(entry: JournalEntry): void {
+function openEntry(entry: PublicJournalFeedItem): void {
+  if (isProtectedJournalEntry(entry)) {
+    void router.push({
+      name: 'detail',
+      params: { publicId: entry.publicId },
+      state: { journalDetailFromFeed: true },
+    });
+    return;
+  }
   if (props.mode === 'private' && entry.publicationStatus === 'draft') {
     editDraft(entry);
     return;
@@ -402,6 +426,24 @@ function openEntry(entry: JournalEntry): void {
   }
   journal.selectDetail(entry);
   emit('openEntry', entry);
+}
+
+async function unlockDetail(password: string): Promise<void> {
+  await journal.unlockDetail(password);
+}
+
+function returnFromDetail(): void {
+  const protectedChannel = journal.protectedDetail.value?.channel ?? protectedDetailChannel.value;
+  if (protectedChannel) {
+    const state = router.currentRoute.value.state as { journalDetailFromFeed?: boolean };
+    if (state.journalDetailFromFeed === true) {
+      router.back();
+      return;
+    }
+    void router.push(publicFeedPath(protectedChannel));
+    return;
+  }
+  emit('returnToFeed');
 }
 
 function changeAssetView(view: AssetView): void {
@@ -448,14 +490,20 @@ async function setPublishedTime(entry: JournalEntry, sourceCreatedAt: string): P
   }
 }
 
-async function setVisibility(entry: JournalEntry, visibility: JournalVisibility): Promise<void> {
-  await journal.setVisibility(entry, visibility);
-  if (journal.error.value === null) {
-    invalidateInactiveView();
-    feedLayoutReady.value = false;
-    if (props.assetView === 'table') await loadTablePage(props.page);
-    else await loadWaterfall();
+async function saveAccessSettings(entry: JournalEntry, settings: AccessSettingsInput): Promise<void> {
+  const updated = await journal.setVisibility(entry, settings.visibility, settings.accessPassword);
+  if (!updated) return;
+
+  invalidateInactiveView();
+  const remainsVisible = filters.visibility === 'all' || filters.visibility === updated.visibility;
+  if (props.assetView === 'table') {
+    if (remainsVisible) table.replaceEntry(updated);
+    else table.removeEntry(updated.id);
   }
+  else if (!remainsVisible) {
+    journal.removeEntryFromResults(updated.id);
+  }
+  showMessage({ message: '访问权限已更新', type: 'success' });
 }
 
 async function setPinned(entry: JournalEntry, pinned: boolean): Promise<void> {
@@ -505,7 +553,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
       }"
     >
       <div v-if="isDetail" class="feed__detail-heading">
-        <button class="text-button" type="button" @click="emit('returnToFeed')">← 返回信息流</button>
+        <button class="text-button" type="button" @click="returnFromDetail">← 返回信息流</button>
         <span>永久记录</span>
       </div>
 
@@ -564,6 +612,14 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
       <div v-if="isDetail" class="feed__reading-stage" :aria-busy="detailPreparing">
         <Transition name="feed-stage" mode="out-in">
           <JournalLoading v-if="deferredDetailLoading.visible.value && !journal.error.value" key="loading" variant="reading" label="正在展开记录…" />
+          <ProtectedEntryUnlock
+            v-else-if="journal.protectedDetail.value"
+            key="protected-detail"
+            :entry="journal.protectedDetail.value"
+            :busy="journal.unlocking.value"
+            :error="journal.unlockError.value"
+            @unlock="unlockDetail"
+          />
           <ArticleCardContent
             v-else-if="journal.detail.value && isArticleEntry(journal.detail.value)"
             key="article-detail"
@@ -585,7 +641,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
             @continue-draft="editDraft"
             @save-content="saveContent"
             @set-published-time="setPublishedTime"
-            @set-visibility="setVisibility"
+            @save-access-settings="saveAccessSettings"
             @set-pinned="setPinned"
             @delete-entry="deleteEntry"
           />
@@ -605,7 +661,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
         >
           <PublicArticleFeed
             v-if="mode === 'public' && publicLayout === 'article'"
-            :entries="journal.entries.value"
+            :entries="journal.publicEntries.value"
             :loading="entriesLoading"
             @layout-ready="handleLayoutReady"
             @open-entry="openEntry"
@@ -613,7 +669,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
           />
           <WaterfallFeed
             v-else
-            :entries="journal.entries.value"
+            :entries="journal.publicEntries.value"
             :loading="entriesLoading"
             :mode="mode"
             :mutation-entry-id="journal.mutationEntryId.value"
@@ -624,13 +680,13 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
             @edit-article="editArticle"
             @save-content="saveContent"
             @set-published-time="setPublishedTime"
-            @set-visibility="setVisibility"
+            @save-access-settings="saveAccessSettings"
             @set-pinned="setPinned"
             @set-channel="setChannel"
             @delete-entry="deleteEntry"
           />
           <p
-            v-if="!initialLoadPending && !listReplacing && !journal.entries.value.length && !journal.error.value"
+            v-if="!initialLoadPending && !listReplacing && !journal.publicEntries.value.length && !journal.error.value"
             class="feed__empty"
           >
             {{ initialTag
@@ -646,7 +702,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
 
           <template #finished>
             <p
-              v-if="!infiniteLoading && !paginationFailed && journal.entries.value.length"
+              v-if="!infiniteLoading && !paginationFailed && journal.publicEntries.value.length"
               class="feed__pagination-finished"
             >
               {{ paginationFinishedText }}
@@ -675,7 +731,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
           @edit-article="editArticle"
           @save-content="saveContent"
           @set-published-time="setPublishedTime"
-          @set-visibility="setVisibility"
+          @save-access-settings="saveAccessSettings"
           @set-pinned="setPinned"
           @set-channel="setChannel"
           @delete-entry="deleteEntry"
@@ -694,7 +750,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
           @edit="editEntry"
           @edit-published-time="editTablePublishedTime"
           @set-pinned="setPinned"
-          @set-visibility="setVisibility"
+          @save-access-settings="saveAccessSettings"
           @delete-entry="deleteEntry"
           @select-tag="selectTag"
           @set-channel="setChannel"
@@ -715,7 +771,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
     @continue-draft="editDraft"
     @save-content="saveContent"
     @set-published-time="setPublishedTime"
-    @set-visibility="setVisibility"
+    @save-access-settings="saveAccessSettings"
     @set-pinned="setPinned"
     @set-channel="setChannel"
     @delete-entry="deleteEntry"

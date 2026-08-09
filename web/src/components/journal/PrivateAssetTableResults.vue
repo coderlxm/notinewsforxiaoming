@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ElPagination } from 'element-plus';
-import type { JournalEntry, JournalPlainChannel, JournalVisibility } from '../../types';
+import type { JournalEntry, JournalPlainChannel } from '../../types';
+import type { AccessSettingsInput } from './accessSettings';
 import AssetTableView from './AssetTableView.vue';
 
 defineProps<{
@@ -19,7 +20,7 @@ const emit = defineEmits<{
   edit: [entry: JournalEntry];
   editPublishedTime: [entry: JournalEntry];
   setPinned: [entry: JournalEntry, pinned: boolean];
-  setVisibility: [entry: JournalEntry, visibility: JournalVisibility];
+  saveAccessSettings: [entry: JournalEntry, settings: AccessSettingsInput];
   deleteEntry: [entry: JournalEntry];
   selectTag: [tag: string];
   setChannel: [entry: JournalEntry, channel: JournalPlainChannel];
@@ -29,8 +30,8 @@ function forwardSetPinned(entry: JournalEntry, pinned: boolean): void {
   emit('setPinned', entry, pinned);
 }
 
-function forwardSetVisibility(entry: JournalEntry, visibility: JournalVisibility): void {
-  emit('setVisibility', entry, visibility);
+function forwardSaveAccessSettings(entry: JournalEntry, settings: AccessSettingsInput): void {
+  emit('saveAccessSettings', entry, settings);
 }
 
 function forwardSetChannel(entry: JournalEntry, channel: JournalPlainChannel): void {
@@ -49,7 +50,7 @@ function forwardSetChannel(entry: JournalEntry, channel: JournalPlainChannel): v
         @edit="emit('edit', $event)"
         @edit-published-time="emit('editPublishedTime', $event)"
         @set-pinned="forwardSetPinned"
-        @set-visibility="forwardSetVisibility"
+        @save-access-settings="forwardSaveAccessSettings"
         @delete-entry="emit('deleteEntry', $event)"
         @select-tag="emit('selectTag', $event)"
         @set-channel="forwardSetChannel"

@@ -2,33 +2,38 @@
 import { shallowRef, watch } from 'vue';
 import type { JournalAsset, JournalEntry, JournalVisibility } from '../../types';
 import { parseTagsInput, tagsInputToString } from '../../types';
+import { copyEntryAccessLink } from '../../utils/accessLink';
+import { showMessage } from '../../utils/message';
 import JournalLoading from '../ui/JournalLoading.vue';
+import EntryVisibilityField from '../publisher/EntryVisibilityField.vue';
 import ArticleMediaPanel from './ArticleMediaPanel.vue';
 
-type SavingAction = 'content' | 'publish' | 'privatize' | null;
+type SavingAction = 'content' | 'access' | null;
 
 const props = defineProps<{
   article: JournalEntry | null;
   actionBusy: boolean;
   assets: readonly JournalAsset[];
   canSave: boolean;
+  canSaveAccess: boolean;
+  hasExistingPassword: boolean;
   isEditing: boolean;
   mediaBusy: boolean;
   mediaBusyLabel: string | null;
-  nextVisibility: JournalVisibility;
   previewing: boolean;
   savingAction: SavingAction;
-  visibilityLoadingLabel: string;
 }>();
 
 const emit = defineEmits<{
-  changeVisibility: [];
+  saveAccessSettings: [];
   removeAsset: [asset: JournalAsset];
   uploadCover: [file: File];
   viewArticle: [];
 }>();
 
 const tags = defineModel<string[]>('tags', { default: () => [] });
+const visibility = defineModel<JournalVisibility>('visibility', { required: true });
+const accessPassword = defineModel<string>('accessPassword', { default: '' });
 const tagsInput = shallowRef(tagsInputToString(tags.value));
 
 watch(tags, (next) => {
@@ -38,6 +43,20 @@ watch(tags, (next) => {
 
 function commitTagsInput(): void {
   tags.value = parseTagsInput(tagsInput.value);
+}
+
+async function copyAccessLink(): Promise<void> {
+  if (!props.article) return;
+  try {
+    await copyEntryAccessLink(props.article.publicId);
+    showMessage({ message: '访问链接已复制', type: 'success' });
+  }
+  catch (reason) {
+    showMessage({
+      message: reason instanceof Error ? reason.message : String(reason),
+      type: 'error',
+    });
+  }
 }
 </script>
 
@@ -58,11 +77,17 @@ function commitTagsInput(): void {
           >
         </label>
 
-        <div class="editor-sidebar__visibility">
+        <EntryVisibilityField
+          v-if="article"
+          :key="article.updatedAt"
+          v-model="visibility"
+          v-model:access-password="accessPassword"
+          :disabled="actionBusy"
+          :has-existing-password="hasExistingPassword"
+        />
+        <div v-else class="editor-sidebar__visibility">
           <span>可见范围</span>
-          <strong class="editor-sidebar__visibility-value">
-            {{ article ? (article.visibility === 'public' ? '公开' : '私有') : '保存后设置' }}
-          </strong>
+          <strong class="editor-sidebar__visibility-value">保存后设置</strong>
         </div>
 
         <div class="editor-sidebar__actions">
@@ -82,22 +107,31 @@ function commitTagsInput(): void {
             :disabled="actionBusy"
             @click="emit('viewArticle')"
           >
-            {{ article.visibility === 'public' ? '查看文章' : (previewing ? '收起预览' : '预览文章') }}
+            {{ article.visibility !== 'private' ? '查看文章' : (previewing ? '收起预览' : '预览文章') }}
           </button>
           <button
             v-if="article"
             class="button button--quiet"
             type="button"
-            :disabled="actionBusy"
-            :aria-busy="savingAction === 'publish' || savingAction === 'privatize'"
-            @click="emit('changeVisibility')"
+            :disabled="!canSaveAccess"
+            :aria-busy="savingAction === 'access'"
+            @click="emit('saveAccessSettings')"
           >
             <JournalLoading
-              v-if="savingAction === 'publish' || savingAction === 'privatize'"
+              v-if="savingAction === 'access'"
               variant="inline"
-              :label="visibilityLoadingLabel"
+              label="保存中…"
             />
-            <template v-else>{{ nextVisibility === 'public' ? '设为公开' : '转为私有' }}</template>
+            <template v-else>保存访问权限</template>
+          </button>
+          <button
+            v-if="article?.visibility === 'protected'"
+            class="button button--quiet"
+            type="button"
+            :disabled="actionBusy"
+            @click="copyAccessLink"
+          >
+            复制访问链接
           </button>
         </div>
       </div>

@@ -7,6 +7,7 @@ import {
   extractJournalTags,
   type JournalRepository,
 } from './repository.js';
+import { hashAccessPassword } from './auth.js';
 import type { JournalStorage } from './storage.js';
 import type { PreparedWebEntryUpload } from './webEntryUploadService.js';
 
@@ -18,6 +19,7 @@ export interface CreateWebEntryServiceInput {
   action: 'draft' | 'publish';
   channel: JournalPlainChannel;
   visibility?: JournalVisibility;
+  accessPassword?: string;
   uploadId: string;
   sourceCreatedAt?: string;
 }
@@ -31,10 +33,12 @@ export interface UpdateWebDraftServiceInput {
 
 export interface PublishWebDraftServiceInput extends UpdateWebDraftServiceInput {
   visibility: JournalVisibility;
+  accessPassword?: string;
 }
 
 export interface UpdatePublishedWebEntryServiceInput extends UpdateWebDraftServiceInput {
   visibility: JournalVisibility;
+  accessPassword?: string;
   sourceCreatedAt: string;
 }
 
@@ -68,6 +72,9 @@ export class JournalWebEntryService {
         publicationStatus: input.action === 'draft' ? 'draft' : 'published',
         channel: input.channel,
         visibility: input.action === 'draft' ? 'private' : input.visibility as JournalVisibility,
+        accessPasswordHash: input.action === 'draft'
+          ? null
+          : this.hashForNewAccess(input.visibility as JournalVisibility, input.accessPassword),
         sourceCreatedAt: input.sourceCreatedAt ?? upload.createdAt,
         assets: upload.assets,
       });
@@ -84,6 +91,7 @@ export class JournalWebEntryService {
     input: Omit<UpdateWebDraftServiceInput, 'uploadId'>,
     upload: PreparedWebEntryUpload,
     publishVisibility: JournalVisibility | null,
+    accessPassword?: string,
     sourceCreatedAt?: string,
   ): Promise<JournalEntry> {
     const draft = this.getDraft(id);
@@ -124,6 +132,7 @@ export class JournalWebEntryService {
             removedAssetIds: input.removedAssetIds,
             newAssets,
             visibility: publishVisibility,
+            accessPasswordHash: this.hashForNewAccess(publishVisibility, accessPassword),
             sourceCreatedAt: sourceCreatedAt ?? updatedAt,
           });
     } catch (error) {
@@ -170,6 +179,11 @@ export class JournalWebEntryService {
         tags: extractJournalTags(input.contentText),
         channel: input.channel,
         visibility: input.visibility,
+        accessPasswordHash: this.hashForAccessUpdate(
+          entry.visibility,
+          input.visibility,
+          input.accessPassword,
+        ),
         sourceCreatedAt: input.sourceCreatedAt,
         updatedAt: new Date().toISOString(),
         removedAssetIds: input.removedAssetIds,
@@ -225,6 +239,40 @@ export class JournalWebEntryService {
     if (action === 'draft' && visibility !== undefined) {
       throw new Error('Web content drafts must not specify visibility.');
     }
+  }
+
+  private hashForNewAccess(
+    visibility: JournalVisibility,
+    accessPassword: string | undefined,
+  ): string | null {
+    if (visibility !== 'protected') {
+      if (accessPassword !== undefined) {
+        throw new Error('Only protected Journal entries accept an access password.');
+      }
+      return null;
+    }
+    if (accessPassword === undefined) {
+      throw new Error('Protected Journal entries require a 6-digit access password.');
+    }
+    return hashAccessPassword(accessPassword);
+  }
+
+  private hashForAccessUpdate(
+    currentVisibility: JournalVisibility,
+    visibility: JournalVisibility,
+    accessPassword: string | undefined,
+  ): string | undefined {
+    if (visibility !== 'protected') {
+      if (accessPassword !== undefined) {
+        throw new Error('Only protected Journal entries accept an access password.');
+      }
+      return undefined;
+    }
+    if (accessPassword !== undefined) return hashAccessPassword(accessPassword);
+    if (currentVisibility !== 'protected') {
+      throw new Error('Protected Journal entries require a 6-digit access password.');
+    }
+    return undefined;
   }
 
   private assertContent(contentText: string, mediaCount: number): void {

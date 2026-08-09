@@ -76,15 +76,20 @@ export function useArticleEditor() {
     }
   }
 
-  async function setVisibility(visibility: JournalVisibility): Promise<void> {
-    if (article.value === null) return;
+  async function setVisibility(
+    visibility: JournalVisibility,
+    accessPassword?: string,
+  ): Promise<JournalEntry | null> {
+    if (article.value === null) return null;
     saving.value = true;
     error.value = null;
     try {
-      const updated = await updateEntryVisibility(article.value.id, visibility);
+      const updated = await updateEntryVisibility(article.value.id, visibility, accessPassword);
       article.value = updated;
+      return updated;
     } catch (reason) {
       exposeError(reason);
+      return null;
     } finally {
       saving.value = false;
     }

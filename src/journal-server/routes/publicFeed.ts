@@ -1,7 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { journalChannelSchema } from '../../shared/journalProtocol.js';
-import type { JournalRepository } from '../repository.js';
+import {
+  journalChannelSchema,
+  journalUnlockRequestSchema,
+  type JournalProtectedEntryPreview,
+} from '../../shared/journalProtocol.js';
+import { accessPasswordMatches, type JournalAuth } from '../auth.js';
+import type { JournalPublishedAccess, JournalRepository } from '../repository.js';
 
 const publicFeedQuerySchema = z.object({
   cursor: z.string().min(1).optional(),
@@ -11,12 +16,12 @@ const publicFeedQuerySchema = z.object({
 
 export async function registerPublicFeedRoutes(
   server: FastifyInstance,
+  auth: JournalAuth,
   repository: JournalRepository,
 ): Promise<void> {
   server.get('/api/feed', async (request) => {
     const query = publicFeedQuerySchema.parse(request.query);
-    return repository.list({
-      visibility: 'public',
+    return repository.listPublicFeed({
       channel: query.channel,
       limit: 20,
       ...(query.cursor ? { cursor: query.cursor } : {}),
@@ -26,8 +31,44 @@ export async function registerPublicFeedRoutes(
 
   server.get('/api/entries/:publicId', async (request, reply) => {
     const { publicId } = request.params as { publicId: string };
-    const entry = repository.getPublicByPublicId(publicId);
-    if (!entry) return reply.code(404).send({ error: 'Public Journal entry was not found.' });
-    return entry;
+    const access = repository.getPublishedAccessByPublicId(publicId);
+    if (!access || access.visibility === 'private') {
+      return reply.code(404).send({ error: 'Public Journal entry was not found.' });
+    }
+    if (access.visibility === 'public') return access.entry;
+
+    reply.header('Cache-Control', 'private, no-store');
+    if (
+      auth.isAdmin(request)
+      || auth.hasProtectedAccess(request, access.publicId, access.accessRevision)
+    ) {
+      return access.entry;
+    }
+    return protectedPreview(access);
   });
+
+  server.post('/api/entries/:publicId/unlock', async (request, reply) => {
+    const { publicId } = request.params as { publicId: string };
+    const { password } = journalUnlockRequestSchema.parse(request.body);
+    const access = repository.getPublishedAccessByPublicId(publicId);
+    if (!access || access.visibility !== 'protected' || !access.accessPasswordHash) {
+      return reply.code(404).send({ error: 'Protected Journal entry was not found.' });
+    }
+    if (!accessPasswordMatches(password, access.accessPasswordHash)) {
+      return reply.code(401).send({ error: 'Journal access password is incorrect.' });
+    }
+    auth.setProtectedAccessCookie(reply, access.publicId, access.accessRevision);
+    reply.header('Cache-Control', 'private, no-store');
+    return access.entry;
+  });
+}
+
+function protectedPreview(access: JournalPublishedAccess): JournalProtectedEntryPreview {
+  return {
+    kind: 'protected',
+    publicId: access.publicId,
+    channel: access.entry.channel,
+    entryType: access.entry.bodyFormat === 'rich' ? 'article' : 'record',
+    sourceCreatedAt: access.entry.sourceCreatedAt,
+  };
 }

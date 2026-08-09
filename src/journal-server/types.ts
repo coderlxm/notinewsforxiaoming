@@ -89,6 +89,8 @@ export interface JournalAssetAccess {
   mimeType: string | null;
   byteSize: number | null;
   visibility: JournalVisibility;
+  publicId: string;
+  accessRevision: number;
 }
 
 export interface JournalDeletionTargetEntry {

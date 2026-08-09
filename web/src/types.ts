@@ -1,4 +1,4 @@
-export type JournalVisibility = 'private' | 'public';
+export type JournalVisibility = 'private' | 'protected' | 'public';
 export type JournalPublicationStatus = 'draft' | 'published';
 export type JournalChannel = 'life' | 'article' | 'interest';
 export type JournalPlainChannel = Exclude<JournalChannel, 'article'>;
@@ -60,8 +60,30 @@ export interface JournalEntry {
   assets: JournalAsset[];
 }
 
+export interface ProtectedJournalEntryPreview {
+  kind: 'protected';
+  publicId: string;
+  channel: JournalChannel;
+  entryType: 'record' | 'article';
+  sourceCreatedAt: string;
+}
+
+export type PublicJournalFeedItem = JournalEntry | ProtectedJournalEntryPreview;
+export type PublicJournalEntryResponse = JournalEntry | ProtectedJournalEntryPreview;
+
+export function isProtectedJournalEntry(
+  entry: PublicJournalFeedItem,
+): entry is ProtectedJournalEntryPreview {
+  return 'kind' in entry && entry.kind === 'protected';
+}
+
 export interface JournalFeed {
   entries: JournalEntry[];
+  nextCursor: string | null;
+}
+
+export interface PublicJournalFeed {
+  entries: PublicJournalFeedItem[];
   nextCursor: string | null;
 }
 

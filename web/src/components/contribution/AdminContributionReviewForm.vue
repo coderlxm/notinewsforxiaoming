@@ -67,7 +67,7 @@ function forwardMove(assetId: number, direction: -1 | 1): void {
       <span class="review-form__hint">按 Asia/Shanghai 记录，默认使用朋友送达时间。</span>
     </label>
 
-    <EntryVisibilityField v-model="visibility" :disabled="busy" />
+    <EntryVisibilityField v-model="visibility" :disabled="busy" :allow-protected="false" />
 
     <div class="review-form__actions">
       <button

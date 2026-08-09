@@ -8,6 +8,7 @@ import { useEntryMediaSubmit } from '../../composables/useEntryMediaSubmit';
 import { plainJournalChannels } from '../../journalChannels';
 import type { JournalAsset, JournalPlainChannel, JournalVisibility } from '../../types';
 import { showMessage } from '../../utils/message';
+import { copyEntryAccessLink } from '../../utils/accessLink';
 import {
   beginPublishProbe,
   clearPublishProbe,
@@ -31,6 +32,7 @@ const publisher = useEntryPublisher();
 const contentText = shallowRef('');
 const channel = shallowRef<JournalPlainChannel>('life');
 const visibility = shallowRef<JournalVisibility>('public');
+const accessPassword = shallowRef('');
 const newMedia = shallowRef<File[]>([]);
 const removedAssetIds = shallowRef<ReadonlySet<number>>(new Set());
 const specifyTime = shallowRef(false);
@@ -62,11 +64,26 @@ const canSaveDraft = computed(() =>
   && hasContent.value
   && !busy.value,
 );
+const hasExistingPassword = computed(() =>
+  isPublished.value && publisher.entry.value?.visibility === 'protected',
+);
+const accessSettingsValid = computed(() =>
+  visibility.value !== 'protected'
+  || /^\d{6}$/.test(accessPassword.value)
+  || (hasExistingPassword.value && accessPassword.value === ''),
+);
 const canPublish = computed(() =>
   canSaveDraft.value
+  && accessSettingsValid.value
   && (!specifyTime.value || specifiedTime.value !== ''),
 );
-const canSavePublished = computed(() => isPublished.value && hasContent.value && specifiedTime.value !== '' && !busy.value);
+const canSavePublished = computed(() =>
+  isPublished.value
+  && hasContent.value
+  && specifiedTime.value !== ''
+  && accessSettingsValid.value
+  && !busy.value,
+);
 const routeError = computed(() => publisher.error.value);
 
 watch(() => publisher.entry.value, (entry) => {
@@ -75,6 +92,7 @@ watch(() => publisher.entry.value, (entry) => {
   contentText.value = entry.contentText;
   channel.value = entry.channel as JournalPlainChannel;
   visibility.value = entry.visibility;
+  accessPassword.value = '';
   specifyTime.value = true;
   specifiedTime.value = entry.sourceCreatedAt;
   newMedia.value = [];
@@ -126,6 +144,9 @@ function buildInput() {
     removedAssetIds: [...removedAssetIds.value],
     channel: channel.value,
     visibility: visibility.value,
+    ...(visibility.value === 'protected' && accessPassword.value
+      ? { accessPassword: accessPassword.value }
+      : {}),
     sourceCreatedAt: specifyTime.value ? specifiedTime.value : undefined,
   };
 }
@@ -209,6 +230,21 @@ async function submit(): Promise<void> {
   if (isPublished.value) await savePublished();
   else await publish();
 }
+
+async function copyAccessLink(): Promise<void> {
+  const entry = publisher.entry.value;
+  if (!entry) return;
+  try {
+    await copyEntryAccessLink(entry.publicId);
+    showMessage({ message: '访问链接已复制', type: 'success' });
+  }
+  catch (reason) {
+    showMessage({
+      message: reason instanceof Error ? reason.message : String(reason),
+      type: 'error',
+    });
+  }
+}
 </script>
 
 <template>
@@ -263,7 +299,13 @@ async function submit(): Promise<void> {
               <div class="publisher-view__fields-row">
                 <EntryChannelField v-model="channel" :disabled="busy" />
 
-                <EntryVisibilityField v-model="visibility" :disabled="busy" />
+                <EntryVisibilityField
+                  :key="publisher.entry.value?.updatedAt ?? 'new'"
+                  v-model="visibility"
+                  v-model:access-password="accessPassword"
+                  :disabled="busy"
+                  :has-existing-password="hasExistingPassword"
+                />
               </div>
 
               <EntryPublishedTimeField
@@ -274,6 +316,15 @@ async function submit(): Promise<void> {
               />
 
               <div class="publisher-view__actions">
+                <button
+                  v-if="isPublished && publisher.entry.value?.visibility === 'protected'"
+                  class="button button--quiet"
+                  type="button"
+                  :disabled="busy"
+                  @click="copyAccessLink"
+                >
+                  复制访问链接
+                </button>
                 <button
                   v-if="!isPublished"
                   class="button button--quiet"

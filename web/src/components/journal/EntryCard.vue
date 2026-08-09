@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, shallowRef, watch } from 'vue';
 import JournalLoading from '../ui/JournalLoading.vue';
-import type { JournalEntry, JournalPlainChannel, JournalVisibility } from '../../types';
+import type { JournalEntry, JournalPlainChannel } from '../../types';
 import { formatStructuredValue } from '../../utils/formatters';
 import { stripJournalTags } from '../../utils/journalText';
 import CardActionMenu from './CardActionMenu.vue';
@@ -9,6 +9,8 @@ import CardDateSpine from './CardDateSpine.vue';
 import JournalTextPoster from './JournalTextPoster.vue';
 import MediaGallery from './MediaGallery.vue';
 import PublishedTimeDialog from './PublishedTimeDialog.vue';
+import AccessSettingsDialog from './AccessSettingsDialog.vue';
+import type { AccessSettingsInput } from './accessSettings';
 
 const props = withDefaults(defineProps<{
   entry: JournalEntry;
@@ -31,7 +33,7 @@ const emit = defineEmits<{
   selectTag: [tag: string];
   saveContent: [entry: JournalEntry, contentText: string];
   setPublishedTime: [entry: JournalEntry, sourceCreatedAt: string];
-  setVisibility: [entry: JournalEntry, visibility: JournalVisibility];
+  saveAccessSettings: [entry: JournalEntry, settings: AccessSettingsInput];
   setChannel: [entry: JournalEntry, channel: JournalPlainChannel];
   setPinned: [entry: JournalEntry, pinned: boolean];
   deleteEntry: [entry: JournalEntry];
@@ -40,6 +42,7 @@ const emit = defineEmits<{
 const editing = shallowRef(false);
 const confirmingDeletion = shallowRef(false);
 const editingPublishedTime = shallowRef(false);
+const accessSettingsOpen = shallowRef(false);
 const draft = shallowRef(props.entry.contentText);
 const hiddenStructuredKeys = new Set(['entities', 'caption_entities']);
 const cardDateFormatter = new Intl.DateTimeFormat('zh-CN', {
@@ -98,7 +101,9 @@ const formattedDate = computed(() => formatCardDate(sourceCreatedDate.value));
 const formattedTime = computed(() => cardTimeFormatter.format(sourceCreatedDate.value));
 const statusLabel = computed(() => isDraft.value
   ? '草稿'
-  : (props.entry.visibility === 'public' ? '公开' : '私有'));
+  : (props.entry.visibility === 'public'
+      ? '公开'
+      : (props.entry.visibility === 'protected' ? '加密' : '私有')));
 const canSave = computed(() => draft.value !== props.entry.contentText && !props.busy);
 const deletionMessage = computed(() => {
   if (props.entry.assets.length === 0) return '永久删除这条记录？此操作无法撤销。';
@@ -134,6 +139,15 @@ function startPublishedTimeEditing(): void {
   editing.value = false;
   confirmingDeletion.value = false;
   editingPublishedTime.value = true;
+}
+
+function openAccessSettings(): void {
+  accessSettingsOpen.value = true;
+}
+
+function saveAccessSettings(settings: AccessSettingsInput): void {
+  accessSettingsOpen.value = false;
+  emit('saveAccessSettings', props.entry, settings);
 }
 
 function openEntry(): void {
@@ -175,6 +189,7 @@ function handleCardClick(event: MouseEvent): void {
         v-if="editable && !confirmingDeletion"
         :busy="busy"
         :pinned="entry.pinned"
+        :public-id="entry.publicId"
         :visibility="entry.visibility"
         :publication-status="entry.publicationStatus"
         :channel="plainChannel"
@@ -183,7 +198,7 @@ function handleCardClick(event: MouseEvent): void {
         @continue-edit="emit('continueDraft', entry)"
         @edit-published-time="startPublishedTimeEditing"
         @set-pinned="emit('setPinned', entry, $event)"
-        @set-visibility="emit('setVisibility', entry, $event)"
+        @request-access-settings="openAccessSettings"
         @set-channel="emit('setChannel', entry, $event)"
         @request-delete="startDeletion"
       />
@@ -258,6 +273,7 @@ function handleCardClick(event: MouseEvent): void {
             v-if="editable && !confirmingDeletion"
             :busy="busy"
             :pinned="entry.pinned"
+            :public-id="entry.publicId"
             :visibility="entry.visibility"
             :publication-status="entry.publicationStatus"
             :channel="plainChannel"
@@ -267,7 +283,7 @@ function handleCardClick(event: MouseEvent): void {
             @continue-edit="emit('continueDraft', entry)"
             @edit-published-time="startPublishedTimeEditing"
             @set-pinned="emit('setPinned', entry, $event)"
-            @set-visibility="emit('setVisibility', entry, $event)"
+            @request-access-settings="openAccessSettings"
             @set-channel="emit('setChannel', entry, $event)"
             @request-delete="startDeletion"
           />
@@ -301,6 +317,13 @@ function handleCardClick(event: MouseEvent): void {
       :busy="busy"
       @close="editingPublishedTime = false"
       @save="emit('setPublishedTime', entry, $event)"
+    />
+    <AccessSettingsDialog
+      v-if="accessSettingsOpen"
+      :visibility="entry.visibility"
+      :busy="busy"
+      @close="accessSettingsOpen = false"
+      @save="saveAccessSettings"
     />
   </article>
 </template>

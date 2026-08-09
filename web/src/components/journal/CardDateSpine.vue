@@ -78,7 +78,9 @@ const fullDateTime = computed(() => new Intl.DateTimeFormat('zh-CN', {
       </time>
       <span v-if="pinned" class="date-spine__pin" title="已置顶" aria-label="已置顶">📌</span>
       <span v-if="showStatus" class="date-spine__status">
-        {{ publicationStatus === 'draft' ? '草稿' : (visibility === 'public' ? '公开' : '私有') }}
+        {{ publicationStatus === 'draft'
+          ? '草稿'
+          : (visibility === 'public' ? '公开' : (visibility === 'protected' ? '加密' : '私有')) }}
       </span>
     </div>
   </div>

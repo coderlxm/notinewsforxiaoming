@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Connection, Lock } from '@element-plus/icons-vue';
+import { Connection, Hide, Lock } from '@element-plus/icons-vue';
 import { computed, reactive, shallowRef } from 'vue';
 import { useImeAwareDebouncedAction } from '../../composables/useImeAwareDebouncedAction';
 import { emptyFeedFilters, type AssetView, type FeedFilters } from '../../types';
@@ -21,6 +21,7 @@ const expanded = shallowRef(false);
 const visibilityOptions = [
   { value: 'all', label: '全部' },
   { value: 'private', label: '私有' },
+  { value: 'protected', label: '加密' },
   { value: 'public', label: '公开' },
 ] satisfies { value: FeedFilters['visibility']; label: string }[];
 
@@ -139,7 +140,8 @@ function reset(): void {
               @change="queueApply"
             >
             <span>
-              <Lock v-if="option.value === 'private'" aria-hidden="true" />
+              <Hide v-if="option.value === 'private'" aria-hidden="true" />
+              <Lock v-else-if="option.value === 'protected'" aria-hidden="true" />
               <Connection v-else-if="option.value === 'public'" aria-hidden="true" />
               {{ option.label }}
             </span>

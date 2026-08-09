@@ -10,17 +10,21 @@ import {
   JournalRequestError,
   login as loginRequest,
   logout as logoutRequest,
+  unlockPublicEntry,
   updateEntryContent,
   updateEntryChannel,
   updateEntryPinned,
   updateEntryPublishedTime,
   updateEntryVisibility,
 } from '../api';
+import { isProtectedJournalEntry } from '../types';
 import type {
   FeedFilters,
   JournalChannel,
   JournalEntry,
   JournalPlainChannel,
+  ProtectedJournalEntryPreview,
+  PublicJournalFeedItem,
   JournalVisibility,
 } from '../types';
 
@@ -28,12 +32,16 @@ type AuthenticationState = 'checking' | 'authenticated' | 'anonymous';
 
 export function useJournalApi() {
   const entries = ref<JournalEntry[]>([]);
+  const publicEntries = ref<PublicJournalFeedItem[]>([]);
   const detail = shallowRef<JournalEntry | null>(null);
+  const protectedDetail = shallowRef<ProtectedJournalEntryPreview | null>(null);
   const onThisDayEntries = ref<JournalEntry[]>([]);
   const nextCursor = shallowRef<string | null>(null);
   const error = shallowRef<string | null>(null);
   const loading = shallowRef(false);
   const loadingMore = shallowRef(false);
+  const unlocking = shallowRef(false);
+  const unlockError = shallowRef<string | null>(null);
   const mutationEntryId = shallowRef<number | null>(null);
   const authenticationState = shallowRef<AuthenticationState>('checking');
 
@@ -63,7 +71,7 @@ export function useJournalApi() {
     error.value = null;
     try {
       const feed = await fetchPublicFeed(options);
-      entries.value = feed.entries;
+      publicEntries.value = feed.entries;
       nextCursor.value = feed.nextCursor;
     }
     catch (reason) {
@@ -77,15 +85,39 @@ export function useJournalApi() {
   async function loadPublicDetail(publicId: string): Promise<void> {
     loading.value = true;
     error.value = null;
+    unlockError.value = null;
     detail.value = null;
+    protectedDetail.value = null;
     try {
-      detail.value = await fetchPublicEntry(publicId);
+      const response = await fetchPublicEntry(publicId);
+      if (isProtectedJournalEntry(response)) protectedDetail.value = response;
+      else detail.value = response;
     }
     catch (reason) {
       exposeError(reason);
     }
     finally {
       loading.value = false;
+    }
+  }
+
+  async function unlockDetail(password: string): Promise<void> {
+    const protectedEntry = protectedDetail.value;
+    if (!protectedEntry) return;
+    unlocking.value = true;
+    unlockError.value = null;
+    try {
+      detail.value = await unlockPublicEntry(protectedEntry.publicId, password);
+      protectedDetail.value = null;
+    }
+    catch (reason) {
+      if (reason instanceof JournalRequestError && reason.status === 401) {
+        unlockError.value = '访问密码不正确';
+      }
+      else exposeError(reason);
+    }
+    finally {
+      unlocking.value = false;
     }
   }
 
@@ -179,7 +211,7 @@ export function useJournalApi() {
     error.value = null;
     try {
       const feed = await fetchPublicFeed({ ...options, cursor: nextCursor.value });
-      entries.value = [...entries.value, ...feed.entries];
+      publicEntries.value = [...publicEntries.value, ...feed.entries];
       nextCursor.value = feed.nextCursor;
     }
     catch (reason) {
@@ -263,17 +295,24 @@ export function useJournalApi() {
     }
   }
 
-  async function setVisibility(entry: JournalEntry, visibility: JournalVisibility): Promise<void> {
+  async function setVisibility(
+    entry: JournalEntry,
+    visibility: JournalVisibility,
+    accessPassword?: string,
+  ): Promise<JournalEntry | null> {
     mutationEntryId.value = entry.id;
     error.value = null;
     try {
-      replaceEntry(await updateEntryVisibility(entry.id, visibility));
+      const updated = await updateEntryVisibility(entry.id, visibility, accessPassword);
+      replaceEntry(updated);
+      return updated;
     }
     catch (reason) {
       if (reason instanceof JournalRequestError && reason.status === 401) {
         authenticationState.value = 'anonymous';
       }
       exposeError(reason);
+      return null;
     }
     finally {
       mutationEntryId.value = null;
@@ -351,18 +390,27 @@ export function useJournalApi() {
     }
   }
 
+  function removeEntryFromResults(id: number): void {
+    entries.value = entries.value.filter(entry => entry.id !== id);
+  }
+
   return {
     entries: shallowReadonly(entries),
+    publicEntries: shallowReadonly(publicEntries),
     detail: shallowReadonly(detail),
+    protectedDetail: shallowReadonly(protectedDetail),
     onThisDayEntries: shallowReadonly(onThisDayEntries),
     nextCursor: readonly(nextCursor),
     error: readonly(error),
     loading: readonly(loading),
     loadingMore: readonly(loadingMore),
+    unlocking: readonly(unlocking),
+    unlockError: readonly(unlockError),
     mutationEntryId: readonly(mutationEntryId),
     authenticationState: readonly(authenticationState),
     loadPublic,
     loadPublicDetail,
+    unlockDetail,
     loadPrivateDetail,
     selectDetail,
     loadPrivate,
@@ -379,5 +427,6 @@ export function useJournalApi() {
     setPublishedTime,
     setPinned,
     deleteEntry,
+    removeEntryFromResults,
   };
 }

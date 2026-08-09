@@ -4,8 +4,8 @@ import type {
   JournalAsset,
   JournalEntry,
   JournalPlainChannel,
-  JournalVisibility,
 } from '../../types';
+import type { AccessSettingsInput } from './accessSettings';
 import JournalDetailContent from './JournalDetailContent.vue';
 import JournalDetailPeek from './JournalDetailPeek.vue';
 import JournalMediaStage from './JournalMediaStage.vue';
@@ -24,7 +24,7 @@ const emit = defineEmits<{
   continueDraft: [entry: JournalEntry];
   saveContent: [entry: JournalEntry, contentText: string];
   setPublishedTime: [entry: JournalEntry, sourceCreatedAt: string];
-  setVisibility: [entry: JournalEntry, visibility: JournalVisibility];
+  saveAccessSettings: [entry: JournalEntry, settings: AccessSettingsInput];
   setChannel: [entry: JournalEntry, channel: JournalPlainChannel];
   setPinned: [entry: JournalEntry, pinned: boolean];
   deleteEntry: [entry: JournalEntry];
@@ -77,8 +77,8 @@ function forwardPublishedTime(entry: JournalEntry, sourceCreatedAt: string): voi
   emit('setPublishedTime', entry, sourceCreatedAt);
 }
 
-function forwardVisibility(entry: JournalEntry, visibility: JournalVisibility): void {
-  emit('setVisibility', entry, visibility);
+function forwardAccessSettings(entry: JournalEntry, settings: AccessSettingsInput): void {
+  emit('saveAccessSettings', entry, settings);
 }
 
 function forwardChannel(entry: JournalEntry, channel: JournalPlainChannel): void {
@@ -118,7 +118,7 @@ function forwardPinned(entry: JournalEntry, pinned: boolean): void {
         @continue-draft="emit('continueDraft', $event)"
         @save-content="forwardSaveContent"
         @set-published-time="forwardPublishedTime"
-        @set-visibility="forwardVisibility"
+        @save-access-settings="forwardAccessSettings"
         @set-channel="forwardChannel"
         @set-pinned="forwardPinned"
         @delete-entry="emit('deleteEntry', $event)"

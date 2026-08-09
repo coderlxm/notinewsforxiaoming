@@ -18,6 +18,7 @@ interface EntryPublisherInput {
   removedAssetIds: number[];
   channel: JournalPlainChannel;
   visibility?: JournalVisibility;
+  accessPassword?: string;
   sourceCreatedAt?: string;
 }
 
@@ -57,6 +58,9 @@ export function useEntryPublisher() {
             action,
             channel: input.channel,
             visibility: action === 'publish' ? input.visibility : undefined,
+            ...(action === 'publish' && input.accessPassword
+              ? { accessPassword: input.accessPassword }
+              : {}),
             sourceCreatedAt: action === 'publish' ? input.sourceCreatedAt : undefined,
           })
         : await updateDraftRequest(entry.value.id, {
@@ -66,6 +70,9 @@ export function useEntryPublisher() {
             action,
             channel: input.channel,
             visibility: action === 'publish' ? input.visibility : undefined,
+            ...(action === 'publish' && input.accessPassword
+              ? { accessPassword: input.accessPassword }
+              : {}),
             sourceCreatedAt: action === 'publish' ? input.sourceCreatedAt : undefined,
           });
       entry.value = saved;
@@ -102,6 +109,7 @@ export function useEntryPublisher() {
           removedAssetIds: input.removedAssetIds,
           channel: input.channel,
           visibility: input.visibility!,
+          ...(input.accessPassword ? { accessPassword: input.accessPassword } : {}),
           sourceCreatedAt: input.sourceCreatedAt!,
         });
         entry.value = updated;
@@ -109,7 +117,7 @@ export function useEntryPublisher() {
       }
       await updateEntryContent(current.id, input.contentText);
       await updateEntryChannel(current.id, input.channel);
-      await updateEntryVisibility(current.id, input.visibility!);
+      await updateEntryVisibility(current.id, input.visibility!, input.accessPassword);
       const updated = await updateEntryPublishedTime(current.id, input.sourceCreatedAt!);
       entry.value = updated;
       return updated;

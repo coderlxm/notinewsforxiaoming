@@ -3,7 +3,9 @@ import { computed, shallowRef } from 'vue';
 import type { CSSProperties } from 'vue';
 import JournalLoading from '../ui/JournalLoading.vue';
 import JournalProgressiveImage from '../ui/JournalProgressiveImage.vue';
-import type { JournalEntry, JournalVisibility } from '../../types';
+import type { JournalEntry } from '../../types';
+import AccessSettingsDialog from '../journal/AccessSettingsDialog.vue';
+import type { AccessSettingsInput } from '../journal/accessSettings';
 import CardActionMenu from '../journal/CardActionMenu.vue';
 import CardDateSpine from '../journal/CardDateSpine.vue';
 import PublishedTimeDialog from '../journal/PublishedTimeDialog.vue';
@@ -32,13 +34,14 @@ const emit = defineEmits<{
   selectTag: [tag: string];
   edit: [id: number];
   setPublishedTime: [entry: JournalEntry, sourceCreatedAt: string];
-  setVisibility: [entry: JournalEntry, visibility: JournalVisibility];
+  saveAccessSettings: [entry: JournalEntry, settings: AccessSettingsInput];
   setPinned: [entry: JournalEntry, pinned: boolean];
   deleteEntry: [entry: JournalEntry];
 }>();
 
 const confirmingDeletion = shallowRef(false);
 const editingPublishedTime = shallowRef(false);
+const accessSettingsOpen = shallowRef(false);
 
 const cover = computed(() => props.entry.assets.find((asset) =>
   asset.sourceKind === 'web' && asset.role === 'cover') ?? null);
@@ -66,6 +69,11 @@ function startDeletion(): void {
 function startPublishedTimeEditing(): void {
   confirmingDeletion.value = false;
   editingPublishedTime.value = true;
+}
+
+function saveAccessSettings(settings: AccessSettingsInput): void {
+  accessSettingsOpen.value = false;
+  emit('saveAccessSettings', props.entry, settings);
 }
 
 function openEntry(): void {
@@ -105,12 +113,13 @@ function handleCardClick(event: MouseEvent): void {
         v-if="editable && !confirmingDeletion"
         :busy="busy"
         :pinned="entry.pinned"
+        :public-id="entry.publicId"
         :visibility="entry.visibility"
         :publication-status="entry.publicationStatus"
         @edit="emit('edit', entry.id)"
         @edit-published-time="startPublishedTimeEditing"
         @set-pinned="emit('setPinned', entry, $event)"
-        @set-visibility="emit('setVisibility', entry, $event)"
+        @request-access-settings="accessSettingsOpen = true"
         @request-delete="startDeletion"
       />
     </header>
@@ -211,6 +220,13 @@ function handleCardClick(event: MouseEvent): void {
       :busy="busy"
       @close="editingPublishedTime = false"
       @save="emit('setPublishedTime', entry, $event)"
+    />
+    <AccessSettingsDialog
+      v-if="accessSettingsOpen"
+      :visibility="entry.visibility"
+      :busy="busy"
+      @close="accessSettingsOpen = false"
+      @save="saveAccessSettings"
     />
   </article>
 </template>

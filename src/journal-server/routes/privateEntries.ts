@@ -11,7 +11,7 @@ import {
   journalWebDraftUpdateFieldsSchema,
   journalWebEntryCreateFieldsSchema,
 } from '../../shared/journalProtocol.js';
-import type { JournalAuth } from '../auth.js';
+import { hashAccessPassword, type JournalAuth } from '../auth.js';
 import type { JournalDeletionService } from '../deletion.js';
 import type { JournalRepository } from '../repository.js';
 import type { JournalWebEntryService } from '../webEntryService.js';
@@ -19,7 +19,7 @@ import type { JournalWebEntryUploadService } from '../webEntryUploadService.js';
 
 const privateEntriesQuerySchema = z.object({
   cursor: z.string().min(1).optional(),
-  visibility: z.enum(['private', 'public']).optional(),
+  visibility: z.enum(['private', 'protected', 'public']).optional(),
   query: z.string().min(1).optional(),
   tag: z.string().min(1).optional(),
   contentType: z.string().min(1).optional(),
@@ -32,7 +32,7 @@ const privateEntriesPageQuerySchema = z.object({
   pageSize: z.coerce.number().int().positive()
     .refine((value) => value === 30, { message: 'pageSize must be 30.' })
     .default(30),
-  visibility: z.enum(['private', 'public']).optional(),
+  visibility: z.enum(['private', 'protected', 'public']).optional(),
   query: z.string().min(1).optional(),
   tag: z.string().min(1).optional(),
   contentType: z.string().min(1).optional(),
@@ -184,7 +184,14 @@ export async function registerPrivateEntryRoutes(
       };
       return fields.action === 'draft'
         ? await webEntryService.updatePreparedDraft(id, input, webEntryUploads.take(uploadId), null)
-        : await webEntryService.updatePreparedDraft(id, input, webEntryUploads.take(uploadId), fields.visibility, fields.sourceCreatedAt);
+        : await webEntryService.updatePreparedDraft(
+            id,
+            input,
+            webEntryUploads.take(uploadId),
+            fields.visibility,
+            fields.accessPassword,
+            fields.sourceCreatedAt,
+          );
     } catch (error) {
       if (error instanceof Error && error.message.includes('was not found')) {
         return reply.code(404).send({ error: error.message });
@@ -196,6 +203,17 @@ export async function registerPrivateEntryRoutes(
   server.patch('/api/me/entries/:id', { preHandler: auth.requireAdmin }, async (request, reply) => {
     const { id } = idParamsSchema.parse(request.params);
     const fields = journalPublishedWebEntryUpdateFieldsSchema.parse(request.body);
+    const current = repository.getByIdOrNull(id);
+    if (!current) return reply.code(404).send({ error: 'Journal entry was not found.' });
+    if (
+      fields.visibility === 'protected'
+      && current.visibility !== 'protected'
+      && fields.accessPassword === undefined
+    ) {
+      return reply.code(400).send({
+        error: 'Protected Journal entries require a 6-digit access password.',
+      });
+    }
     try {
       return await webEntryService.updatePreparedPublished(id, fields, webEntryUploads.take(fields.uploadId));
     } catch (error) {
@@ -225,8 +243,24 @@ export async function registerPrivateEntryRoutes(
     preHandler: auth.requireAdmin,
   }, async (request, reply) => {
     const { id } = idParamsSchema.parse(request.params);
-    const { visibility } = journalVisibilityRequestSchema.parse(request.body);
-    const entry = repository.updateVisibilityById(id, visibility);
+    const { visibility, accessPassword } = journalVisibilityRequestSchema.parse(request.body);
+    const current = repository.getByIdOrNull(id);
+    if (!current) return reply.code(404).send({ error: 'Journal entry was not found.' });
+    if (visibility === 'protected' && current.visibility !== 'protected' && !accessPassword) {
+      return reply.code(400).send({
+        error: 'Protected Journal entries require a 6-digit access password.',
+      });
+    }
+    if (visibility !== 'protected' && accessPassword) {
+      return reply.code(400).send({
+        error: 'Only protected Journal entries accept an access password.',
+      });
+    }
+    const entry = repository.updateVisibilityById(
+      id,
+      visibility,
+      accessPassword ? hashAccessPassword(accessPassword) : undefined,
+    );
     if (!entry) return reply.code(404).send({ error: 'Journal entry was not found.' });
     return entry;
   });

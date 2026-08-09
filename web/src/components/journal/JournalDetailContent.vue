@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Connection, Document, Lock, Top } from '@element-plus/icons-vue';
+import { Connection, Document, Hide, Lock, Top } from '@element-plus/icons-vue';
 import { storeToRefs } from 'pinia';
 import { computed, shallowRef, watch } from 'vue';
 import ArticleRichBody from '../article/ArticleRichBody.vue';
@@ -9,12 +9,13 @@ import type {
   JournalAsset,
   JournalEntry,
   JournalPlainChannel,
-  JournalVisibility,
 } from '../../types';
 import { formatEntryTime, formatStructuredValue } from '../../utils/formatters';
 import CardActionMenu from './CardActionMenu.vue';
 import MediaGallery from './MediaGallery.vue';
 import PublishedTimeDialog from './PublishedTimeDialog.vue';
+import AccessSettingsDialog from './AccessSettingsDialog.vue';
+import type { AccessSettingsInput } from './accessSettings';
 
 const props = defineProps<{
   entry: JournalEntry;
@@ -33,7 +34,7 @@ const emit = defineEmits<{
   continueDraft: [entry: JournalEntry];
   saveContent: [entry: JournalEntry, contentText: string];
   setPublishedTime: [entry: JournalEntry, sourceCreatedAt: string];
-  setVisibility: [entry: JournalEntry, visibility: JournalVisibility];
+  saveAccessSettings: [entry: JournalEntry, settings: AccessSettingsInput];
   setChannel: [entry: JournalEntry, channel: JournalPlainChannel];
   setPinned: [entry: JournalEntry, pinned: boolean];
   deleteEntry: [entry: JournalEntry];
@@ -42,6 +43,7 @@ const emit = defineEmits<{
 const editing = shallowRef(false);
 const confirmingDeletion = shallowRef(false);
 const editingPublishedTime = shallowRef(false);
+const accessSettingsOpen = shallowRef(false);
 const draft = shallowRef(props.entry.contentText);
 const hiddenStructuredKeys = new Set(['entities', 'caption_entities']);
 
@@ -95,6 +97,11 @@ function requestPublishedTimeEditing(): void {
   confirmingDeletion.value = false;
   editingPublishedTime.value = true;
 }
+
+function saveAccessSettings(settings: AccessSettingsInput): void {
+  accessSettingsOpen.value = false;
+  emit('saveAccessSettings', props.entry, settings);
+}
 </script>
 
 <template>
@@ -118,14 +125,18 @@ function requestPublishedTimeEditing(): void {
         <span class="detail-content__status">
           <Document v-if="entry.publicationStatus === 'draft'" aria-hidden="true" />
           <Connection v-else-if="entry.visibility === 'public'" aria-hidden="true" />
-          <Lock v-else aria-hidden="true" />
-          {{ entry.publicationStatus === 'draft' ? '草稿' : (entry.visibility === 'public' ? '公开' : '私有') }}
+          <Lock v-else-if="entry.visibility === 'protected'" aria-hidden="true" />
+          <Hide v-else aria-hidden="true" />
+          {{ entry.publicationStatus === 'draft'
+            ? '草稿'
+            : (entry.visibility === 'public' ? '公开' : (entry.visibility === 'protected' ? '加密' : '私有')) }}
         </span>
         <span v-if="entry.pinned" class="detail-content__status"><Top aria-hidden="true" />置顶</span>
         <CardActionMenu
           v-if="isPrivateMode && !confirmingDeletion"
           :busy="busy"
           :pinned="entry.pinned"
+          :public-id="entry.publicId"
           :visibility="entry.visibility"
           :publication-status="entry.publicationStatus"
           :channel="plainChannel"
@@ -135,7 +146,7 @@ function requestPublishedTimeEditing(): void {
           @continue-edit="emit('continueDraft', entry)"
           @edit-published-time="requestPublishedTimeEditing"
           @set-pinned="emit('setPinned', entry, $event)"
-          @set-visibility="emit('setVisibility', entry, $event)"
+          @request-access-settings="accessSettingsOpen = true"
           @set-channel="emit('setChannel', entry, $event)"
           @request-delete="requestDeletion"
         />
@@ -236,6 +247,13 @@ function requestPublishedTimeEditing(): void {
       :busy="busy"
       @close="editingPublishedTime = false"
       @save="emit('setPublishedTime', entry, $event)"
+    />
+    <AccessSettingsDialog
+      v-if="accessSettingsOpen"
+      :visibility="entry.visibility"
+      :busy="busy"
+      @close="accessSettingsOpen = false"
+      @save="saveAccessSettings"
     />
   </article>
 </template>

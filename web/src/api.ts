@@ -13,6 +13,8 @@ import type {
   JournalPage,
   JournalChannel,
   JournalPlainChannel,
+  PublicJournalEntryResponse,
+  PublicJournalFeed,
   JournalRichDocument,
   JournalVisibility,
   OnThisDayResponse,
@@ -93,17 +95,24 @@ export function fetchPublicFeed(options: {
   channel: JournalChannel;
   cursor?: string;
   tag?: string;
-}): Promise<JournalFeed> {
+}): Promise<PublicJournalFeed> {
   const params = new URLSearchParams();
   params.set('channel', options.channel);
   if (options.cursor) params.set('cursor', options.cursor);
   if (options.tag) params.set('tag', options.tag);
   const query = params.size ? `?${params.toString()}` : '';
-  return requestJson<JournalFeed>(`/api/feed${query}`);
+  return requestJson<PublicJournalFeed>(`/api/feed${query}`);
 }
 
-export function fetchPublicEntry(publicId: string): Promise<JournalEntry> {
-  return requestJson<JournalEntry>(`/api/entries/${encodeURIComponent(publicId)}`);
+export function fetchPublicEntry(publicId: string): Promise<PublicJournalEntryResponse> {
+  return requestJson<PublicJournalEntryResponse>(`/api/entries/${encodeURIComponent(publicId)}`);
+}
+
+export function unlockPublicEntry(publicId: string, password: string): Promise<JournalEntry> {
+  return requestJson<JournalEntry>(
+    `/api/entries/${encodeURIComponent(publicId)}/unlock`,
+    jsonRequest('POST', { password }),
+  );
 }
 
 export function fetchAuthenticationState(): Promise<{ authenticated: boolean }> {
@@ -230,6 +239,7 @@ export function publishEntry(input: {
   action: 'draft' | 'publish';
   channel: JournalPlainChannel;
   visibility?: JournalVisibility;
+  accessPassword?: string;
   sourceCreatedAt?: string;
 }): Promise<JournalEntry> {
   return requestJson<JournalEntry>('/api/me/entries', jsonRequest('POST', input));
@@ -242,6 +252,7 @@ export function updateDraft(id: number, input: {
   action: 'draft' | 'publish';
   channel: JournalPlainChannel;
   visibility?: JournalVisibility;
+  accessPassword?: string;
   sourceCreatedAt?: string;
 }): Promise<JournalEntry> {
   return requestJson<JournalEntry>(`/api/me/entries/${id}/draft`, jsonRequest('PATCH', input));
@@ -253,6 +264,7 @@ export function updatePublishedWebEntry(id: number, input: {
   removedAssetIds: number[];
   channel: JournalPlainChannel;
   visibility: JournalVisibility;
+  accessPassword?: string;
   sourceCreatedAt: string;
 }): Promise<JournalEntry> {
   return requestJson<JournalEntry>(`/api/me/entries/${id}`, jsonRequest('PATCH', input));
@@ -294,10 +306,14 @@ export function updateEntryPublishedTime(id: number, sourceCreatedAt: string): P
   );
 }
 
-export function updateEntryVisibility(id: number, visibility: JournalVisibility): Promise<JournalEntry> {
+export function updateEntryVisibility(
+  id: number,
+  visibility: JournalVisibility,
+  accessPassword?: string,
+): Promise<JournalEntry> {
   return requestJson<JournalEntry>(
     `/api/me/entries/${id}/visibility`,
-    jsonRequest('PATCH', { visibility }),
+    jsonRequest('PATCH', { visibility, accessPassword }),
   );
 }
 

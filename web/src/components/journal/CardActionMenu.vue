@@ -3,6 +3,8 @@ import { ElDropdown, ElDropdownItem, ElDropdownMenu } from 'element-plus';
 import { computed, shallowRef, watch } from 'vue';
 import JournalLoading from '../ui/JournalLoading.vue';
 import { plainJournalChannels } from '../../journalChannels';
+import { copyEntryAccessLink } from '../../utils/accessLink';
+import { showMessage } from '../../utils/message';
 import type {
   JournalPlainChannel,
   JournalPublicationStatus,
@@ -12,6 +14,7 @@ import type {
 const props = withDefaults(defineProps<{
   busy: boolean;
   pinned: boolean;
+  publicId: string;
   visibility: JournalVisibility;
   publicationStatus: JournalPublicationStatus;
   channel?: JournalPlainChannel;
@@ -32,7 +35,7 @@ const emit = defineEmits<{
   continueEdit: [];
   editPublishedTime: [];
   setPinned: [pinned: boolean];
-  setVisibility: [visibility: JournalVisibility];
+  requestAccessSettings: [];
   setChannel: [channel: JournalPlainChannel];
   requestDelete: [];
 }>();
@@ -59,14 +62,6 @@ function changePinned(): void {
   );
 }
 
-function changeVisibility(): void {
-  const visibility = props.visibility === 'public' ? 'private' : 'public';
-  runMutation(
-    visibility === 'public' ? '正在设为公开…' : '正在转为私有…',
-    () => emit('setVisibility', visibility),
-  );
-}
-
 function editEntry(): void {
   if (props.publicationStatus === 'draft') {
     emit('continueEdit');
@@ -79,6 +74,19 @@ function changeChannel(channel: JournalPlainChannel): void {
   emit('setChannel', channel);
 }
 
+async function copyAccessLink(): Promise<void> {
+  try {
+    await copyEntryAccessLink(props.publicId);
+    showMessage({ message: '访问链接已复制', type: 'success' });
+  }
+  catch (reason) {
+    showMessage({
+      message: reason instanceof Error ? reason.message : String(reason),
+      type: 'error',
+    });
+  }
+}
+
 function handleCommand(command: string): void {
   if (command.startsWith('channel:')) {
     changeChannel(command.slice('channel:'.length) as JournalPlainChannel);
@@ -88,7 +96,8 @@ function handleCommand(command: string): void {
     case 'edit': editEntry(); break;
     case 'published-time': emit('editPublishedTime'); break;
     case 'pinned': changePinned(); break;
-    case 'visibility': changeVisibility(); break;
+    case 'access-settings': emit('requestAccessSettings'); break;
+    case 'copy-access-link': void copyAccessLink(); break;
     case 'delete': emit('requestDelete'); break;
   }
 }
@@ -139,8 +148,11 @@ function handleCommand(command: string): void {
           <ElDropdownItem v-if="publicationStatus === 'published'" command="pinned">
             {{ pinned ? '取消置顶' : '置顶' }}
           </ElDropdownItem>
-          <ElDropdownItem v-if="publicationStatus === 'published'" command="visibility">
-            {{ visibility === 'public' ? '转为私有' : '设为公开' }}
+          <ElDropdownItem v-if="publicationStatus === 'published'" command="access-settings">
+            访问权限…
+          </ElDropdownItem>
+          <ElDropdownItem v-if="publicationStatus === 'published' && visibility === 'protected'" command="copy-access-link">
+            复制访问链接
           </ElDropdownItem>
           <ElDropdownItem
             v-for="option in channelTargets"

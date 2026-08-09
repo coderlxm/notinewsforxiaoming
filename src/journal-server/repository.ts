@@ -17,6 +17,7 @@ import type {
   JournalPage,
   JournalPublicationStatus,
   JournalPlainChannel,
+  JournalProtectedEntryPreview,
   JournalRichDocument,
   JournalSiteContactItem,
   JournalSourceKind,
@@ -52,6 +53,8 @@ interface EntryRow {
   publication_status: JournalPublicationStatus;
   channel: JournalChannel;
   visibility: JournalVisibility;
+  access_password_hash: string | null;
+  access_revision: number;
   tags_json: string;
   structured_content_json: string | null;
   telegram_message_json: string | null;
@@ -110,6 +113,7 @@ export interface CreateWebEntryInput {
   publicationStatus: JournalPublicationStatus;
   channel: JournalPlainChannel;
   visibility: JournalVisibility;
+  accessPasswordHash: string | null;
   sourceCreatedAt: string;
   assets: WebEntryAssetInput[];
 }
@@ -125,11 +129,13 @@ export interface UpdateWebDraftInput {
 
 export interface PublishWebDraftInput extends UpdateWebDraftInput {
   visibility: JournalVisibility;
+  accessPasswordHash: string | null;
   sourceCreatedAt: string;
 }
 
 export interface UpdatePublishedWebEntryInput extends UpdateWebDraftInput {
   visibility: JournalVisibility;
+  accessPasswordHash: string | undefined;
   sourceCreatedAt: string;
 }
 
@@ -242,6 +248,19 @@ export interface JournalContributionStoredAsset {
   id: number;
   relativePath: string;
   previewRelativePath: string;
+}
+
+export interface JournalPublishedAccess {
+  publicId: string;
+  visibility: JournalVisibility;
+  accessPasswordHash: string | null;
+  accessRevision: number;
+  entry: JournalEntry;
+}
+
+export interface JournalEntryFeed {
+  entries: JournalEntry[];
+  nextCursor: string | null;
 }
 
 const cursorSchema = z.object({
@@ -391,9 +410,10 @@ export class JournalRepository {
         INSERT INTO journal_entries (
           public_id, source_kind, chat_id, source_message_id, media_group_id, content_type,
           title, body_format, rich_body_json, content_text, publication_status,
-          channel, visibility, tags_json, structured_content_json, telegram_message_json,
+          channel, visibility, access_password_hash, access_revision,
+          tags_json, structured_content_json, telegram_message_json,
           source_created_at, captured_at, updated_at
-        ) VALUES (?, 'web', NULL, NULL, NULL, ?, NULL, 'plain', NULL, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?)
+        ) VALUES (?, 'web', NULL, NULL, NULL, ?, NULL, 'plain', NULL, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?)
       `).run(
         input.publicId,
         contentTypeOf(input.assets),
@@ -401,6 +421,8 @@ export class JournalRepository {
         input.publicationStatus,
         input.channel,
         input.visibility,
+        input.accessPasswordHash,
+        input.visibility === 'protected' ? 1 : 0,
         JSON.stringify(input.tags),
         input.sourceCreatedAt,
         now,
@@ -446,6 +468,7 @@ export class JournalRepository {
         UPDATE journal_entries
         SET content_type = ?, content_text = ?, tags_json = ?,
             channel = ?, publication_status = 'published', visibility = ?,
+            access_password_hash = ?, access_revision = ?,
             source_created_at = ?, updated_at = ?
         WHERE id = ?
           AND source_kind = 'web'
@@ -457,6 +480,8 @@ export class JournalRepository {
         JSON.stringify(input.tags),
         input.channel,
         input.visibility,
+        input.accessPasswordHash,
+        input.visibility === 'protected' ? 1 : 0,
         input.sourceCreatedAt,
         input.updatedAt,
         id,
@@ -471,11 +496,20 @@ export class JournalRepository {
 
   updatePublishedWebEntry(id: number, input: UpdatePublishedWebEntryInput): JournalEntry {
     const update = this.database.transaction(() => {
+      const row = this.findRowById(id);
+      if (
+        !row
+        || row.source_kind !== 'web'
+        || row.body_format !== 'plain'
+        || row.publication_status !== 'published'
+      ) {
+        throw new Error(`Published web entry ${id} was not found.`);
+      }
       const assets = this.replaceWebEntryAssets(id, 'published', input.removedAssetIds, input.newAssets);
       const result = this.database.prepare(`
         UPDATE journal_entries
         SET content_type = ?, content_text = ?, tags_json = ?, channel = ?,
-            visibility = ?, source_created_at = ?, updated_at = ?
+            source_created_at = ?, updated_at = ?
         WHERE id = ? AND source_kind = 'web' AND body_format = 'plain'
           AND publication_status = 'published'
       `).run(
@@ -483,12 +517,12 @@ export class JournalRepository {
         input.contentText,
         JSON.stringify(input.tags),
         input.channel,
-        input.visibility,
         input.sourceCreatedAt,
         input.updatedAt,
         id,
       );
       if (result.changes === 0) throw new Error(`Published web entry ${id} was not found.`);
+      this.updateAccess(row, input.visibility, input.accessPasswordHash);
     });
     update();
     return this.getById(id);
@@ -673,17 +707,25 @@ export class JournalRepository {
       .run(...assetIds);
   }
 
-  updateVisibilityByPublicId(publicId: string, visibility: JournalVisibility): JournalEntry | null {
+  updateVisibilityByPublicId(
+    publicId: string,
+    visibility: JournalVisibility,
+    accessPasswordHash?: string,
+  ): JournalEntry | null {
     const row = this.findRowByPublicId(publicId);
     if (!row || row.publication_status !== 'published') return null;
-    this.updateGroup(row, 'visibility = ?, updated_at = ?', [visibility, new Date().toISOString()]);
+    this.updateAccess(row, visibility, accessPasswordHash);
     return this.getById(row.id);
   }
 
-  updateVisibilityById(id: number, visibility: JournalVisibility): JournalEntry | null {
+  updateVisibilityById(
+    id: number,
+    visibility: JournalVisibility,
+    accessPasswordHash?: string,
+  ): JournalEntry | null {
     const row = this.findRowById(id);
     if (!row || row.publication_status !== 'published') return null;
-    this.updateGroup(row, 'visibility = ?, updated_at = ?', [visibility, new Date().toISOString()]);
+    this.updateAccess(row, visibility, accessPasswordHash);
     return this.getById(row.id);
   }
 
@@ -735,13 +777,22 @@ export class JournalRepository {
   }
 
   getPublicByPublicId(publicId: string): JournalEntry | null {
-    const row = this.database.prepare(`
-      SELECT * FROM journal_entries
-      WHERE public_id = ?
-        AND visibility = 'public'
-        AND publication_status = 'published'
-    `).get(publicId) as EntryRow | undefined;
-    return row ? this.toEntry(row) : null;
+    const access = this.getPublishedAccessByPublicId(publicId);
+    return access?.visibility === 'public' ? access.entry : null;
+  }
+
+  getPublishedAccessByPublicId(publicId: string): JournalPublishedAccess | null {
+    const requested = this.findRowByPublicId(publicId);
+    if (!requested) return null;
+    const row = this.representativeRow(requested);
+    if (row.publication_status !== 'published') return null;
+    return {
+      publicId: row.public_id,
+      visibility: row.visibility,
+      accessPasswordHash: row.access_password_hash,
+      accessRevision: row.access_revision,
+      entry: this.toEntry(row),
+    };
   }
 
   getByIdOrNull(id: number): JournalEntry | null {
@@ -785,7 +836,60 @@ export class JournalRepository {
     return remove();
   }
 
-  list(filters: JournalListFilters): JournalFeed {
+  listPublicFeed(filters: {
+    cursor?: string;
+    channel: JournalChannel;
+    tag?: string;
+    limit: number;
+  }): JournalFeed {
+    const conditions = [
+      this.groupRepresentativeCondition('e'),
+      "e.publication_status = 'published'",
+      "e.visibility IN ('public', 'protected')",
+      'e.channel = ?',
+    ];
+    const parameters: unknown[] = [filters.channel];
+    if (filters.tag) {
+      conditions.push("e.visibility = 'public'");
+      conditions.push('EXISTS (SELECT 1 FROM json_each(e.tags_json) WHERE value = ?)');
+      parameters.push(filters.tag);
+    }
+    if (filters.cursor) {
+      const cursor = decodeCursor(filters.cursor);
+      conditions.push(`(
+        e.pinned < ? OR
+        (e.pinned = ? AND e.source_created_at < ?) OR
+        (e.pinned = ? AND e.source_created_at = ? AND e.id < ?)
+      )`);
+      parameters.push(
+        cursor.pinned,
+        cursor.pinned,
+        cursor.sourceCreatedAt,
+        cursor.pinned,
+        cursor.sourceCreatedAt,
+        cursor.id,
+      );
+    }
+
+    const rows = this.database.prepare(`
+      SELECT e.* FROM journal_entries e
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY e.pinned DESC, e.source_created_at DESC, e.id DESC
+      LIMIT ?
+    `).all(...parameters, filters.limit + 1) as EntryRow[];
+    const hasNext = rows.length > filters.limit;
+    const pageRows = rows.slice(0, filters.limit);
+    return {
+      entries: pageRows.map((row) => row.visibility === 'protected'
+        ? this.toProtectedPreview(row)
+        : this.toEntry(row)),
+      nextCursor: hasNext && pageRows.length > 0
+        ? encodeCursor(pageRows[pageRows.length - 1] as EntryRow)
+        : null,
+    };
+  }
+
+  list(filters: JournalListFilters): JournalEntryFeed {
     const { conditions, parameters } = this.listFilterConditions(filters);
     if (filters.cursor) {
       const cursor = decodeCursor(filters.cursor);
@@ -911,9 +1015,22 @@ export class JournalRepository {
       SELECT
         a.id, a.kind, a.relative_path, a.preview_relative_path,
         a.original_name, a.mime_type, a.byte_size,
-        e.visibility
+        representative.visibility,
+        representative.public_id,
+        representative.access_revision
       FROM journal_assets a
       JOIN journal_entries e ON e.id = a.entry_id
+      JOIN journal_entries representative ON representative.id = CASE
+        WHEN e.media_group_id IS NULL THEN e.id
+        ELSE (
+          SELECT grouped.id
+          FROM journal_entries grouped
+          WHERE grouped.chat_id = e.chat_id
+            AND grouped.media_group_id = e.media_group_id
+          ORDER BY grouped.source_message_id, grouped.id
+          LIMIT 1
+        )
+      END
       WHERE a.id = ?
     `).get(assetId) as {
       id: number;
@@ -924,6 +1041,8 @@ export class JournalRepository {
       mime_type: string | null;
       byte_size: number | null;
       visibility: JournalVisibility;
+      public_id: string;
+      access_revision: number;
     } | undefined;
     return row ? {
       id: row.id,
@@ -934,6 +1053,8 @@ export class JournalRepository {
       mimeType: row.mime_type,
       byteSize: row.byte_size,
       visibility: row.visibility,
+      publicId: row.public_id,
+      accessRevision: row.access_revision,
     } : null;
   }
 
@@ -1365,6 +1486,55 @@ export class JournalRepository {
       .get(publicId) as EntryRow | undefined;
   }
 
+  private representativeRow(row: EntryRow): EntryRow {
+    if (row.media_group_id === null) return row;
+    const representative = this.database.prepare(`
+      SELECT * FROM journal_entries
+      WHERE chat_id = ? AND media_group_id = ?
+      ORDER BY source_message_id, id
+      LIMIT 1
+    `).get(row.chat_id, row.media_group_id) as EntryRow | undefined;
+    if (!representative) {
+      throw new Error(`Journal media group ${row.media_group_id} does not have an entry.`);
+    }
+    return representative;
+  }
+
+  private updateAccess(
+    sourceRow: EntryRow,
+    visibility: JournalVisibility,
+    accessPasswordHash?: string,
+  ): void {
+    const row = this.representativeRow(sourceRow);
+    const updatedAt = new Date().toISOString();
+    if (visibility !== 'protected') {
+      if (accessPasswordHash !== undefined) {
+        throw new Error('Only protected Journal entries accept an access password.');
+      }
+      this.updateGroup(
+        row,
+        'visibility = ?, access_password_hash = NULL, updated_at = ?',
+        [visibility, updatedAt],
+      );
+      return;
+    }
+
+    if (accessPasswordHash === undefined) {
+      if (row.visibility !== 'protected') {
+        throw new Error('Protected Journal entries require a 6-digit access password.');
+      }
+      this.updateGroup(row, 'visibility = ?, updated_at = ?', [visibility, updatedAt]);
+      return;
+    }
+
+    this.updateGroup(
+      row,
+      `visibility = ?, access_password_hash = ?,
+       access_revision = access_revision + 1, updated_at = ?`,
+      [visibility, accessPasswordHash, updatedAt],
+    );
+  }
+
   private updateGroup(row: EntryRow, assignments: string, parameters: unknown[]): void {
     if (row.media_group_id === null) {
       this.database.prepare(`
@@ -1531,6 +1701,16 @@ export class JournalRepository {
         height: asset.height,
         duration: asset.duration,
       })),
+    };
+  }
+
+  private toProtectedPreview(row: EntryRow): JournalProtectedEntryPreview {
+    return {
+      kind: 'protected',
+      publicId: row.public_id,
+      channel: row.channel,
+      entryType: row.body_format === 'rich' ? 'article' : 'record',
+      sourceCreatedAt: row.source_created_at,
     };
   }
 
