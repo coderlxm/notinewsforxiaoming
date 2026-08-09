@@ -7,6 +7,7 @@ const props = defineProps<{
   entry: ProtectedJournalEntryPreview;
   busy: boolean;
   error: string | null;
+  fillContainer?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -29,7 +30,11 @@ function submit(): void {
 </script>
 
 <template>
-  <section class="protected-access" aria-labelledby="protected-access-title">
+  <section
+    class="protected-access"
+    :class="{ 'protected-access--fill': fillContainer }"
+    aria-labelledby="protected-access-title"
+  >
     <div class="protected-access__mark" aria-hidden="true">
       <svg viewBox="0 0 64 64" fill="none">
         <path d="M19 29v-7c0-8 5.4-14 13-14s13 6 13 14v7" />
@@ -89,6 +94,17 @@ function submit(): void {
     radial-gradient(circle at 100% 0, color-mix(in srgb, var(--accent) 11%, transparent), transparent 34%),
     var(--surface-card);
   box-shadow: inset 0 0 0 1px var(--border-subtle);
+}
+
+.protected-access--fill {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding-block: clamp(4rem, 9vh, 7rem);
+  padding-inline: max(clamp(1.4rem, 5vw, 4rem), calc((100% - 42rem) / 2));
+  border-radius: 0;
+  box-shadow: none;
+  align-content: center;
 }
 
 .protected-access__mark {
@@ -184,6 +200,12 @@ function submit(): void {
     grid-template-columns: minmax(0, 1fr);
     gap: 1rem;
     margin-top: 0;
+  }
+
+  .protected-access--fill {
+    height: 100%;
+    padding: 4.5rem 1.4rem 2rem;
+    align-content: center;
   }
 
   .protected-access__mark {

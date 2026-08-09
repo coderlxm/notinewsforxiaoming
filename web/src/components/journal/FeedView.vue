@@ -83,6 +83,7 @@ const siteProfile = useSiteProfileStore();
 const initialLoadPending = shallowRef(true);
 const listReplacing = shallowRef(false);
 const refreshing = shallowRef(false);
+const authenticating = shallowRef(false);
 const refreshRequestComplete = shallowRef(false);
 const paginationLayoutPending = shallowRef(false);
 const feedLayoutReady = shallowRef(false);
@@ -94,6 +95,7 @@ const tableLoaded = shallowRef(false);
 let terminalErrorMessage: ReturnType<typeof showMessage> | null = null;
 let removeRouteAfterEach: (() => void) | null = null;
 let protectedRobotsMeta: HTMLMetaElement | null = null;
+let authenticationRequest: Promise<void> | null = null;
 
 const isDetail = computed(() => props.mode === 'public' && props.detailId !== undefined);
 const isOverlay = computed(() =>
@@ -221,6 +223,15 @@ async function loadDirectPrivateDetail(): Promise<void> {
   await journal.loadPrivateDetail(props.overlayEntryId);
 }
 
+function prepareProtectedDetail(entry: ProtectedJournalEntryPreview): void {
+  journal.selectProtectedDetail(entry);
+  protectedDetailChannel.value = entry.channel;
+  protectedRobotsMeta = document.createElement('meta');
+  protectedRobotsMeta.name = 'robots';
+  protectedRobotsMeta.content = 'noindex, nofollow';
+  document.head.append(protectedRobotsMeta);
+}
+
 onMounted(async () => {
   if (props.mode === 'private') {
     removeRouteAfterEach = router.afterEach((to, from) => {
@@ -246,14 +257,17 @@ onMounted(async () => {
   }
   try {
     if (isDetail.value) {
+      const routeState = router.currentRoute.value.state as {
+        journalProtectedPreview?: ProtectedJournalEntryPreview;
+      };
+      if (routeState.journalProtectedPreview?.publicId === props.detailId) {
+        prepareProtectedDetail(routeState.journalProtectedPreview);
+        return;
+      }
       await journal.loadPublicDetail(props.detailId as string);
       if (journal.detail.value) emit('detailLoaded', journal.detail.value);
       if (journal.protectedDetail.value) {
-        protectedDetailChannel.value = journal.protectedDetail.value.channel;
-        protectedRobotsMeta = document.createElement('meta');
-        protectedRobotsMeta.name = 'robots';
-        protectedRobotsMeta.content = 'noindex, nofollow';
-        document.head.append(protectedRobotsMeta);
+        prepareProtectedDetail(journal.protectedDetail.value);
       }
       return;
     }
@@ -261,7 +275,9 @@ onMounted(async () => {
       await journal.loadPublic({ channel: props.channel, tag: props.initialTag });
       return;
     }
-    await journal.loadPrivateContext();
+    authenticationRequest = journal.loadPrivateContext();
+    await authenticationRequest;
+    authenticationRequest = null;
     if (journal.authenticationState.value === 'authenticated') {
       await loadPrivateResults();
     }
@@ -367,13 +383,17 @@ async function handleLayoutReady(): Promise<void> {
 async function authenticate(password: string): Promise<void> {
   feedLayoutReady.value = false;
   listReplacing.value = true;
+  authenticating.value = true;
   try {
+    await authenticationRequest;
+    if (journal.authenticationState.value === 'authenticated') return;
     await journal.authenticate(password);
     if (journal.authenticationState.value === 'authenticated') {
       await loadPrivateResults();
     }
     await loadDirectPrivateDetail();
   } finally {
+    authenticating.value = false;
     listReplacing.value = false;
   }
 }
@@ -417,14 +437,17 @@ function editEntry(entry: JournalEntry): void {
 function openEntry(entry: PublicJournalFeedItem): void {
   if (isProtectedJournalEntry(entry)) {
     if (entry.entryType === 'record') {
+      journal.selectProtectedDetail(entry);
       emit('openEntry', entry);
-      void journal.loadPublicDetail(entry.publicId);
       return;
     }
     void router.push({
       name: 'detail',
       params: { publicId: entry.publicId },
-      state: { journalDetailFromFeed: true },
+      state: {
+        journalDetailFromFeed: true,
+        journalProtectedPreview: entry,
+      },
     });
     return;
   }
@@ -611,13 +634,13 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
       </div>
 
       <LoginView
-        v-if="mode === 'private' && journal.authenticationState.value === 'anonymous'"
-        :busy="journal.loading.value"
+        v-if="mode === 'private' && journal.authenticationState.value !== 'authenticated'"
+        :busy="authenticating"
         @login="authenticate"
       />
 
       <AssetManagementToolbar
-        v-if="mode === 'private' && journal.authenticationState.value !== 'anonymous'"
+        v-if="mode === 'private' && journal.authenticationState.value === 'authenticated'"
         :key="toolbarRevision"
         :filters="filters"
         :view="assetView"
@@ -728,7 +751,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
       </div>
 
       <div
-        v-else-if="journal.authenticationState.value !== 'anonymous'"
+        v-else-if="journal.authenticationState.value === 'authenticated'"
         class="feed__entries"
       >
         <PrivateWaterfallResults

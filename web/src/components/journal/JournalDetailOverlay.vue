@@ -221,14 +221,14 @@ function forwardPinned(entry: JournalEntry, pinned: boolean): void {
           @set-pinned="forwardPinned"
           @delete-entry="emit('deleteEntry', $event)"
         />
-        <div v-else-if="protectedEntry" class="detail-overlay__reading-stage">
-          <ProtectedEntryUnlock
-            :entry="protectedEntry"
-            :busy="unlocking ?? false"
-            :error="unlockError ?? null"
-            @unlock="emit('unlock', $event)"
-          />
-        </div>
+        <ProtectedEntryUnlock
+          v-else-if="protectedEntry"
+          :entry="protectedEntry"
+          :busy="unlocking ?? false"
+          :error="unlockError ?? null"
+          fill-container
+          @unlock="emit('unlock', $event)"
+        />
         <div v-else class="detail-overlay__reading-stage" :aria-busy="loading">
           <JournalLoading v-if="loading" variant="reading" label="正在展开记录…" />
         </div>

@@ -59,6 +59,12 @@ export function useJournalApi() {
     detail.value = entry;
   }
 
+  function selectProtectedDetail(entry: ProtectedJournalEntryPreview): void {
+    detail.value = null;
+    protectedDetail.value = entry;
+    unlockError.value = null;
+  }
+
   async function fetchAndReplacePrivateFeed(filters: FeedFilters): Promise<void> {
     const feed = await fetchPrivateFeed({ filters });
     entries.value = feed.entries;
@@ -413,6 +419,7 @@ export function useJournalApi() {
     unlockDetail,
     loadPrivateDetail,
     selectDetail,
+    selectProtectedDetail,
     loadPrivate,
     loadPrivateContext,
     refreshOnThisDay,
