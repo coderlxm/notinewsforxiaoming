@@ -384,10 +384,6 @@ async function authenticate(password: string): Promise<void> {
   authenticating.value = true;
   try {
     await journal.authenticate(password);
-    if (journal.authenticationState.value === 'authenticated') {
-      await loadPrivateResults();
-    }
-    await loadDirectPrivateDetail();
   } finally {
     authenticating.value = false;
     listReplacing.value = false;

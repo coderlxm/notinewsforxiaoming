@@ -284,6 +284,8 @@ watch(ownerAuthenticated, (authenticated) => {
     void contributionInbox.loadInbox();
     return;
   }
+  overlayContext.value = null;
+  directPublicEntry.value = null;
   contributionInbox.clear();
 }, { immediate: true });
 
@@ -628,7 +630,7 @@ onUnmounted(() => {
       />
 
       <div ref="contentScroll" class="app-scroll">
-        <KeepAlive :max="1">
+        <KeepAlive v-if="session.ownerAuthenticated" :max="1">
           <FeedView
             v-if="backgroundFeedRoute?.name === 'private'"
             :key="backgroundFeedRoute.key"
@@ -647,8 +649,41 @@ onUnmounted(() => {
             @remove-deleted-overlay="removeDeletedOverlay"
           />
         </KeepAlive>
+        <FeedView
+          v-else-if="backgroundFeedRoute?.name === 'private'"
+          :key="backgroundFeedRoute.key"
+          mode="private"
+          :asset-view="backgroundFeedRoute.assetView"
+          :page="backgroundFeedRoute.page"
+          :overlay-entry-id="overlayEntryId"
+          :overlay-entry="overlayEntry"
+          :overlay-protected-entry="overlayProtectedEntry"
+          :direct-overlay="directPrivateOverlay"
+          @layout-ready="restoreFeedScroll"
+          @change-asset-view="changeAssetView"
+          @change-page="changePrivatePage"
+          @open-entry="openEntry"
+          @close-overlay="closeOverlay"
+          @remove-deleted-overlay="removeDeletedOverlay"
+        />
 
-        <KeepAlive :max="PUBLIC_FEED_CACHE_LIMIT">
+        <KeepAlive v-if="session.ownerAuthenticated" :max="PUBLIC_FEED_CACHE_LIMIT">
+          <FeedView
+            v-if="backgroundFeedRoute?.name === 'public'"
+            :key="backgroundFeedRoute.key"
+            mode="public"
+            :channel="backgroundFeedRoute.channel"
+            :initial-tag="backgroundFeedRoute.tag"
+            :overlay-entry-id="overlayEntryId"
+            :overlay-entry="overlayEntry"
+            :overlay-protected-entry="overlayProtectedEntry"
+            @layout-ready="restoreFeedScroll"
+            @open-entry="openEntry"
+            @close-overlay="closeOverlay"
+            @remove-deleted-overlay="removeDeletedOverlay"
+          />
+        </KeepAlive>
+        <KeepAlive v-else :max="PUBLIC_FEED_CACHE_LIMIT">
           <FeedView
             v-if="backgroundFeedRoute?.name === 'public'"
             :key="backgroundFeedRoute.key"
