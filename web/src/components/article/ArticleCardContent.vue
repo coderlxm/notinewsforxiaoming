@@ -9,6 +9,7 @@ import type { AccessSettingsInput } from '../journal/accessSettings';
 import CardActionMenu from '../journal/CardActionMenu.vue';
 import CardDateSpine from '../journal/CardDateSpine.vue';
 import PublishedTimeDialog from '../journal/PublishedTimeDialog.vue';
+import CardStatusIndicator from '../journal/CardStatusIndicator.vue';
 import ArticleRichBody from './ArticleRichBody.vue';
 import RichArticleRenderer from './RichArticleRenderer.vue';
 
@@ -55,6 +56,9 @@ const summary = computed(() => {
   return `${text.slice(0, 72)}…`;
 });
 const cardLinkable = computed(() => props.linkable && props.display === 'summary');
+const cardStatusCount = computed(() => props.display === 'summary'
+  ? Number(props.entry.pinned) + Number(props.entry.visibility === 'protected')
+  : 0);
 const deletionMessage = computed(() => {
   if (props.entry.assets.length === 0) return '永久删除这篇文章？此操作无法撤销。';
   if (props.entry.assets.length === 1) return '永久删除这篇文章及其附件？此操作无法撤销。';
@@ -95,13 +99,21 @@ function handleCardClick(event: MouseEvent): void {
       'article-card--full': display === 'full',
       'article-card--without-cover': !cover,
       'article-card--linkable': cardLinkable && !confirmingDeletion,
+      'article-card--status-fold': cardStatusCount > 0 && !cover,
+      'article-card--two-statuses': cardStatusCount > 1 && !cover,
     }"
     @click="handleCardClick"
   >
+    <CardStatusIndicator
+      v-if="cardStatusCount && !cover"
+      :pinned="entry.pinned"
+      :encrypted="entry.visibility === 'protected'"
+      tone="surface"
+    />
     <header class="article-card__header">
       <CardDateSpine
         :source-created-at="entry.sourceCreatedAt"
-        :pinned="entry.pinned"
+        :pinned="display === 'full' && entry.pinned"
         :visibility="entry.visibility"
         :publication-status="entry.publicationStatus"
         :show-status="editable"
@@ -129,6 +141,12 @@ function handleCardClick(event: MouseEvent): void {
       class="article-card__cover article-card__cover--summary"
       :style="summaryCoverStyle"
     >
+      <CardStatusIndicator
+        v-if="cardStatusCount"
+        :pinned="entry.pinned"
+        :encrypted="entry.visibility === 'protected'"
+        tone="media"
+      />
       <button v-if="linkable" class="article-card__cover-button" type="button" @click="openEntry">
         <JournalProgressiveImage
           class="article-card__cover-image"
@@ -233,6 +251,7 @@ function handleCardClick(event: MouseEvent): void {
 
 <style scoped>
 .article-card {
+  position: relative;
   display: grid;
   gap: 0.8rem;
   padding: 0.9rem;
@@ -240,6 +259,18 @@ function handleCardClick(event: MouseEvent): void {
   border-radius: 1.25rem;
   background: var(--surface-card);
   transition: border-color 180ms ease, transform 180ms ease;
+}
+
+.article-card--status-fold:not(.article-card--full) {
+  overflow: hidden;
+}
+
+.article-card--status-fold:not(.article-card--full) .article-card__header {
+  padding-right: 2.65rem;
+}
+
+.article-card--two-statuses:not(.article-card--full) .article-card__header {
+  padding-right: 3.65rem;
 }
 
 .article-card--linkable:hover {
@@ -275,6 +306,7 @@ function handleCardClick(event: MouseEvent): void {
 }
 
 .article-card__cover {
+  position: relative;
   margin: 0;
   overflow: hidden;
   border-radius: var(--radius-media);

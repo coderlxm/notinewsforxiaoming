@@ -4,6 +4,7 @@ import JournalLoading from '../ui/JournalLoading.vue';
 import type { JournalEntry, JournalPlainChannel } from '../../types';
 import { formatStructuredValue } from '../../utils/formatters';
 import { stripJournalTags } from '../../utils/journalText';
+import { resolveTextPosterTemplate } from '../../utils/textPosterTemplate';
 import CardActionMenu from './CardActionMenu.vue';
 import CardDateSpine from './CardDateSpine.vue';
 import JournalTextPoster from './JournalTextPoster.vue';
@@ -11,6 +12,7 @@ import MediaGallery from './MediaGallery.vue';
 import PublishedTimeDialog from './PublishedTimeDialog.vue';
 import AccessSettingsDialog from './AccessSettingsDialog.vue';
 import type { AccessSettingsInput } from './accessSettings';
+import CardStatusIndicator from './CardStatusIndicator.vue';
 
 const props = withDefaults(defineProps<{
   entry: JournalEntry;
@@ -67,6 +69,9 @@ function formatCardDate(date: Date): string {
 
 const isDetail = computed(() => !props.linkable);
 const isDraft = computed(() => props.entry.publicationStatus === 'draft');
+const cardStatusCount = computed(() => isDetail.value
+  ? 0
+  : Number(props.entry.pinned) + Number(props.entry.visibility === 'protected'));
 const plainChannel = computed(() => props.entry.channel as JournalPlainChannel);
 const hasVisualMedia = computed(() => props.entry.assets.some(asset =>
   asset.kind === 'photo'
@@ -83,6 +88,13 @@ const hasTextPoster = computed(() =>
   && props.entry.assets.length === 0
   && normalizedPosterContent.value.length > 0,
 );
+const statusTone = computed(() => {
+  if (hasVisualMedia.value) return 'media' as const;
+  return hasTextPoster.value ? 'poster' as const : 'surface' as const;
+});
+const posterTemplate = computed(() => hasTextPoster.value
+  ? resolveTextPosterTemplate(props.entry.publicId)
+  : undefined);
 const displayedContent = computed(() => {
   if (isDetail.value) return props.entry.contentText;
   if (hasTextPoster.value) return normalizedPosterContent.value;
@@ -174,6 +186,13 @@ function handleCardClick(event: MouseEvent): void {
     }"
     @click="handleCardClick"
   >
+    <CardStatusIndicator
+      v-if="cardStatusCount"
+      :pinned="entry.pinned"
+      :encrypted="entry.visibility === 'protected'"
+      :tone="statusTone"
+      :poster-template="posterTemplate"
+    />
     <header v-if="isDetail" class="entry__header">
       <CardDateSpine
         :source-created-at="entry.sourceCreatedAt"
@@ -265,7 +284,6 @@ function handleCardClick(event: MouseEvent): void {
       <footer v-if="!isDetail" class="entry__meta">
         <div class="entry__meta-copy">
           <time :datetime="entry.sourceCreatedAt">{{ formattedDate }}</time>
-          <span v-if="entry.pinned">置顶</span>
           <span v-if="editable">{{ statusLabel }}</span>
         </div>
         <div class="entry__meta-trailing">
@@ -330,6 +348,7 @@ function handleCardClick(event: MouseEvent): void {
 
 <style scoped>
 .entry {
+  position: relative;
   display: grid;
   overflow: hidden;
   border-radius: 1.25rem;

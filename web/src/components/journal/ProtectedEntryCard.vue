@@ -74,6 +74,7 @@ const formattedDate = computed(() => dateFormatter.format(new Date(props.entry.s
   --protected-bg-secondary: #e1d9cc;
   --protected-ink: #2c302f;
   --protected-accent: #ad3840;
+  position: relative;
   overflow: hidden;
   border-radius: 1.25rem;
   background: var(--surface-card);
