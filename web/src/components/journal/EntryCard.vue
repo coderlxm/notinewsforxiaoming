@@ -228,6 +228,7 @@ function handleCardClick(event: MouseEvent): void {
       :assets="entry.assets"
       :display="isDetail ? 'detail' : 'card'"
       :max-visuals="cardVisualLimit"
+      :corner-safe="cardStatusCount > 0 && hasVisualMedia"
       @open="openEntry"
     />
     <JournalTextPoster

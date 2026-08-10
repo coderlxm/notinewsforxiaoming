@@ -139,6 +139,7 @@ function handleCardClick(event: MouseEvent): void {
     <figure
       v-if="cover && display === 'summary'"
       class="article-card__cover article-card__cover--summary"
+      :class="{ 'article-card__cover--corner-safe': cardStatusCount > 0 }"
       :style="summaryCoverStyle"
     >
       <CardStatusIndicator
@@ -147,7 +148,12 @@ function handleCardClick(event: MouseEvent): void {
         :encrypted="entry.visibility === 'protected'"
         tone="media"
       />
-      <button v-if="linkable" class="article-card__cover-button" type="button" @click="openEntry">
+      <button
+        v-if="linkable"
+        class="article-card__cover-media article-card__cover-button"
+        type="button"
+        @click="openEntry"
+      >
         <JournalProgressiveImage
           class="article-card__cover-image"
           :src="cover.url"
@@ -159,7 +165,7 @@ function handleCardClick(event: MouseEvent): void {
       </button>
       <JournalProgressiveImage
         v-else
-        class="article-card__cover-image"
+        class="article-card__cover-media article-card__cover-image"
         :src="cover.url"
         :preview-src="cover.previewUrl!"
         :alt="entry.title ?? '文章封面'"
@@ -313,6 +319,33 @@ function handleCardClick(event: MouseEvent): void {
   background: var(--surface-muted);
 }
 
+.article-card__cover--corner-safe {
+  --article-corner-safe-size: calc(2.75rem + 2px);
+}
+
+.article-card__cover--corner-safe::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 0;
+  height: 0;
+  border-top: var(--article-corner-safe-size) solid #171816;
+  border-left: var(--article-corner-safe-size) solid transparent;
+  content: '';
+}
+
+.article-card__cover--corner-safe .article-card__cover-media {
+  position: relative;
+  z-index: 1;
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--article-corner-safe-size)) 0,
+    100% var(--article-corner-safe-size),
+    100% 100%,
+    0 100%
+  );
+}
+
 .article-card__cover img,
 .article-card__cover-button {
   display: block;
@@ -344,6 +377,12 @@ function handleCardClick(event: MouseEvent): void {
 
 .article-card__cover--full {
   margin-top: 0.25rem;
+}
+
+@media (max-width: 599px) {
+  .article-card__cover--corner-safe {
+    --article-corner-safe-size: calc(2.5rem + 2px);
+  }
 }
 
 .article-card__title-button,

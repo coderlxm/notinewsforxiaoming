@@ -10,8 +10,10 @@ const props = withDefaults(defineProps<{
   assets: readonly JournalAsset[];
   display?: 'card' | 'detail';
   maxVisuals?: number;
+  cornerSafe?: boolean;
 }>(), {
   display: 'detail',
+  cornerSafe: false,
 });
 
 const emit = defineEmits<{
@@ -67,7 +69,10 @@ function preserveAssetRatio(asset: DisplayAsset): { aspectRatio: string } | unde
   <section
     v-if="displayAssets.length"
     class="media"
-    :class="`media--${display}`"
+    :class="[
+      `media--${display}`,
+      { 'media--corner-safe': cornerSafe && visualAssets.length > 0 },
+    ]"
     aria-label="记录附件"
   >
     <div
@@ -167,6 +172,34 @@ function preserveAssetRatio(asset: DisplayAsset): { aspectRatio: string } | unde
 .media {
   display: grid;
   gap: 0.75rem;
+}
+
+.media--corner-safe {
+  --media-corner-safe-size: calc(2.75rem + 2px);
+  position: relative;
+}
+
+.media--corner-safe::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 0;
+  height: 0;
+  border-top: var(--media-corner-safe-size) solid #171816;
+  border-left: var(--media-corner-safe-size) solid transparent;
+  content: '';
+}
+
+.media--corner-safe .media__visuals {
+  position: relative;
+  z-index: 1;
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--media-corner-safe-size)) 0,
+    100% var(--media-corner-safe-size),
+    100% 100%,
+    0 100%
+  );
 }
 
 .media__visuals {
@@ -373,6 +406,12 @@ function preserveAssetRatio(asset: DisplayAsset): { aspectRatio: string } | unde
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+@media (max-width: 599px) {
+  .media--corner-safe {
+    --media-corner-safe-size: calc(2.5rem + 2px);
+  }
 }
 
 .media__file-copy small {
