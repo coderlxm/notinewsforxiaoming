@@ -3,7 +3,6 @@ import { useEventListener, useMediaQuery } from '@vueuse/core';
 import { storeToRefs } from 'pinia';
 import {
   computed,
-  defineAsyncComponent,
   onMounted,
   onUnmounted,
   shallowRef,
@@ -11,12 +10,8 @@ import {
   watch,
 } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import AboutView from './components/about/AboutView.vue';
-import ArticleEditorView from './components/article/ArticleEditorView.vue';
-import FeedView from './components/journal/FeedView.vue';
+import NotFoundView from './components/NotFoundView.vue';
 import PublicChannelNavigation from './components/journal/PublicChannelNavigation.vue';
-import EntryPublisherView from './components/publisher/EntryPublisherView.vue';
-import SiteProfileSettingsView from './components/settings/SiteProfileSettingsView.vue';
 import { useAdminContributions } from './composables/useAdminContributions';
 import { isJournalChannel, publicFeedPath } from './journalChannels';
 import { useSessionStore } from './stores/session';
@@ -58,13 +53,6 @@ interface OverlayContext {
   origin: FeedRoute;
   originPath: string;
 }
-
-const AdminContributionInboxView = defineAsyncComponent(
-  () => import('./components/contribution/AdminContributionInboxView.vue'),
-);
-const AdminContributionReviewView = defineAsyncComponent(
-  () => import('./components/contribution/AdminContributionReviewView.vue'),
-);
 
 const currentRoute = useRoute();
 const router = useRouter();
@@ -635,9 +623,30 @@ onUnmounted(() => {
       />
 
       <div ref="contentScroll" class="app-scroll">
-        <KeepAlive v-if="session.ownerAuthenticated" :max="1">
-          <FeedView
-            v-if="backgroundFeedRoute?.name === 'private'"
+        <RouterView v-slot="{ Component }">
+          <KeepAlive v-if="session.ownerAuthenticated" :max="1">
+            <component
+              :is="Component"
+              v-if="backgroundFeedRoute?.name === 'private'"
+              :key="backgroundFeedRoute.key"
+              mode="private"
+              :asset-view="backgroundFeedRoute.assetView"
+              :page="backgroundFeedRoute.page"
+              :overlay-entry-id="overlayEntryId"
+              :overlay-entry="overlayEntry"
+              :overlay-protected-entry="overlayProtectedEntry"
+              :direct-overlay="directPrivateOverlay"
+              @layout-ready="restoreFeedScroll"
+              @change-asset-view="changeAssetView"
+              @change-page="changePrivatePage"
+              @open-entry="openEntry"
+              @close-overlay="closeOverlay"
+              @remove-deleted-overlay="removeDeletedOverlay"
+            />
+          </KeepAlive>
+          <component
+            :is="Component"
+            v-else-if="backgroundFeedRoute?.name === 'private'"
             :key="backgroundFeedRoute.key"
             mode="private"
             :asset-view="backgroundFeedRoute.assetView"
@@ -653,107 +662,64 @@ onUnmounted(() => {
             @close-overlay="closeOverlay"
             @remove-deleted-overlay="removeDeletedOverlay"
           />
-        </KeepAlive>
-        <FeedView
-          v-else-if="backgroundFeedRoute?.name === 'private'"
-          :key="backgroundFeedRoute.key"
-          mode="private"
-          :asset-view="backgroundFeedRoute.assetView"
-          :page="backgroundFeedRoute.page"
-          :overlay-entry-id="overlayEntryId"
-          :overlay-entry="overlayEntry"
-          :overlay-protected-entry="overlayProtectedEntry"
-          :direct-overlay="directPrivateOverlay"
-          @layout-ready="restoreFeedScroll"
-          @change-asset-view="changeAssetView"
-          @change-page="changePrivatePage"
-          @open-entry="openEntry"
-          @close-overlay="closeOverlay"
-          @remove-deleted-overlay="removeDeletedOverlay"
-        />
 
-        <KeepAlive v-if="session.ownerAuthenticated" :max="PUBLIC_FEED_CACHE_LIMIT">
-          <FeedView
-            v-if="backgroundFeedRoute?.name === 'public'"
-            :key="backgroundFeedRoute.key"
-            mode="public"
-            :channel="backgroundFeedRoute.channel"
-            :initial-tag="backgroundFeedRoute.tag"
-            :overlay-entry-id="overlayEntryId"
-            :overlay-entry="overlayEntry"
-            :overlay-protected-entry="overlayProtectedEntry"
-            :revealed-public-entries="revealedPublicEntries"
-            @layout-ready="restoreFeedScroll"
-            @open-entry="openEntry"
-            @close-overlay="closeOverlay"
-            @remove-deleted-overlay="removeDeletedOverlay"
-          />
-        </KeepAlive>
-        <KeepAlive v-else :max="PUBLIC_FEED_CACHE_LIMIT">
-          <FeedView
-            v-if="backgroundFeedRoute?.name === 'public'"
-            :key="backgroundFeedRoute.key"
-            mode="public"
-            :channel="backgroundFeedRoute.channel"
-            :initial-tag="backgroundFeedRoute.tag"
-            :overlay-entry-id="overlayEntryId"
-            :overlay-entry="overlayEntry"
-            :overlay-protected-entry="overlayProtectedEntry"
-            :revealed-public-entries="revealedPublicEntries"
-            @layout-ready="restoreFeedScroll"
-            @open-entry="openEntry"
-            @close-overlay="closeOverlay"
-            @remove-deleted-overlay="removeDeletedOverlay"
-          />
-        </KeepAlive>
+          <KeepAlive v-if="session.ownerAuthenticated" :max="PUBLIC_FEED_CACHE_LIMIT">
+            <component
+              :is="Component"
+              v-if="backgroundFeedRoute?.name === 'public'"
+              :key="backgroundFeedRoute.key"
+              mode="public"
+              :channel="backgroundFeedRoute.channel"
+              :initial-tag="backgroundFeedRoute.tag"
+              :overlay-entry-id="overlayEntryId"
+              :overlay-entry="overlayEntry"
+              :overlay-protected-entry="overlayProtectedEntry"
+              :revealed-public-entries="revealedPublicEntries"
+              @layout-ready="restoreFeedScroll"
+              @open-entry="openEntry"
+              @close-overlay="closeOverlay"
+              @remove-deleted-overlay="removeDeletedOverlay"
+            />
+          </KeepAlive>
+          <KeepAlive v-else :max="PUBLIC_FEED_CACHE_LIMIT">
+            <component
+              :is="Component"
+              v-if="backgroundFeedRoute?.name === 'public'"
+              :key="backgroundFeedRoute.key"
+              mode="public"
+              :channel="backgroundFeedRoute.channel"
+              :initial-tag="backgroundFeedRoute.tag"
+              :overlay-entry-id="overlayEntryId"
+              :overlay-entry="overlayEntry"
+              :overlay-protected-entry="overlayProtectedEntry"
+              :revealed-public-entries="revealedPublicEntries"
+              @layout-ready="restoreFeedScroll"
+              @open-entry="openEntry"
+              @close-overlay="closeOverlay"
+              @remove-deleted-overlay="removeDeletedOverlay"
+            />
+          </KeepAlive>
 
-        <FeedView
-          v-if="route.name === 'detail' && !activeOverlayContext && !directPublicOverlayEntry"
-          :key="route.key"
-          mode="public"
-          :detail-id="route.publicId"
-          @detail-loaded="handlePublicDetailLoaded"
-          @detail-unlocked="handlePublicDetailUnlocked"
-          @return-to-feed="returnFromDetail"
-        />
-        <AboutView
-          v-else-if="route.name === 'about'"
-          :key="route.key"
-        />
-        <ArticleEditorView
-          v-else-if="route.name === 'article-new'"
-          :key="route.key"
-        />
-        <ArticleEditorView
-          v-else-if="route.name === 'article-edit'"
-          :key="route.key"
-          :article-id="route.articleId"
-        />
-        <EntryPublisherView
-          v-else-if="route.name === 'entry-new'"
-          :key="route.key"
-        />
-        <EntryPublisherView
-          v-else-if="route.name === 'entry-edit'"
-          :key="route.key"
-          :entry-id="route.entryId"
-        />
-        <SiteProfileSettingsView
-          v-else-if="route.name === 'settings'"
-          :key="route.key"
-        />
-        <AdminContributionInboxView
-          v-else-if="route.name === 'contribution-inbox'"
-        />
-        <AdminContributionReviewView
-          v-else-if="route.name === 'contribution-review'"
-          :public-id="route.publicId"
-        />
-        <main v-else-if="route.name === 'not-found'" class="not-found">
-          <span class="not-found__code">404</span>
-          <h1>这条路没有记录</h1>
-          <button class="button button--primary" type="button" @click="navigate('/')">返回首页</button>
-        </main>
+          <component
+            :is="Component"
+            v-if="route.name === 'detail' && !activeOverlayContext && !directPublicOverlayEntry"
+            :key="route.key"
+            mode="public"
+            :detail-id="route.publicId"
+            @detail-loaded="handlePublicDetailLoaded"
+            @detail-unlocked="handlePublicDetailUnlocked"
+            @return-to-feed="returnFromDetail"
+          />
+          <NotFoundView
+            v-else-if="route.name === 'not-found' && currentRoute.name !== 'not-found'"
+            :key="route.key"
+          />
+          <component
+            :is="Component"
+            v-else-if="backgroundFeedRoute === null"
+            :key="route.key"
+          />
+        </RouterView>
       </div>
     </div>
   </div>
@@ -952,27 +918,6 @@ onUnmounted(() => {
   font-weight: 750;
   line-height: 1;
   place-items: center;
-}
-
-.not-found {
-  display: grid;
-  min-height: 55vh;
-  place-content: center;
-  justify-items: center;
-  text-align: center;
-}
-
-.not-found__code {
-  color: var(--accent);
-  font-family: var(--font-serif);
-  font-size: 4rem;
-  line-height: 1;
-}
-
-.not-found h1 {
-  margin: 0.5rem 0 1.2rem;
-  font-family: var(--font-serif);
-  font-size: 1.35rem;
 }
 
 @keyframes profile-skeleton-pulse {
