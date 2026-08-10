@@ -77,6 +77,7 @@ const { ownerAuthenticated } = storeToRefs(session);
 const { profile, loadError: profileLoadError } = storeToRefs(siteProfile);
 const overlayContext = shallowRef<OverlayContext | null>(null);
 const directPublicEntry = shallowRef<JournalEntry | null>(null);
+const revealedPublicEntries = shallowRef<ReadonlyMap<string, JournalEntry>>(new Map());
 const contentScroll = useTemplateRef<HTMLDivElement>('contentScroll');
 const profileBio = useTemplateRef<HTMLParagraphElement>('profileBio');
 const profileBioOverflow = shallowRef(0);
@@ -515,6 +516,10 @@ function handlePublicDetailLoaded(entry: JournalEntry): void {
   directPublicEntry.value = entry;
 }
 
+function handlePublicDetailUnlocked(entry: JournalEntry): void {
+  revealedPublicEntries.value = new Map(revealedPublicEntries.value).set(entry.publicId, entry);
+}
+
 function restoreFeedScroll(): void {
   if (pendingFeedScrollTop === null) return;
 
@@ -677,6 +682,7 @@ onUnmounted(() => {
             :overlay-entry-id="overlayEntryId"
             :overlay-entry="overlayEntry"
             :overlay-protected-entry="overlayProtectedEntry"
+            :revealed-public-entries="revealedPublicEntries"
             @layout-ready="restoreFeedScroll"
             @open-entry="openEntry"
             @close-overlay="closeOverlay"
@@ -693,6 +699,7 @@ onUnmounted(() => {
             :overlay-entry-id="overlayEntryId"
             :overlay-entry="overlayEntry"
             :overlay-protected-entry="overlayProtectedEntry"
+            :revealed-public-entries="revealedPublicEntries"
             @layout-ready="restoreFeedScroll"
             @open-entry="openEntry"
             @close-overlay="closeOverlay"
@@ -706,6 +713,7 @@ onUnmounted(() => {
           mode="public"
           :detail-id="route.publicId"
           @detail-loaded="handlePublicDetailLoaded"
+          @detail-unlocked="handlePublicDetailUnlocked"
           @return-to-feed="returnFromDetail"
         />
         <AboutView

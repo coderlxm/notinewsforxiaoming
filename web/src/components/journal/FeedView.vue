@@ -45,6 +45,7 @@ const props = withDefaults(defineProps<{
   overlayEntryId?: number;
   overlayEntry?: JournalEntry;
   overlayProtectedEntry?: ProtectedJournalEntryPreview;
+  revealedPublicEntries?: ReadonlyMap<string, JournalEntry>;
   directOverlay?: boolean;
   assetView?: AssetView;
   page?: number;
@@ -55,6 +56,7 @@ const props = withDefaults(defineProps<{
   overlayEntryId: undefined,
   overlayEntry: undefined,
   overlayProtectedEntry: undefined,
+  revealedPublicEntries: undefined,
   directOverlay: false,
   assetView: 'waterfall',
   page: 1,
@@ -64,6 +66,7 @@ const emit = defineEmits<{
   layoutReady: [];
   openEntry: [entry: PublicJournalFeedItem];
   detailLoaded: [entry: JournalEntry];
+  detailUnlocked: [entry: JournalEntry];
   closeOverlay: [];
   removeDeletedOverlay: [];
   returnToFeed: [];
@@ -119,9 +122,12 @@ const overlayVisible = computed(() => isOverlay.value && (
   || (props.directOverlay && journal.authenticationState.value === 'authenticated')
 ));
 const detailPreparing = computed(() => isDetail.value && initialLoadPending.value);
-const feedEntries = computed(() => props.mode === 'public'
-  ? journal.publicEntries.value
-  : journal.entries.value);
+const feedEntries = computed<readonly PublicJournalFeedItem[]>(() => {
+  if (props.mode !== 'public') return journal.entries.value;
+  const revealedEntries = props.revealedPublicEntries;
+  if (!revealedEntries?.size) return journal.publicEntries.value;
+  return journal.publicEntries.value.map(entry => revealedEntries.get(entry.publicId) ?? entry);
+});
 const deferredDetailLoading = useDeferredLoading(detailPreparing);
 const publicChannelTags = computed<readonly string[]>(() => {
   if (siteProfile.profile === null) return [];
@@ -461,6 +467,7 @@ function openEntry(entry: PublicJournalFeedItem): void {
 
 async function unlockDetail(password: string): Promise<void> {
   await journal.unlockDetail(password);
+  if (isDetail.value && journal.detail.value) emit('detailUnlocked', journal.detail.value);
 }
 
 function returnFromDetail(): void {
@@ -692,7 +699,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
         >
           <PublicArticleFeed
             v-if="mode === 'public' && publicLayout === 'article'"
-            :entries="journal.publicEntries.value"
+            :entries="feedEntries"
             :loading="entriesLoading"
             @layout-ready="handleLayoutReady"
             @open-entry="openEntry"
@@ -700,7 +707,7 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
           />
           <WaterfallFeed
             v-else
-            :entries="journal.publicEntries.value"
+            :entries="feedEntries"
             :loading="entriesLoading"
             :mode="mode"
             :mutation-entry-id="journal.mutationEntryId.value"

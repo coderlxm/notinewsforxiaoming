@@ -1,19 +1,16 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import {
-  isProtectedJournalEntry,
-  type PublicJournalFeedItem,
-} from '../../types';
+import type { ProtectedJournalEntryPreview } from '../../types';
 
 const props = withDefaults(defineProps<{
-  entry: PublicJournalFeedItem;
+  entry: ProtectedJournalEntryPreview;
   display?: 'waterfall' | 'article';
 }>(), {
   display: 'waterfall',
 });
 
 const emit = defineEmits<{
-  open: [entry: PublicJournalFeedItem];
+  open: [entry: ProtectedJournalEntryPreview];
 }>();
 
 const dateFormatter = new Intl.DateTimeFormat('zh-CN', {
@@ -30,15 +27,8 @@ const templateNumber = computed(() => {
   }
   return (hash % 7) + 1;
 });
-const typeLabel = computed(() => {
-  const article = isProtectedJournalEntry(props.entry)
-    ? props.entry.entryType === 'article'
-    : props.entry.bodyFormat === 'rich';
-  return article ? '加密文章' : '加密记录';
-});
-const actionLabel = computed(() =>
-  isProtectedJournalEntry(props.entry) ? '输入密码查看' : '打开查看',
-);
+const typeLabel = computed(() => props.entry.entryType === 'article' ? '加密文章' : '加密记录');
+const actionLabel = '输入密码查看';
 const formattedDate = computed(() => dateFormatter.format(new Date(props.entry.sourceCreatedAt)));
 </script>
 

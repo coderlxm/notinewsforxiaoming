@@ -203,11 +203,6 @@ onBeforeUnmount(() => {
             :entry="entry"
             @open="emit('openEntry', $event)"
           />
-          <ProtectedEntryCard
-            v-else-if="entry.visibility === 'protected'"
-            :entry="entry"
-            @open="emit('openEntry', $event)"
-          />
           <ArticleCardContent
             v-else-if="isArticleEntry(entry)"
             :entry="entry"
