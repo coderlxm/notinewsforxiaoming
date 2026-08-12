@@ -296,7 +296,7 @@ jobs:
               exit 1
             fi
             RELEASE_TIME=\$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S %Z')
-            BOT_STATUS=\$(systemctl is-active notinews-bot.service || echo unknown)
+            BOT_STATUS=\$(systemctl is-active notinews-bot.service)
             MSG=\$(printf '✅ NotiNews Bot 已更新\n发布时间: %s\nCommit: %s\nBot 状态: %s' \"\${RELEASE_TIME}\" \"${SHORT_SHA}\" \"\${BOT_STATUS}\")
             curl -sS -X POST \"https://api.telegram.org/bot\${TG_TOKEN}/sendMessage\" \
               --data-urlencode \"chat_id=\${TG_CHAT_ID}\" \
