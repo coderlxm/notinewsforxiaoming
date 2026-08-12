@@ -18,6 +18,10 @@ import {
   resetActiveStartggWatchEventStates,
   setStartggPollingPersistedEnabled,
 } from '../services/startggRepository.js';
+import {
+  completeWorkCheckin,
+  sendWorkCheckinFollowUpIfPending,
+} from '../services/workCheckinReminder.js';
 
 const VITAMIN_WORKDAY_RANDOM_WINDOW_MS = 15 * 60 * 1000;
 const STARTGG_FAST_WATCH_INTERVAL_MS = 2 * 60 * 1000;
@@ -171,6 +175,18 @@ export function registerFixedJobs(bot: Telegraf): void {
   // news: 09:55
   schedule.scheduleJob({ hour: 9, minute: 55, tz: 'Asia/Shanghai' }, async () => {
     await runMode('news', getChinaDayOfWeek(), bot);
+  });
+
+  // work check-in follow-up: 09:59 on China workdays
+  schedule.scheduleJob({ hour: 9, minute: 59, tz: 'Asia/Shanghai' }, async () => {
+    if (!isChinaWorkday(new Date())) return;
+    await sendWorkCheckinFollowUpIfPending(bot);
+  });
+
+  // work check-in closes automatically: 10:00 on China workdays
+  schedule.scheduleJob({ hour: 10, minute: 0, tz: 'Asia/Shanghai' }, async () => {
+    if (!isChinaWorkday(new Date())) return;
+    await completeWorkCheckin(bot);
   });
 
   // english: 10:30

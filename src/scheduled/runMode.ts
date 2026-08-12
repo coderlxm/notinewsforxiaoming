@@ -37,6 +37,7 @@ import {
   formatXLikedVideoStatusMessage,
   readXLikedVideoStatus,
 } from '../services/xLikedVideoStatus.js';
+import { beginWorkCheckin, sendMorningNewsWithWorkCheckin } from '../services/workCheckinReminder.js';
 
 export type PushMode = 'sleep' | 'wakeup' | 'server_health' | 'news' | 'github' | 'v2ex' | 'v2ex_buffered_push' | 'fitness' | 'vitamin' | 'english' | 'av_update' | 'startgg_watch' | 'coffee';
 
@@ -84,13 +85,19 @@ export async function runMode(mode: PushMode, chinaDayOfWeek: number, bot?: Tele
 
   if (mode === 'news') {
     console.log('Mode: Morning News');
+    const workday = isChinaWorkday(new Date());
+    if (workday) beginWorkCheckin();
     const [weather, rawNews] = await Promise.all([
       fetchWeather(),
       fetchGameNews()
     ]);
     const aiProcessedNews = await summarizeNewsWithAI(rawNews);
     const message = formatTelegramMessage(weather, aiProcessedNews);
-    await sendTelegramMessage(message, bot);
+    if (workday) {
+      await sendMorningNewsWithWorkCheckin(message, bot);
+    } else {
+      await sendTelegramMessage(message, bot);
+    }
     return;
   }
 

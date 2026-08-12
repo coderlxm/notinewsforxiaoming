@@ -71,6 +71,12 @@ export function parseVitaminCallbackData(data: string | undefined): VitaminActio
   return null;
 }
 
+export function parseWorkCheckinCallbackData(data: string | undefined): string | null {
+  if (!data) return null;
+  const match = /^work-checkin:done:(\d{4}-\d{2}-\d{2})$/.exec(data);
+  return match?.[1] ?? null;
+}
+
 export interface StartggWatchCallbackData {
   eventRowId: number;
   playerId: number;

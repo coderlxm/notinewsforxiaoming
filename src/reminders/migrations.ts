@@ -323,6 +323,25 @@ const MIGRATIONS: DbMigration[] = [
       `);
     },
   },
+  {
+    version: 17,
+    up(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS work_checkins (
+          date_key TEXT PRIMARY KEY,
+          completed INTEGER NOT NULL DEFAULT 0 CHECK (completed IN (0, 1)),
+          completed_at TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS work_checkin_messages (
+          date_key TEXT NOT NULL,
+          message_id INTEGER NOT NULL,
+          PRIMARY KEY (date_key, message_id),
+          FOREIGN KEY(date_key) REFERENCES work_checkins(date_key)
+        );
+      `);
+    },
+  },
 ];
 
 export function runDbMigrations(db: Database.Database): void {

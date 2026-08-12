@@ -39,6 +39,7 @@ import {
   parseRecurringCallbackData,
   parseNaturalCancelCallbackData,
   parseVitaminCallbackData,
+  parseWorkCheckinCallbackData,
   parseStartggWatchCallbackData,
   parseMasturbationCallbackData,
   parseStartggSeedsCallbackData,
@@ -50,6 +51,7 @@ import { resolveAvSubscription } from '../services/avSubscriptionService.js';
 import { runAvFetchOnce } from '../services/avTracker.js';
 import { buildAvTargetUrl, getAvTargetTypeLabel } from '../services/avTargets.js';
 import { markVitaminEatenToday, scheduleVitaminSnooze, getAndClearVitaminSentMessages } from '../services/vitaminReminder.js';
+import { completeWorkCheckin } from '../services/workCheckinReminder.js';
 import { findPresetByText, STARTGG_GO_SHORTCUT } from '../reminders/presets.js';
 import {
   buildStartggWatchCandidateButtons,
@@ -1258,6 +1260,13 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     if (!isAuthorized(ctx)) return;
 
     const cbData = ctx.callbackQuery && 'data' in ctx.callbackQuery ? ctx.callbackQuery.data : undefined;
+
+    const workCheckinDate = parseWorkCheckinCallbackData(cbData);
+    if (workCheckinDate) {
+      const completed = await completeWorkCheckin(bot, workCheckinDate);
+      await ctx.answerCbQuery(completed ? '已记录打卡' : '这次打卡已经处理');
+      return;
+    }
 
     const masturbationAction = parseMasturbationCallbackData(cbData);
     if (masturbationAction) {

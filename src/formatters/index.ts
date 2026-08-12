@@ -165,11 +165,25 @@ export function formatCoffeeMessage(): string {
   return message;
 }
 
-interface VitaminInlineKeyboardMarkup {
+export function formatWorkCheckinFollowUpMessage(): string {
+  return '🚨 <b>上班打卡补提醒</b>\n\n09:59 了，还没确认打卡的话，现在记得去打卡。';
+}
+
+interface InlineKeyboardMarkup {
   inline_keyboard: Array<Array<{ text: string; callback_data: string }>>;
 }
 
-export function buildVitaminButtons(): { reply_markup: VitaminInlineKeyboardMarkup } {
+export function buildWorkCheckinButtons(dateKey: string): { reply_markup: InlineKeyboardMarkup } {
+  return {
+    reply_markup: {
+      inline_keyboard: [[
+        { text: '✅ 我已打卡', callback_data: `work-checkin:done:${dateKey}` },
+      ]],
+    },
+  };
+}
+
+export function buildVitaminButtons(): { reply_markup: InlineKeyboardMarkup } {
   return {
     reply_markup: {
       inline_keyboard: [[
