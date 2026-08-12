@@ -236,6 +236,54 @@ export type JournalProtectedEntryPreview = z.infer<
   typeof journalProtectedEntryPreviewSchema
 >;
 
+export const journalDiscoveryEntrySummarySchema = z.object({
+  kind: z.literal('entry'),
+  publicId: z.string().uuid(),
+  title: z.string().nullable(),
+  excerpt: z.string(),
+  channel: journalChannelSchema,
+  entryType: z.enum(['article', 'record']),
+  contentType: z.string().min(1),
+  tags: z.array(z.string()),
+  visibility: z.enum(['public', 'protected']),
+  sourceCreatedAt: z.string().datetime(),
+});
+export type JournalDiscoveryEntrySummary = z.infer<
+  typeof journalDiscoveryEntrySummarySchema
+>;
+
+export const journalDiscoverySearchResponseSchema = z.object({
+  entries: z.array(journalDiscoveryEntrySummarySchema),
+  nextCursor: z.string().nullable(),
+});
+export type JournalDiscoverySearchResponse = z.infer<
+  typeof journalDiscoverySearchResponseSchema
+>;
+
+export const journalDiscoveryArchiveOverviewSchema = z.object({
+  years: z.array(z.object({
+    year: z.number().int(),
+    months: z.array(z.object({
+      month: z.number().int().min(1).max(12),
+      count: z.number().int().nonnegative(),
+    })),
+  })),
+});
+export type JournalDiscoveryArchiveOverview = z.infer<
+  typeof journalDiscoveryArchiveOverviewSchema
+>;
+
+export const journalDiscoveryArchiveMonthResponseSchema = z.object({
+  entries: z.array(z.union([
+    journalDiscoveryEntrySummarySchema,
+    journalProtectedEntryPreviewSchema,
+  ])),
+  nextCursor: z.string().nullable(),
+});
+export type JournalDiscoveryArchiveMonthResponse = z.infer<
+  typeof journalDiscoveryArchiveMonthResponseSchema
+>;
+
 export const journalFeedSchema = z.object({
   entries: z.array(z.union([journalEntrySchema, journalProtectedEntryPreviewSchema])),
   nextCursor: z.string().nullable(),

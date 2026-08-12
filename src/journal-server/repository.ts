@@ -12,6 +12,10 @@ import type {
   JournalContributionDetail,
   JournalContributionSummary,
   JournalDeletionResult,
+  JournalDiscoveryArchiveMonthResponse,
+  JournalDiscoveryArchiveOverview,
+  JournalDiscoveryEntrySummary,
+  JournalDiscoverySearchResponse,
   JournalEntry,
   JournalFeed,
   JournalPage,
@@ -63,6 +67,8 @@ interface EntryRow {
   captured_at: string;
   updated_at: string;
 }
+
+type DiscoveryEntryRow = EntryRow & { visibility: 'public' | 'protected' };
 
 interface AssetRow {
   id: number;
@@ -273,6 +279,26 @@ const cursorSchema = z.object({
 
 type Cursor = z.infer<typeof cursorSchema>;
 
+const discoverySearchCursorSchema = z.object({
+  kind: z.literal('discovery-search'),
+  query: z.string(),
+  rank: z.number().int().min(0).max(3),
+  sourceCreatedAt: z.string().datetime(),
+  id: z.number().int().positive(),
+});
+
+type DiscoverySearchCursor = z.infer<typeof discoverySearchCursorSchema>;
+
+const discoveryArchiveCursorSchema = z.object({
+  kind: z.literal('discovery-archive'),
+  year: z.number().int(),
+  month: z.number().int().min(1).max(12),
+  sourceCreatedAt: z.string().datetime(),
+  id: z.number().int().positive(),
+});
+
+type DiscoveryArchiveCursor = z.infer<typeof discoveryArchiveCursorSchema>;
+
 function encodeCursor(row: EntryRow): string {
   return Buffer.from(JSON.stringify({
     pinned: row.pinned,
@@ -283,6 +309,22 @@ function encodeCursor(row: EntryRow): string {
 
 function decodeCursor(value: string): Cursor {
   return cursorSchema.parse(JSON.parse(Buffer.from(value, 'base64url').toString('utf8')));
+}
+
+function encodeDiscoveryCursor(cursor: DiscoverySearchCursor | DiscoveryArchiveCursor): string {
+  return Buffer.from(JSON.stringify(cursor)).toString('base64url');
+}
+
+function decodeDiscoverySearchCursor(value: string): DiscoverySearchCursor {
+  return discoverySearchCursorSchema.parse(
+    JSON.parse(Buffer.from(value, 'base64url').toString('utf8')),
+  );
+}
+
+function decodeDiscoveryArchiveCursor(value: string): DiscoveryArchiveCursor {
+  return discoveryArchiveCursorSchema.parse(
+    JSON.parse(Buffer.from(value, 'base64url').toString('utf8')),
+  );
 }
 
 function parseStructuredContent(value: string | null): Record<string, unknown> | null {
@@ -307,6 +349,89 @@ export function contentTypeOf(assets: Array<{ kind: string }>): 'video' | 'photo
     : assets.length > 0
       ? 'photo'
       : 'text';
+}
+
+function normalizeDiscoveryText(value: string): string {
+  return value.trim().replace(/\s+/gu, ' ');
+}
+
+function foldAsciiCharacter(character: string): string {
+  return character >= 'A' && character <= 'Z'
+    ? character.toLowerCase()
+    : character;
+}
+
+function asciiInsensitiveIndexOf(value: string, query: string): number {
+  const valueCharacters = [...value].map(foldAsciiCharacter);
+  const queryCharacters = [...query].map(foldAsciiCharacter);
+  const lastStart = valueCharacters.length - queryCharacters.length;
+  for (let start = 0; start <= lastStart; start += 1) {
+    if (queryCharacters.every((character, index) => (
+      valueCharacters[start + index] === character
+    ))) return start;
+  }
+  return -1;
+}
+
+function discoveryTags(row: EntryRow): string[] {
+  return z.array(z.string()).parse(JSON.parse(row.tags_json));
+}
+
+function discoverySearchRank(row: DiscoveryEntryRow, query: string): number | null {
+  const title = normalizeDiscoveryText(row.title ?? '');
+  const content = normalizeDiscoveryText(row.content_text);
+  const tags = discoveryTags(row).map(normalizeDiscoveryText);
+  const terms = query.split(' ');
+  const matchesEveryTerm = terms.every((term) => (
+    asciiInsensitiveIndexOf(title, term) >= 0
+    || asciiInsensitiveIndexOf(content, term) >= 0
+    || tags.some(tag => asciiInsensitiveIndexOf(tag, term) >= 0)
+  ));
+  if (!matchesEveryTerm) return null;
+  if (asciiInsensitiveIndexOf(title, query) >= 0) return 0;
+  if (tags.some(tag => asciiInsensitiveIndexOf(tag, query) === 0
+    && [...tag].length === [...query].length)) return 1;
+  if (asciiInsensitiveIndexOf(content, query) >= 0) return 2;
+  return 3;
+}
+
+function discoveryExcerpt(contentText: string, query: string | null): string {
+  const content = normalizeDiscoveryText(contentText);
+  const characters = [...content];
+  const excerptLength = 120;
+  if (characters.length <= excerptLength) return content;
+
+  const bodyMatches = query === null
+    ? []
+    : [query, ...query.split(' ')]
+        .map(term => asciiInsensitiveIndexOf(content, term))
+        .filter(index => index >= 0);
+  const matchIndex = bodyMatches.length === 0 ? 0 : Math.min(...bodyMatches);
+  const start = Math.max(0, Math.min(matchIndex - 36, characters.length - 119));
+  const hasPrefix = start > 0;
+  const available = excerptLength - (hasPrefix ? 1 : 0);
+  let end = Math.min(characters.length, start + available);
+  if (end < characters.length) end -= 1;
+  const hasSuffix = end < characters.length;
+  return `${hasPrefix ? '…' : ''}${characters.slice(start, end).join('')}${hasSuffix ? '…' : ''}`;
+}
+
+function toDiscoveryEntrySummary(
+  row: DiscoveryEntryRow,
+  query: string | null,
+): JournalDiscoveryEntrySummary {
+  return {
+    kind: 'entry',
+    publicId: row.public_id,
+    title: row.title,
+    excerpt: discoveryExcerpt(row.content_text, query),
+    channel: row.channel,
+    entryType: row.body_format === 'rich' ? 'article' : 'record',
+    contentType: row.content_type,
+    tags: discoveryTags(row),
+    visibility: row.visibility,
+    sourceCreatedAt: row.source_created_at,
+  };
 }
 
 export class JournalRepository {
@@ -894,6 +1019,150 @@ export class JournalRepository {
         : this.toEntry(row)),
       nextCursor: hasNext && pageRows.length > 0
         ? encodeCursor(pageRows[pageRows.length - 1] as EntryRow)
+        : null,
+    };
+  }
+
+  searchDiscovery(filters: {
+    query: string;
+    cursor?: string;
+    limit: number;
+    canReadProtectedContent: (publicId: string, accessRevision: number) => boolean;
+  }): JournalDiscoverySearchResponse {
+    const rows = this.database.prepare(`
+      SELECT e.* FROM journal_entries e
+      WHERE ${this.groupRepresentativeCondition('e')}
+        AND e.publication_status = 'published'
+        AND e.visibility IN ('public', 'protected')
+    `).all() as DiscoveryEntryRow[];
+
+    const matches: Array<{ row: DiscoveryEntryRow; rank: number }> = [];
+    for (const row of rows) {
+      const readable = row.visibility === 'public'
+        || filters.canReadProtectedContent(row.public_id, row.access_revision);
+      if (!readable) continue;
+      const rank = discoverySearchRank(row, filters.query);
+      if (rank !== null) matches.push({ row, rank });
+    }
+    matches.sort((left, right) => {
+      if (left.rank !== right.rank) return left.rank - right.rank;
+      if (left.row.source_created_at !== right.row.source_created_at) {
+        return left.row.source_created_at < right.row.source_created_at ? 1 : -1;
+      }
+      return right.row.id - left.row.id;
+    });
+
+    const cursor = filters.cursor
+      ? decodeDiscoverySearchCursor(filters.cursor)
+      : null;
+    if (cursor) z.literal(filters.query).parse(cursor.query);
+    const remaining = cursor === null
+      ? matches
+      : matches.filter(({ row, rank }) => (
+          rank > cursor.rank
+          || (rank === cursor.rank && row.source_created_at < cursor.sourceCreatedAt)
+          || (
+            rank === cursor.rank
+            && row.source_created_at === cursor.sourceCreatedAt
+            && row.id < cursor.id
+          )
+        ));
+    const hasNext = remaining.length > filters.limit;
+    const pageRows = remaining.slice(0, filters.limit);
+    const last = pageRows[pageRows.length - 1];
+    return {
+      entries: pageRows.map(({ row }) => toDiscoveryEntrySummary(row, filters.query)),
+      nextCursor: hasNext && last
+        ? encodeDiscoveryCursor({
+            kind: 'discovery-search',
+            query: filters.query,
+            rank: last.rank,
+            sourceCreatedAt: last.row.source_created_at,
+            id: last.row.id,
+          })
+        : null,
+    };
+  }
+
+  getDiscoveryArchiveOverview(): JournalDiscoveryArchiveOverview {
+    const rows = this.database.prepare(`
+      SELECT
+        strftime('%Y', e.source_created_at, '+8 hours') AS year,
+        strftime('%m', e.source_created_at, '+8 hours') AS month,
+        COUNT(*) AS count
+      FROM journal_entries e
+      WHERE ${this.groupRepresentativeCondition('e')}
+        AND e.publication_status = 'published'
+        AND e.visibility IN ('public', 'protected')
+      GROUP BY year, month
+      ORDER BY year DESC, month DESC
+    `).all() as Array<{ year: string; month: string; count: number }>;
+
+    const years = new Map<number, JournalDiscoveryArchiveOverview['years'][number]>();
+    for (const row of rows) {
+      const year = Number(row.year);
+      const month = Number(row.month);
+      const existing = years.get(year);
+      if (existing) {
+        existing.months.push({ month, count: row.count });
+      } else {
+        years.set(year, { year, months: [{ month, count: row.count }] });
+      }
+    }
+    return { years: [...years.values()] };
+  }
+
+  listDiscoveryArchiveMonth(filters: {
+    year: number;
+    month: number;
+    cursor?: string;
+    limit: number;
+    canReadProtectedContent: (publicId: string, accessRevision: number) => boolean;
+  }): JournalDiscoveryArchiveMonthResponse {
+    const conditions = [
+      this.groupRepresentativeCondition('e'),
+      "e.publication_status = 'published'",
+      "e.visibility IN ('public', 'protected')",
+      "strftime('%Y', e.source_created_at, '+8 hours') = ?",
+      "strftime('%m', e.source_created_at, '+8 hours') = ?",
+    ];
+    const parameters: unknown[] = [
+      String(filters.year).padStart(4, '0'),
+      String(filters.month).padStart(2, '0'),
+    ];
+    if (filters.cursor) {
+      const cursor = decodeDiscoveryArchiveCursor(filters.cursor);
+      z.literal(filters.year).parse(cursor.year);
+      z.literal(filters.month).parse(cursor.month);
+      conditions.push(`(
+        e.source_created_at < ? OR
+        (e.source_created_at = ? AND e.id < ?)
+      )`);
+      parameters.push(cursor.sourceCreatedAt, cursor.sourceCreatedAt, cursor.id);
+    }
+
+    const rows = this.database.prepare(`
+      SELECT e.* FROM journal_entries e
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY e.source_created_at DESC, e.id DESC
+      LIMIT ?
+    `).all(...parameters, filters.limit + 1) as DiscoveryEntryRow[];
+    const hasNext = rows.length > filters.limit;
+    const pageRows = rows.slice(0, filters.limit);
+    const last = pageRows[pageRows.length - 1];
+    return {
+      entries: pageRows.map((row) => row.visibility === 'protected'
+        && !filters.canReadProtectedContent(row.public_id, row.access_revision)
+        ? this.toProtectedPreview(row)
+        : toDiscoveryEntrySummary(row, null)),
+      nextCursor: hasNext && last
+        ? encodeDiscoveryCursor({
+            kind: 'discovery-archive',
+            year: filters.year,
+            month: filters.month,
+            sourceCreatedAt: last.source_created_at,
+            id: last.id,
+          })
         : null,
     };
   }

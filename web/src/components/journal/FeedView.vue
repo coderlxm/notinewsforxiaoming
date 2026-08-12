@@ -133,9 +133,6 @@ const publicChannelTags = computed<readonly string[]>(() => {
   if (siteProfile.profile === null) return [];
   return siteProfile.profile.channelTags[props.channel];
 });
-const publicTagNavigationVisible = computed(() =>
-  publicChannelTags.value.length > 0 || props.initialTag.length > 0,
-);
 const publicLayout = computed(() =>
   journalChannels.find(item => item.value === props.channel)!.layout,
 );
@@ -467,7 +464,24 @@ function openEntry(entry: PublicJournalFeedItem): void {
 
 async function unlockDetail(password: string): Promise<void> {
   await journal.unlockDetail(password);
-  if (isDetail.value && journal.detail.value) emit('detailUnlocked', journal.detail.value);
+  if (!isDetail.value || !journal.detail.value) return;
+
+  const state = window.history.state as {
+    journalDetailFromFeed?: boolean;
+    journalProtectedPreview?: ProtectedJournalEntryPreview;
+  } | null;
+  if (state?.journalProtectedPreview) {
+    await router.replace({
+      name: 'detail',
+      params: { publicId: journal.detail.value.publicId },
+      force: true,
+      state: {
+        journalDetailFromFeed: state.journalDetailFromFeed === true ? true : undefined,
+        journalProtectedPreview: undefined,
+      },
+    });
+  }
+  emit('detailUnlocked', journal.detail.value);
 }
 
 function returnFromDetail(): void {
@@ -610,7 +624,6 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
       <div
         v-else-if="!isDetail"
         class="feed__public-intro"
-        :class="{ 'feed__public-intro--without-tags': !publicTagNavigationVisible }"
       >
         <div class="feed__public-heading">
           <PublicChannelTagNavigation
@@ -619,16 +632,21 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
             :active-tag="initialTag"
             @select="selectPublicChannelTag"
           />
-          <button
-            class="text-button feed__public-refresh"
-            type="button"
-            :disabled="refreshDisabled || refreshing"
-            :aria-busy="refreshing"
-            @click="refreshFeed"
-          >
-            <JournalLoading v-if="refreshing" variant="inline" label="刷新中…" />
-            <template v-else>刷新</template>
-          </button>
+          <div class="feed__public-actions">
+            <button class="text-button" type="button" @click="router.push('/archive')">
+              归档
+            </button>
+            <button
+              class="text-button feed__public-refresh"
+              type="button"
+              :disabled="refreshDisabled || refreshing"
+              :aria-busy="refreshing"
+              @click="refreshFeed"
+            >
+              <JournalLoading v-if="refreshing" variant="inline" label="刷新中…" />
+              <template v-else>刷新</template>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -902,8 +920,11 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
   min-width: 0;
 }
 
-.feed__public-refresh {
+.feed__public-actions {
+  display: flex;
   flex: 0 0 auto;
+  align-items: center;
+  gap: 0.75rem;
   margin-left: auto;
 }
 
@@ -1002,10 +1023,6 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
 
   .feed__public-intro {
     padding: 0;
-  }
-
-  .feed__public-intro--without-tags {
-    display: none;
   }
 
   .feed__public-refresh {

@@ -68,6 +68,41 @@ export interface ProtectedJournalEntryPreview {
   sourceCreatedAt: string;
 }
 
+export interface JournalDiscoveryEntrySummary {
+  kind: 'entry';
+  publicId: string;
+  title: string | null;
+  excerpt: string;
+  channel: JournalChannel;
+  entryType: 'record' | 'article';
+  contentType: string;
+  tags: string[];
+  visibility: 'public' | 'protected';
+  sourceCreatedAt: string;
+}
+
+export interface JournalDiscoverySearchResponse {
+  entries: JournalDiscoveryEntrySummary[];
+  nextCursor: string | null;
+}
+
+export interface JournalDiscoveryArchiveOverview {
+  years: Array<{
+    year: number;
+    months: Array<{
+      month: number;
+      count: number;
+    }>;
+  }>;
+}
+
+export interface JournalDiscoveryArchiveMonthResponse {
+  entries: Array<JournalDiscoveryEntrySummary | ProtectedJournalEntryPreview>;
+  nextCursor: string | null;
+}
+
+export type JournalDiscoveryListItem = JournalDiscoveryArchiveMonthResponse['entries'][number];
+
 export type PublicJournalFeedItem = JournalEntry | ProtectedJournalEntryPreview;
 export type PublicJournalEntryResponse = JournalEntry | ProtectedJournalEntryPreview;
 

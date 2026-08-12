@@ -31,6 +31,7 @@ import { registerInternalRoutes } from './routes/internal.js';
 import { registerMediaRoutes } from './routes/media.js';
 import { registerPrivateContributionRoutes } from './routes/privateContributions.js';
 import { registerPrivateEntryRoutes } from './routes/privateEntries.js';
+import { registerPublicDiscoveryRoutes } from './routes/publicDiscovery.js';
 import { registerPublicFeedRoutes } from './routes/publicFeed.js';
 import { registerSiteProfileRoutes } from './routes/siteProfile.js';
 import { registerTagSuggestionRoutes } from './routes/tagSuggestions.js';
@@ -143,6 +144,7 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
     notifications: contributionNotifications,
     storage,
   });
+  await registerPublicDiscoveryRoutes(server, auth, repository);
   await registerPublicFeedRoutes(server, auth, repository);
   await registerPrivateEntryRoutes(
     server,
@@ -173,6 +175,9 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
     return reply.sendFile('index.html');
   };
   server.get('/', sendApplication);
+  server.get('/search', sendApplication);
+  server.get('/archive', sendApplication);
+  server.get('/archive/:year/:month', sendApplication);
   server.get('/p/:publicId', sendApplication);
   server.get('/me', sendApplication);
   server.get('/me/settings', sendApplication);

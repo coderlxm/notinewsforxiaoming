@@ -1,6 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import AboutView from './components/about/AboutView.vue';
 import ArticleEditorView from './components/article/ArticleEditorView.vue';
+import PublicArchiveMonthView from './components/discovery/PublicArchiveMonthView.vue';
+import PublicArchiveView from './components/discovery/PublicArchiveView.vue';
+import PublicSearchView from './components/discovery/PublicSearchView.vue';
+import { normalizePublicSearchQuery } from './components/discovery/discoveryRoutes';
 import NotFoundView from './components/NotFoundView.vue';
 import FeedView from './components/journal/FeedView.vue';
 import EntryPublisherView from './components/publisher/EntryPublisherView.vue';
@@ -11,6 +15,27 @@ export const router = createRouter({
   routes: [
     { path: '/', name: 'public', component: FeedView },
     { path: '/about', name: 'about', component: AboutView },
+    {
+      path: '/search',
+      name: 'search',
+      component: PublicSearchView,
+      props: route => ({
+        query: typeof route.query.q === 'string'
+          ? normalizePublicSearchQuery(route.query.q)
+          : '',
+      }),
+    },
+    {
+      path: '/archive',
+      name: 'archive',
+      component: PublicArchiveView,
+    },
+    {
+      path: '/archive/:year(\\d{4})/:month(0[1-9]|1[0-2])',
+      name: 'archive-month',
+      component: PublicArchiveMonthView,
+      props: true,
+    },
     { path: '/me', name: 'private', component: FeedView },
     {
       path: '/me/settings',

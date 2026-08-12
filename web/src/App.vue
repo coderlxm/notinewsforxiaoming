@@ -11,6 +11,11 @@ import {
 } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import NotFoundView from './components/NotFoundView.vue';
+import PublicSearchBar from './components/discovery/PublicSearchBar.vue';
+import {
+  normalizePublicSearchQuery,
+  publicSearchPath,
+} from './components/discovery/discoveryRoutes';
 import PublicChannelNavigation from './components/journal/PublicChannelNavigation.vue';
 import ThemeModeControl from './components/ui/ThemeModeControl.vue';
 import { useAdminContributions } from './composables/useAdminContributions';
@@ -30,6 +35,9 @@ import { showMessage } from './utils/message';
 type AppRoute =
   | { name: 'public'; key: string; channel: JournalChannel; tag: string }
   | { name: 'about'; key: string }
+  | { name: 'search'; key: string; query: string }
+  | { name: 'archive'; key: string }
+  | { name: 'archive-month'; key: string; year: string; month: string }
   | { name: 'detail'; key: string; publicId: string }
   | { name: 'private'; key: string; entryId: number | null; assetView: AssetView; page: number }
   | { name: 'entry-new'; key: string }
@@ -48,6 +56,7 @@ const HEADER_ALWAYS_VISIBLE_TOP = 24;
 const HEADER_HIDE_DISTANCE = 112;
 const HEADER_SHOW_DISTANCE = 64;
 const PUBLIC_FEED_CACHE_LIMIT = 30;
+const MAX_PUBLIC_SEARCH_QUERY_LENGTH = 80;
 
 interface OverlayContext {
   entry: PublicJournalFeedItem;
@@ -67,6 +76,7 @@ const { profile, loadError: profileLoadError } = storeToRefs(siteProfile);
 const overlayContext = shallowRef<OverlayContext | null>(null);
 const directPublicEntry = shallowRef<JournalEntry | null>(null);
 const revealedPublicEntries = shallowRef<ReadonlyMap<string, JournalEntry>>(new Map());
+const discoveryAccessRevision = shallowRef(0);
 const contentScroll = useTemplateRef<HTMLDivElement>('contentScroll');
 const profileBio = useTemplateRef<HTMLParagraphElement>('profileBio');
 const profileBioOverflow = shallowRef(0);
@@ -124,6 +134,34 @@ const route = computed<AppRoute>(() => {
   }
   if (currentRoute.name === 'about') {
     return { name: 'about', key: 'about' };
+  }
+  if (currentRoute.name === 'search') {
+    const query = currentRoute.query.q;
+    if (query !== undefined && typeof query !== 'string') {
+      return { name: 'not-found', key: currentRoute.fullPath };
+    }
+    const normalizedQuery = normalizePublicSearchQuery(query ?? '');
+    if (Array.from(normalizedQuery).length > MAX_PUBLIC_SEARCH_QUERY_LENGTH) {
+      return { name: 'not-found', key: currentRoute.fullPath };
+    }
+    return {
+      name: 'search',
+      key: `search:${normalizedQuery}`,
+      query: normalizedQuery,
+    };
+  }
+  if (currentRoute.name === 'archive') {
+    return { name: 'archive', key: 'archive' };
+  }
+  if (currentRoute.name === 'archive-month') {
+    const year = String(currentRoute.params.year);
+    const month = String(currentRoute.params.month);
+    return {
+      name: 'archive-month',
+      key: `archive-month:${year}:${month}`,
+      year,
+      month,
+    };
   }
   if (currentRoute.name === 'article-new') {
     return { name: 'article-new', key: 'article-new' };
@@ -198,7 +236,24 @@ const publicFeedRoute = computed(() => {
   return background?.name === 'public' ? background : null;
 });
 const publicShellActive = computed(() =>
-  publicFeedRoute.value !== null || route.value.name === 'about',
+  publicFeedRoute.value !== null
+  || route.value.name === 'about'
+  || route.value.name === 'search'
+  || route.value.name === 'archive'
+  || route.value.name === 'archive-month'
+  || route.value.name === 'detail',
+);
+const discoveryRouteActive = computed(() =>
+  route.value.name === 'search'
+  || route.value.name === 'archive'
+  || route.value.name === 'archive-month',
+);
+const discoveryAudience = computed(() => {
+  if (!session.authenticationChecked) return 'checking';
+  return ownerAuthenticated.value ? 'admin' : 'visitor';
+});
+const discoveryAccessScope = computed(() =>
+  `${discoveryAudience.value}:${discoveryAccessRevision.value}`,
 );
 
 const overlayEntryId = computed(() => {
@@ -298,6 +353,19 @@ function persistentFeedKey(path: string): string | null {
     return `public:${channel}:${tag}`;
   }
   if (url.pathname === '/me') return 'private';
+  if (url.pathname === '/search') {
+    const queryValues = url.searchParams.getAll('q');
+    if (queryValues.length > 1) return null;
+    const query = normalizePublicSearchQuery(queryValues[0] ?? '');
+    if (Array.from(query).length > MAX_PUBLIC_SEARCH_QUERY_LENGTH) return null;
+    return `discovery:${publicSearchPath(query)}`;
+  }
+  if (
+    url.pathname === '/archive'
+    || /^\/archive\/\d{4}\/(?:0[1-9]|1[0-2])$/.test(url.pathname)
+  ) {
+    return `discovery:${url.pathname}`;
+  }
   return null;
 }
 
@@ -470,6 +538,11 @@ function closeOverlay(): void {
     return;
   }
   if (directPublicOverlayEntry.value) {
+    const state = window.history.state as { journalDetailFromFeed?: boolean } | null;
+    if (state?.journalDetailFromFeed === true) {
+      router.back();
+      return;
+    }
     navigate(publicFeedPath(directPublicOverlayEntry.value.channel));
     return;
   }
@@ -507,6 +580,7 @@ function handlePublicDetailLoaded(entry: JournalEntry): void {
 
 function handlePublicDetailUnlocked(entry: JournalEntry): void {
   revealedPublicEntries.value = new Map(revealedPublicEntries.value).set(entry.publicId, entry);
+  discoveryAccessRevision.value += 1;
 }
 
 function restoreFeedScroll(): void {
@@ -544,33 +618,38 @@ onUnmounted(() => {
 <template>
   <div class="app-shell" :class="{ 'app-shell--header-hidden': headerCollapsed }">
     <div class="profile-bar">
-      <header class="profile">
-        <button class="profile__home" type="button" aria-label="返回公开首页" @click="navigate('/')">
-          <img v-if="profile" class="profile__avatar" :src="profile.avatarUrl" alt="小明同学">
-          <span
-            v-else
-            class="profile__avatar-placeholder"
-            :class="{ 'profile__avatar-placeholder--error': profileLoadError }"
-            aria-hidden="true"
-          />
-        </button>
-        <div class="profile__copy">
-          <button class="profile__name" type="button" @click="navigate('/')">小明同学</button>
-          <p
-            v-if="profile?.bio"
-            ref="profileBio"
-            class="profile__bio"
-            :class="{ 'profile__bio--scrolling': profileBioOverflow > 0 }"
-            :style="profileBioStyle"
-          >
-            <span class="profile__bio-text">{{ profile.bio }}</span>
-          </p>
-          <span
-            v-else-if="!profile && !profileLoadError"
-            class="profile__bio-skeleton"
-            role="status"
-            aria-label="正在读取公开资料"
-          />
+      <header class="profile" :class="{ 'profile--public': publicShellActive }">
+        <div class="profile__identity">
+          <button class="profile__home" type="button" aria-label="返回公开首页" @click="navigate('/')">
+            <img v-if="profile" class="profile__avatar" :src="profile.avatarUrl" alt="小明同学">
+            <span
+              v-else
+              class="profile__avatar-placeholder"
+              :class="{ 'profile__avatar-placeholder--error': profileLoadError }"
+              aria-hidden="true"
+            />
+          </button>
+          <div class="profile__copy">
+            <button class="profile__name" type="button" @click="navigate('/')">小明同学</button>
+            <p
+              v-if="profile?.bio"
+              ref="profileBio"
+              class="profile__bio"
+              :class="{ 'profile__bio--scrolling': profileBioOverflow > 0 }"
+              :style="profileBioStyle"
+            >
+              <span class="profile__bio-text">{{ profile.bio }}</span>
+            </p>
+            <span
+              v-else-if="!profile && !profileLoadError"
+              class="profile__bio-skeleton"
+              role="status"
+              aria-label="正在读取公开资料"
+            />
+          </div>
+        </div>
+        <div v-if="publicShellActive" class="profile__search">
+          <PublicSearchBar @focus-requested="revealHeader" />
         </div>
         <div class="profile__actions">
           <nav v-if="showProfileNavigation" class="profile__nav" aria-label="主导航">
@@ -714,6 +793,13 @@ onUnmounted(() => {
             @detail-unlocked="handlePublicDetailUnlocked"
             @return-to-feed="returnFromDetail"
           />
+          <component
+            :is="Component"
+            v-else-if="discoveryRouteActive"
+            :key="`${route.key}:${discoveryAccessScope}`"
+            :access-scope="discoveryAccessScope"
+            @layout-ready="restoreFeedScroll"
+          />
           <NotFoundView
             v-else-if="route.name === 'not-found' && currentRoute.name !== 'not-found'"
             :key="route.key"
@@ -789,13 +875,19 @@ onUnmounted(() => {
 .profile {
   display: grid;
   min-height: 0;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: "identity actions";
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.9rem;
   width: min(calc(100% - (var(--workspace-gutter) * 2)), var(--workspace-width));
   margin: 0 auto;
   padding: 1.15rem 0 1rem;
   transition: opacity 180ms ease, transform 200ms ease;
+}
+
+.profile--public {
+  grid-template-areas: "identity search actions";
+  grid-template-columns: minmax(0, 1fr) minmax(18rem, 40rem) minmax(0, 1fr);
 }
 
 .app-shell--header-hidden .profile {
@@ -814,6 +906,7 @@ onUnmounted(() => {
 }
 
 .profile__home {
+  flex: 0 0 auto;
   padding: 0;
   border-radius: 50%;
 }
@@ -842,8 +935,23 @@ onUnmounted(() => {
   animation: none;
 }
 
+.profile__identity {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.9rem;
+  grid-area: identity;
+}
+
 .profile__copy {
   min-width: 0;
+}
+
+.profile__search {
+  width: min(100%, 40rem);
+  min-width: 0;
+  justify-self: center;
+  grid-area: search;
 }
 
 .profile__name {
@@ -896,6 +1004,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: flex-end;
   gap: 0.65rem;
+  grid-area: actions;
 }
 
 .profile__nav-link {
@@ -973,11 +1082,33 @@ onUnmounted(() => {
   }
 }
 
+@media (max-width: 1279px) {
+  .profile--public {
+    grid-template-areas:
+      "identity actions"
+      "search search";
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: 0.7rem;
+  }
+
+  .profile__search {
+    width: 100%;
+  }
+}
+
 @media (max-width: 599px) {
   .profile {
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     gap: 0.45rem;
     padding: 0.8rem 0 0.72rem;
+  }
+
+  .profile--public {
+    row-gap: 0.55rem;
+  }
+
+  .profile__identity {
+    gap: 0.55rem;
   }
 
   .profile__avatar,
