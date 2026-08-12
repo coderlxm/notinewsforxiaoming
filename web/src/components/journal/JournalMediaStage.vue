@@ -413,10 +413,8 @@ onBeforeUnmount(() => activeVideo.value?.pause());
   }
 }
 
-@media (prefers-color-scheme: dark) {
-  .media-stage {
-    background: #171715;
-  }
+:global(html[data-theme='dark']) .media-stage {
+  background: #171715;
 }
 
 @media (prefers-reduced-motion: reduce) {

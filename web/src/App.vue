@@ -12,6 +12,7 @@ import {
 import { useRoute, useRouter } from 'vue-router';
 import NotFoundView from './components/NotFoundView.vue';
 import PublicChannelNavigation from './components/journal/PublicChannelNavigation.vue';
+import ThemeModeControl from './components/ui/ThemeModeControl.vue';
 import { useAdminContributions } from './composables/useAdminContributions';
 import { isJournalChannel, publicFeedPath } from './journalChannels';
 import { useSessionStore } from './stores/session';
@@ -571,45 +572,48 @@ onUnmounted(() => {
             aria-label="正在读取公开资料"
           />
         </div>
-        <nav v-if="showProfileNavigation" class="profile__nav" aria-label="主导航">
-          <button
-            v-if="isPrivateRoute"
-            class="profile__nav-link"
-            :class="{ 'profile__nav-link--active': route.name === 'public' || route.name === 'detail' }"
-            type="button"
-            :aria-current="route.name === 'public' || route.name === 'detail' ? 'page' : undefined"
-            @click="navigate('/')"
-          >
-            公开记录
-          </button>
-          <button
-            v-if="isPrivateRoute || ownerAuthenticated"
-            class="profile__nav-link"
-            :class="{ 'profile__nav-link--active': isAssetRoute }"
-            type="button"
-            :aria-current="isAssetRoute ? 'page' : undefined"
-            @click="navigate('/me')"
-          >
-            我的资产
-          </button>
-          <button
-            v-if="isPrivateRoute || ownerAuthenticated"
-            class="profile__nav-link profile__nav-link--inbox"
-            :class="{ 'profile__nav-link--active': isContributionRoute }"
-            type="button"
-            :aria-current="isContributionRoute ? 'page' : undefined"
-            @click="navigate('/me/contributions')"
-          >
-            <span>朋友投稿</span>
-            <span
-              v-if="contributionInbox.pendingCount.value"
-              class="profile__nav-count"
-              :aria-label="`${contributionInbox.pendingCount.value} 份待处理投稿`"
+        <div class="profile__actions">
+          <nav v-if="showProfileNavigation" class="profile__nav" aria-label="主导航">
+            <button
+              v-if="isPrivateRoute"
+              class="profile__nav-link"
+              :class="{ 'profile__nav-link--active': route.name === 'public' || route.name === 'detail' }"
+              type="button"
+              :aria-current="route.name === 'public' || route.name === 'detail' ? 'page' : undefined"
+              @click="navigate('/')"
             >
-              {{ contributionInbox.pendingCount.value }}
-            </span>
-          </button>
-        </nav>
+              公开记录
+            </button>
+            <button
+              v-if="isPrivateRoute || ownerAuthenticated"
+              class="profile__nav-link"
+              :class="{ 'profile__nav-link--active': isAssetRoute }"
+              type="button"
+              :aria-current="isAssetRoute ? 'page' : undefined"
+              @click="navigate('/me')"
+            >
+              我的资产
+            </button>
+            <button
+              v-if="isPrivateRoute || ownerAuthenticated"
+              class="profile__nav-link profile__nav-link--inbox"
+              :class="{ 'profile__nav-link--active': isContributionRoute }"
+              type="button"
+              :aria-current="isContributionRoute ? 'page' : undefined"
+              @click="navigate('/me/contributions')"
+            >
+              <span>朋友投稿</span>
+              <span
+                v-if="contributionInbox.pendingCount.value"
+                class="profile__nav-count"
+                :aria-label="`${contributionInbox.pendingCount.value} 份待处理投稿`"
+              >
+                {{ contributionInbox.pendingCount.value }}
+              </span>
+            </button>
+          </nav>
+          <ThemeModeControl />
+        </div>
       </header>
     </div>
 
@@ -886,6 +890,14 @@ onUnmounted(() => {
   gap: 1rem;
 }
 
+.profile__actions {
+  display: flex;
+  align-self: stretch;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.65rem;
+}
+
 .profile__nav-link {
   min-height: 2.5rem;
   padding: 0.25rem 0;
@@ -983,9 +995,13 @@ onUnmounted(() => {
     white-space: nowrap;
   }
 
-  .profile__nav {
+  .profile__actions {
     grid-column: auto;
     justify-self: end;
+    gap: 0.25rem;
+  }
+
+  .profile__nav {
     justify-content: flex-end;
     gap: 0.5rem;
   }

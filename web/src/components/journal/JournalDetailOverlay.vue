@@ -375,15 +375,13 @@ function forwardPinned(entry: JournalEntry, pinned: boolean): void {
 
 }
 
-@media (prefers-color-scheme: dark) {
-  .detail-overlay__panel {
-    border-color: #4b4a46;
-    box-shadow: 0 30px 90px rgb(0 0 0 / 56%);
-  }
+:global(html[data-theme='dark']) .detail-overlay__panel {
+  border-color: #4b4a46;
+  box-shadow: 0 30px 90px rgb(0 0 0 / 56%);
+}
 
-  .detail-overlay::backdrop {
-    background: rgb(8 8 7 / 76%);
-  }
+:global(html[data-theme='dark']) .detail-overlay::backdrop {
+  background: rgb(8 8 7 / 76%);
 }
 
 @media (prefers-reduced-motion: reduce) {

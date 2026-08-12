@@ -5,6 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="小明同学的个人记录与生活日常">
     <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#f7f7f5">
+    <script>
+      (() => {
+        const storedMode = localStorage.getItem('notinews-theme-mode') ?? 'auto';
+        const theme = storedMode === 'dark'
+          || (storedMode === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches)
+          ? 'dark'
+          : 'light';
+        const root = document.documentElement;
+        root.dataset.theme = theme;
+        root.style.colorScheme = theme;
+        document.querySelector('meta[name="theme-color"]').content = theme === 'dark' ? '#1d1d1b' : '#f7f7f5';
+      })();
+    </script>
     <link rel="icon" href="/favicon-48.png" type="image/png" sizes="48x48">
     <link rel="icon" href="/avatar-ming.svg" type="image/svg+xml" sizes="any">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">

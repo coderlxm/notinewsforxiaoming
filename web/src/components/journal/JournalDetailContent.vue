@@ -557,10 +557,8 @@ function saveAccessSettings(settings: AccessSettingsInput): void {
   }
 }
 
-@media (prefers-color-scheme: dark) {
-  .detail-content {
-    background: #272725;
-  }
+:global(html[data-theme='dark']) .detail-content {
+  background: #272725;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -325,48 +325,46 @@ const formattedDate = computed(() => dateFormatter.format(new Date(props.entry.s
   background: color-mix(in srgb, var(--protected-ink) 17%, transparent);
 }
 
-@media (prefers-color-scheme: dark) {
-  .protected-card {
-    --protected-bg: #242522;
-    --protected-bg-secondary: #30312d;
-    --protected-ink: #ececec;
-    --protected-accent: #dc6870;
-  }
+:global(html[data-theme='dark']) .protected-card {
+  --protected-bg: #242522;
+  --protected-bg-secondary: #30312d;
+  --protected-ink: #ececec;
+  --protected-accent: #dc6870;
+}
 
-  .protected-card--template-2 {
-    --protected-bg: #29251f;
-    --protected-bg-secondary: #393126;
-    --protected-accent: #d27b58;
-  }
+:global(html[data-theme='dark']) .protected-card--template-2 {
+  --protected-bg: #29251f;
+  --protected-bg-secondary: #393126;
+  --protected-accent: #d27b58;
+}
 
-  .protected-card--template-3 {
-    --protected-bg: #232623;
-    --protected-bg-secondary: #a73b3e;
-    --protected-accent: #c84b50;
-  }
+:global(html[data-theme='dark']) .protected-card--template-3 {
+  --protected-bg: #232623;
+  --protected-bg-secondary: #a73b3e;
+  --protected-accent: #c84b50;
+}
 
-  .protected-card--template-4 {
-    --protected-bg: #2a2721;
-    --protected-bg-secondary: #3a3327;
-    --protected-accent: #cf6464;
-  }
+:global(html[data-theme='dark']) .protected-card--template-4 {
+  --protected-bg: #2a2721;
+  --protected-bg-secondary: #3a3327;
+  --protected-accent: #cf6464;
+}
 
-  .protected-card--template-5 {
-    --protected-bg: #1d1e24;
-    --protected-bg-secondary: #312a37;
-  }
+:global(html[data-theme='dark']) .protected-card--template-5 {
+  --protected-bg: #1d1e24;
+  --protected-bg-secondary: #312a37;
+}
 
-  .protected-card--template-6 {
-    --protected-bg: #272721;
-    --protected-bg-secondary: #35342b;
-    --protected-accent: #d6656c;
-  }
+:global(html[data-theme='dark']) .protected-card--template-6 {
+  --protected-bg: #272721;
+  --protected-bg-secondary: #35342b;
+  --protected-accent: #d6656c;
+}
 
-  .protected-card--template-7 {
-    --protected-bg: #242523;
-    --protected-bg-secondary: #33332e;
-    --protected-accent: #d6646b;
-  }
+:global(html[data-theme='dark']) .protected-card--template-7 {
+  --protected-bg: #242523;
+  --protected-bg-secondary: #33332e;
+  --protected-accent: #d6646b;
 }
 
 @media (max-width: 599px) {

@@ -421,80 +421,78 @@ const visibilityLabel = computed(() => props.entry.publicationStatus === 'draft'
   }
 }
 
-@media (prefers-color-scheme: dark) {
-  .text-poster {
-    --poster-color: #ececec;
-    background: #171715;
-  }
+:global(html[data-theme='dark']) .text-poster {
+  --poster-color: #ececec;
+  background: #171715;
+}
 
-  .text-poster--editorial {
-    --poster-background:
-      linear-gradient(145deg, rgb(255 255 255 / 4%), transparent 42%),
-      radial-gradient(circle at 85% 13%, rgb(228 91 102 / 13%), transparent 24%),
-      radial-gradient(circle at 12% 88%, rgb(111 143 142 / 12%), transparent 26%),
-      #1d201e;
-    --poster-muted: #999a94;
-    --poster-accent: #d65c67;
-    --poster-mark: rgb(235 232 223 / 5%);
-  }
+:global(html[data-theme='dark']) .text-poster--editorial {
+  --poster-background:
+    linear-gradient(145deg, rgb(255 255 255 / 4%), transparent 42%),
+    radial-gradient(circle at 85% 13%, rgb(228 91 102 / 13%), transparent 24%),
+    radial-gradient(circle at 12% 88%, rgb(111 143 142 / 12%), transparent 26%),
+    #1d201e;
+  --poster-muted: #999a94;
+  --poster-accent: #d65c67;
+  --poster-mark: rgb(235 232 223 / 5%);
+}
 
-  .text-poster--book {
-    --poster-background:
-      linear-gradient(90deg, rgb(0 0 0 / 24%), transparent 8%, transparent 92%, rgb(0 0 0 / 16%)),
-      #211b17;
-    --poster-muted: #aa9a84;
-    --poster-accent: #c78758;
-    --poster-mark: rgb(214 175 126 / 6%);
-  }
+:global(html[data-theme='dark']) .text-poster--book {
+  --poster-background:
+    linear-gradient(90deg, rgb(0 0 0 / 24%), transparent 8%, transparent 92%, rgb(0 0 0 / 16%)),
+    #211b17;
+  --poster-muted: #aa9a84;
+  --poster-accent: #c78758;
+  --poster-mark: rgb(214 175 126 / 6%);
+}
 
-  .text-poster--swiss {
-    --poster-background:
-      linear-gradient(90deg, #9f2d38 0 8%, transparent 8%),
-      linear-gradient(180deg, transparent 0 72%, rgb(255 255 255 / 4%) 72%),
-      #202422;
-    --poster-muted: #a2aaa6;
-    --poster-accent: #e45a65;
-    --poster-mark: rgb(228 90 101 / 10%);
-  }
+:global(html[data-theme='dark']) .text-poster--swiss {
+  --poster-background:
+    linear-gradient(90deg, #9f2d38 0 8%, transparent 8%),
+    linear-gradient(180deg, transparent 0 72%, rgb(255 255 255 / 4%) 72%),
+    #202422;
+  --poster-muted: #a2aaa6;
+  --poster-accent: #e45a65;
+  --poster-mark: rgb(228 90 101 / 10%);
+}
 
-  .text-poster--archive {
-    --poster-background:
-      repeating-linear-gradient(0deg, transparent 0 31px, rgb(205 174 122 / 7%) 31px 32px),
-      #25251d;
-    --poster-muted: #a89b7e;
-    --poster-accent: #c86b4e;
-    --poster-mark: rgb(207 149 90 / 7%);
-  }
+:global(html[data-theme='dark']) .text-poster--archive {
+  --poster-background:
+    repeating-linear-gradient(0deg, transparent 0 31px, rgb(205 174 122 / 7%) 31px 32px),
+    #25251d;
+  --poster-muted: #a89b7e;
+  --poster-accent: #c86b4e;
+  --poster-mark: rgb(207 149 90 / 7%);
+}
 
-  .text-poster--cinema {
-    --poster-background:
-      radial-gradient(circle at 70% 24%, rgb(171 61 117 / 24%), transparent 30%),
-      linear-gradient(160deg, #11151d, #1d2029 58%, #171319);
-    --poster-muted: #9da1ad;
-    --poster-accent: #d270a3;
-    --poster-mark: rgb(210 112 163 / 8%);
-  }
+:global(html[data-theme='dark']) .text-poster--cinema {
+  --poster-background:
+    radial-gradient(circle at 70% 24%, rgb(171 61 117 / 24%), transparent 30%),
+    linear-gradient(160deg, #11151d, #1d2029 58%, #171319);
+  --poster-muted: #9da1ad;
+  --poster-accent: #d270a3;
+  --poster-mark: rgb(210 112 163 / 8%);
+}
 
-  .text-poster--notebook {
-    --poster-background:
-      linear-gradient(90deg, transparent 0 12%, rgb(183 68 73 / 25%) 12% 12.5%, transparent 12.5%),
-      repeating-linear-gradient(0deg, #202827 0 29px, #34403d 29px 30px);
-    --poster-muted: #a5aa9e;
-    --poster-accent: #d36769;
-    --poster-mark: rgb(203 214 189 / 5%);
-  }
+:global(html[data-theme='dark']) .text-poster--notebook {
+  --poster-background:
+    linear-gradient(90deg, transparent 0 12%, rgb(183 68 73 / 25%) 12% 12.5%, transparent 12.5%),
+    repeating-linear-gradient(0deg, #202827 0 29px, #34403d 29px 30px);
+  --poster-muted: #a5aa9e;
+  --poster-accent: #d36769;
+  --poster-mark: rgb(203 214 189 / 5%);
+}
 
-  .text-poster--notebook .text-poster__sheet::after {
-    background: rgb(157 112 65 / 50%);
-  }
+:global(html[data-theme='dark']) .text-poster--notebook .text-poster__sheet::after {
+  background: rgb(157 112 65 / 50%);
+}
 
-  .text-poster--gazette {
-    --poster-background:
-      repeating-linear-gradient(90deg, transparent 0 49.8%, rgb(238 235 226 / 4%) 49.8% 50.2%, transparent 50.2% 100%),
-      #1d1c1a;
-    --poster-muted: #aaa69d;
-    --poster-accent: #ce5a63;
-    --poster-mark: rgb(235 232 223 / 5%);
-  }
+:global(html[data-theme='dark']) .text-poster--gazette {
+  --poster-background:
+    repeating-linear-gradient(90deg, transparent 0 49.8%, rgb(238 235 226 / 4%) 49.8% 50.2%, transparent 50.2% 100%),
+    #1d1c1a;
+  --poster-muted: #aaa69d;
+  --poster-accent: #ce5a63;
+  --poster-mark: rgb(235 232 223 / 5%);
 }
 </style>
