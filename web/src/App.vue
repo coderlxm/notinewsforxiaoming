@@ -9,8 +9,9 @@ import {
   useTemplateRef,
   watch,
 } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { useRoute, useRouter, type RouteLocationNormalizedLoaded } from 'vue-router';
 import NotFoundView from './components/NotFoundView.vue';
+import PublicDiscoveryDetailOverlay from './components/discovery/PublicDiscoveryDetailOverlay.vue';
 import PublicSearchBar from './components/discovery/PublicSearchBar.vue';
 import {
   normalizePublicSearchQuery,
@@ -26,6 +27,7 @@ import {
   isProtectedJournalEntry,
   type AssetView,
   type JournalChannel,
+  type JournalDiscoveryListItem,
   type JournalEntry,
   type ProtectedJournalEntryPreview,
   type PublicJournalFeedItem,
@@ -50,6 +52,8 @@ type AppRoute =
   | { name: 'not-found'; key: string };
 
 type FeedRoute = Extract<AppRoute, { name: 'public' | 'private' }>;
+type DiscoveryRoute = Extract<AppRoute, { name: 'search' | 'archive' | 'archive-month' }>;
+type DiscoveryOverlayRoute = Extract<AppRoute, { name: 'search' | 'archive-month' }>;
 type ScrollDirection = -1 | 0 | 1;
 
 const HEADER_ALWAYS_VISIBLE_TOP = 24;
@@ -64,6 +68,16 @@ interface OverlayContext {
   originPath: string;
 }
 
+interface DiscoveryOverlayContext {
+  entry: JournalDiscoveryListItem;
+  loadedEntry?: JournalEntry;
+  origin: DiscoveryOverlayRoute;
+  originLocation: RouteLocationNormalizedLoaded;
+  originPath: string;
+  originTitle: string;
+  accessScope: string;
+}
+
 const currentRoute = useRoute();
 const router = useRouter();
 const session = useSessionStore();
@@ -74,6 +88,7 @@ const isMobileOrTablet = useMediaQuery('(max-width: 1024px)');
 const { ownerAuthenticated } = storeToRefs(session);
 const { profile, loadError: profileLoadError } = storeToRefs(siteProfile);
 const overlayContext = shallowRef<OverlayContext | null>(null);
+const discoveryOverlayContext = shallowRef<DiscoveryOverlayContext | null>(null);
 const directPublicEntry = shallowRef<JournalEntry | null>(null);
 const revealedPublicEntries = shallowRef<ReadonlyMap<string, JournalEntry>>(new Map());
 const discoveryAccessRevision = shallowRef(0);
@@ -210,12 +225,23 @@ const activeOverlayContext = computed(() => {
   return null;
 });
 
+const activeDiscoveryOverlayContext = computed(() => {
+  const context = discoveryOverlayContext.value;
+  if (
+    context
+    && route.value.name === 'detail'
+    && route.value.publicId === context.entry.publicId
+  ) return context;
+  return null;
+});
+
 const directPublicOverlayEntry = computed(() => {
   const currentRoute = route.value;
   const entry = directPublicEntry.value;
   if (
     currentRoute.name !== 'detail'
     || activeOverlayContext.value
+    || activeDiscoveryOverlayContext.value
     || entry?.publicId !== currentRoute.publicId
     || entry.bodyFormat !== 'plain'
   ) return null;
@@ -243,10 +269,17 @@ const publicShellActive = computed(() =>
   || route.value.name === 'archive-month'
   || route.value.name === 'detail',
 );
-const discoveryRouteActive = computed(() =>
-  route.value.name === 'search'
-  || route.value.name === 'archive'
-  || route.value.name === 'archive-month',
+const discoveryBackgroundRoute = computed<DiscoveryRoute | null>(() => {
+  if (activeDiscoveryOverlayContext.value) return activeDiscoveryOverlayContext.value.origin;
+  if (
+    route.value.name === 'search'
+    || route.value.name === 'archive'
+    || route.value.name === 'archive-month'
+  ) return route.value;
+  return null;
+});
+const routedViewLocation = computed<RouteLocationNormalizedLoaded>(() =>
+  activeDiscoveryOverlayContext.value?.originLocation ?? router.currentRoute.value,
 );
 const discoveryAudience = computed(() => {
   if (!session.authenticationChecked) return 'checking';
@@ -255,6 +288,17 @@ const discoveryAudience = computed(() => {
 const discoveryAccessScope = computed(() =>
   `${discoveryAudience.value}:${discoveryAccessRevision.value}`,
 );
+const renderedDiscoveryAccessScope = computed(() => {
+  const context = discoveryOverlayContext.value;
+  if (
+    context
+    && (
+      activeDiscoveryOverlayContext.value
+      || currentRoute.fullPath === context.originPath
+    )
+  ) return context.accessScope;
+  return discoveryAccessScope.value;
+});
 
 const overlayEntryId = computed(() => {
   const contextEntry = activeOverlayContext.value?.entry;
@@ -385,13 +429,31 @@ function pathMatchesOverlayContext(path: string, context: OverlayContext): boole
   return url.pathname === '/me' && url.searchParams.get('entry') === String(context.entry.id);
 }
 
+function pathMatchesDiscoveryOverlayContext(
+  path: string,
+  context: DiscoveryOverlayContext,
+): boolean {
+  const url = new URL(path, window.location.origin);
+  return url.pathname === `/p/${encodeURIComponent(context.entry.publicId)}`;
+}
+
 function isOverlayHistoryTransition(fromPath: string, toPath: string): boolean {
   const context = overlayContext.value;
-  if (!context) return false;
-  return (
-    pathMatchesOverlayContext(fromPath, context) && toPath === context.originPath
-  ) || (
-    fromPath === context.originPath && pathMatchesOverlayContext(toPath, context)
+  if (context && (
+    (pathMatchesOverlayContext(fromPath, context) && toPath === context.originPath)
+    || (fromPath === context.originPath && pathMatchesOverlayContext(toPath, context))
+  )) return true;
+
+  const discoveryContext = discoveryOverlayContext.value;
+  return discoveryContext !== null && (
+    (
+      pathMatchesDiscoveryOverlayContext(fromPath, discoveryContext)
+      && toPath === discoveryContext.originPath
+    )
+    || (
+      fromPath === discoveryContext.originPath
+      && pathMatchesDiscoveryOverlayContext(toPath, discoveryContext)
+    )
   );
 }
 
@@ -510,6 +572,36 @@ async function openEntry(entry: PublicJournalFeedItem): Promise<void> {
   await router.push(path);
 }
 
+async function openDiscoveryEntry(entry: JournalDiscoveryListItem): Promise<void> {
+  const origin = route.value;
+  if (origin.name !== 'search' && origin.name !== 'archive-month') {
+    throw new Error('Discovery overlay requires a searchable list origin.');
+  }
+
+  const previousContext = discoveryOverlayContext.value;
+  const loadedEntry = previousContext?.originPath === currentRoute.fullPath
+    && previousContext.entry.publicId === entry.publicId
+    ? previousContext.loadedEntry
+    : undefined;
+  overlayContext.value = null;
+  discoveryOverlayContext.value = {
+    entry,
+    ...(loadedEntry ? { loadedEntry } : {}),
+    origin,
+    originLocation: router.currentRoute.value,
+    originPath: currentRoute.fullPath,
+    originTitle: document.title,
+    accessScope: renderedDiscoveryAccessScope.value,
+  };
+  await router.push({
+    name: 'detail',
+    params: { publicId: entry.publicId },
+    state: entry.kind === 'protected' && !loadedEntry
+      ? { journalDetailFromFeed: true, journalProtectedPreview: entry }
+      : { journalDetailFromFeed: true },
+  });
+}
+
 function changeAssetView(assetView: AssetView): void {
   if (route.value.name !== 'private') return;
   void router.push(privateFeedPath({
@@ -550,6 +642,15 @@ function closeOverlay(): void {
   void router.replace(privateFeedPath({ assetView: route.value.assetView, page: route.value.page }));
 }
 
+function closeDiscoveryOverlay(): void {
+  if (!activeDiscoveryOverlayContext.value) return;
+  router.back();
+}
+
+function selectDiscoveryTag(channel: JournalChannel, tag: string): void {
+  void router.push(publicFeedPath(channel, tag));
+}
+
 async function removeDeletedOverlay(): Promise<void> {
   const context = activeOverlayContext.value;
   const current = route.value;
@@ -583,6 +684,17 @@ function handlePublicDetailUnlocked(entry: JournalEntry): void {
   discoveryAccessRevision.value += 1;
 }
 
+function handleDiscoveryDetailLoaded(entry: JournalEntry): void {
+  const context = activeDiscoveryOverlayContext.value;
+  if (!context || context.entry.publicId !== entry.publicId) return;
+  discoveryOverlayContext.value = { ...context, loadedEntry: entry };
+}
+
+function handleDiscoveryDetailUnlocked(entry: JournalEntry): void {
+  handleDiscoveryDetailLoaded(entry);
+  handlePublicDetailUnlocked(entry);
+}
+
 function restoreFeedScroll(): void {
   if (pendingFeedScrollTop === null) return;
 
@@ -597,6 +709,19 @@ useEventListener('resize', revealHeader, { passive: true });
 
 const removeAfterEach = router.afterEach((to, from) => {
   if (to.fullPath !== from.fullPath) handleRouteChange(to.fullPath, from.fullPath);
+  const context = discoveryOverlayContext.value;
+  if (
+    context
+    && (
+      to.fullPath === context.originPath
+      || pathMatchesDiscoveryOverlayContext(to.fullPath, context)
+    )
+  ) document.title = context.originTitle;
+  if (
+    context
+    && to.fullPath !== context.originPath
+    && !pathMatchesDiscoveryOverlayContext(to.fullPath, context)
+  ) discoveryOverlayContext.value = null;
 });
 
 onMounted(() => {
@@ -706,7 +831,7 @@ onUnmounted(() => {
       />
 
       <div ref="contentScroll" class="app-scroll">
-        <RouterView v-slot="{ Component }">
+        <RouterView v-slot="{ Component }" :route="routedViewLocation">
           <KeepAlive v-if="session.ownerAuthenticated" :max="1">
             <component
               :is="Component"
@@ -785,7 +910,10 @@ onUnmounted(() => {
 
           <component
             :is="Component"
-            v-if="route.name === 'detail' && !activeOverlayContext && !directPublicOverlayEntry"
+            v-if="route.name === 'detail'
+              && !activeOverlayContext
+              && !activeDiscoveryOverlayContext
+              && !directPublicOverlayEntry"
             :key="route.key"
             mode="public"
             :detail-id="route.publicId"
@@ -795,10 +923,11 @@ onUnmounted(() => {
           />
           <component
             :is="Component"
-            v-else-if="discoveryRouteActive"
-            :key="`${route.key}:${discoveryAccessScope}`"
-            :access-scope="discoveryAccessScope"
+            v-else-if="discoveryBackgroundRoute"
+            :key="`${discoveryBackgroundRoute.key}:${renderedDiscoveryAccessScope}`"
+            :access-scope="renderedDiscoveryAccessScope"
             @layout-ready="restoreFeedScroll"
+            @open-entry="openDiscoveryEntry"
           />
           <NotFoundView
             v-else-if="route.name === 'not-found' && currentRoute.name !== 'not-found'"
@@ -810,6 +939,17 @@ onUnmounted(() => {
             :key="route.key"
           />
         </RouterView>
+
+        <PublicDiscoveryDetailOverlay
+          v-if="activeDiscoveryOverlayContext"
+          :key="activeDiscoveryOverlayContext.entry.publicId"
+          :entry="activeDiscoveryOverlayContext.entry"
+          :loaded-entry="activeDiscoveryOverlayContext.loadedEntry"
+          @close="closeDiscoveryOverlay"
+          @loaded="handleDiscoveryDetailLoaded"
+          @unlocked="handleDiscoveryDetailUnlocked"
+          @select-tag="selectDiscoveryTag"
+        />
       </div>
     </div>
   </div>
@@ -849,7 +989,7 @@ onUnmounted(() => {
 .app-main--public {
   width: min(calc(100% - (var(--workspace-gutter) * 2)), var(--workspace-width));
   margin: 0 auto;
-  grid-template-columns: 224px minmax(0, 1fr);
+  grid-template-columns: 180px minmax(0, 1fr);
   gap: 1.75rem;
 }
 

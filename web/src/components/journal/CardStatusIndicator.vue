@@ -171,31 +171,31 @@ const statusCount = computed(() => Number(props.pinned) + Number(props.encrypted
   }
 }
 
-:global(html[data-theme='dark']) .card-status-indicator--poster-editorial {
+:global(html[data-theme='dark'] .card-status-indicator--poster-editorial) {
   --status-fold-bg: #d65c67;
 }
 
-:global(html[data-theme='dark']) .card-status-indicator--poster-book {
+:global(html[data-theme='dark'] .card-status-indicator--poster-book) {
   --status-fold-bg: #c78758;
 }
 
-:global(html[data-theme='dark']) .card-status-indicator--poster-swiss {
+:global(html[data-theme='dark'] .card-status-indicator--poster-swiss) {
   --status-fold-bg: #e45a65;
 }
 
-:global(html[data-theme='dark']) .card-status-indicator--poster-archive {
+:global(html[data-theme='dark'] .card-status-indicator--poster-archive) {
   --status-fold-bg: #c86b4e;
 }
 
-:global(html[data-theme='dark']) .card-status-indicator--poster-cinema {
+:global(html[data-theme='dark'] .card-status-indicator--poster-cinema) {
   --status-fold-bg: #d270a3;
 }
 
-:global(html[data-theme='dark']) .card-status-indicator--poster-notebook {
+:global(html[data-theme='dark'] .card-status-indicator--poster-notebook) {
   --status-fold-bg: #d36769;
 }
 
-:global(html[data-theme='dark']) .card-status-indicator--poster-gazette {
+:global(html[data-theme='dark'] .card-status-indicator--poster-gazette) {
   --status-fold-bg: #ce5a63;
 }
 </style>

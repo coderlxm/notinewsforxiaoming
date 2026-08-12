@@ -413,7 +413,7 @@ onBeforeUnmount(() => activeVideo.value?.pause());
   }
 }
 
-:global(html[data-theme='dark']) .media-stage {
+:global(html[data-theme='dark'] .media-stage) {
   background: #171715;
 }
 

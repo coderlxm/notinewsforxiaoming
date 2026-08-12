@@ -34,6 +34,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   layoutReady: [];
+  openEntry: [entry: JournalDiscoveryListItem];
 }>();
 
 const route = useRoute();
@@ -155,13 +156,7 @@ async function loadMore(): Promise<void> {
 }
 
 function openEntry(entry: JournalDiscoveryListItem): void {
-  void router.push({
-    name: 'detail',
-    params: { publicId: entry.publicId },
-    state: entry.kind === 'protected'
-      ? { journalDetailFromFeed: true, journalProtectedPreview: entry }
-      : { journalDetailFromFeed: true },
-  });
+  emit('openEntry', entry);
 }
 
 onBeforeRouteUpdate((to) => {

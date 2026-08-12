@@ -557,7 +557,7 @@ function saveAccessSettings(settings: AccessSettingsInput): void {
   }
 }
 
-:global(html[data-theme='dark']) .detail-content {
+:global(html[data-theme='dark'] .detail-content) {
   background: #272725;
 }
 

@@ -105,7 +105,7 @@ const { profile } = storeToRefs(siteProfile);
   }
 }
 
-:global(html[data-theme='dark']) .detail-peek {
+:global(html[data-theme='dark'] .detail-peek) {
   background: color-mix(in srgb, #272725 96%, transparent);
   box-shadow: 0 -18px 52px rgb(0 0 0 / 42%);
 }
