@@ -256,16 +256,29 @@ function preserveAssetRatio(asset: DisplayAsset): { aspectRatio: string } | unde
 }
 
 .media--card .media__visuals--multiple .media__visual {
-  aspect-ratio: 1;
+  min-height: 0;
+  aspect-ratio: auto;
 }
 
 .media--card .media__visuals--multiple .media__visual:first-child {
   grid-column: 1 / -1;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: auto;
 }
 
 .media--card {
+  --media-card-max-height: 361px;
   gap: 0;
+}
+
+.media--card .media__visuals--single .media__visual {
+  width: 100%;
+  max-height: var(--media-card-max-height);
+}
+
+.media--card .media__visuals--multiple {
+  grid-template-rows: minmax(0, 3fr) minmax(0, 2fr);
+  max-height: var(--media-card-max-height);
+  aspect-ratio: 4 / 5;
 }
 
 .media--card .media__visual {
