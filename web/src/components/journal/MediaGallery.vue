@@ -137,7 +137,7 @@ function preserveAssetRatio(asset: DisplayAsset): { aspectRatio: string } | unde
       </figure>
     </div>
 
-    <div v-if="audioAssets.length" class="media__audios">
+    <div v-if="display === 'detail' && audioAssets.length" class="media__audios">
       <div v-for="asset in audioAssets" :key="asset.id" class="media__audio-row">
         <div class="media__audio-copy">
           <span class="media__audio-kind">{{ asset.kind === 'voice' ? '语音' : '音频' }}</span>
@@ -147,7 +147,7 @@ function preserveAssetRatio(asset: DisplayAsset): { aspectRatio: string } | unde
       </div>
     </div>
 
-    <div v-if="fileAssets.length" class="media__files">
+    <div v-if="display === 'detail' && fileAssets.length" class="media__files">
       <a
         v-for="asset in fileAssets"
         :key="asset.id"
