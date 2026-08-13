@@ -1222,17 +1222,45 @@ onUnmounted(() => {
   }
 }
 
-@media (max-width: 1279px) {
+@media (min-width: 600px) and (max-width: 1279px) {
   .profile--public {
-    grid-template-areas:
-      "identity actions"
-      "search search";
-    grid-template-columns: minmax(0, 1fr) auto;
-    row-gap: 0.7rem;
+    grid-template-columns: minmax(8rem, 13rem) minmax(14rem, 1fr) auto;
+    gap: 0.65rem;
+  }
+
+  .profile__identity {
+    gap: 0.55rem;
+  }
+
+  .profile__avatar,
+  .profile__avatar-placeholder {
+    width: 2.65rem;
+    height: 2.65rem;
+  }
+
+  .profile__name,
+  .profile__nav-link {
+    white-space: nowrap;
+  }
+
+  .profile__name {
+    font-size: 0.96rem;
   }
 
   .profile__search {
-    width: 100%;
+    width: 80%;
+  }
+
+  .profile__actions {
+    gap: 0.4rem;
+  }
+
+  .profile__nav {
+    gap: 0.65rem;
+  }
+
+  .profile__nav-link {
+    font-size: 0.72rem;
   }
 }
 
@@ -1244,7 +1272,15 @@ onUnmounted(() => {
   }
 
   .profile--public {
+    grid-template-areas:
+      "identity actions"
+      "search search";
+    grid-template-columns: minmax(0, 1fr) auto;
     row-gap: 0.55rem;
+  }
+
+  .profile__search {
+    width: 100%;
   }
 
   .profile__identity {

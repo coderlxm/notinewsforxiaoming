@@ -313,7 +313,7 @@ onBeforeUnmount(() => {
   }
 }
 
-@container (min-width: 980px) {
+@container (min-width: 920px) {
   .waterfall__item {
     width: 25%;
   }

@@ -46,7 +46,7 @@
   }
 }
 
-@container (min-width: 980px) {
+@container (min-width: 920px) {
   .waterfall-placeholder {
     columns: 4;
   }
