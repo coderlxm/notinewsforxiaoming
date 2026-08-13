@@ -106,7 +106,7 @@ const structuredRows = computed(() => Object.entries(props.entry.structuredConte
 const displayedStructuredRows = computed(() => isDetail.value
   ? structuredRows.value
   : structuredRows.value.slice(0, 3));
-const cardVisualLimit = computed(() => props.linkable ? 5 : undefined);
+const cardVisualLimit = computed(() => props.linkable ? 3 : undefined);
 const cardLinkable = computed(() => props.linkable);
 const sourceCreatedDate = computed(() => new Date(props.entry.sourceCreatedAt));
 const formattedDate = computed(() => formatCardDate(sourceCreatedDate.value));
