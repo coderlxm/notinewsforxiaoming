@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Calendar, Refresh } from '@element-plus/icons-vue';
 import { List } from 'vant';
 import { computed, nextTick, onActivated, onBeforeUnmount, onMounted, reactive, shallowRef, watch } from 'vue';
 import { useRouter } from 'vue-router';
@@ -633,18 +634,25 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
             @select="selectPublicChannelTag"
           />
           <div class="feed__public-actions">
-            <button class="text-button" type="button" @click="router.push('/archive')">
-              归档
+            <button
+              class="feed__public-action"
+              type="button"
+              aria-label="查看时间归档"
+              title="时间归档"
+              @click="router.push('/archive')"
+            >
+              <Calendar aria-hidden="true" />
             </button>
             <button
-              class="text-button feed__public-refresh"
+              class="feed__public-action feed__public-refresh"
               type="button"
               :disabled="refreshDisabled || refreshing"
               :aria-busy="refreshing"
+              aria-label="刷新信息流"
+              title="刷新信息流"
               @click="refreshFeed"
             >
-              <JournalLoading v-if="refreshing" variant="inline" label="刷新中…" />
-              <template v-else>刷新</template>
+              <Refresh :class="{ 'feed__public-refresh-icon--active': refreshing }" aria-hidden="true" />
             </button>
           </div>
         </div>
@@ -924,8 +932,50 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.45rem;
   margin-left: auto;
+}
+
+.feed__public-action {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  place-items: center;
+  transition: color 160ms ease;
+}
+
+.feed__public-action:hover:not(:disabled) {
+  color: var(--accent-strong);
+}
+
+.feed__public-action:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.feed__public-action:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.feed__public-action svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.feed__public-refresh-icon--active {
+  animation: feed-public-refresh-spin 760ms linear infinite;
+}
+
+@keyframes feed-public-refresh-spin {
+  to {
+    transform: rotate(1turn);
+  }
 }
 
 .feed__private-actions {
