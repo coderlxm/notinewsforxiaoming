@@ -104,12 +104,12 @@ function exposeImageError(): void {
 
 .progressive-image--loaded .progressive-image__preview {
   opacity: 0;
-  animation: progressive-preview-hide 320ms ease both;
+  animation: progressive-preview-hide 420ms var(--ease-card) both;
 }
 
 .progressive-image--loaded .progressive-image__original {
   opacity: 1;
-  animation: progressive-original-reveal 320ms ease both;
+  animation: progressive-original-reveal 420ms var(--ease-card) both;
 }
 
 .progressive-image--error .progressive-image__preview {
