@@ -957,6 +957,9 @@ onUnmounted(() => {
 
 <style scoped>
 .app-shell {
+  --public-sidebar-width: 180px;
+  --public-layout-gap: 1.75rem;
+
   display: grid;
   height: 100dvh;
   grid-template-rows: auto minmax(0, 1fr);
@@ -989,8 +992,8 @@ onUnmounted(() => {
 .app-main--public {
   width: min(calc(100% - (var(--workspace-gutter) * 2)), var(--workspace-width));
   margin: 0 auto;
-  grid-template-columns: 180px minmax(0, 1fr);
-  gap: 1.75rem;
+  grid-template-columns: var(--public-sidebar-width) minmax(0, 1fr);
+  gap: var(--public-layout-gap);
 }
 
 .app-scroll {
@@ -1219,6 +1222,23 @@ onUnmounted(() => {
   100% {
     transform: translateX(0);
     opacity: 1;
+  }
+}
+
+@media (min-width: 1280px) {
+  .profile--public {
+    grid-template-areas: "identity . content";
+    grid-template-columns: var(--public-sidebar-width) var(--public-layout-gap) minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .profile--public .profile__search,
+  .profile--public .profile__actions {
+    grid-area: content;
+  }
+
+  .profile--public .profile__actions {
+    justify-self: end;
   }
 }
 

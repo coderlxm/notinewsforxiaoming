@@ -904,12 +904,12 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
 }
 
 .feed__public-heading {
-  display: flex;
+  --public-actions-space: 5.2rem;
+
+  position: relative;
+  display: block;
   min-width: 0;
   min-height: 1.5rem;
-  align-items: center;
-  gap: 0.75rem;
-  justify-content: space-between;
 }
 
 .feed__public-intro {
@@ -924,16 +924,20 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
 }
 
 .feed__public-tags {
-  flex: 1 1 auto;
+  box-sizing: border-box;
+  width: 100%;
   min-width: 0;
+  padding-inline: var(--public-actions-space);
 }
 
 .feed__public-actions {
+  position: absolute;
+  top: 50%;
+  right: 0.15rem;
   display: flex;
-  flex: 0 0 auto;
   align-items: center;
   gap: 0.45rem;
-  margin-left: auto;
+  transform: translateY(-50%);
 }
 
 .feed__public-action {

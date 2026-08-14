@@ -82,6 +82,7 @@ onActivated(keepActiveTagVisible);
   overflow-x: auto;
   scrollbar-width: none;
   gap: 0.35rem;
+  justify-content: safe center;
   white-space: nowrap;
 }
 
