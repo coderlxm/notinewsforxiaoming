@@ -69,6 +69,9 @@ function formatCardDate(date: Date): string {
 
 const isDetail = computed(() => !props.linkable);
 const isDraft = computed(() => props.entry.publicationStatus === 'draft');
+const isPublicFeedCard = computed(() => props.linkable
+  && !props.editable
+  && props.entry.visibility === 'public');
 const cardStatusCount = computed(() => isDetail.value
   ? 0
   : Number(props.entry.pinned) + Number(props.entry.visibility === 'protected'));
@@ -182,6 +185,7 @@ function handleCardClick(event: MouseEvent): void {
       'entry--visual': hasVisualMedia,
       'entry--poster': hasTextPoster,
       'entry--editable': editable,
+      'entry--public-feed': isPublicFeedCard,
       'entry--linkable': cardLinkable && !editing && !confirmingDeletion,
     }"
     @click="handleCardClick"
@@ -225,6 +229,7 @@ function handleCardClick(event: MouseEvent): void {
 
     <MediaGallery
       v-if="entry.assets.length"
+      class="entry__visual-surface"
       :assets="entry.assets"
       :display="isDetail ? 'detail' : 'card'"
       :max-visuals="cardVisualLimit"
@@ -233,6 +238,7 @@ function handleCardClick(event: MouseEvent): void {
     />
     <JournalTextPoster
       v-else-if="hasTextPoster && !editing"
+      class="entry__visual-surface"
       :entry="entry"
       display="card"
     />
@@ -363,6 +369,56 @@ function handleCardClick(event: MouseEvent): void {
 
 .entry--linkable {
   cursor: pointer;
+}
+
+.entry--public-feed.entry--visual,
+.entry--public-feed.entry--poster {
+  --entry-visual-radius: 1.25rem;
+
+  overflow: visible;
+  border-radius: 0;
+  background: transparent;
+}
+
+.entry--public-feed.entry--linkable:hover {
+  transform: none;
+}
+
+.entry--public-feed.entry--visual .entry__visual-surface,
+.entry--public-feed.entry--poster .entry__visual-surface {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--entry-visual-radius);
+}
+
+.entry--public-feed.entry--visual .entry__visual-surface::after,
+.entry--public-feed.entry--poster .entry__visual-surface::after {
+  position: absolute;
+  z-index: 2;
+  background: rgb(0 0 0 / 18%);
+  content: '';
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+
+@media (hover: hover) {
+  .entry--public-feed.entry--visual:hover .entry__visual-surface::after,
+  .entry--public-feed.entry--poster:hover .entry__visual-surface::after {
+    opacity: 1;
+  }
+}
+
+.entry--public-feed.entry--visual .entry__body,
+.entry--public-feed.entry--poster .entry__body {
+  gap: 0.3rem;
+  padding: 0.55rem 0.65rem 0.1rem;
+}
+
+.entry--public-feed.entry--visual .entry__content,
+.entry--public-feed.entry--poster .entry__content {
+  line-height: 1.55;
 }
 
 .entry--detail {
@@ -581,6 +637,16 @@ function handleCardClick(event: MouseEvent): void {
     border-radius: var(--radius-card);
   }
 
+  .entry--public-feed.entry--visual,
+  .entry--public-feed.entry--poster {
+    --entry-visual-radius: 1.125rem;
+  }
+
+  .entry--public-feed.entry--visual .entry__body,
+  .entry--public-feed.entry--poster .entry__body {
+    padding: 0.5rem 0.5rem 0.08rem;
+  }
+
   .entry__body {
     padding: 0.65rem;
   }
@@ -610,6 +676,10 @@ function handleCardClick(event: MouseEvent): void {
 
 @media (prefers-reduced-motion: reduce) {
   .entry {
+    transition: none;
+  }
+
+  .entry--public-feed .entry__visual-surface::after {
     transition: none;
   }
 

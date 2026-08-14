@@ -51,7 +51,7 @@ function exposeVideoError(): void {
         draggable="false"
         @load="markPreviewReady"
       >
-      <span class="progressive-video__play" aria-hidden="true">▶</span>
+      <span class="progressive-video__play" aria-hidden="true" />
     </button>
     <video
       v-else
@@ -122,16 +122,27 @@ function exposeVideoError(): void {
 
 .progressive-video__play {
   position: absolute;
+  z-index: 3;
   display: grid;
-  width: 3rem;
-  height: 3rem;
+  top: 0.6rem;
+  right: 0.6rem;
+  width: 1.5rem;
+  height: 1.5rem;
   border-radius: 50%;
-  background: rgb(20 20 18 / 66%);
-  box-shadow: 0 0 0 1px rgb(255 255 255 / 32%);
-  font-size: 0.9rem;
-  inset: 50% auto auto 50%;
+  background: rgb(255 255 255 / 24%);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 18%);
+  backdrop-filter: blur(4px);
   place-items: center;
-  transform: translate(-50%, -50%);
+}
+
+.progressive-video__play::before {
+  width: 0;
+  height: 0;
+  border-top: 0.24rem solid transparent;
+  border-bottom: 0.24rem solid transparent;
+  border-left: 0.36rem solid #fff;
+  content: '';
+  transform: translateX(0.04rem);
 }
 
 @keyframes progressive-video-cover-reveal {
