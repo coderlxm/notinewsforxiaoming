@@ -1227,18 +1227,13 @@ onUnmounted(() => {
 
 @media (min-width: 1280px) {
   .profile--public {
-    grid-template-areas: "identity . content";
-    grid-template-columns: var(--public-sidebar-width) var(--public-layout-gap) minmax(0, 1fr);
+    grid-template-areas: "identity identity search actions";
+    grid-template-columns:
+      calc(var(--public-sidebar-width) + var(--public-layout-gap))
+      minmax(0, 1fr)
+      minmax(18rem, 40rem)
+      minmax(0, 1fr);
     gap: 0;
-  }
-
-  .profile--public .profile__search,
-  .profile--public .profile__actions {
-    grid-area: content;
-  }
-
-  .profile--public .profile__actions {
-    justify-self: end;
   }
 }
 
