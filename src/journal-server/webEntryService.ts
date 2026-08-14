@@ -142,13 +142,21 @@ export class JournalWebEntryService {
           });
     } catch (error) {
       for (const asset of newAssets) {
-        await this.storage.deleteAssetPair(asset.relativePath, asset.previewRelativePath);
+        await this.storage.deleteAssetFiles(
+          asset.relativePath,
+          asset.previewRelativePath,
+          asset.posterRelativePath,
+        );
       }
       throw error;
     }
     for (const asset of storedAssets) {
       if (removedIds.has(asset.id)) {
-        await this.storage.deleteAssetPair(asset.relativePath, asset.previewRelativePath);
+        await this.storage.deleteAssetFiles(
+          asset.relativePath,
+          asset.previewRelativePath,
+          asset.posterRelativePath,
+        );
       }
     }
     return updated;
@@ -197,13 +205,21 @@ export class JournalWebEntryService {
       });
     } catch (error) {
       for (const asset of newAssets) {
-        await this.storage.deleteAssetPair(asset.relativePath, asset.previewRelativePath);
+        await this.storage.deleteAssetFiles(
+          asset.relativePath,
+          asset.previewRelativePath,
+          asset.posterRelativePath,
+        );
       }
       throw error;
     }
     for (const asset of storedAssets) {
       if (removedIds.has(asset.id)) {
-        await this.storage.deleteAssetPair(asset.relativePath, asset.previewRelativePath);
+        await this.storage.deleteAssetFiles(
+          asset.relativePath,
+          asset.previewRelativePath,
+          asset.posterRelativePath,
+        );
       }
     }
     return updated;

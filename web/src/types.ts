@@ -31,6 +31,7 @@ export interface JournalAsset {
   kind: string;
   url: string;
   previewUrl: string | null;
+  posterUrl: string | null;
   originalName: string | null;
   mimeType: string | null;
   byteSize: number | null;

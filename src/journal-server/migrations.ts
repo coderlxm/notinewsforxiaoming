@@ -1035,6 +1035,19 @@ const migrations: JournalMigration[] = [
       `);
     },
   },
+  {
+    version: 15,
+    up(database) {
+      database.exec(`
+        ALTER TABLE journal_assets
+        ADD COLUMN poster_relative_path TEXT;
+
+        CREATE UNIQUE INDEX idx_journal_assets_poster_relative_path
+        ON journal_assets(poster_relative_path)
+        WHERE poster_relative_path IS NOT NULL;
+      `);
+    },
+  },
 ];
 
 export function runJournalMigrations(database: Database.Database): void {

@@ -14,6 +14,8 @@ export interface ContributionAssetTarget {
   relativePath: string;
   previewAbsolutePath: string;
   previewRelativePath: string;
+  posterAbsolutePath: string;
+  posterRelativePath: string;
 }
 
 export class JournalStorage {
@@ -57,6 +59,8 @@ export class JournalStorage {
     relativePath: string;
     previewAbsolutePath: string;
     previewRelativePath: string;
+    posterAbsolutePath: string;
+    posterRelativePath: string;
   } {
     const filename = randomUUID();
     const absolutePath = path.join(session.tempDir, filename);
@@ -66,6 +70,8 @@ export class JournalStorage {
       relativePath,
       previewAbsolutePath: `${absolutePath}.preview.webp`,
       previewRelativePath: this.previewRelativePath(relativePath),
+      posterAbsolutePath: `${absolutePath}.poster.webp`,
+      posterRelativePath: this.posterRelativePath(relativePath),
     };
   }
 
@@ -81,11 +87,17 @@ export class JournalStorage {
       relativePath,
       previewAbsolutePath: `${absolutePath}.preview.webp`,
       previewRelativePath: this.previewRelativePath(relativePath),
+      posterAbsolutePath: `${absolutePath}.poster.webp`,
+      posterRelativePath: this.posterRelativePath(relativePath),
     };
   }
 
   previewRelativePath(relativePath: string): string {
     return `${relativePath}.preview.webp`;
+  }
+
+  posterRelativePath(relativePath: string): string {
+    return `${relativePath}.poster.webp`;
   }
 
   absoluteAssetPath(relativePath: string): string {
@@ -195,8 +207,15 @@ export class JournalStorage {
     await fs.promises.rm(this.absoluteAssetPath(relativePath));
   }
 
-  async deleteAssetPair(relativePath: string, previewRelativePath: string): Promise<void> {
+  async deleteAssetFiles(
+    relativePath: string,
+    previewRelativePath: string,
+    posterRelativePath: string | null,
+  ): Promise<void> {
     await fs.promises.rm(this.absoluteAssetPath(previewRelativePath));
+    if (posterRelativePath !== null) {
+      await fs.promises.rm(this.absoluteAssetPath(posterRelativePath));
+    }
     await fs.promises.rm(this.absoluteAssetPath(relativePath));
   }
 

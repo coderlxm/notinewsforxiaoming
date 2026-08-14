@@ -4,7 +4,7 @@ import { computed } from 'vue';
 import type { JournalAsset } from '../../types';
 import { formatFileSize } from '../../utils/formatters';
 import {
-  isJournalAnimatedImage,
+  resolveJournalCardImageSource,
   resolveJournalMediaType,
 } from '../../utils/journalMedia';
 import JournalProgressiveImage from '../ui/JournalProgressiveImage.vue';
@@ -81,10 +81,10 @@ function preserveAssetRatio(asset: DisplayAsset): { aspectRatio: string } | unde
         :style="preserveAssetRatio(asset)"
       >
         <JournalProgressiveImage
-          v-if="asset.displayType === 'image' && display === 'card' && !isJournalAnimatedImage(asset)"
+          v-if="asset.displayType === 'image' && display === 'card'"
           class="media__image"
           :class="{ 'media__image--sticker': asset.kind === 'sticker' }"
-          :src="asset.url"
+          :src="resolveJournalCardImageSource(asset)"
           :preview-src="asset.previewUrl!"
           :alt="asset.sourceKind === 'telegram' ? '' : (asset.originalName ?? '')"
           :fit="asset.kind === 'sticker' ? 'contain' : 'cover'"

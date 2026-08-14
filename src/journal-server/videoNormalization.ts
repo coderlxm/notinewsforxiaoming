@@ -164,6 +164,7 @@ export class JournalVideoNormalizationService {
     return {
       relativePath: target.relativePath,
       previewRelativePath: target.previewRelativePath,
+      posterRelativePath: null,
       kind: 'video',
       mimeType: 'video/mp4',
       originalName: source.sourceName,

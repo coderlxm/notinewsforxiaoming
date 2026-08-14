@@ -84,7 +84,11 @@ export class JournalArticleService {
     }, unreferenced.map((asset) => asset.id));
 
     for (const asset of unreferenced) {
-      await this.storage.deleteAssetPair(asset.relativePath, asset.previewRelativePath);
+      await this.storage.deleteAssetFiles(
+        asset.relativePath,
+        asset.previewRelativePath,
+        asset.posterRelativePath,
+      );
     }
 
     return updated;
@@ -111,6 +115,10 @@ export class JournalArticleService {
       input.buffer,
     );
     const previewRelativePath = this.storage.previewRelativePath(relativePath);
+    const kind = webImageKind(input.mimeType);
+    const posterRelativePath = kind === 'animation'
+      ? this.storage.posterRelativePath(relativePath)
+      : null;
     let dimensions: JournalImageDimensions;
     try {
       dimensions = await this.previews.generate(
@@ -121,12 +129,22 @@ export class JournalArticleService {
       await this.storage.deleteAsset(relativePath);
       throw error;
     }
+    if (posterRelativePath !== null) {
+      try {
+        await this.previews.generatePoster(
+          this.storage.absoluteAssetPath(relativePath),
+          this.storage.absoluteAssetPath(posterRelativePath),
+        );
+      } catch (error) {
+        await this.storage.deleteAssetFiles(relativePath, previewRelativePath, null);
+        throw error;
+      }
+    }
 
     let previousCover: CoverAssetRecord | null = null;
     if (role === 'cover') {
       previousCover = this.repository.findCover(id);
     }
-    const kind = webImageKind(input.mimeType);
     let newAssetId: number;
     try {
       const sortOrder = role === 'cover' ? 0 : this.repository.listInlineAssets(id).length;
@@ -135,6 +153,7 @@ export class JournalArticleService {
         role,
         relativePath,
         previewRelativePath,
+        posterRelativePath,
         kind,
         mimeType: input.mimeType,
         originalName: input.originalName,
@@ -144,14 +163,15 @@ export class JournalArticleService {
         sortOrder,
       });
     } catch (error) {
-      await this.storage.deleteAssetPair(relativePath, previewRelativePath);
+      await this.storage.deleteAssetFiles(relativePath, previewRelativePath, posterRelativePath);
       throw error;
     }
 
     if (previousCover) {
-      await this.storage.deleteAssetPair(
+      await this.storage.deleteAssetFiles(
         previousCover.relativePath,
         previousCover.previewRelativePath,
+        previousCover.posterRelativePath,
       );
     }
     return journalArticleAssetResponseSchema.parse({
@@ -182,7 +202,11 @@ export class JournalArticleService {
     if (asset.preview_relative_path === null) {
       throw new Error(`Article asset ${assetId} does not have an image preview.`);
     }
-    await this.storage.deleteAssetPair(asset.relative_path, asset.preview_relative_path);
+    await this.storage.deleteAssetFiles(
+      asset.relative_path,
+      asset.preview_relative_path,
+      asset.poster_relative_path,
+    );
     this.repository.deleteAssets([assetId]);
   }
 

@@ -191,7 +191,7 @@ export class JournalContributionService {
   ): Promise<JournalContributionDetail | null> {
     const asset = this.repository.findContributionStoredAsset(publicId, assetId);
     if (!asset) return null;
-    await this.storage.deleteAssetPair(asset.relativePath, asset.previewRelativePath);
+    await this.storage.deleteAssetFiles(asset.relativePath, asset.previewRelativePath, null);
     const contribution = this.repository.deleteContributionAsset(publicId, assetId);
     if (contribution?.assets.length === 0) {
       await this.storage.deleteContributionDirectory(publicId, contribution.submittedAt);

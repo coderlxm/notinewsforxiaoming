@@ -6,6 +6,7 @@ import {
 } from '../shared/journalProtocol.js';
 import { JournalRepository } from './repository.js';
 import {
+  isJournalAnimatedImageAsset,
   isJournalImageAsset,
   JournalImagePreviewService,
 } from './imagePreview.js';
@@ -60,6 +61,7 @@ export class JournalIngestService {
           const target = this.storage.assetTarget(storageSession);
           const downloaded = await this.downloader.download(source, target.absolutePath);
           const isImage = isJournalImageAsset(source.kind, downloaded.mimeType);
+          const isAnimated = isJournalAnimatedImageAsset(source.kind, downloaded.mimeType);
           const isVideo = isJournalVideoAsset(source.kind, downloaded.mimeType);
           const dimensions = isImage
             ? await this.previews.generate(target.absolutePath, target.previewAbsolutePath)
@@ -67,10 +69,14 @@ export class JournalIngestService {
           if (isVideo) {
             await this.videoPreviews.generate(target.absolutePath, target.previewAbsolutePath);
           }
+          if (isAnimated) {
+            await this.previews.generatePoster(target.absolutePath, target.posterAbsolutePath);
+          }
           storedAssets.push({
             ...source,
             relativePath: target.relativePath,
             previewRelativePath: isImage || isVideo ? target.previewRelativePath : null,
+            posterRelativePath: isAnimated ? target.posterRelativePath : null,
             byteSize: downloaded.byteSize,
             mimeType: downloaded.mimeType,
             width: dimensions?.width ?? source.width,

@@ -76,6 +76,7 @@ export const journalAssetSchema = z.object({
   kind: z.string().min(1),
   url: z.string().min(1),
   previewUrl: z.string().min(1).nullable(),
+  posterUrl: z.string().min(1).nullable(),
   originalName: z.string().nullable(),
   mimeType: z.string().nullable(),
   byteSize: z.number().int().nonnegative().nullable(),

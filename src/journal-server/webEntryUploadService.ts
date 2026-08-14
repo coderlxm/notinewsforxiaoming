@@ -6,7 +6,10 @@ import { Server as TusServer, type Upload } from '@tus/server';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { JournalRepository, WebEntryAssetInput } from './repository.js';
 import type { EntryStorageSession, JournalStorage } from './storage.js';
-import type { JournalImagePreviewService } from './imagePreview.js';
+import type {
+  JournalImageDimensions,
+  JournalImagePreviewService,
+} from './imagePreview.js';
 import { assertWebImageUpload, webImageKind } from './webImage.js';
 import type { JournalVideoNormalizationService } from './videoNormalization.js';
 
@@ -231,23 +234,34 @@ export class JournalWebEntryUploadService {
     assertWebImageUpload({ buffer, mimeType: pending.mimeType, originalName: pending.sourceName });
     const target = this.storage.assetTarget(upload.storageSession);
     await fs.promises.writeFile(target.absolutePath, buffer, { flag: 'wx' });
+    const kind = webImageKind(pending.mimeType);
+    let dimensions: JournalImageDimensions;
     try {
-      const dimensions = await this.previews.generate(target.absolutePath, target.previewAbsolutePath);
-      return {
-        relativePath: target.relativePath,
-        previewRelativePath: target.previewRelativePath,
-        kind: webImageKind(pending.mimeType),
-        mimeType: pending.mimeType,
-        originalName: pending.sourceName,
-        byteSize: pending.byteSize,
-        width: dimensions.width,
-        height: dimensions.height,
-        duration: null,
-      };
+      dimensions = await this.previews.generate(target.absolutePath, target.previewAbsolutePath);
     } catch (error) {
       await this.storage.deleteAsset(target.relativePath);
       throw error;
     }
+    if (kind === 'animation') {
+      try {
+        await this.previews.generatePoster(target.absolutePath, target.posterAbsolutePath);
+      } catch (error) {
+        await this.storage.deleteAssetFiles(target.relativePath, target.previewRelativePath, null);
+        throw error;
+      }
+    }
+    return {
+      relativePath: target.relativePath,
+      previewRelativePath: target.previewRelativePath,
+      posterRelativePath: kind === 'animation' ? target.posterRelativePath : null,
+      kind,
+      mimeType: pending.mimeType,
+      originalName: pending.sourceName,
+      byteSize: pending.byteSize,
+      width: dimensions.width,
+      height: dimensions.height,
+      duration: null,
+    };
   }
 
   private async processVideo(

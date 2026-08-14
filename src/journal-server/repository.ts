@@ -39,6 +39,7 @@ import type {
   JournalImagePreviewBackfillAsset,
   JournalListFilters,
   JournalPageFilters,
+  JournalPosterBackfillAsset,
   JournalVideoPreviewBackfillAsset,
 } from './types.js';
 
@@ -83,6 +84,7 @@ interface AssetRow {
   duration: number | null;
   relative_path: string;
   preview_relative_path: string | null;
+  poster_relative_path: string | null;
 }
 
 export interface CreateArticleInput {
@@ -102,6 +104,7 @@ export interface UpdateArticleInput {
 export interface WebEntryAssetInput {
   relativePath: string;
   previewRelativePath: string;
+  posterRelativePath: string | null;
   kind: string;
   mimeType: string;
   originalName: string | null;
@@ -151,18 +154,21 @@ export interface WebDraftAssetRecord {
   id: number;
   relativePath: string;
   previewRelativePath: string;
+  posterRelativePath: string | null;
 }
 
 export interface InlineAssetRecord {
   id: number;
   relativePath: string;
   previewRelativePath: string;
+  posterRelativePath: string | null;
 }
 
 export interface CoverAssetRecord {
   id: number;
   relativePath: string;
   previewRelativePath: string;
+  posterRelativePath: string | null;
 }
 
 export interface JournalSiteProfileRecord {
@@ -475,9 +481,9 @@ export class JournalRepository {
       const insertAsset = this.database.prepare(`
         INSERT INTO journal_assets (
           entry_id, source_kind, role, kind, telegram_file_id, telegram_file_unique_id, original_name,
-          mime_type, byte_size, relative_path, preview_relative_path,
+          mime_type, byte_size, relative_path, preview_relative_path, poster_relative_path,
           width, height, duration, sort_order
-        ) VALUES (?, 'telegram', 'attachment', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, 'telegram', 'attachment', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
       for (const asset of entry.assets) {
         insertAsset.run(
@@ -490,6 +496,7 @@ export class JournalRepository {
           asset.byteSize,
           asset.relativePath,
           asset.previewRelativePath,
+          asset.posterRelativePath,
           asset.width,
           asset.height,
           asset.duration,
@@ -662,7 +669,7 @@ export class JournalRepository {
 
   listWebDraftAssets(id: number): WebDraftAssetRecord[] {
     const rows = this.database.prepare(`
-      SELECT a.id, a.relative_path, a.preview_relative_path
+      SELECT a.id, a.relative_path, a.preview_relative_path, a.poster_relative_path
       FROM journal_assets a
       JOIN journal_entries e ON e.id = a.entry_id
       WHERE e.id = ?
@@ -676,28 +683,36 @@ export class JournalRepository {
       id: number;
       relative_path: string;
       preview_relative_path: string;
+      poster_relative_path: string | null;
     }>;
     return rows.map((row) => ({
       id: row.id,
       relativePath: row.relative_path,
       previewRelativePath: row.preview_relative_path,
+      posterRelativePath: row.poster_relative_path,
     }));
   }
 
   listPublishedWebEntryAssets(id: number): WebDraftAssetRecord[] {
     const rows = this.database.prepare(`
-      SELECT a.id, a.relative_path, a.preview_relative_path
+      SELECT a.id, a.relative_path, a.preview_relative_path, a.poster_relative_path
       FROM journal_assets a
       JOIN journal_entries e ON e.id = a.entry_id
       WHERE e.id = ? AND e.source_kind = 'web' AND e.body_format = 'plain'
         AND e.publication_status = 'published'
         AND a.source_kind = 'web' AND a.role = 'attachment'
       ORDER BY a.sort_order, a.id
-    `).all(id) as Array<{ id: number; relative_path: string; preview_relative_path: string }>;
+    `).all(id) as Array<{
+      id: number;
+      relative_path: string;
+      preview_relative_path: string;
+      poster_relative_path: string | null;
+    }>;
     return rows.map(row => ({
       id: row.id,
       relativePath: row.relative_path,
       previewRelativePath: row.preview_relative_path,
+      posterRelativePath: row.poster_relative_path,
     }));
   }
 
@@ -736,7 +751,7 @@ export class JournalRepository {
 
   listInlineAssets(id: number): InlineAssetRecord[] {
     const rows = this.database.prepare(`
-      SELECT id, relative_path, preview_relative_path
+      SELECT id, relative_path, preview_relative_path, poster_relative_path
       FROM journal_assets
       WHERE entry_id = ? AND source_kind = 'web' AND role = 'inline'
       ORDER BY sort_order, id
@@ -744,28 +759,32 @@ export class JournalRepository {
       id: number;
       relative_path: string;
       preview_relative_path: string;
+      poster_relative_path: string | null;
     }>;
     return rows.map((row) => ({
       id: row.id,
       relativePath: row.relative_path,
       previewRelativePath: row.preview_relative_path,
+      posterRelativePath: row.poster_relative_path,
     }));
   }
 
   findCover(id: number): CoverAssetRecord | null {
     const row = this.database.prepare(`
-      SELECT id, relative_path, preview_relative_path
+      SELECT id, relative_path, preview_relative_path, poster_relative_path
       FROM journal_assets
       WHERE entry_id = ? AND source_kind = 'web' AND role = 'cover'
     `).get(id) as {
       id: number;
       relative_path: string;
       preview_relative_path: string;
+      poster_relative_path: string | null;
     } | undefined;
     return row ? {
       id: row.id,
       relativePath: row.relative_path,
       previewRelativePath: row.preview_relative_path,
+      posterRelativePath: row.poster_relative_path,
     } : null;
   }
 
@@ -775,6 +794,7 @@ export class JournalRepository {
       role: JournalAssetRole;
       relativePath: string;
       previewRelativePath: string;
+      posterRelativePath: string | null;
       kind: string;
       mimeType: string | null;
       originalName: string | null;
@@ -796,8 +816,8 @@ export class JournalRepository {
         INSERT INTO journal_assets (
           entry_id, source_kind, role, kind, telegram_file_id, telegram_file_unique_id,
           original_name, mime_type, byte_size, relative_path, preview_relative_path,
-          width, height, duration, sort_order
-        ) VALUES (?, 'web', ?, ?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          poster_relative_path, width, height, duration, sort_order
+        ) VALUES (?, 'web', ?, ?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         input.entryId,
         input.role,
@@ -807,6 +827,7 @@ export class JournalRepository {
         input.byteSize,
         input.relativePath,
         input.previewRelativePath,
+        input.posterRelativePath,
         input.width ?? null,
         input.height ?? null,
         input.duration ?? null,
@@ -1291,7 +1312,7 @@ export class JournalRepository {
   getAssetAccess(assetId: number): JournalAssetAccess | null {
     const row = this.database.prepare(`
       SELECT
-        a.id, a.kind, a.relative_path, a.preview_relative_path,
+        a.id, a.kind, a.relative_path, a.preview_relative_path, a.poster_relative_path,
         a.original_name, a.mime_type, a.byte_size,
         representative.visibility,
         representative.public_id,
@@ -1315,6 +1336,7 @@ export class JournalRepository {
       kind: string;
       relative_path: string;
       preview_relative_path: string | null;
+      poster_relative_path: string | null;
       original_name: string | null;
       mime_type: string | null;
       byte_size: number | null;
@@ -1327,6 +1349,7 @@ export class JournalRepository {
       kind: row.kind,
       relativePath: row.relative_path,
       previewRelativePath: row.preview_relative_path,
+      posterRelativePath: row.poster_relative_path,
       originalName: row.original_name,
       mimeType: row.mime_type,
       byteSize: row.byte_size,
@@ -1365,6 +1388,29 @@ export class JournalRepository {
     `).run(previewRelativePath, width, height, assetId);
     if (result.changes !== 1) {
       throw new Error(`Journal asset ${assetId} preview state changed before backfill completed.`);
+    }
+  }
+
+  listAnimatedAssetsMissingPoster(): JournalPosterBackfillAsset[] {
+    const rows = this.database.prepare(`
+      SELECT id, relative_path
+      FROM journal_assets
+      WHERE poster_relative_path IS NULL
+        AND kind = 'animation'
+        AND mime_type LIKE 'image/%'
+      ORDER BY id
+    `).all() as Array<{ id: number; relative_path: string }>;
+    return rows.map((row) => ({ id: row.id, relativePath: row.relative_path }));
+  }
+
+  completePosterBackfill(assetId: number, posterRelativePath: string): void {
+    const result = this.database.prepare(`
+      UPDATE journal_assets
+      SET poster_relative_path = ?
+      WHERE id = ? AND poster_relative_path IS NULL
+    `).run(posterRelativePath, assetId);
+    if (result.changes !== 1) {
+      throw new Error(`Journal asset ${assetId} poster state changed before backfill completed.`);
     }
   }
 
@@ -1891,8 +1937,8 @@ export class JournalRepository {
       INSERT INTO journal_assets (
         entry_id, source_kind, role, kind, telegram_file_id, telegram_file_unique_id,
         original_name, mime_type, byte_size, relative_path, preview_relative_path,
-        width, height, duration, sort_order
-      ) VALUES (?, 'web', 'attachment', ?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        poster_relative_path, width, height, duration, sort_order
+      ) VALUES (?, 'web', 'attachment', ?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     assets.forEach((asset, index) => {
       insertAsset.run(
@@ -1903,6 +1949,7 @@ export class JournalRepository {
         asset.byteSize,
         asset.relativePath,
         asset.previewRelativePath,
+        asset.posterRelativePath,
         asset.width,
         asset.height,
         asset.duration ?? null,
@@ -1972,6 +2019,9 @@ export class JournalRepository {
         previewUrl: asset.preview_relative_path === null
           ? null
           : `/media/${asset.id}/preview`,
+        posterUrl: asset.poster_relative_path === null
+          ? null
+          : `/media/${asset.id}/poster`,
         originalName: asset.original_name,
         mimeType: asset.mime_type,
         byteSize: asset.byte_size,
@@ -1996,7 +2046,8 @@ export class JournalRepository {
     if (row.media_group_id === null) {
       return this.database.prepare(`
         SELECT id, source_kind, role, kind, original_name, mime_type, byte_size,
-               relative_path, preview_relative_path, width, height, duration
+               relative_path, preview_relative_path, poster_relative_path,
+               width, height, duration
         FROM journal_assets
         WHERE entry_id = ?
         ORDER BY sort_order, id
@@ -2004,7 +2055,8 @@ export class JournalRepository {
     }
     return this.database.prepare(`
       SELECT a.id, a.source_kind, a.role, a.kind, a.original_name, a.mime_type, a.byte_size,
-             a.relative_path, a.preview_relative_path, a.width, a.height, a.duration
+             a.relative_path, a.preview_relative_path, a.poster_relative_path,
+             a.width, a.height, a.duration
       FROM journal_assets a
       JOIN journal_entries e ON e.id = a.entry_id
       WHERE e.chat_id = ? AND e.media_group_id = ?

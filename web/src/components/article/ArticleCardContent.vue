@@ -4,6 +4,7 @@ import type { CSSProperties } from 'vue';
 import JournalLoading from '../ui/JournalLoading.vue';
 import JournalProgressiveImage from '../ui/JournalProgressiveImage.vue';
 import type { JournalEntry } from '../../types';
+import { resolveJournalCardImageSource } from '../../utils/journalMedia';
 import AccessSettingsDialog from '../journal/AccessSettingsDialog.vue';
 import type { AccessSettingsInput } from '../journal/accessSettings';
 import CardActionMenu from '../journal/CardActionMenu.vue';
@@ -156,7 +157,7 @@ function handleCardClick(event: MouseEvent): void {
       >
         <JournalProgressiveImage
           class="article-card__cover-image"
-          :src="cover.url"
+          :src="resolveJournalCardImageSource(cover)"
           :preview-src="cover.previewUrl!"
           :alt="entry.title ?? '文章封面'"
           fit="cover"
@@ -166,7 +167,7 @@ function handleCardClick(event: MouseEvent): void {
       <JournalProgressiveImage
         v-else
         class="article-card__cover-media article-card__cover-image"
-        :src="cover.url"
+        :src="resolveJournalCardImageSource(cover)"
         :preview-src="cover.previewUrl!"
         :alt="entry.title ?? '文章封面'"
         fit="cover"
