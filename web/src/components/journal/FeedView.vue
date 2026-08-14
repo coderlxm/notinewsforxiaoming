@@ -1079,6 +1079,22 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
     padding: 0;
   }
 
+  .feed__public-heading {
+    display: grid;
+    align-items: center;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.35rem;
+  }
+
+  .feed__public-tags {
+    padding-inline: 0;
+  }
+
+  .feed__public-actions {
+    position: static;
+    transform: none;
+  }
+
   .feed__public-refresh {
     display: none;
   }
