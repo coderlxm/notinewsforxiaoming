@@ -4,6 +4,7 @@ import { InfoFilled } from '@element-plus/icons-vue';
 import { ElTooltip } from 'element-plus';
 import { computed, useTemplateRef } from 'vue';
 import type { JournalAsset } from '../../types';
+import { resolveJournalMediaType } from '../../utils/journalMedia';
 import { showMessage } from '../../utils/message';
 
 const props = defineProps<{
@@ -20,7 +21,9 @@ const maximumVideoCount = 5;
 const maximumFileSize = 20 * 1024 * 1024;
 const maximumVideoSize = 500 * 1024 * 1024;
 const imageCount = computed(() => props.existingAssets.length + files.value.length);
-const videoCount = computed(() => [...props.existingAssets, ...files.value].filter(item => item instanceof File ? item.type.startsWith('video/') : item.kind === 'video').length);
+const videoCount = computed(() => [...props.existingAssets, ...files.value].filter(item => item instanceof File
+  ? item.type.startsWith('video/')
+  : resolveJournalMediaType(item) === 'video').length);
 const imageLimitReached = computed(() => imageCount.value >= maximumMediaCount);
 const pickerDisabled = computed(() => props.disabled || imageLimitReached.value);
 

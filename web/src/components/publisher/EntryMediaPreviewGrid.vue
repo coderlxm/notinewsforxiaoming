@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { onBeforeUnmount } from 'vue';
 import type { JournalAsset } from '../../types';
+import {
+  isJournalAnimatedImage,
+  resolveJournalMediaType,
+} from '../../utils/journalMedia';
 
 const props = defineProps<{
   existingAssets: readonly JournalAsset[];
@@ -38,13 +42,17 @@ onBeforeUnmount(() => {
   <div class="media-preview-grid">
     <figure v-for="asset in props.existingAssets" :key="`asset-${asset.id}`" class="media-preview-grid__item">
       <video
-        v-if="asset.kind === 'video'"
+        v-if="resolveJournalMediaType(asset) === 'video'"
         :src="asset.url"
         :poster="asset.previewUrl ?? undefined"
         muted
         preload="metadata"
       />
-      <img v-else :src="asset.previewUrl ?? asset.url" :alt="asset.originalName ?? '草稿图片'">
+      <img
+        v-else
+        :src="isJournalAnimatedImage(asset) ? asset.url : (asset.previewUrl ?? asset.url)"
+        :alt="asset.originalName ?? '草稿图片'"
+      >
       <button
         class="media-preview-grid__remove"
         type="button"

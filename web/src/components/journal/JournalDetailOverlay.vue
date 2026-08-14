@@ -9,6 +9,7 @@ import type {
   ProtectedJournalEntryPreview,
 } from '../../types';
 import type { AccessSettingsInput } from './accessSettings';
+import { resolveJournalMediaType } from '../../utils/journalMedia';
 import JournalDetailLayout from './JournalDetailLayout.vue';
 import ProtectedEntryUnlock from './ProtectedEntryUnlock.vue';
 
@@ -45,19 +46,17 @@ const textPosterAspectRatio = 4 / 5;
 const mediaControlsHeight = 130;
 
 function isVisualAsset(asset: JournalAsset): boolean {
-  if (['photo', 'video', 'video_note', 'animation'].includes(asset.kind)) return true;
-  return asset.kind === 'sticker'
-    && (asset.mimeType?.startsWith('image/') === true || asset.mimeType?.startsWith('video/') === true);
-}
-
-function isVideoAsset(asset: JournalAsset): boolean {
-  return ['video', 'video_note'].includes(asset.kind)
-    || (asset.kind === 'animation' && asset.mimeType?.startsWith('image/') !== true)
-    || (asset.kind === 'sticker' && asset.mimeType?.startsWith('video/') === true);
+  const mediaType = resolveJournalMediaType(asset);
+  return mediaType === 'image' || mediaType === 'video';
 }
 
 function isAdaptiveImage(asset: JournalAsset): boolean {
-  if (isVideoAsset(asset) || asset.kind === 'sticker' || !asset.width || !asset.height) return false;
+  if (
+    resolveJournalMediaType(asset) === 'video'
+    || asset.kind === 'sticker'
+    || !asset.width
+    || !asset.height
+  ) return false;
   const ratio = asset.width / asset.height;
   return ratio >= 0.45 && ratio <= 2.2;
 }

@@ -3,6 +3,7 @@ import { computed, shallowRef, watch } from 'vue';
 import JournalLoading from '../ui/JournalLoading.vue';
 import type { JournalEntry, JournalPlainChannel } from '../../types';
 import { formatStructuredValue } from '../../utils/formatters';
+import { resolveJournalMediaType } from '../../utils/journalMedia';
 import { stripJournalTags } from '../../utils/journalText';
 import { resolveTextPosterTemplate } from '../../utils/textPosterTemplate';
 import CardActionMenu from './CardActionMenu.vue';
@@ -76,12 +77,10 @@ const cardStatusCount = computed(() => isDetail.value
   ? 0
   : Number(props.entry.pinned) + Number(props.entry.visibility === 'protected'));
 const plainChannel = computed(() => props.entry.channel as JournalPlainChannel);
-const hasVisualMedia = computed(() => props.entry.assets.some(asset =>
-  asset.kind === 'photo'
-  || ['video', 'video_note', 'animation'].includes(asset.kind)
-  || (asset.kind === 'sticker' && asset.mimeType?.startsWith('image/'))
-  || (asset.kind === 'sticker' && asset.mimeType?.startsWith('video/')),
-));
+const hasVisualMedia = computed(() => props.entry.assets.some((asset) => {
+  const mediaType = resolveJournalMediaType(asset);
+  return mediaType === 'image' || mediaType === 'video';
+}));
 const normalizedContent = computed(() => props.entry.contentText.replace(/\s+/g, ' ').trim());
 const normalizedPosterContent = computed(() =>
   stripJournalTags(props.entry.contentText, props.entry.tags).replace(/\s+/g, ' ').trim(),
@@ -378,6 +377,12 @@ function handleCardClick(event: MouseEvent): void {
   overflow: visible;
   border-radius: 0;
   background: transparent;
+}
+
+.entry--public-feed.entry--visual > .card-status-indicator,
+.entry--public-feed.entry--poster > .card-status-indicator {
+  overflow: hidden;
+  border-top-right-radius: var(--entry-visual-radius);
 }
 
 .entry--public-feed.entry--linkable:hover {

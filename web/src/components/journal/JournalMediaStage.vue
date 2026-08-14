@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, shallowRef, useTemplateRef, watch } from 'vue';
 import type { CSSProperties } from 'vue';
 import type { JournalAsset } from '../../types';
+import { resolveJournalMediaType } from '../../utils/journalMedia';
 
 const props = defineProps<{
   assets: readonly JournalAsset[];
@@ -21,7 +22,7 @@ const activeVideo = useTemplateRef<HTMLVideoElement>('activeVideo');
 
 const stageAssets = computed<StageAsset[]>(() => props.assets.map((asset) => ({
   ...asset,
-  mediaType: isVideoAsset(asset) ? 'video' : 'image',
+  mediaType: resolveJournalMediaType(asset) === 'video' ? 'video' : 'image',
 })));
 const currentAsset = computed(() => stageAssets.value[currentIndex.value]);
 const positionLabel = computed(() => `${currentIndex.value + 1} / ${stageAssets.value.length}`);
@@ -43,12 +44,6 @@ watch(currentAdaptiveAspectRatio, (aspectRatio) => {
 watch(() => currentAsset.value?.id, () => {
   videoReady.value = currentAsset.value?.mediaType !== 'video';
 }, { immediate: true });
-
-function isVideoAsset(asset: JournalAsset): boolean {
-  return ['video', 'video_note'].includes(asset.kind)
-    || (asset.kind === 'animation' && asset.mimeType?.startsWith('image/') !== true)
-    || (asset.kind === 'sticker' && asset.mimeType?.startsWith('video/') === true);
-}
 
 function goTo(index: number): void {
   if (index === currentIndex.value) return;

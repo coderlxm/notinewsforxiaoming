@@ -3,6 +3,10 @@ import { TopRight } from '@element-plus/icons-vue';
 import { computed } from 'vue';
 import type { JournalAsset } from '../../types';
 import { formatFileSize } from '../../utils/formatters';
+import {
+  isJournalAnimatedImage,
+  resolveJournalMediaType,
+} from '../../utils/journalMedia';
 import JournalProgressiveImage from '../ui/JournalProgressiveImage.vue';
 import JournalProgressiveVideo from '../ui/JournalProgressiveVideo.vue';
 
@@ -27,23 +31,9 @@ type DisplayAsset = JournalAsset & {
 };
 
 const displayAssets = computed<DisplayAsset[]>(() => props.assets.map(asset => {
-  let displayType: DisplayAsset['displayType'] = 'file';
-  if (asset.kind === 'photo' || (asset.kind === 'sticker' && asset.mimeType?.startsWith('image/'))) {
-    displayType = 'image';
-  }
-  else if (
-    ['video', 'video_note', 'animation'].includes(asset.kind)
-    || (asset.kind === 'sticker' && asset.mimeType?.startsWith('video/'))
-  ) {
-    displayType = 'video';
-  }
-  else if (['voice', 'audio'].includes(asset.kind)) {
-    displayType = 'audio';
-  }
-
   return {
     ...asset,
-    displayType,
+    displayType: resolveJournalMediaType(asset),
     sizeLabel: formatFileSize(asset.byteSize),
     aspectRatio: asset.width && asset.height ? `${asset.width} / ${asset.height}` : null,
   };
@@ -91,7 +81,7 @@ function preserveAssetRatio(asset: DisplayAsset): { aspectRatio: string } | unde
         :style="preserveAssetRatio(asset)"
       >
         <JournalProgressiveImage
-          v-if="asset.displayType === 'image' && display === 'card'"
+          v-if="asset.displayType === 'image' && display === 'card' && !isJournalAnimatedImage(asset)"
           class="media__image"
           :class="{ 'media__image--sticker': asset.kind === 'sticker' }"
           :src="asset.url"
