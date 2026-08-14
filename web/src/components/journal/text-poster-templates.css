@@ -231,3 +231,241 @@
   font-family: var(--font-condensed);
   font-size: clamp(8rem, 42cqw, 19rem);
 }
+
+.text-poster--monolith {
+  --poster-background-light:
+    linear-gradient(90deg, rgb(45 52 54 / 5%) 0 1px, transparent 1px) 0 0 / 24px 24px,
+    #e6e7e4;
+  --poster-background-dark:
+    linear-gradient(90deg, rgb(255 255 255 / 3%) 0 1px, transparent 1px) 0 0 / 24px 24px,
+    #1a1c1e;
+  --poster-color-light: #23272a;
+  --poster-color-dark: #ececec;
+  --poster-muted-light: #636b70;
+  --poster-muted-dark: #9ba4aa;
+  --poster-accent-light: #a37234;
+  --poster-accent-dark: #cca062;
+  --poster-mark-light: rgb(35 39 42 / 6%);
+  --poster-mark-dark: rgb(236 236 236 / 5%);
+  --poster-font: var(--font-condensed);
+  --poster-letter-spacing: -0.02em;
+}
+
+.text-poster--monolith .text-poster__sheet::before {
+  right: -0.05em;
+  bottom: -0.22em;
+  content: 'I';
+  font-family: var(--font-condensed);
+  font-size: clamp(14rem, 64cqw, 28rem);
+}
+
+.text-poster--monolith .text-poster__sheet::after {
+  border-left: 2px solid var(--poster-accent);
+}
+
+.text-poster--monolith .text-poster__rule {
+  width: 24px;
+  height: 2px;
+}
+
+.text-poster--botanical {
+  --poster-background-light:
+    radial-gradient(ellipse at 80% 20%, rgb(110 148 118 / 14%), transparent 38%),
+    #eaf0ea;
+  --poster-background-dark:
+    radial-gradient(ellipse at 80% 20%, rgb(90 138 104 / 16%), transparent 38%),
+    #18221c;
+  --poster-color-light: #213327;
+  --poster-color-dark: #ececec;
+  --poster-muted-light: #586e5e;
+  --poster-muted-dark: #97ad9d;
+  --poster-accent-light: #3a7350;
+  --poster-accent-dark: #63a87d;
+  --poster-mark-light: rgb(46 82 58 / 6%);
+  --poster-mark-dark: rgb(151 173 157 / 6%);
+  --poster-letter-spacing: 0.02em;
+}
+
+.text-poster--botanical .text-poster__sheet::before {
+  right: -0.02em;
+  bottom: -0.15em;
+  content: '❦';
+  font-size: clamp(12rem, 50cqw, 22rem);
+}
+
+.text-poster--botanical .text-poster__rule {
+  width: 32px;
+  height: 1px;
+}
+
+.text-poster--manifesto {
+  --poster-background-light:
+    linear-gradient(180deg, #f7f6f2 0%, #eceae1 100%);
+  --poster-background-dark:
+    linear-gradient(180deg, #1b1c1e 0%, #131415 100%);
+  --poster-color-light: #111215;
+  --poster-color-dark: #f4f4f4;
+  --poster-muted-light: #5a5e66;
+  --poster-muted-dark: #9da2ab;
+  --poster-accent-light: #1d4ed8;
+  --poster-accent-dark: #4f7cf7;
+  --poster-mark-light: rgb(29 78 216 / 7%);
+  --poster-mark-dark: rgb(79 124 247 / 8%);
+  --poster-font: var(--font-condensed);
+  --poster-letter-spacing: -0.035em;
+}
+
+.text-poster--manifesto .text-poster__sheet::before {
+  right: -0.04em;
+  bottom: -0.22em;
+  content: '★';
+  font-size: clamp(14rem, 55cqw, 26rem);
+}
+
+.text-poster--manifesto .text-poster__rule {
+  width: 48px;
+  height: 4px;
+}
+
+.text-poster--blueprint {
+  --poster-background-light:
+    linear-gradient(90deg, rgb(37 99 148 / 6%) 1px, transparent 1px) 0 0 / 20px 20px,
+    linear-gradient(0deg, rgb(37 99 148 / 6%) 1px, transparent 1px) 0 0 / 20px 20px,
+    #e5ecf0;
+  --poster-background-dark:
+    linear-gradient(90deg, rgb(86 163 219 / 6%) 1px, transparent 1px) 0 0 / 20px 20px,
+    linear-gradient(0deg, rgb(86 163 219 / 6%) 1px, transparent 1px) 0 0 / 20px 20px,
+    #141d24;
+  --poster-color-light: #1c2c38;
+  --poster-color-dark: #ececec;
+  --poster-muted-light: #506879;
+  --poster-muted-dark: #8da6b8;
+  --poster-accent-light: #1b6e9c;
+  --poster-accent-dark: #48a6dd;
+  --poster-mark-light: rgb(27 110 156 / 7%);
+  --poster-mark-dark: rgb(72 166 221 / 7%);
+  --poster-font: var(--font-condensed);
+  --poster-letter-spacing: 0.02em;
+}
+
+.text-poster--blueprint .text-poster__sheet::before {
+  right: 0.05em;
+  bottom: -0.1em;
+  content: '✛';
+  font-size: clamp(10rem, 46cqw, 20rem);
+}
+
+.text-poster--blueprint .text-poster__rule {
+  width: 36px;
+  height: 1px;
+  border-bottom: 1px dashed var(--poster-accent);
+  background: transparent;
+}
+
+.text-poster--poetry {
+  --poster-background-light:
+    radial-gradient(circle at 50% 50%, rgb(255 255 255 / 60%), transparent 70%),
+    #f6f1e8;
+  --poster-background-dark:
+    radial-gradient(circle at 50% 50%, rgb(255 255 255 / 3%), transparent 70%),
+    #1f1d1a;
+  --poster-color-light: #312720;
+  --poster-color-dark: #ede6de;
+  --poster-muted-light: #79675a;
+  --poster-muted-dark: #b09c8d;
+  --poster-accent-light: #b8583e;
+  --poster-accent-dark: #db785e;
+  --poster-mark-light: rgb(184 88 62 / 5%);
+  --poster-mark-dark: rgb(219 120 94 / 6%);
+  --poster-align: center;
+  --poster-letter-spacing: 0.04em;
+}
+
+.text-poster--poetry .text-poster__header,
+.text-poster--poetry .text-poster__footer {
+  justify-content: center;
+}
+
+.text-poster--poetry .text-poster__rule {
+  width: 18px;
+  height: 1px;
+}
+
+.text-poster--poetry .text-poster__sheet::before {
+  right: 50%;
+  bottom: -0.22em;
+  content: '※';
+  font-size: clamp(10rem, 48cqw, 22rem);
+  transform: translateX(50%);
+}
+
+.text-poster--receipt {
+  --poster-background-light:
+    repeating-linear-gradient(0deg, transparent 0 23px, rgb(53 43 51 / 4%) 23px 24px),
+    #f2efe9;
+  --poster-background-dark:
+    repeating-linear-gradient(0deg, transparent 0 23px, rgb(238 226 235 / 4%) 23px 24px),
+    #201e22;
+  --poster-color-light: #2b262d;
+  --poster-color-dark: #ececec;
+  --poster-muted-light: #6a626d;
+  --poster-muted-dark: #aaa2ad;
+  --poster-accent-light: #7e395d;
+  --poster-accent-dark: #be6795;
+  --poster-mark-light: rgb(126 57 93 / 6%);
+  --poster-mark-dark: rgb(190 103 149 / 6%);
+  --poster-font: var(--font-condensed);
+  --poster-letter-spacing: -0.01em;
+}
+
+.text-poster--receipt .text-poster__header {
+  padding-bottom: 0.5rem;
+  border-bottom: 1px dashed var(--poster-color);
+  justify-content: space-between;
+}
+
+.text-poster--receipt .text-poster__footer {
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--poster-color);
+}
+
+.text-poster--receipt .text-poster__sheet::before {
+  right: 0.04em;
+  bottom: -0.16em;
+  content: '№';
+  font-family: var(--font-condensed);
+  font-size: clamp(10rem, 50cqw, 22rem);
+}
+
+.text-poster--horizon {
+  --poster-background-light:
+    radial-gradient(circle at 80% 80%, rgb(235 130 92 / 18%), transparent 42%),
+    radial-gradient(circle at 18% 18%, rgb(152 108 178 / 14%), transparent 36%),
+    #f3ede6;
+  --poster-background-dark:
+    radial-gradient(circle at 80% 80%, rgb(235 130 92 / 16%), transparent 42%),
+    radial-gradient(circle at 18% 18%, rgb(164 117 191 / 14%), transparent 36%),
+    #1c1920;
+  --poster-color-light: #282329;
+  --poster-color-dark: #ece8eb;
+  --poster-muted-light: #695f6b;
+  --poster-muted-dark: #aa9faa;
+  --poster-accent-light: #c45437;
+  --poster-accent-dark: #e5775c;
+  --poster-mark-light: rgb(196 84 55 / 7%);
+  --poster-mark-dark: rgb(229 119 92 / 8%);
+  --poster-letter-spacing: 0.015em;
+}
+
+.text-poster--horizon .text-poster__sheet::before {
+  right: -0.05em;
+  bottom: -0.28em;
+  content: '○';
+  font-size: clamp(14rem, 58cqw, 28rem);
+}
+
+.text-poster--horizon .text-poster__rule {
+  width: 32px;
+  height: 2px;
+  border-radius: 999px;
+}

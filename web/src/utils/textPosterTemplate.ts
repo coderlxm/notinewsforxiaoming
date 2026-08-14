@@ -6,6 +6,13 @@ export const textPosterTemplates = [
   'cinema',
   'notebook',
   'gazette',
+  'monolith',
+  'botanical',
+  'manifesto',
+  'blueprint',
+  'poetry',
+  'receipt',
+  'horizon',
 ] as const;
 
 export type TextPosterTemplate = typeof textPosterTemplates[number];

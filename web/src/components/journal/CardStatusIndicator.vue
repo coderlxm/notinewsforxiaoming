@@ -120,6 +120,34 @@ const statusCount = computed(() => Number(props.pinned) + Number(props.encrypted
   --status-fold-bg: #8e2932;
 }
 
+.card-status-indicator--poster-monolith {
+  --status-fold-bg: #a37234;
+}
+
+.card-status-indicator--poster-botanical {
+  --status-fold-bg: #3a7350;
+}
+
+.card-status-indicator--poster-manifesto {
+  --status-fold-bg: #1d4ed8;
+}
+
+.card-status-indicator--poster-blueprint {
+  --status-fold-bg: #1b6e9c;
+}
+
+.card-status-indicator--poster-poetry {
+  --status-fold-bg: #b8583e;
+}
+
+.card-status-indicator--poster-receipt {
+  --status-fold-bg: #7e395d;
+}
+
+.card-status-indicator--poster-horizon {
+  --status-fold-bg: #c45437;
+}
+
 .card-status-indicator__icons {
   position: relative;
   display: flex;
@@ -197,5 +225,33 @@ const statusCount = computed(() => Number(props.pinned) + Number(props.encrypted
 
 :global(html[data-theme='dark'] .card-status-indicator--poster-gazette) {
   --status-fold-bg: #ce5a63;
+}
+
+:global(html[data-theme='dark'] .card-status-indicator--poster-monolith) {
+  --status-fold-bg: #cca062;
+}
+
+:global(html[data-theme='dark'] .card-status-indicator--poster-botanical) {
+  --status-fold-bg: #63a87d;
+}
+
+:global(html[data-theme='dark'] .card-status-indicator--poster-manifesto) {
+  --status-fold-bg: #4f7cf7;
+}
+
+:global(html[data-theme='dark'] .card-status-indicator--poster-blueprint) {
+  --status-fold-bg: #48a6dd;
+}
+
+:global(html[data-theme='dark'] .card-status-indicator--poster-poetry) {
+  --status-fold-bg: #db785e;
+}
+
+:global(html[data-theme='dark'] .card-status-indicator--poster-receipt) {
+  --status-fold-bg: #be6795;
+}
+
+:global(html[data-theme='dark'] .card-status-indicator--poster-horizon) {
+  --status-fold-bg: #e5775c;
 }
 </style>
