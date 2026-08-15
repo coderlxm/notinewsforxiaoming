@@ -175,18 +175,6 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
     return reply.sendFile('index.html');
   };
   server.get('/', sendApplication);
-  server.get('/search', sendApplication);
-  server.get('/archive', sendApplication);
-  server.get('/archive/:year/:month', sendApplication);
-  server.get('/p/:publicId', sendApplication);
-  server.get('/me', sendApplication);
-  server.get('/me/settings', sendApplication);
-  server.get('/me/articles/new', sendApplication);
-  server.get('/me/articles/:id/edit', sendApplication);
-  server.get('/me/entries/new', sendApplication);
-  server.get('/me/entries/:id/edit', sendApplication);
-  server.get('/me/contributions', sendApplication);
-  server.get('/me/contributions/:publicId', sendApplication);
 
   server.get('/contribute', async (_request, reply) => {
     reply.header('Cache-Control', 'no-cache');
@@ -197,6 +185,27 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
       "default-src 'self'; img-src 'self' blob: data:; media-src 'self' blob:; style-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
     );
     return reply.sendFile('contribute.html');
+  });
+
+  server.setNotFoundHandler(async (request, reply) => {
+    const pathname = new URL(request.url, config.publicBaseUrl).pathname;
+    const isServerResource = pathname === '/api'
+      || pathname.startsWith('/api/')
+      || pathname === '/media'
+      || pathname.startsWith('/media/')
+      || path.extname(pathname) !== '';
+    const isPageNavigation = (request.method === 'GET' || request.method === 'HEAD')
+      && typeof request.headers.accept === 'string'
+      && request.headers.accept.includes('text/html')
+      && !isServerResource;
+    if (isPageNavigation) {
+      return sendApplication(request, reply);
+    }
+    return reply.code(404).send({
+      message: `Route ${request.method}:${request.url} not found`,
+      error: 'Not Found',
+      statusCode: 404,
+    });
   });
 
   server.addHook('onClose', async () => {
