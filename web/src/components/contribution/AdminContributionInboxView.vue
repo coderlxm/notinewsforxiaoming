@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Message } from '@element-plus/icons-vue';
 import { storeToRefs } from 'pinia';
-import { computed, onBeforeUnmount, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAdminContributions } from '../../composables/useAdminContributions';
 import { useSessionStore } from '../../stores/session';
@@ -39,6 +39,12 @@ watch(inboxError, (error) => {
     persistentMessage = null;
   }
 }, { immediate: true });
+
+onMounted(async () => {
+  await session.load();
+  if (ownerAuthenticated.value) await inbox.loadInbox();
+  else inbox.clear();
+});
 
 onBeforeUnmount(() => persistentMessage?.close());
 </script>
