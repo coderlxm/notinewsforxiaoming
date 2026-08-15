@@ -1,0 +1,378 @@
+:root {
+  color-scheme: dark;
+  --background: #0d1113;
+  --surface: #151b1e;
+  --surface-strong: #1d2528;
+  --border: #2b3539;
+  --text: #f4efec;
+  --muted: #9caaa6;
+  --accent: #f08a72;
+  --accent-soft: #5f3934;
+  --danger: #ff9b88;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --background: #f4f0eb;
+  --surface: #fffaf6;
+  --surface-strong: #ece5df;
+  --border: #d8d0c9;
+  --text: #262321;
+  --muted: #6f7471;
+  --accent: #c95f4d;
+  --accent-soft: #f3d3ca;
+  --danger: #a73d2c;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  background: var(--background);
+  color: var(--text);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+button,
+input {
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface-strong);
+  color: var(--text);
+  font: inherit;
+}
+
+button {
+  min-height: 36px;
+  padding: 0 12px;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+h1,
+h2,
+p {
+  margin-top: 0;
+}
+
+h2 {
+  margin-bottom: 18px;
+  font-size: 15px;
+  font-weight: 650;
+}
+
+footer {
+  color: var(--muted);
+  font-size: 12px;
+  text-align: right;
+}
+
+.dashboard-shell {
+  width: min(1280px, 100%);
+  margin: 0 auto;
+  padding: 0 24px 44px;
+}
+
+.dashboard-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px 0;
+  background: var(--background);
+  border-bottom: 1px solid var(--border);
+}
+
+.dashboard-header h1 {
+  margin: 0;
+  font-size: 20px;
+  letter-spacing: 0.04em;
+}
+
+.dashboard-header p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.header-actions,
+.range-switch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.range-switch {
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+}
+
+.range-switch button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+}
+
+.range-switch button.active {
+  background: var(--accent);
+  color: #201513;
+  font-weight: 700;
+}
+
+.dashboard-content {
+  display: grid;
+  gap: 18px;
+  padding-top: 22px;
+}
+
+.overview-grid,
+.detail-grid,
+.chart-grid {
+  display: grid;
+  gap: 18px;
+}
+
+.overview-grid {
+  grid-template-columns: minmax(280px, 1.2fr) minmax(420px, 2fr);
+}
+
+.detail-grid,
+.chart-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.panel,
+.current-interval-card,
+.summary-cards {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 20px;
+}
+
+.current-interval-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.current-interval-card strong,
+.summary-card .value,
+.interval-stats .value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.current-interval-card strong {
+  font-size: clamp(30px, 4vw, 52px);
+  color: var(--accent);
+}
+
+.current-interval-card > p:last-child {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.eyebrow {
+  margin-bottom: 10px;
+  color: var(--muted);
+  font: 700 11px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.12em;
+}
+
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.summary-card,
+.interval-stats .stat {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface-strong);
+}
+
+.summary-card .value {
+  margin-bottom: 5px;
+  color: var(--accent);
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.summary-card .label,
+.interval-stats .label {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.interval-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.interval-stats .stat {
+  display: grid;
+  gap: 8px;
+}
+
+.interval-stats .value {
+  font-size: 16px;
+}
+
+.recent-records {
+  overflow-x: auto;
+}
+
+.recent-records table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.recent-records th,
+.recent-records td {
+  padding: 9px 8px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.recent-records th {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.error-message {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--danger);
+  border-radius: 8px;
+  color: var(--danger);
+  background: var(--surface);
+  white-space: pre-wrap;
+}
+
+.dashboard-skeleton {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 18px;
+}
+
+.dashboard-skeleton div {
+  min-height: 220px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.login-panel {
+  width: min(380px, calc(100% - 32px));
+  margin: 16vh auto 0;
+  padding: 28px;
+  display: grid;
+  gap: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.login-panel h1 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.login-panel label {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.login-panel input {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 12px;
+}
+
+.login-panel button {
+  min-height: 42px;
+  background: var(--accent);
+  color: #201513;
+  font-weight: 700;
+}
+
+.login-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.app-state {
+  width: min(520px, calc(100% - 32px));
+  margin: 20vh auto 0;
+  color: var(--muted);
+  text-align: center;
+}
+
+@media (max-width: 760px) {
+  .dashboard-shell {
+    padding-inline: 14px;
+  }
+
+  .dashboard-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .header-actions {
+    flex-wrap: wrap;
+  }
+
+  .range-switch {
+    flex: 1;
+  }
+
+  .range-switch button {
+    flex: 1;
+  }
+
+  .overview-grid,
+  .detail-grid,
+  .chart-grid,
+  .dashboard-skeleton {
+    grid-template-columns: 1fr;
+  }
+
+  .interval-stats {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,33 @@
+services:
+  lu-dashboard:
+    image: "notinews-lu-dashboard:${LU_DASHBOARD_IMAGE_TAG:?LU_DASHBOARD_IMAGE_TAG must be a 40-character commit SHA}"
+    container_name: notinews-lu-dashboard
+    init: true
+    env_file:
+      - /opt/lu-dashboard/.env
+    environment:
+      NODE_ENV: production
+      TZ: Asia/Shanghai
+      LU_DASHBOARD_PORT: "8787"
+      LU_DATABASE_PATH: /data/notinews.sqlite
+    volumes:
+      - /root/NotiNewsForXiaoming/data:/data:ro
+    cpus: 0.5
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD", "node", "/usr/local/bin/lu-dashboard-healthcheck.mjs"]
+      interval: 5s
+      timeout: 5s
+      retries: 1
+      start_period: 15s
+    networks:
+      - lu-dashboard-internal
+      - web
+
+networks:
+  lu-dashboard-internal:
+    name: lu-dashboard-internal
+    driver: bridge
+  web:
+    external: true
+    name: web_default

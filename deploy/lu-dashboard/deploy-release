@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+
+PROJECT_DIR=/opt/lu-dashboard
+COMPOSE_FILE=${PROJECT_DIR}/compose.yaml
+INCOMING_DIR=/var/lib/lu-dashboard-deploy/incoming
+IMAGE_REPOSITORY=notinews-lu-dashboard
+DEPLOY_COMMIT_FILE=${PROJECT_DIR}/.deploy-commit
+PREVIOUS_COMMIT_FILE=${PROJECT_DIR}/.previous-deploy-commit
+
+if [[ $# -lt 1 || $# -gt 2 || ! $1 =~ ^[0-9a-f]{40}$ ]]; then
+  echo 'usage: lu-dashboard-deploy-release <40-character-lowercase-commit-sha> [--install-host-assets]' >&2
+  exit 64
+fi
+
+RELEASE_SHA=$1
+INSTALL_HOST_ASSETS=false
+if [[ $# -eq 2 ]]; then
+  if [[ $2 != --install-host-assets ]]; then
+    echo 'second argument must be --install-host-assets' >&2
+    exit 64
+  fi
+  INSTALL_HOST_ASSETS=true
+fi
+
+IMAGE_ARCHIVE=${INCOMING_DIR}/lu-dashboard-${RELEASE_SHA}.tar
+HOST_ASSETS_ARCHIVE=${INCOMING_DIR}/lu-dashboard-host-${RELEASE_SHA}.tar
+IMAGE_REFERENCE=${IMAGE_REPOSITORY}:${RELEASE_SHA}
+HOST_ASSETS_ROOT=$(mktemp -d /var/lib/lu-dashboard-deploy/host-assets.XXXXXX)
+
+cleanup() {
+  rm -rf -- "${HOST_ASSETS_ROOT}"
+}
+trap cleanup EXIT
+
+if [[ ! -f ${IMAGE_ARCHIVE} || -L ${IMAGE_ARCHIVE} ]]; then
+  echo "release archive is missing or is not a regular file: ${IMAGE_ARCHIVE}" >&2
+  exit 66
+fi
+
+if [[ ${INSTALL_HOST_ASSETS} == true ]]; then
+  if [[ ! -f ${HOST_ASSETS_ARCHIVE} || -L ${HOST_ASSETS_ARCHIVE} ]]; then
+    echo "host assets archive is missing or is not a regular file: ${HOST_ASSETS_ARCHIVE}" >&2
+    exit 66
+  fi
+
+  tar -xf "${HOST_ASSETS_ARCHIVE}" -C "${HOST_ASSETS_ROOT}"
+  install -d -m 700 "${PROJECT_DIR}"
+  install -m 755 "${HOST_ASSETS_ROOT}/deploy/lu-dashboard/deploy-release" /usr/local/sbin/lu-dashboard-deploy-release
+  install -m 644 "${HOST_ASSETS_ROOT}/deploy/lu-dashboard/compose.yaml" "${COMPOSE_FILE}"
+fi
+
+if [[ ! -f ${PROJECT_DIR}/.env ]]; then
+  echo "dashboard environment file is missing: ${PROJECT_DIR}/.env" >&2
+  exit 66
+fi
+
+docker image load --input "${IMAGE_ARCHIVE}"
+rm -- "${IMAGE_ARCHIVE}"
+docker image inspect "${IMAGE_REFERENCE}" >/dev/null
+
+CURRENT_SHA=
+if [[ -f ${DEPLOY_COMMIT_FILE} ]]; then
+  CURRENT_SHA=$(<"${DEPLOY_COMMIT_FILE}")
+fi
+
+LU_DASHBOARD_IMAGE_TAG=${RELEASE_SHA} docker compose \
+  --project-name lu-dashboard \
+  --file "${COMPOSE_FILE}" \
+  up --detach --no-deps --wait --wait-timeout 60 lu-dashboard
+
+if [[ ${INSTALL_HOST_ASSETS} == true ]]; then
+  install -m 644 "${HOST_ASSETS_ROOT}/deploy/lu-dashboard/lu.xmcloud.buzz.conf" /home/web/conf.d/lu.xmcloud.buzz.conf
+  docker exec nginx nginx -t
+  docker exec nginx nginx -s reload
+  rm -- "${HOST_ASSETS_ARCHIVE}"
+fi
+
+if [[ -n ${CURRENT_SHA} && ${CURRENT_SHA} != ${RELEASE_SHA} ]]; then
+  printf '%s\n' "${CURRENT_SHA}" > "${PREVIOUS_COMMIT_FILE}.new"
+  chmod 600 "${PREVIOUS_COMMIT_FILE}.new"
+  mv "${PREVIOUS_COMMIT_FILE}.new" "${PREVIOUS_COMMIT_FILE}"
+fi
+
+printf '%s\n' "${RELEASE_SHA}" > "${DEPLOY_COMMIT_FILE}.new"
+chmod 600 "${DEPLOY_COMMIT_FILE}.new"
+mv "${DEPLOY_COMMIT_FILE}.new" "${DEPLOY_COMMIT_FILE}"
+
+PREVIOUS_SHA=
+if [[ -f ${PREVIOUS_COMMIT_FILE} ]]; then
+  PREVIOUS_SHA=$(<"${PREVIOUS_COMMIT_FILE}")
+fi
+
+while IFS= read -r image_tag; do
+  if [[ ! ${image_tag} =~ ^[0-9a-f]{40}$ ]]; then
+    continue
+  fi
+  if [[ ${image_tag} == ${RELEASE_SHA} || ${image_tag} == ${PREVIOUS_SHA} ]]; then
+    continue
+  fi
+  docker image rm "${IMAGE_REPOSITORY}:${image_tag}"
+done < <(docker image ls "${IMAGE_REPOSITORY}" --format '{{.Tag}}')
