@@ -148,10 +148,19 @@ h1, h2, h3, p {
   border-bottom: 1px solid var(--border);
 }
 
-.header-brand {
+.header-main-group {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+}
+
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .brand-dot {
@@ -162,12 +171,13 @@ h1, h2, h3, p {
   box-shadow: 0 0 8px var(--accent);
 }
 
-.dashboard-header h1 {
+.brand-title {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--text-primary);
+  white-space: nowrap;
 }
 
 .header-tag {
@@ -180,6 +190,7 @@ h1, h2, h3, p {
   color: var(--text-tertiary);
   font-size: 10px;
   font-family: var(--font-mono);
+  white-space: nowrap;
 }
 
 .header-updated {
@@ -191,6 +202,7 @@ h1, h2, h3, p {
   background: var(--surface-subtle);
   border: 1px solid var(--border);
   font-size: 10px;
+  white-space: nowrap;
 }
 
 .updated-label {
@@ -209,6 +221,12 @@ h1, h2, h3, p {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.header-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 /* Segmented Control */
@@ -552,6 +570,42 @@ h1, h2, h3, p {
     min-height: 100vh;
     padding-inline: 12px;
     overflow: visible;
+  }
+
+  .dashboard-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 10px 0;
+  }
+
+  .header-main-group {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 8px;
+  }
+
+  .range-switch {
+    flex: 1;
+    max-width: 180px;
+  }
+
+  .range-switch button {
+    flex: 1;
+  }
+
+  .header-tools {
+    gap: 4px;
+    flex-shrink: 0;
   }
 
   .dashboard-content {

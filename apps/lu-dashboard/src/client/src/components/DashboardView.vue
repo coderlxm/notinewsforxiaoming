@@ -42,10 +42,12 @@ onMounted(async () => {
 <template>
   <div class="dashboard-shell">
     <header class="dashboard-header">
-      <div class="header-brand">
-        <span class="brand-dot" />
-        <h1>撸了吗</h1>
-        <span class="header-tag">DASHBOARD</span>
+      <div class="header-main-group">
+        <div class="header-brand">
+          <span class="brand-dot" />
+          <h1 class="brand-title">撸了吗</h1>
+          <span class="header-tag">DASHBOARD</span>
+        </div>
         <span v-if="generatedAt" class="header-updated">
           <span class="updated-label">UPDATED</span>
           <span class="mono-number">{{ formatGeneratedAt(generatedAt) }}</span>
@@ -63,15 +65,17 @@ onMounted(async () => {
             {{ r }}d
           </button>
         </div>
-        <button type="button" class="btn-ghost" @click="toggleTheme">
-          {{ theme === 'dark' ? '浅色' : '深色' }}
-        </button>
-        <button type="button" class="btn-ghost" :disabled="loading" @click="refresh">
-          {{ loading ? '刷新中…' : '刷新' }}
-        </button>
-        <button type="button" class="btn-ghost" @click="emit('logout')">
-          退出
-        </button>
+        <div class="header-tools">
+          <button type="button" class="btn-ghost" @click="toggleTheme">
+            {{ theme === 'dark' ? '浅色' : '深色' }}
+          </button>
+          <button type="button" class="btn-ghost" :disabled="loading" @click="refresh">
+            {{ loading ? '…' : '刷新' }}
+          </button>
+          <button type="button" class="btn-ghost" @click="emit('logout')">
+            退出
+          </button>
+        </div>
       </div>
     </header>
 
