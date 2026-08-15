@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useEventListener, useMediaQuery } from '@vueuse/core';
+import { useMediaQuery } from '@vueuse/core';
 import { storeToRefs } from 'pinia';
 import {
   computed,
@@ -54,11 +54,6 @@ type AppRoute =
 type FeedRoute = Extract<AppRoute, { name: 'public' | 'private' }>;
 type DiscoveryRoute = Extract<AppRoute, { name: 'search' | 'archive' | 'archive-month' }>;
 type DiscoveryOverlayRoute = Extract<AppRoute, { name: 'search' | 'archive-month' }>;
-type ScrollDirection = -1 | 0 | 1;
-
-const HEADER_ALWAYS_VISIBLE_TOP = 24;
-const HEADER_HIDE_DISTANCE = 112;
-const HEADER_SHOW_DISTANCE = 64;
 const PUBLIC_FEED_CACHE_LIMIT = 30;
 const MAX_PUBLIC_SEARCH_QUERY_LENGTH = 80;
 
@@ -84,7 +79,6 @@ const session = useSessionStore();
 const siteProfile = useSiteProfileStore();
 const contributionInbox = useAdminContributions();
 const isMobile = useMediaQuery('(max-width: 599px)');
-const isMobileOrTablet = useMediaQuery('(max-width: 1024px)');
 const { ownerAuthenticated } = storeToRefs(session);
 const { profile, loadError: profileLoadError } = storeToRefs(siteProfile);
 const overlayContext = shallowRef<OverlayContext | null>(null);
@@ -95,13 +89,8 @@ const discoveryAccessRevision = shallowRef(0);
 const contentScroll = useTemplateRef<HTMLDivElement>('contentScroll');
 const profileBio = useTemplateRef<HTMLParagraphElement>('profileBio');
 const profileBioOverflow = shallowRef(0);
-const headerHidden = shallowRef(false);
 const defaultAssetView = computed<AssetView>(() => isMobile.value ? 'waterfall' : 'table');
-const headerCollapsed = computed(() => isMobileOrTablet.value && headerHidden.value);
 const feedScrollPositions = new Map<string, number>();
-let previousContentScrollTop = 0;
-let headerScrollDistance = 0;
-let headerScrollDirection: ScrollDirection = 0;
 let pendingFeedScrollTop: number | null = null;
 let profileBioResizeObserver: ResizeObserver | null = null;
 let profileErrorMessage: ReturnType<typeof showMessage> | null = null;
@@ -478,45 +467,6 @@ function privateFeedPath(options: {
   return query ? `/me?${query}` : '/me';
 }
 
-function revealHeader(): void {
-  headerHidden.value = false;
-  headerScrollDistance = 0;
-  headerScrollDirection = 0;
-}
-
-function resetHeaderScrollTracking(scrollTop: number): void {
-  previousContentScrollTop = scrollTop;
-  headerScrollDistance = 0;
-  headerScrollDirection = 0;
-}
-
-function handleContentScroll(event: Event): void {
-  const scrollTop = Math.max(0, (event.currentTarget as HTMLDivElement).scrollTop);
-  const delta = scrollTop - previousContentScrollTop;
-  previousContentScrollTop = scrollTop;
-
-  if (!isMobileOrTablet.value || scrollTop <= HEADER_ALWAYS_VISIBLE_TOP) {
-    revealHeader();
-    return;
-  }
-  if (delta === 0) return;
-
-  const direction: ScrollDirection = delta > 0 ? 1 : -1;
-  if (direction !== headerScrollDirection) {
-    headerScrollDirection = direction;
-    headerScrollDistance = 0;
-  }
-  headerScrollDistance += Math.abs(delta);
-
-  if (direction === 1 && headerScrollDistance >= HEADER_HIDE_DISTANCE) {
-    headerHidden.value = true;
-    headerScrollDistance = 0;
-  }
-  else if (direction === -1 && headerScrollDistance >= HEADER_SHOW_DISTANCE) {
-    revealHeader();
-  }
-}
-
 function handleRouteChange(nextPath: string, currentPath: string): void {
   if (currentPath === nextPath) return;
   const nextUrl = new URL(nextPath, window.location.origin);
@@ -525,7 +475,6 @@ function handleRouteChange(nextPath: string, currentPath: string): void {
     nextUrl.pathname === currentUrl.pathname
     && nextUrl.search === currentUrl.search
   ) return;
-  revealHeader();
   if (isOverlayHistoryTransition(currentPath, nextPath)) {
     return;
   }
@@ -548,7 +497,6 @@ function handleRouteChange(nextPath: string, currentPath: string): void {
   else pendingFeedScrollTop = null;
   if (pendingFeedScrollTop === null) {
     contentScroll.value!.scrollTo({ top: 0, behavior: 'auto' });
-    resetHeaderScrollTracking(0);
   }
 }
 
@@ -701,11 +649,7 @@ function restoreFeedScroll(): void {
   const scrollTop = pendingFeedScrollTop;
   pendingFeedScrollTop = null;
   contentScroll.value!.scrollTo({ top: scrollTop, behavior: 'auto' });
-  resetHeaderScrollTracking(scrollTop);
 }
-
-useEventListener(contentScroll, 'scroll', handleContentScroll, { passive: true });
-useEventListener('resize', revealHeader, { passive: true });
 
 const removeAfterEach = router.afterEach((to, from) => {
   if (to.fullPath !== from.fullPath) handleRouteChange(to.fullPath, from.fullPath);
@@ -741,7 +685,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="app-shell" :class="{ 'app-shell--header-hidden': headerCollapsed }">
+  <div class="app-shell">
     <div class="profile-bar">
       <header class="profile" :class="{ 'profile--public': publicShellActive }">
         <div class="profile__identity">
@@ -774,7 +718,7 @@ onUnmounted(() => {
           </div>
         </div>
         <div v-if="publicShellActive" class="profile__search">
-          <PublicSearchBar @focus-requested="revealHeader" />
+          <PublicSearchBar />
         </div>
         <div class="profile__actions">
           <nav v-if="showProfileNavigation" class="profile__nav" aria-label="主导航">
@@ -797,23 +741,6 @@ onUnmounted(() => {
               @click="navigate('/me')"
             >
               我的资产
-            </button>
-            <button
-              v-if="isPrivateRoute || ownerAuthenticated"
-              class="profile__nav-link profile__nav-link--inbox"
-              :class="{ 'profile__nav-link--active': isContributionRoute }"
-              type="button"
-              :aria-current="isContributionRoute ? 'page' : undefined"
-              @click="navigate('/me/contributions')"
-            >
-              <span>朋友投稿</span>
-              <span
-                v-if="contributionInbox.pendingCount.value"
-                class="profile__nav-count"
-                :aria-label="`${contributionInbox.pendingCount.value} 份待处理投稿`"
-              >
-                {{ contributionInbox.pendingCount.value }}
-              </span>
             </button>
           </nav>
           <ThemeModeControl />
@@ -973,12 +900,6 @@ onUnmounted(() => {
   overflow: hidden;
   border-bottom: 1px solid var(--border-subtle);
   background: var(--surface-page);
-  transition: grid-template-rows 200ms ease, border-color 200ms ease;
-}
-
-.app-shell--header-hidden .profile-bar {
-  grid-template-rows: 0fr;
-  border-bottom-color: transparent;
 }
 
 .app-main {
@@ -1025,18 +946,11 @@ onUnmounted(() => {
   width: min(calc(100% - (var(--workspace-gutter) * 2)), var(--workspace-width));
   margin: 0 auto;
   padding: 1.15rem 0 1rem;
-  transition: opacity 180ms ease, transform 200ms ease;
 }
 
 .profile--public {
   grid-template-areas: "identity search actions";
   grid-template-columns: minmax(0, 1fr) minmax(18rem, 40rem) minmax(0, 1fr);
-}
-
-.app-shell--header-hidden .profile {
-  transform: translateY(-0.75rem);
-  opacity: 0;
-  pointer-events: none;
 }
 
 .profile__home,
@@ -1162,26 +1076,6 @@ onUnmounted(() => {
 .profile__nav-link--active {
   color: var(--text-primary);
   border-bottom-color: var(--accent);
-}
-
-.profile__nav-link--inbox {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-}
-
-.profile__nav-count {
-  display: grid;
-  min-width: 1.15rem;
-  height: 1.15rem;
-  padding: 0 0.28rem;
-  border-radius: 999px;
-  background: var(--accent);
-  color: #fff;
-  font-size: 0.65rem;
-  font-weight: 750;
-  line-height: 1;
-  place-items: center;
 }
 
 @keyframes profile-skeleton-pulse {
@@ -1334,15 +1228,6 @@ onUnmounted(() => {
     white-space: nowrap;
   }
 
-  .profile__nav-link--inbox {
-    position: relative;
-  }
-
-  .profile__nav-count {
-    position: absolute;
-    top: -0.05rem;
-    right: -0.45rem;
-  }
 }
 
 @media (max-width: 799px) {

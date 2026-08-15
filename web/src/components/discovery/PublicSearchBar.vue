@@ -8,9 +8,6 @@ const MAX_QUERY_LENGTH = 80;
 
 const currentRoute = useRoute();
 const router = useRouter();
-const emit = defineEmits<{
-  focusRequested: [];
-}>();
 const input = useTemplateRef<HTMLInputElement>('input');
 const query = shallowRef(readRouteQuery(currentRoute));
 const composing = shallowRef(false);
@@ -75,7 +72,6 @@ function handleSearchShortcut(event: KeyboardEvent): void {
   if (activeElement !== input.value && isEditable(activeElement)) return;
 
   event.preventDefault();
-  emit('focusRequested');
   input.value!.focus();
   input.value!.select();
 }
