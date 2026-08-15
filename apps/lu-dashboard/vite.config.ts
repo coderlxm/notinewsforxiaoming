@@ -26,7 +26,10 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       proxy: {
-        '/api': 'http://localhost:8787',
+        '/api': {
+          target: 'https://lu.xmcloud.buzz',
+          changeOrigin: true,
+        },
       },
     },
   }

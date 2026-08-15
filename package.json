@@ -14,6 +14,7 @@
     "prestart:bot": "node scripts/ensure-node-lts.mjs",
     "prestart:journal": "node scripts/ensure-node-lts.mjs",
     "test": "echo \"Error: no test specified\" && exit 1",
+    "dev:lu": "pnpm --filter @notinews/lu-dashboard dev",
     "dev:journal": "vite --config web/vite.config.ts",
     "build:journal": "vite build --config web/vite.config.ts",
     "notify:service-failure": "tsx src/serviceFailureNotifier.ts",

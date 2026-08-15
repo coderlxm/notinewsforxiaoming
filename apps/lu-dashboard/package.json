@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "build": "vite build && vite build --mode server",
+    "dev": "vite",
     "start": "node dist/server/server.js"
   },
   "dependencies": {
