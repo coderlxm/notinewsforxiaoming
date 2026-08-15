@@ -112,7 +112,10 @@ onBeforeUnmount(() => activeVideo.value?.pause());
           :class="{ 'media-stage__video--ready': videoReady }"
           :src="currentAsset.url"
           :poster="currentAsset.previewUrl!"
+          autoplay
           controls
+          muted
+          playsinline
           preload="auto"
           :aria-busy="!videoReady"
           @loadeddata="revealVideo"

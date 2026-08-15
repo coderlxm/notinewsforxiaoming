@@ -1,29 +1,24 @@
 <script setup lang="ts">
-import { shallowRef, watch } from 'vue';
+import { shallowRef } from 'vue';
 
 const props = withDefaults(defineProps<{
-  src: string;
   previewSrc: string;
   fit?: 'cover' | 'contain';
 }>(), {
   fit: 'cover',
 });
 
-const state = shallowRef<'loading' | 'ready' | 'playing' | 'error'>('loading');
+const emit = defineEmits<{
+  open: [];
+}>();
 
-watch([() => props.src, () => props.previewSrc], () => {
-  state.value = 'loading';
-});
+const state = shallowRef<'loading' | 'ready' | 'error'>('loading');
 
 function markPreviewReady(): void {
   state.value = 'ready';
 }
 
-function playVideo(): void {
-  state.value = 'playing';
-}
-
-function exposeVideoError(): void {
+function exposePreviewError(): void {
   state.value = 'error';
 }
 </script>
@@ -35,12 +30,10 @@ function exposeVideoError(): void {
     :aria-busy="state === 'loading'"
   >
     <button
-      v-if="state === 'loading' || state === 'ready'"
       class="progressive-video__cover"
       type="button"
-      :disabled="state === 'loading'"
-      aria-label="播放视频"
-      @click="playVideo"
+      aria-label="打开视频详情"
+      @click="emit('open')"
     >
       <img
         class="progressive-video__preview"
@@ -50,19 +43,10 @@ function exposeVideoError(): void {
         loading="eager"
         draggable="false"
         @load="markPreviewReady"
+        @error="exposePreviewError"
       >
       <span class="progressive-video__play" aria-hidden="true" />
     </button>
-    <video
-      v-else
-      class="progressive-video__media"
-      :src="src"
-      :poster="previewSrc"
-      controls
-      autoplay
-      preload="metadata"
-      @error="exposeVideoError"
-    />
   </span>
 </template>
 
@@ -73,21 +57,18 @@ function exposeVideoError(): void {
   overflow: hidden;
 }
 
-.progressive-video__cover,
-.progressive-video__media {
+.progressive-video__cover {
   display: block;
   width: 100%;
   height: 100%;
   grid-area: 1 / 1;
 }
 
-.progressive-video--cover .progressive-video__preview,
-.progressive-video--cover .progressive-video__media {
+.progressive-video--cover .progressive-video__preview {
   object-fit: cover;
 }
 
-.progressive-video--contain .progressive-video__preview,
-.progressive-video--contain .progressive-video__media {
+.progressive-video--contain .progressive-video__preview {
   object-fit: contain;
 }
 
@@ -99,10 +80,6 @@ function exposeVideoError(): void {
   background: var(--surface-muted);
   color: #fff;
   cursor: pointer;
-}
-
-.progressive-video__cover:disabled {
-  cursor: default;
 }
 
 .progressive-video__preview {

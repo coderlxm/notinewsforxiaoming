@@ -102,9 +102,9 @@ function preserveAssetRatio(asset: DisplayAsset): { aspectRatio: string } | unde
           v-else-if="display === 'card'"
           class="media__video"
           :class="{ 'media__video--round': asset.kind === 'video_note' }"
-          :src="asset.url"
           :preview-src="asset.previewUrl!"
           fit="cover"
+          @open="emit('open')"
         />
         <video
           v-else
