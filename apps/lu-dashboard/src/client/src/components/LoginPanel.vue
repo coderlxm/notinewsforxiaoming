@@ -23,22 +23,27 @@ async function onSubmit() {
 </script>
 
 <template>
-  <form class="login-panel" @submit.prevent="onSubmit">
-    <div>
-      <p class="eyebrow">PRIVATE LOG</p>
-      <h1>私人看板</h1>
-    </div>
-    <label for="password">密码</label>
-    <input
-      id="password"
-      v-model="password"
-      type="password"
-      autocomplete="current-password"
-      :disabled="submitting"
-    />
-    <button type="submit" :disabled="submitting">
-      {{ submitting ? '登录中…' : '登录' }}
-    </button>
-    <p v-if="error" class="login-error">{{ error }}</p>
-  </form>
+  <div class="login-shell">
+    <form class="login-card" @submit.prevent="onSubmit">
+      <div class="login-header">
+        <span class="header-tag">AUTHENTICATION</span>
+        <h1>私人看板访问</h1>
+      </div>
+      <div class="login-field">
+        <label for="password">ACCESS KEY / 密码</label>
+        <input
+          id="password"
+          v-model="password"
+          type="password"
+          autocomplete="current-password"
+          placeholder="••••••••"
+          :disabled="submitting"
+        />
+      </div>
+      <button type="submit" class="btn-primary" :disabled="submitting">
+        {{ submitting ? '验证中…' : '进入看板' }}
+      </button>
+      <p v-if="error" class="login-error">{{ error }}</p>
+    </form>
+  </div>
 </template>

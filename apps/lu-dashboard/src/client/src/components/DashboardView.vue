@@ -42,12 +42,17 @@ onMounted(async () => {
 <template>
   <div class="dashboard-shell">
     <header class="dashboard-header">
-      <div>
+      <div class="header-brand">
+        <span class="brand-dot" />
         <h1>撸了吗</h1>
-        <p>只看记录，不下结论</p>
+        <span class="header-tag">DASHBOARD</span>
+        <span v-if="generatedAt" class="header-updated">
+          <span class="updated-label">UPDATED</span>
+          <span class="mono-number">{{ formatGeneratedAt(generatedAt) }}</span>
+        </span>
       </div>
       <div class="header-actions">
-        <div class="range-switch">
+        <div class="range-switch" role="group" aria-label="统计周期选择">
           <button
             v-for="r in ranges"
             :key="r"
@@ -55,39 +60,45 @@ onMounted(async () => {
             type="button"
             @click="setRange(r)"
           >
-            {{ r }} 天
+            {{ r }}d
           </button>
         </div>
-        <button type="button" @click="toggleTheme">
+        <button type="button" class="btn-ghost" @click="toggleTheme">
           {{ theme === 'dark' ? '浅色' : '深色' }}
         </button>
-        <button type="button" :disabled="loading" @click="refresh">
-          {{ loading ? '刷新中' : '刷新' }}
+        <button type="button" class="btn-ghost" :disabled="loading" @click="refresh">
+          {{ loading ? '刷新中…' : '刷新' }}
         </button>
-        <button type="button" @click="emit('logout')">退出</button>
+        <button type="button" class="btn-ghost" @click="emit('logout')">
+          退出
+        </button>
       </div>
     </header>
 
     <main class="dashboard-content">
       <p v-if="error || sessionError" class="error-message" role="alert">{{ error || sessionError }}</p>
       <template v-if="analytics">
-        <div class="overview-grid">
-          <CurrentIntervalCard :current="analytics.current" />
-          <SummaryCards :summary="analytics.summary" />
+        <div class="dashboard-viewport">
+          <!-- 左栏：核心状态、指标与记录明细 -->
+          <aside class="viewport-sidebar">
+            <CurrentIntervalCard :current="analytics.current" />
+            <SummaryCards :summary="analytics.summary" />
+            <IntervalStats :current="analytics.current" :intervals="analytics.intervals" />
+            <RecentRecords :records="analytics.recent" />
+          </aside>
+
+          <!-- 右栏：全景热力与多维图表 -->
+          <section class="viewport-main">
+            <CalendarHeatmap :data="analytics.calendar" :theme="theme" />
+            <div class="viewport-charts">
+              <TrendChart :data="analytics.trend" :theme="theme" />
+              <WeekdayTimeHeatmap :data="analytics.weekdayTime" :theme="theme" />
+            </div>
+          </section>
         </div>
-        <CalendarHeatmap :data="analytics.calendar" :theme="theme" />
-        <div class="chart-grid">
-          <TrendChart :data="analytics.trend" :theme="theme" />
-          <WeekdayTimeHeatmap :data="analytics.weekdayTime" :theme="theme" />
-        </div>
-        <div class="detail-grid">
-          <IntervalStats :current="analytics.current" :intervals="analytics.intervals" />
-          <RecentRecords :records="analytics.recent" />
-        </div>
-        <footer v-if="generatedAt">最近刷新：{{ formatGeneratedAt(generatedAt) }}</footer>
       </template>
       <div v-else-if="loading" class="dashboard-skeleton" aria-label="正在载入数据">
-        <div /><div /><div /><div />
+        <div class="skeleton-box" /><div class="skeleton-box" /><div class="skeleton-box" /><div class="skeleton-box" />
       </div>
     </main>
   </div>

@@ -5,22 +5,22 @@ defineProps<{ summary: DashboardSummary }>()
 </script>
 
 <template>
-  <div class="summary-cards">
-    <div class="summary-card">
-      <div class="value">{{ summary.todayCount }}</div>
-      <div class="label">今天</div>
+  <div class="summary-grid">
+    <div class="metric-cell">
+      <div class="metric-label">今天 TODAY</div>
+      <div class="metric-value mono-number">{{ summary.todayCount }}</div>
     </div>
-    <div class="summary-card">
-      <div class="value">{{ summary.last7Count }}</div>
-      <div class="label">近 7 天</div>
+    <div class="metric-cell">
+      <div class="metric-label">近 7 天 7D</div>
+      <div class="metric-value mono-number">{{ summary.last7Count }}</div>
     </div>
-    <div class="summary-card">
-      <div class="value">{{ summary.last30Count }}</div>
-      <div class="label">近 30 天 · {{ summary.last30ActiveDays }} 个活跃日</div>
+    <div class="metric-cell">
+      <div class="metric-label">近 30 天 ({{ summary.last30ActiveDays }}d活跃)</div>
+      <div class="metric-value mono-number">{{ summary.last30Count }}</div>
     </div>
-    <div class="summary-card">
-      <div class="value">{{ summary.totalCount }}</div>
-      <div class="label">历史总计</div>
+    <div class="metric-cell">
+      <div class="metric-label">历史总计 TOTAL</div>
+      <div class="metric-value mono-number">{{ summary.totalCount }}</div>
     </div>
   </div>
 </template>

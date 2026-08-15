@@ -16,9 +16,16 @@ const lastTime = computed(() => props.current.lastOccurredAt
 </script>
 
 <template>
-  <section class="current-interval-card">
-    <p class="eyebrow">距上次</p>
-    <strong>{{ current.minutes === null ? '还没有记录' : formatDuration(current.minutes) }}</strong>
-    <p v-if="lastTime">上次：{{ lastTime }}</p>
+  <section class="panel current-hero-card">
+    <div class="current-hero-header">
+      <div class="live-indicator">
+        <span class="live-dot" />
+        <span>SINCE LAST · 距上次</span>
+      </div>
+      <span v-if="lastTime" class="panel-badge">{{ lastTime }}</span>
+    </div>
+    <div class="current-value mono-number">
+      {{ current.minutes === null ? '无记录' : formatDuration(current.minutes) }}
+    </div>
   </section>
 </template>

@@ -14,37 +14,48 @@ const weekdays = ['周一', '周二', '周三', '周四', '周五', '周六', '�
 
 const option = computed<EChartsCoreOption>(() => {
   const max = Math.max(1, ...props.data.map((point) => point.count))
-  const foreground = props.theme === 'dark' ? '#a9b8b4' : '#5f6865'
-  const empty = props.theme === 'dark' ? '#20282b' : '#ece8e4'
+  const foreground = props.theme === 'dark' ? '#94a3b8' : '#64748b'
+  const empty = props.theme === 'dark' ? '#141820' : '#f1f5f9'
+  const colors = props.theme === 'dark'
+    ? [empty, '#312e81', '#6366f1', '#a5b4fc']
+    : [empty, '#c7d2fe', '#6366f1', '#3730a3']
+
   const values = props.data.map((point) => [point.weekday - 1, periods.indexOf(point.period), point.count])
 
   return {
     backgroundColor: 'transparent',
     aria: { show: true, description: '星期和时段的记录次数热力图' },
     tooltip: {
+      backgroundColor: props.theme === 'dark' ? '#0e1217' : '#ffffff',
+      borderColor: props.theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+      textStyle: { color: props.theme === 'dark' ? '#f0f6fc' : '#0f172a', fontSize: 12 },
       formatter: (params: unknown) => {
         const value = (params as { value: [number, number, number] }).value
-        return `${weekdays[value[0]]} ${periods[value[1]]} · ${value[2]} 次`
+        return `${weekdays[value[0]]} · ${periods[value[1]]}<br/><strong>${value[2]}</strong> 次记录`
       },
     },
     grid: {
       left: 8,
       right: 16,
-      top: 8,
-      bottom: 54,
+      top: 12,
+      bottom: 44,
       containLabel: true,
     },
     xAxis: {
       type: 'category',
       data: weekdays,
-      axisLabel: { color: foreground },
-      splitArea: { show: true },
+      axisLabel: { color: foreground, fontSize: 11 },
+      axisLine: { show: false },
+      axisTick: { show: false },
+      splitArea: { show: true, areaStyle: { color: props.theme === 'dark' ? ['transparent', 'rgba(255,255,255,0.01)'] : ['transparent', 'rgba(0,0,0,0.01)'] } },
     },
     yAxis: {
       type: 'category',
       data: periods,
-      axisLabel: { color: foreground },
-      splitArea: { show: true },
+      axisLabel: { color: foreground, fontSize: 11 },
+      axisLine: { show: false },
+      axisTick: { show: false },
+      splitArea: { show: true, areaStyle: { color: props.theme === 'dark' ? ['transparent', 'rgba(255,255,255,0.01)'] : ['transparent', 'rgba(0,0,0,0.01)'] } },
     },
     visualMap: {
       min: 0,
@@ -53,8 +64,11 @@ const option = computed<EChartsCoreOption>(() => {
       orient: 'horizontal',
       left: 'center',
       bottom: 0,
+      itemWidth: 10,
+      itemHeight: 10,
+      textStyle: { color: foreground, fontSize: 11 },
       inRange: {
-        color: [empty, '#9c574b', '#f08a72'],
+        color: colors,
       },
     },
     series: [
@@ -63,10 +77,18 @@ const option = computed<EChartsCoreOption>(() => {
         data: values,
         label: {
           show: true,
+          color: props.theme === 'dark' ? '#f0f6fc' : '#0f172a',
+          fontSize: 11,
+          fontFamily: 'monospace',
           formatter: (params: unknown) => {
             const value = (params as { value: [number, number, number] }).value
             return value[2] > 0 ? String(value[2]) : ''
           },
+        },
+        itemStyle: {
+          borderColor: props.theme === 'dark' ? '#090b0e' : '#ffffff',
+          borderWidth: 2,
+          borderRadius: 4,
         },
       },
     ],
@@ -75,8 +97,13 @@ const option = computed<EChartsCoreOption>(() => {
 </script>
 
 <template>
-  <section class="panel">
-    <h2>时间规律</h2>
-    <EChart :key="theme" :option="option" :theme="theme" />
+  <section class="panel chart-panel">
+    <div class="panel-header">
+      <h2>时间分布 PERIOD & WEEKDAY</h2>
+      <span class="panel-badge">PATTERN</span>
+    </div>
+    <div class="chart-panel-body">
+      <EChart :key="theme" :option="option" :theme="theme" style="width: 100%; height: 100%; min-height: 200px" />
+    </div>
   </section>
 </template>
