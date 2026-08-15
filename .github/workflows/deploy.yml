@@ -57,10 +57,7 @@ jobs:
               - 'deploy/journal/**'
               - 'scripts/journal-backup'
               - 'package.json'
-              - 'pnpm-lock.yaml'
-              - 'pnpm-workspace.yaml'
               - 'tsconfig.json'
-              - '.github/workflows/deploy.yml'
             bot:
               - 'src/*.ts'
               - 'src/ai/**'
@@ -84,17 +81,13 @@ jobs:
               - 'scripts/notinews-backup'
               - 'scripts/notinews-video-worker'
               - 'package.json'
-              - 'pnpm-lock.yaml'
-              - 'pnpm-workspace.yaml'
               - 'tsconfig.json'
-              - '.github/workflows/deploy.yml'
             lu_dashboard:
               - 'apps/lu-dashboard/**'
               - 'deploy/lu-dashboard/**'
               - 'package.json'
               - 'pnpm-lock.yaml'
               - 'pnpm-workspace.yaml'
-              - '.github/workflows/deploy.yml'
 
       - name: Resolve deployment scope
         id: scope
