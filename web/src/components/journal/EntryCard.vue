@@ -409,8 +409,8 @@ function handleCardClick(event: MouseEvent): void {
 }
 
 @media (hover: hover) {
-  .entry--public-feed.entry--visual:hover .entry__visual-surface::after,
-  .entry--public-feed.entry--poster:hover .entry__visual-surface::after {
+  .entry--public-feed.entry--visual .entry__visual-surface:hover::after,
+  .entry--public-feed.entry--poster .entry__visual-surface:hover::after {
     opacity: 1;
   }
 }
