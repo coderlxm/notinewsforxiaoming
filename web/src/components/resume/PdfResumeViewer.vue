@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, shallowRef } from 'vue';
 import type { JournalResumePreviewPage, SiteContactItem } from '../../types';
 import { showMessage } from '../../utils/message';
 import AboutContactIcon from '../about/AboutContactIcon.vue';
@@ -14,7 +14,9 @@ const props = defineProps<{
   contacts?: SiteContactItem[];
 }>();
 
-const currentPage = ref(1);
+const currentPage = shallowRef(1);
+const navigating = shallowRef(false);
+const previewImages = new Map<string, HTMLImageElement>();
 const totalPages = computed(() => props.pages.length);
 
 const activePage = computed(() =>
@@ -35,22 +37,46 @@ const formattedDate = computed(() => {
   }).format(new Date(props.updatedAt));
 });
 
-function prevPage(): void {
-  if (currentPage.value > 1) {
-    currentPage.value -= 1;
+function preloadPreviewImages(): void {
+  for (const page of props.pages) {
+    for (const source of [page.lightUrl, page.darkUrl]) {
+      const image = new Image();
+      image.src = source;
+      previewImages.set(source, image);
+    }
   }
+}
+
+async function ensurePageDecoded(page: JournalResumePreviewPage): Promise<void> {
+  await Promise.all([
+    previewImages.get(page.lightUrl)!.decode(),
+    previewImages.get(page.darkUrl)!.decode(),
+  ]);
+}
+
+async function goToPage(pageNumber: number): Promise<void> {
+  if (
+    navigating.value
+    || pageNumber === currentPage.value
+    || pageNumber < 1
+    || pageNumber > totalPages.value
+  ) return;
+  const page = props.pages.find(item => item.pageNumber === pageNumber)!;
+  navigating.value = true;
+  try {
+    await ensurePageDecoded(page);
+    currentPage.value = pageNumber;
+  } finally {
+    navigating.value = false;
+  }
+}
+
+function prevPage(): void {
+  void goToPage(currentPage.value - 1);
 }
 
 function nextPage(): void {
-  if (currentPage.value < totalPages.value) {
-    currentPage.value += 1;
-  }
-}
-
-function goToPage(pageNumber: number): void {
-  if (pageNumber >= 1 && pageNumber <= totalPages.value) {
-    currentPage.value = pageNumber;
-  }
+  void goToPage(currentPage.value + 1);
 }
 
 function handleKeydown(event: KeyboardEvent): void {
@@ -79,10 +105,12 @@ async function copyShareUrl(): Promise<void> {
 }
 
 onMounted(() => {
+  preloadPreviewImages();
   window.addEventListener('keydown', handleKeydown);
 });
 
 onUnmounted(() => {
+  previewImages.clear();
   window.removeEventListener('keydown', handleKeydown);
 });
 </script>
@@ -91,13 +119,13 @@ onUnmounted(() => {
   <div class="pdf-viewer-root">
     <!-- 桌面端视图：画廊级单页聚焦翻页器 -->
     <section class="pdf-book" aria-label="PDF 简历单页阅读器">
-      <div class="pdf-book__stage">
+      <div class="pdf-book__stage" :aria-busy="navigating">
         <!-- 左侧翻页浮动按钮 -->
         <button
           v-if="totalPages > 1"
           class="pdf-book__nav pdf-book__nav--prev"
           type="button"
-          :disabled="currentPage <= 1"
+          :disabled="navigating || currentPage <= 1"
           aria-label="上一页"
           title="上一页 (←)"
           @click="prevPage"
@@ -140,7 +168,7 @@ onUnmounted(() => {
           v-if="totalPages > 1"
           class="pdf-book__nav pdf-book__nav--next"
           type="button"
-          :disabled="currentPage >= totalPages"
+          :disabled="navigating || currentPage >= totalPages"
           aria-label="下一页"
           title="下一页 (→)"
           @click="nextPage"
@@ -156,7 +184,7 @@ onUnmounted(() => {
         <button
           class="pdf-book__pager-btn"
           type="button"
-          :disabled="currentPage <= 1"
+          :disabled="navigating || currentPage <= 1"
           @click="prevPage"
         >
           ‹ 上一页
@@ -170,6 +198,7 @@ onUnmounted(() => {
             :class="{ 'pdf-book__page-pill--active': page.pageNumber === currentPage }"
             type="button"
             :aria-label="`跳转到第 ${page.pageNumber} 页`"
+            :disabled="navigating"
             @click="goToPage(page.pageNumber)"
           >
             {{ page.pageNumber }}
@@ -179,7 +208,7 @@ onUnmounted(() => {
         <button
           class="pdf-book__pager-btn"
           type="button"
-          :disabled="currentPage >= totalPages"
+          :disabled="navigating || currentPage >= totalPages"
           @click="nextPage"
         >
           下一页 ›
@@ -313,7 +342,7 @@ onUnmounted(() => {
   position: relative;
   width: min(100%, 860px);
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--surface-card);
   box-shadow:
     0 16px 36px color-mix(in srgb, var(--ink) 12%, transparent),
     0 2px 6px color-mix(in srgb, var(--ink) 4%, transparent),
