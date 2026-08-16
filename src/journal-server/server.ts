@@ -25,6 +25,10 @@ import {
   JournalImagePreviewService,
 } from './imagePreview.js';
 import { JournalRepository } from './repository.js';
+import {
+  JournalResumePreviewBackfillService,
+  JournalResumePreviewService,
+} from './resumePreview.js';
 import { JournalResumeService } from './resumeService.js';
 import { registerArticleRoutes } from './routes/articles.js';
 import { registerContributionRoutes } from './routes/contributions.js';
@@ -58,10 +62,12 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
   const database = openJournalDatabase(config.dataDir);
   const repository = new JournalRepository(database);
   const auth = new JournalAuth(config.ingestToken, config.adminPassword);
+  const resumePreviews = new JournalResumePreviewService();
   const resumeService = new JournalResumeService(
     repository,
     auth,
     config.publicBaseUrl,
+    resumePreviews,
   );
   const siteProfileService = new JournalSiteProfileService(repository, resumeService);
   const weatherService = new JournalWeatherService(
@@ -108,6 +114,7 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
   );
   await new JournalImagePreviewBackfillService(repository, storage, previews).run();
   await new JournalVideoPreviewBackfillService(repository, storage, videoPreviews).run();
+  await new JournalResumePreviewBackfillService(repository, resumePreviews).run();
   await siteProfileService.initialize(path.join(config.webRoot, 'avatar-ming.png'));
 
   await server.register(fastifyCookie, { secret: config.cookieSecret });

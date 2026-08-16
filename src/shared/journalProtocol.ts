@@ -522,6 +522,14 @@ export type JournalResumeFormat = z.infer<typeof journalResumeFormatSchema>;
 export const journalResumeAccessModeSchema = z.enum(['private', 'protected', 'temporary', 'public']);
 export type JournalResumeAccessMode = z.infer<typeof journalResumeAccessModeSchema>;
 
+export const journalResumePreviewPageSchema = z.object({
+  pageNumber: z.number().int().positive(),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+  url: z.string().min(1),
+});
+export type JournalResumePreviewPage = z.infer<typeof journalResumePreviewPageSchema>;
+
 export const journalResumeSummarySchema = z.object({
   format: journalResumeFormatSchema,
   originalName: z.string().min(1),
@@ -553,6 +561,7 @@ export const journalPublicResumeSchema = z.discriminatedUnion('kind', [
     updatedAt: z.string().datetime(),
     contentUrl: z.string().min(1),
     downloadUrl: z.string().min(1),
+    previewPages: z.array(journalResumePreviewPageSchema).min(1),
   }),
 ]);
 export type JournalPublicResume = z.infer<typeof journalPublicResumeSchema>;

@@ -1097,6 +1097,23 @@ const migrations: JournalMigration[] = [
       `);
     },
   },
+  {
+    version: 18,
+    up(database) {
+      database.exec(`
+        CREATE TABLE journal_resume_preview_pages (
+          page_number INTEGER PRIMARY KEY
+            CHECK (page_number > 0),
+          content_webp BLOB NOT NULL
+            CHECK (length(content_webp) > 0),
+          width INTEGER NOT NULL
+            CHECK (width > 0),
+          height INTEGER NOT NULL
+            CHECK (height > 0)
+        );
+      `);
+    },
+  },
 ];
 
 export function runJournalMigrations(database: Database.Database): void {

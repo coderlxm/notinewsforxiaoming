@@ -16,6 +16,7 @@ import type {
   JournalRepository,
   JournalResumeRecord,
 } from './repository.js';
+import type { JournalResumePreviewService } from './resumePreview.js';
 
 const resumeAccessCookieName = 'journal_resume_access';
 const maxMarkdownBytes = 1024 * 1024;
@@ -58,6 +59,7 @@ export class JournalResumeService {
     private readonly repository: JournalRepository,
     private readonly auth: JournalAuth,
     private readonly publicBaseUrl: string,
+    private readonly previews: JournalResumePreviewService,
   ) {}
 
   resolveContent(request: FastifyRequest): JournalPublicResume | null {
@@ -89,6 +91,10 @@ export class JournalResumeService {
         downloadUrl: this.downloadUrl(record.revision),
       };
     }
+    const previewPages = this.repository.listResumePreviewPageMetadata();
+    if (previewPages.length === 0) {
+      throw new Error('Stored PDF resume is missing preview pages.');
+    }
     return {
       kind: 'resume',
       format: 'pdf',
@@ -97,7 +103,19 @@ export class JournalResumeService {
       updatedAt: record.updatedAt,
       contentUrl: this.fileUrl(record.revision),
       downloadUrl: this.downloadUrl(record.revision),
+      previewPages: previewPages.map(page => ({
+        pageNumber: page.pageNumber,
+        width: page.width,
+        height: page.height,
+        url: this.previewPageUrl(page.pageNumber, record.revision),
+      })),
     };
+  }
+
+  resolvePreviewPage(request: FastifyRequest, pageNumber: number): Buffer | null {
+    const record = this.authorize(request);
+    if (!record || record.format !== 'pdf') return null;
+    return this.repository.getResumePreviewPageOrNull(pageNumber)?.contentWebp ?? null;
   }
 
   authorize(request: FastifyRequest): JournalResumeRecord | null {
@@ -179,11 +197,15 @@ export class JournalResumeService {
     const renderedHtml = format === 'markdown'
       ? this.renderMarkdown(input.buffer)
       : null;
+    const previewPages = format === 'pdf'
+      ? await this.previews.generate(input.buffer)
+      : [];
     return this.repository.saveResume({
       format,
       originalName: input.originalName,
       content: input.buffer,
       renderedHtml,
+      previewPages,
       accessGrantId: randomBytes(32).toString('base64url'),
       updatedAt: new Date().toISOString(),
     });
@@ -339,5 +361,9 @@ export class JournalResumeService {
 
   private downloadUrl(revision: number): string {
     return `/api/resume/download?v=${revision}`;
+  }
+
+  private previewPageUrl(pageNumber: number, revision: number): string {
+    return `/api/resume/pages/${pageNumber}?v=${revision}`;
   }
 }

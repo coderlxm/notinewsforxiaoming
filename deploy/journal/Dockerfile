@@ -30,7 +30,7 @@ ENV JOURNAL_DATA_DIR=/data
 ENV JOURNAL_WEB_ROOT=/app/web/dist
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends ffmpeg libheif-examples \
+  && apt-get install -y --no-install-recommends ffmpeg libheif-examples poppler-utils \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

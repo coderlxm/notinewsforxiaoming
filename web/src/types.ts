@@ -176,6 +176,13 @@ export interface JournalResumeSummary {
   accessMode: 'protected' | 'public';
 }
 
+export interface JournalResumePreviewPage {
+  pageNumber: number;
+  width: number;
+  height: number;
+  url: string;
+}
+
 export type JournalPublicResume =
   | { kind: 'locked'; accessMode: 'protected' }
   | {
@@ -195,6 +202,7 @@ export type JournalPublicResume =
       updatedAt: string;
       contentUrl: string;
       downloadUrl: string;
+      previewPages: JournalResumePreviewPage[];
     };
 
 export interface JournalAdminResumeSummary {

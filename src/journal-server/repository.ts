@@ -206,6 +206,18 @@ export interface JournalResumeShareLinkRecord {
   createdAt: string;
 }
 
+export interface JournalResumePreviewPageRecord {
+  pageNumber: number;
+  contentWebp: Buffer;
+  width: number;
+  height: number;
+}
+
+export type JournalResumePreviewPageMetadata = Omit<
+  JournalResumePreviewPageRecord,
+  'contentWebp'
+>;
+
 export interface UpdateResumeAccessInput {
   accessMode: JournalResumeAccessMode;
   accessPasswordHash: string | null;
@@ -1884,33 +1896,80 @@ export class JournalRepository {
     originalName: string;
     content: Buffer;
     renderedHtml: string | null;
+    previewPages: JournalResumePreviewPageRecord[];
     accessGrantId: string;
     updatedAt: string;
   }): JournalResumeRecord {
-    this.database.prepare(`
-      INSERT INTO journal_site_resume (
-        id, format, original_name, content, rendered_html,
-        access_mode, access_password_hash, access_grant_id,
-        access_revision, revision, updated_at
-      ) VALUES (1, ?, ?, ?, ?, 'private', NULL, ?, 1, 1, ?)
-      ON CONFLICT(id) DO UPDATE SET
-        format = excluded.format,
-        original_name = excluded.original_name,
-        content = excluded.content,
-        rendered_html = excluded.rendered_html,
-        revision = journal_site_resume.revision + 1,
-        updated_at = excluded.updated_at
-    `).run(
-      input.format,
-      input.originalName,
-      input.content,
-      input.renderedHtml,
-      input.accessGrantId,
-      input.updatedAt,
-    );
+    const save = this.database.transaction(() => {
+      this.database.prepare(`
+        INSERT INTO journal_site_resume (
+          id, format, original_name, content, rendered_html,
+          access_mode, access_password_hash, access_grant_id,
+          access_revision, revision, updated_at
+        ) VALUES (1, ?, ?, ?, ?, 'private', NULL, ?, 1, 1, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          format = excluded.format,
+          original_name = excluded.original_name,
+          content = excluded.content,
+          rendered_html = excluded.rendered_html,
+          revision = journal_site_resume.revision + 1,
+          updated_at = excluded.updated_at
+      `).run(
+        input.format,
+        input.originalName,
+        input.content,
+        input.renderedHtml,
+        input.accessGrantId,
+        input.updatedAt,
+      );
+      this.replaceResumePreviewPagesInTransaction(input.previewPages);
+    });
+    save();
     const record = this.getResumeOrNull();
     if (!record) throw new Error('Journal resume was not stored.');
     return record;
+  }
+
+  listResumePreviewPageMetadata(): JournalResumePreviewPageMetadata[] {
+    const rows = this.database.prepare(`
+      SELECT page_number, width, height
+      FROM journal_resume_preview_pages
+      ORDER BY page_number ASC
+    `).all() as Array<{
+      page_number: number;
+      width: number;
+      height: number;
+    }>;
+    return rows.map(row => ({
+      pageNumber: row.page_number,
+      width: row.width,
+      height: row.height,
+    }));
+  }
+
+  getResumePreviewPageOrNull(pageNumber: number): JournalResumePreviewPageRecord | null {
+    const row = this.database.prepare(`
+      SELECT page_number, content_webp, width, height
+      FROM journal_resume_preview_pages
+      WHERE page_number = ?
+    `).get(pageNumber) as {
+      page_number: number;
+      content_webp: Buffer;
+      width: number;
+      height: number;
+    } | undefined;
+    return row ? {
+      pageNumber: row.page_number,
+      contentWebp: row.content_webp,
+      width: row.width,
+      height: row.height,
+    } : null;
+  }
+
+  replaceResumePreviewPages(pages: JournalResumePreviewPageRecord[]): void {
+    this.database.transaction(() => {
+      this.replaceResumePreviewPagesInTransaction(pages);
+    })();
   }
 
   updateResumeAccess(input: UpdateResumeAccessInput): JournalResumeRecord {
@@ -1952,9 +2011,24 @@ export class JournalRepository {
   deleteResume(): void {
     const remove = this.database.transaction(() => {
       this.database.prepare('DELETE FROM journal_resume_share_link WHERE id = 1').run();
+      this.database.prepare('DELETE FROM journal_resume_preview_pages').run();
       this.database.prepare('DELETE FROM journal_site_resume WHERE id = 1').run();
     });
     remove();
+  }
+
+  private replaceResumePreviewPagesInTransaction(
+    pages: JournalResumePreviewPageRecord[],
+  ): void {
+    this.database.prepare('DELETE FROM journal_resume_preview_pages').run();
+    const insert = this.database.prepare(`
+      INSERT INTO journal_resume_preview_pages (
+        page_number, content_webp, width, height
+      ) VALUES (?, ?, ?, ?)
+    `);
+    for (const page of pages) {
+      insert.run(page.pageNumber, page.contentWebp, page.width, page.height);
+    }
   }
 
   private getById(id: number): JournalEntry {
