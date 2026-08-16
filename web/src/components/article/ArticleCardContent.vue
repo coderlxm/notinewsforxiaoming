@@ -22,6 +22,7 @@ const props = withDefaults(defineProps<{
   display?: 'summary' | 'full';
   anchored?: boolean;
   showYear?: boolean;
+  showAiBadge?: boolean;
 }>(), {
   editable: false,
   busy: false,
@@ -29,6 +30,7 @@ const props = withDefaults(defineProps<{
   display: 'summary',
   anchored: false,
   showYear: false,
+  showAiBadge: true,
 });
 
 const emit = defineEmits<{
@@ -124,7 +126,7 @@ function handleCardClick(event: MouseEvent): void {
       />
       <div class="article-card__header-actions">
         <span
-          v-if="display === 'summary' && entry.aiGenerated"
+          v-if="showAiBadge && display === 'summary' && entry.aiGenerated"
           class="article-card__ai-badge"
           aria-label="AI 生成"
         >AI 生成</span>

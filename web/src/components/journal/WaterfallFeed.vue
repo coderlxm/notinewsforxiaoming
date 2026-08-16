@@ -208,6 +208,7 @@ onBeforeUnmount(() => {
             :entry="entry"
             :editable="mode === 'private'"
             :busy="mutationEntryId === entry.id"
+            :show-ai-badge="mode !== 'private'"
             :show-year="mode === 'public'"
             @open-entry="emit('openEntry', $event)"
             @select-tag="emit('selectTag', $event)"
