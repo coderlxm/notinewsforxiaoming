@@ -43,7 +43,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          fetch-depth: 2
+          fetch-depth: 0
 
       - name: Detect changed deployment scope
         id: paths
@@ -56,7 +56,6 @@ jobs:
               - 'web/**'
               - 'deploy/journal/**'
               - 'scripts/journal-backup'
-              - 'package.json'
               - 'tsconfig.json'
             bot:
               - 'src/*.ts'
@@ -80,14 +79,57 @@ jobs:
               - 'scripts/install-video-download-tools'
               - 'scripts/notinews-backup'
               - 'scripts/notinews-video-worker'
-              - 'package.json'
               - 'tsconfig.json'
             lu_dashboard:
               - 'apps/lu-dashboard/**'
               - 'deploy/lu-dashboard/**'
-              - 'package.json'
               - 'pnpm-lock.yaml'
               - 'pnpm-workspace.yaml'
+
+      - name: Detect root manifest deployment scope
+        id: root-manifest
+        if: github.event_name == 'push'
+        env:
+          BASE_SHA: ${{ github.event.before }}
+        run: |
+          before_manifest="$(git show "$BASE_SHA:package.json")"
+          current_manifest="$(git show "$GITHUB_SHA:package.json")"
+
+          manifest_changed() {
+            local filter="$1"
+            local before after
+            before="$(printf '%s\n' "$before_manifest" | jq -S -c "$filter")"
+            after="$(printf '%s\n' "$current_manifest" | jq -S -c "$filter")"
+            [ "$before" != "$after" ]
+          }
+
+          root_journal=false
+          root_bot=false
+          root_lu=false
+
+          if manifest_changed '.scripts | with_entries(select(.key | endswith(":journal")))'; then
+            root_journal=true
+          fi
+          if manifest_changed '.scripts | with_entries(select(.key | endswith(":bot") or (.key == "start" or .key == "prestart")))'; then
+            root_bot=true
+          fi
+          if manifest_changed '{dependencies, devDependencies}'; then
+            root_journal=true
+            root_bot=true
+          fi
+          if manifest_changed '{engines}'; then
+            root_journal=true
+            root_bot=true
+          fi
+          if manifest_changed '{packageManager}'; then
+            root_journal=true
+            root_bot=true
+            root_lu=true
+          fi
+
+          echo "root_journal=$root_journal" >> "$GITHUB_OUTPUT"
+          echo "root_bot=$root_bot" >> "$GITHUB_OUTPUT"
+          echo "root_lu_dashboard=$root_lu" >> "$GITHUB_OUTPUT"
 
       - name: Resolve deployment scope
         id: scope
@@ -95,6 +137,9 @@ jobs:
           PUSH_JOURNAL: ${{ steps.paths.outputs.journal }}
           PUSH_BOT: ${{ steps.paths.outputs.bot }}
           PUSH_LU_DASHBOARD: ${{ steps.paths.outputs.lu_dashboard }}
+          ROOT_JOURNAL: ${{ steps.root-manifest.outputs.root_journal }}
+          ROOT_BOT: ${{ steps.root-manifest.outputs.root_bot }}
+          ROOT_LU_DASHBOARD: ${{ steps.root-manifest.outputs.root_lu_dashboard }}
           MANUAL_JOURNAL: ${{ inputs.deploy_journal }}
           MANUAL_BOT: ${{ inputs.deploy_bot }}
           MANUAL_LU_DASHBOARD: ${{ inputs.deploy_lu_dashboard }}
@@ -104,9 +149,18 @@ jobs:
             echo "bot=$MANUAL_BOT" >> "$GITHUB_OUTPUT"
             echo "lu_dashboard=$MANUAL_LU_DASHBOARD" >> "$GITHUB_OUTPUT"
           else
-            echo "journal=$PUSH_JOURNAL" >> "$GITHUB_OUTPUT"
-            echo "bot=$PUSH_BOT" >> "$GITHUB_OUTPUT"
-            echo "lu_dashboard=$PUSH_LU_DASHBOARD" >> "$GITHUB_OUTPUT"
+            journal=false
+            bot=false
+            lu_dashboard=false
+            [ "$PUSH_JOURNAL" = "true" ] && journal=true
+            [ "$PUSH_BOT" = "true" ] && bot=true
+            [ "$PUSH_LU_DASHBOARD" = "true" ] && lu_dashboard=true
+            [ "$ROOT_JOURNAL" = "true" ] && journal=true
+            [ "$ROOT_BOT" = "true" ] && bot=true
+            [ "$ROOT_LU_DASHBOARD" = "true" ] && lu_dashboard=true
+            echo "journal=$journal" >> "$GITHUB_OUTPUT"
+            echo "bot=$bot" >> "$GITHUB_OUTPUT"
+            echo "lu_dashboard=$lu_dashboard" >> "$GITHUB_OUTPUT"
           fi
 
   journal:

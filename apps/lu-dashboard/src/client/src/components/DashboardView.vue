@@ -20,13 +20,24 @@ defineProps<{ sessionError: string | null }>()
 dayjs.extend(utc)
 dayjs.extend(timezone)
 
+const THEME_STORAGE_KEY = 'lu_dashboard_theme'
+
+function getInitialTheme(): 'dark' | 'light' {
+  const saved = localStorage.getItem(THEME_STORAGE_KEY)
+  if (saved === 'dark' || saved === 'light') {
+    return saved
+  }
+  return 'dark'
+}
+
 const ranges: DashboardRange[] = [30, 90, 365]
-const theme = ref<'dark' | 'light'>('dark')
+const theme = ref<'dark' | 'light'>(getInitialTheme())
 const { analytics, error, generatedAt, loading, range, refresh, setRange } = useDashboard()
 
 function toggleTheme() {
   theme.value = theme.value === 'dark' ? 'light' : 'dark'
   document.documentElement.dataset.theme = theme.value
+  localStorage.setItem(THEME_STORAGE_KEY, theme.value)
 }
 
 function formatGeneratedAt(value: string) {
