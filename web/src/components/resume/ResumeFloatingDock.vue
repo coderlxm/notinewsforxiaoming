@@ -75,10 +75,13 @@ async function copyShareUrl(): Promise<void> {
 
 <style scoped>
 .resume-dock {
-  position: fixed;
-  right: clamp(1.25rem, 3vw, 2.5rem);
+  position: sticky;
   bottom: clamp(1.25rem, 3vw, 2.2rem);
   z-index: 40;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin-top: 1.75rem;
   pointer-events: none;
 }
 
@@ -158,17 +161,13 @@ async function copyShareUrl(): Promise<void> {
   }
 
   .resume-dock {
-    left: 50%;
-    right: auto;
-    transform: translateX(-50%);
     bottom: 1rem;
-    width: calc(100% - 2rem);
-    max-width: 24rem;
+    margin-top: 1.2rem;
   }
 
   .resume-dock__inner {
     justify-content: space-around;
-    width: 100%;
+    width: min(100%, 24rem);
     padding: 0.3rem;
   }
 

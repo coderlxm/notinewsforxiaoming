@@ -152,7 +152,7 @@ async function unlock(password: string): Promise<void> {
 .resume-view {
   width: min(calc(100% - (var(--page-gutter) * 2)), 960px);
   margin: 0 auto;
-  padding: clamp(1.8rem, 4vw, 3.2rem) 0 6.5rem;
+  padding: clamp(1.8rem, 4vw, 3.2rem) 0 3.5rem;
 }
 
 .resume-view__loading {
@@ -174,7 +174,7 @@ async function unlock(password: string): Promise<void> {
 @media (max-width: 599px) {
   .resume-view {
     padding-top: 1.2rem;
-    padding-bottom: 5.5rem;
+    padding-bottom: 2rem;
   }
 }
 </style>
