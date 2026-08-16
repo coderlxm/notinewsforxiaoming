@@ -54,6 +54,7 @@ export interface JournalEntry {
   publicationStatus: JournalPublicationStatus;
   tags: string[];
   pinned: boolean;
+  aiGenerated: boolean;
   structuredContent: Record<string, unknown> | null;
   sourceCreatedAt: string;
   capturedAt: string;

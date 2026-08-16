@@ -41,6 +41,7 @@ export function useArticleEditor() {
     title: string;
     richBody: JournalRichDocument;
     tags: string[];
+    aiGenerated: boolean;
   }): Promise<JournalEntry | null> {
     saving.value = true;
     error.value = null;
@@ -60,6 +61,7 @@ export function useArticleEditor() {
     title: string;
     richBody: JournalRichDocument;
     tags: string[];
+    aiGenerated: boolean;
   }): Promise<JournalEntry | null> {
     if (article.value === null) return null;
     saving.value = true;

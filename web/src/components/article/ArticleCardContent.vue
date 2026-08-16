@@ -112,16 +112,23 @@ function handleCardClick(event: MouseEvent): void {
       tone="surface"
     />
     <header class="article-card__header">
-      <CardDateSpine
-        :source-created-at="entry.sourceCreatedAt"
-        :pinned="display === 'full' && entry.pinned"
-        :visibility="entry.visibility"
-        :publication-status="entry.publicationStatus"
-        :show-status="editable"
-        :show-year="showYear"
-        :linkable="cardLinkable"
-        @open="openEntry"
-      />
+      <div class="article-card__meta">
+        <CardDateSpine
+          :source-created-at="entry.sourceCreatedAt"
+          :pinned="display === 'full' && entry.pinned"
+          :visibility="entry.visibility"
+          :publication-status="entry.publicationStatus"
+          :show-status="editable"
+          :show-year="showYear"
+          :linkable="cardLinkable"
+          @open="openEntry"
+        />
+        <span
+          v-if="display === 'summary' && entry.aiGenerated"
+          class="article-card__ai-badge"
+          aria-label="AI 生成"
+        >AI 生成</span>
+      </div>
       <CardActionMenu
         v-if="editable && !confirmingDeletion"
         :busy="busy"
@@ -304,6 +311,27 @@ function handleCardClick(event: MouseEvent): void {
 .article-card__delete-actions {
   display: flex;
   align-items: center;
+}
+
+.article-card__meta {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.article-card__ai-badge {
+  flex: none;
+  padding: 0.22rem 0.55rem;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 0.68rem;
+  font-weight: 750;
+  line-height: 1.2;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
 }
 
 .article-card__header {

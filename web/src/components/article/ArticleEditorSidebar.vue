@@ -38,6 +38,7 @@ const emit = defineEmits<{
 const tags = defineModel<string[]>('tags', { default: () => [] });
 const visibility = defineModel<JournalVisibility>('visibility', { required: true });
 const accessPassword = defineModel<string>('accessPassword', { default: '' });
+const aiGenerated = defineModel<boolean>('aiGenerated', { default: false });
 const tagsInput = shallowRef(tagsInputToString(tags.value));
 const tagInputFull = computed(() => parseTagsInput(tagsInput.value).length === 20);
 
@@ -78,6 +79,14 @@ async function copyAccessLink(): Promise<void> {
       <h2 class="editor-sidebar__title">文章设置</h2>
 
       <div class="editor-sidebar__settings">
+        <label class="editor-sidebar__ai-generated" :class="{ 'editor-sidebar__ai-generated--on': aiGenerated }">
+          <input v-model="aiGenerated" type="checkbox">
+          <span>
+            <strong>AI 生成内容</strong>
+            <small>AI 完成主要正文撰写时开启</small>
+          </span>
+        </label>
+
         <div class="field">
           <div class="editor-sidebar__field-heading">
             <label class="field__label" for="article-editor-tags">标签（逗号分隔，最多 20 个）</label>
@@ -197,6 +206,43 @@ async function copyAccessLink(): Promise<void> {
   color: var(--text-muted);
   font-size: 0.72rem;
   font-weight: 650;
+}
+
+.editor-sidebar__ai-generated {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.65rem;
+  background: var(--surface-card);
+  cursor: pointer;
+}
+
+.editor-sidebar__ai-generated--on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.editor-sidebar__ai-generated input {
+  flex: none;
+  margin: 0.18rem 0 0;
+  accent-color: var(--accent);
+}
+
+.editor-sidebar__ai-generated span {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.editor-sidebar__ai-generated strong {
+  font-size: 0.86rem;
+}
+
+.editor-sidebar__ai-generated small {
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  line-height: 1.45;
 }
 
 .editor-sidebar__visibility {

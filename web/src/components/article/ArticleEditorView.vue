@@ -24,6 +24,7 @@ const router = useRouter();
 
 const title = shallowRef('');
 const tags = shallowRef<string[]>([]);
+const aiGenerated = shallowRef(false);
 const richBody = shallowRef<JournalRichDocument>({
   type: 'doc',
   content: [{ type: 'paragraph' }],
@@ -56,6 +57,7 @@ const previewEntry = computed<JournalEntry | null>(() => article.value === null
       title: title.value.trim(),
       tags: tags.value,
       richBody: richBody.value,
+      aiGenerated: aiGenerated.value,
     });
 
 function hasArticleBody(document: JournalRichDocument): boolean {
@@ -107,6 +109,7 @@ watch(article, (entry) => {
   initializedArticleId.value = entry.id;
   title.value = entry.title ?? '';
   tags.value = [...entry.tags];
+  aiGenerated.value = entry.aiGenerated;
   selectedVisibility.value = entry.visibility;
   accessPassword.value = '';
   if (entry.richBody) richBody.value = entry.richBody;
@@ -140,6 +143,7 @@ async function save(): Promise<void> {
       title: title.value.trim(),
       richBody: richBody.value,
       tags: tags.value,
+      aiGenerated: aiGenerated.value,
     };
     if (article.value === null) {
       const created = await editor.create(input);
@@ -271,6 +275,7 @@ function returnToAssets(): void {
             v-model:tags="tags"
             v-model:visibility="selectedVisibility"
             v-model:access-password="accessPassword"
+            v-model:ai-generated="aiGenerated"
             :article="article"
             :action-busy="editor.saving.value || editor.uploading.value"
             :assets="assets"

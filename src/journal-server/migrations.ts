@@ -1048,6 +1048,16 @@ const migrations: JournalMigration[] = [
       `);
     },
   },
+  {
+    version: 16,
+    up(database) {
+      database.exec(`
+        ALTER TABLE journal_entries
+        ADD COLUMN ai_generated INTEGER NOT NULL DEFAULT 0
+          CHECK (ai_generated IN (0, 1));
+      `);
+    },
+  },
 ];
 
 export function runJournalMigrations(database: Database.Database): void {

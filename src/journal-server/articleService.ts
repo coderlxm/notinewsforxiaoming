@@ -53,6 +53,7 @@ export class JournalArticleService {
       richBodyJson,
       tags: input.tags,
       contentText,
+      aiGenerated: input.aiGenerated,
     });
   }
 
@@ -81,6 +82,7 @@ export class JournalArticleService {
       richBodyJson,
       tags: input.tags,
       contentText,
+      aiGenerated: input.aiGenerated,
     }, unreferenced.map((asset) => asset.id));
 
     for (const asset of unreferenced) {

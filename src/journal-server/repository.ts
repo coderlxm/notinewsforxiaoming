@@ -64,6 +64,7 @@ interface EntryRow {
   structured_content_json: string | null;
   telegram_message_json: string | null;
   pinned: 0 | 1;
+  ai_generated: 0 | 1;
   source_created_at: string;
   captured_at: string;
   updated_at: string;
@@ -92,6 +93,7 @@ export interface CreateArticleInput {
   richBodyJson: string;
   tags: string[];
   contentText: string;
+  aiGenerated: boolean;
 }
 
 export interface UpdateArticleInput {
@@ -99,6 +101,7 @@ export interface UpdateArticleInput {
   richBodyJson: string;
   tags: string[];
   contentText: string;
+  aiGenerated: boolean;
 }
 
 export interface WebEntryAssetInput {
@@ -519,14 +522,15 @@ export class JournalRepository {
           public_id, source_kind, chat_id, source_message_id, media_group_id, content_type,
           title, body_format, rich_body_json, content_text,
           channel, visibility, tags_json, structured_content_json, telegram_message_json,
-          source_created_at, captured_at, updated_at
-        ) VALUES (?, 'web', NULL, NULL, NULL, 'article', ?, 'rich', ?, ?, 'article', 'private', ?, NULL, NULL, ?, ?, ?)
+          ai_generated, source_created_at, captured_at, updated_at
+        ) VALUES (?, 'web', NULL, NULL, NULL, 'article', ?, 'rich', ?, ?, 'article', 'private', ?, NULL, NULL, ?, ?, ?, ?)
       `).run(
         publicId,
         input.title,
         input.richBodyJson,
         input.contentText,
         JSON.stringify(input.tags),
+        input.aiGenerated ? 1 : 0,
         now,
         now,
         now,
@@ -720,7 +724,8 @@ export class JournalRepository {
     const update = this.database.transaction(() => {
       const result = this.database.prepare(`
         UPDATE journal_entries
-        SET title = ?, rich_body_json = ?, content_text = ?, tags_json = ?, updated_at = ?
+        SET title = ?, rich_body_json = ?, content_text = ?, tags_json = ?,
+            ai_generated = ?, updated_at = ?
         WHERE id = ? AND source_kind = 'web' AND body_format = 'rich'
           AND publication_status = 'published'
       `).run(
@@ -728,6 +733,7 @@ export class JournalRepository {
         input.richBodyJson,
         input.contentText,
         JSON.stringify(input.tags),
+        input.aiGenerated ? 1 : 0,
         new Date().toISOString(),
         id,
       );
@@ -2006,6 +2012,7 @@ export class JournalRepository {
       visibility: row.visibility,
       tags: z.array(z.string()).parse(JSON.parse(row.tags_json)),
       pinned: row.pinned === 1,
+      aiGenerated: row.ai_generated === 1,
       structuredContent: parseStructuredContent(row.structured_content_json),
       sourceCreatedAt: row.source_created_at,
       capturedAt: row.captured_at,

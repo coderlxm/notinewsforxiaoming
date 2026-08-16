@@ -420,6 +420,7 @@ export function createArticle(input: {
   title: string;
   richBody: JournalRichDocument;
   tags: string[];
+  aiGenerated: boolean;
 }): Promise<JournalEntry> {
   return requestJson<JournalEntry>('/api/me/articles', jsonRequest('POST', input));
 }
@@ -428,6 +429,7 @@ export function updateArticle(id: number, input: {
   title: string;
   richBody: JournalRichDocument;
   tags: string[];
+  aiGenerated: boolean;
 }): Promise<JournalEntry> {
   return requestJson<JournalEntry>(
     `/api/me/articles/${id}`,

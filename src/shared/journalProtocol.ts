@@ -100,6 +100,7 @@ export const journalEntrySchema = z.object({
   visibility: journalVisibilitySchema,
   tags: z.array(z.string()),
   pinned: z.boolean(),
+  aiGenerated: z.boolean(),
   structuredContent: z.record(z.string(), z.unknown()).nullable(),
   sourceCreatedAt: z.string().datetime(),
   capturedAt: z.string().datetime(),
@@ -115,6 +116,7 @@ export const journalArticleCreateRequestSchema = z.object({
   title: z.string().trim().min(1).max(120),
   richBody: journalRichDocumentSchema,
   tags: journalArticleTagsSchema,
+  aiGenerated: z.boolean(),
 });
 export type JournalArticleCreateRequest = z.infer<typeof journalArticleCreateRequestSchema>;
 
