@@ -125,6 +125,10 @@ async function unlock(password: string): Promise<void> {
         <PdfResumeViewer
           v-else
           :pages="resume.previewPages"
+          :content-url="resume.contentUrl"
+          :download-url="resume.downloadUrl"
+          :original-name="resume.originalName"
+          :updated-at="resume.updatedAt"
         />
       </section>
 

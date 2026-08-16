@@ -9,6 +9,9 @@ const props = defineProps<{
   resume: Extract<JournalPublicResume, { kind: 'resume' }>;
 }>();
 
+const isPdf = computed(() => props.resume.format === 'pdf');
+const pageCount = computed(() => (props.resume.format === 'pdf' ? props.resume.previewPages.length : 0));
+
 const visibleContacts = computed(() =>
   props.profile?.contactItems.filter((item) => item.enabled && item.value.trim()) ?? [],
 );
@@ -33,7 +36,33 @@ async function copyContact(item: SiteContactItem): Promise<void> {
 </script>
 
 <template>
-  <header class="resume-hero">
+  <!-- 桌面端 PDF 模式：紧凑精炼元信息条，杜绝与桌面端大尺寸 PDF 内部大标题重复 -->
+  <header v-if="isPdf" class="resume-hero resume-hero--desktop-compact">
+    <div class="resume-hero__compact-left">
+      <img
+        v-if="profile?.avatarUrl"
+        class="resume-hero__compact-avatar"
+        :src="profile.avatarUrl"
+        alt="小明同学"
+      >
+      <div class="resume-hero__compact-copy">
+        <span class="resume-hero__compact-name">小明同学</span>
+        <span class="resume-hero__compact-separator">/</span>
+        <span class="resume-hero__compact-title">个人简历</span>
+      </div>
+    </div>
+
+    <div class="resume-hero__compact-meta">
+      <span class="resume-hero__meta-badge">PDF ({{ pageCount }}P)</span>
+      <span class="resume-hero__meta-separator">·</span>
+      <span>更新于 {{ formattedDate }}</span>
+      <span class="resume-hero__meta-separator">·</span>
+      <span class="resume-hero__meta-filename" :title="resume.originalName">{{ resume.originalName }}</span>
+    </div>
+  </header>
+
+  <!-- 移动端（全部格式）或桌面端 Markdown：完整个人名片与联系方式 -->
+  <header class="resume-hero" :class="{ 'resume-hero--mobile-only': isPdf }">
     <div class="resume-hero__profile">
       <img
         v-if="profile?.avatarUrl"
@@ -80,7 +109,7 @@ async function copyContact(item: SiteContactItem): Promise<void> {
     </div>
 
     <div class="resume-hero__meta">
-      <span class="resume-hero__meta-badge">{{ resume.format === 'markdown' ? 'Markdown' : 'PDF' }}</span>
+      <span class="resume-hero__meta-badge">{{ isPdf ? `PDF (${pageCount}P)` : 'Markdown' }}</span>
       <span class="resume-hero__meta-separator" aria-hidden="true">·</span>
       <span>更新于 {{ formattedDate }}</span>
       <span class="resume-hero__meta-separator" aria-hidden="true">·</span>
@@ -93,11 +122,87 @@ async function copyContact(item: SiteContactItem): Promise<void> {
 .resume-hero {
   display: grid;
   gap: 1.25rem;
-  margin-bottom: 2.2rem;
-  padding-bottom: 1.8rem;
+  margin-bottom: 2rem;
+  padding-bottom: 1.6rem;
   border-bottom: 1px solid var(--border-subtle);
 }
 
+/* 桌面端 PDF 紧凑面包屑 */
+.resume-hero--desktop-compact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.9rem;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 599px) {
+  .resume-hero--desktop-compact {
+    display: none;
+  }
+}
+
+.resume-hero--mobile-only {
+  display: none;
+}
+
+@media (max-width: 599px) {
+  .resume-hero--mobile-only {
+    display: grid;
+    margin-bottom: 1.25rem;
+    padding-bottom: 1.25rem;
+  }
+}
+
+.resume-hero__compact-left {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.resume-hero__compact-avatar {
+  width: 1.85rem;
+  height: 1.85rem;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 0 0 1px var(--border-strong);
+}
+
+.resume-hero__compact-copy {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-serif);
+  font-size: 0.95rem;
+  font-weight: 750;
+}
+
+.resume-hero__compact-name {
+  color: var(--text-primary);
+}
+
+.resume-hero__compact-separator {
+  color: var(--border-strong);
+  font-weight: 400;
+}
+
+.resume-hero__compact-title {
+  color: var(--text-muted);
+}
+
+.resume-hero__compact-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  flex-wrap: wrap;
+}
+
+/* 完整版头部 */
 .resume-hero__profile {
   display: flex;
   align-items: center;
@@ -217,7 +322,7 @@ async function copyContact(item: SiteContactItem): Promise<void> {
 }
 
 .resume-hero__meta-badge {
-  padding: 0.1rem 0.45rem;
+  padding: 0.12rem 0.45rem;
   border-radius: 4px;
   background: var(--accent-soft);
   color: var(--accent-strong);
@@ -241,17 +346,17 @@ async function copyContact(item: SiteContactItem): Promise<void> {
 @media (max-width: 599px) {
   .resume-hero {
     gap: 1rem;
-    margin-bottom: 1.5rem;
-    padding-bottom: 1.25rem;
+    margin-bottom: 1.25rem;
+    padding-bottom: 1rem;
   }
 
   .resume-hero__avatar {
-    width: 3.6rem;
-    height: 3.6rem;
+    width: 3.4rem;
+    height: 3.4rem;
   }
 
   .resume-hero__name {
-    font-size: 1.5rem;
+    font-size: 1.45rem;
   }
 
   .resume-hero__contacts {
