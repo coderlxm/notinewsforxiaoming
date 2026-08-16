@@ -129,6 +129,8 @@ async function unlock(password: string): Promise<void> {
           :download-url="resume.downloadUrl"
           :original-name="resume.originalName"
           :updated-at="resume.updatedAt"
+          :share-url="fixedShareUrl"
+          :contacts="profile?.contactItems"
         />
       </section>
 

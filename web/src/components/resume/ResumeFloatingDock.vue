@@ -16,7 +16,7 @@ async function copyShareUrl(): Promise<void> {
 </script>
 
 <template>
-  <aside class="resume-dock" aria-label="简历快捷操作栏">
+  <aside class="resume-dock" :class="{ 'resume-dock--pdf': format === 'pdf' }" aria-label="简历快捷操作栏">
     <div class="resume-dock__inner">
       <RouterLink class="resume-dock__button resume-dock__button--back" to="/about" title="返回关于我">
         <svg class="resume-dock__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -151,7 +151,12 @@ async function copyShareUrl(): Promise<void> {
   flex: none;
 }
 
-@media (max-width: 899px) {
+@media (max-width: 599px) {
+  /* 移动端下，PDF 模式下所有操作均在一体化卡片内原生闭环，隐藏底部悬浮栏以保持视野极致通透 */
+  .resume-dock--pdf {
+    display: none;
+  }
+
   .resume-dock {
     left: 50%;
     right: auto;

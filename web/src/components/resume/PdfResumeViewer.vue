@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import type { JournalResumePreviewPage } from '../../types';
+import type { JournalResumePreviewPage, SiteContactItem } from '../../types';
+import { showMessage } from '../../utils/message';
+import AboutContactIcon from '../about/AboutContactIcon.vue';
 
 const props = defineProps<{
   pages: JournalResumePreviewPage[];
@@ -8,6 +10,8 @@ const props = defineProps<{
   downloadUrl?: string;
   originalName?: string;
   updatedAt?: string;
+  shareUrl?: string | null;
+  contacts?: SiteContactItem[];
 }>();
 
 const currentPage = ref(1);
@@ -16,6 +20,20 @@ const totalPages = computed(() => props.pages.length);
 const activePage = computed(() =>
   props.pages.find((p) => p.pageNumber === currentPage.value) ?? props.pages[0],
 );
+
+const visibleContacts = computed(() =>
+  props.contacts?.filter((item) => item.enabled && item.value.trim()) ?? [],
+);
+
+const formattedDate = computed(() => {
+  if (!props.updatedAt) return '';
+  return new Intl.DateTimeFormat('zh-CN', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date(props.updatedAt));
+});
 
 function prevPage(): void {
   if (currentPage.value > 1) {
@@ -41,6 +59,23 @@ function handleKeydown(event: KeyboardEvent): void {
   } else if (event.key === 'ArrowRight' || event.key === 'PageDown') {
     nextPage();
   }
+}
+
+function contactHref(item: SiteContactItem): string | undefined {
+  if (item.kind === 'email') return `mailto:${item.value}`;
+  if (item.url) return item.url;
+  return undefined;
+}
+
+async function copyContact(item: SiteContactItem): Promise<void> {
+  await navigator.clipboard.writeText(item.value);
+  showMessage({ message: `已复制${item.label}`, type: 'success' });
+}
+
+async function copyShareUrl(): Promise<void> {
+  if (!props.shareUrl) return;
+  await navigator.clipboard.writeText(props.shareUrl);
+  showMessage({ message: '简历分享地址已复制', type: 'success' });
 }
 
 onMounted(() => {
@@ -156,29 +191,53 @@ onUnmounted(() => {
       </p>
     </section>
 
-    <!-- 移动端专属模式：高质感档案卡 + 全屏原生阅读/下载行动点（告别模糊微缩图） -->
+    <!-- 移动端专属模式：一体化集约个人档案卡（0 重复、极简高效） -->
     <section class="pdf-mobile-card" aria-label="移动端简历查看">
       <div class="pdf-mobile-card__header">
-        <div class="pdf-mobile-card__icon-box" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-            <polyline points="14 2 14 8 20 8" />
-            <line x1="16" y1="13" x2="8" y2="13" />
-            <line x1="16" y1="17" x2="8" y2="17" />
-            <polyline points="10 9 9 9 8 9" />
-          </svg>
+        <div class="pdf-mobile-card__header-top">
+          <span class="pdf-mobile-card__badge">PDF · 共 {{ totalPages }} 页</span>
+          <span v-if="formattedDate" class="pdf-mobile-card__date">更新于 {{ formattedDate }}</span>
         </div>
-        <div class="pdf-mobile-card__info">
-          <span class="pdf-mobile-card__tag">PDF 专属文档</span>
-          <h2 class="pdf-mobile-card__title">{{ originalName || '个人简历.pdf' }}</h2>
-          <p class="pdf-mobile-card__sub">共 {{ totalPages }} 页 · 完整版式</p>
-        </div>
+        <h1 class="pdf-mobile-card__title">{{ originalName || '个人简历.pdf' }}</h1>
       </div>
 
+      <!-- 联系方式药丸群 -->
+      <div v-if="visibleContacts.length" class="pdf-mobile-card__contacts">
+        <template v-for="item in visibleContacts" :key="item.kind">
+          <button
+            v-if="item.kind === 'wechat' || !contactHref(item)"
+            class="pdf-mobile-card__pill"
+            type="button"
+            :title="`点击复制 ${item.label}: ${item.value}`"
+            @click="copyContact(item)"
+          >
+            <AboutContactIcon class="pdf-mobile-card__pill-icon" :kind="item.kind" />
+            <span class="pdf-mobile-card__pill-label">{{ item.label }}:</span>
+            <span class="pdf-mobile-card__pill-value">{{ item.value }}</span>
+          </button>
+          <a
+            v-else
+            class="pdf-mobile-card__pill"
+            :href="contactHref(item)"
+            :target="item.kind === 'email' ? undefined : '_blank'"
+            :rel="item.kind === 'email' ? undefined : 'noopener noreferrer'"
+            :title="`${item.label}: ${item.value}`"
+          >
+            <AboutContactIcon class="pdf-mobile-card__pill-icon" :kind="item.kind" />
+            <span class="pdf-mobile-card__pill-label">{{ item.label }}:</span>
+            <span class="pdf-mobile-card__pill-value">{{ item.value }}</span>
+            <span v-if="item.kind !== 'email'" class="pdf-mobile-card__pill-arrow" aria-hidden="true">↗</span>
+          </a>
+        </template>
+      </div>
+
+      <div class="pdf-mobile-card__divider" aria-hidden="true" />
+
+      <!-- 主行动按钮 -->
       <div class="pdf-mobile-card__actions">
         <a
           v-if="contentUrl"
-          class="button button--primary pdf-mobile-card__btn"
+          class="button button--primary pdf-mobile-card__btn-main"
           :href="contentUrl"
           target="_blank"
           rel="noopener noreferrer"
@@ -188,26 +247,44 @@ onUnmounted(() => {
             <polyline points="15 3 21 3 21 9" />
             <line x1="10" y1="14" x2="21" y2="3" />
           </svg>
-          全屏原生阅读 (支持手势缩放)
+          在新窗口全屏阅读 (支持手势缩放)
         </a>
 
-        <a
-          v-if="downloadUrl"
-          class="button button--quiet pdf-mobile-card__btn"
-          :href="downloadUrl"
-        >
-          <svg class="pdf-mobile-card__btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
-          </svg>
-          下载 PDF 简历原件
-        </a>
+        <div class="pdf-mobile-card__btn-row">
+          <a
+            v-if="downloadUrl"
+            class="button button--quiet pdf-mobile-card__btn-sub"
+            :href="downloadUrl"
+          >
+            <svg class="pdf-mobile-card__btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            下载原件
+          </a>
+
+          <button
+            v-if="shareUrl"
+            class="button button--quiet pdf-mobile-card__btn-sub"
+            type="button"
+            @click="copyShareUrl"
+          >
+            <svg class="pdf-mobile-card__btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+            </svg>
+            复制地址
+          </button>
+        </div>
       </div>
 
-      <p class="pdf-mobile-card__tip">
-        手机端推荐点击全屏阅读，享受原生高清排版与平滑双指捏合缩放体验。
-      </p>
+      <!-- 底部返回链接 -->
+      <div class="pdf-mobile-card__footer">
+        <RouterLink class="text-button pdf-mobile-card__back" to="/about">
+          ← 返回关于我
+        </RouterLink>
+      </div>
     </section>
   </div>
 </template>
@@ -418,7 +495,7 @@ onUnmounted(() => {
   opacity: 0.75;
 }
 
-/* 移动端专属行动卡片 */
+/* 移动端专属一体化档案卡 */
 .pdf-mobile-card {
   display: none;
 }
@@ -430,7 +507,8 @@ onUnmounted(() => {
 
   .pdf-mobile-card {
     display: grid;
-    gap: 1.25rem;
+    gap: 1.15rem;
+    margin-top: 0.25rem;
     padding: 1.4rem;
     border-radius: var(--radius-card);
     background: var(--surface-card);
@@ -440,81 +518,144 @@ onUnmounted(() => {
   }
 
   .pdf-mobile-card__header {
+    display: grid;
+    gap: 0.4rem;
+  }
+
+  .pdf-mobile-card__header-top {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    justify-content: space-between;
+    gap: 0.5rem;
   }
 
-  .pdf-mobile-card__icon-box {
-    display: grid;
-    width: 3.2rem;
-    height: 3.2rem;
-    flex: none;
-    border-radius: 10px;
+  .pdf-mobile-card__badge {
+    padding: 0.12rem 0.45rem;
+    border-radius: 4px;
     background: var(--accent-soft);
     color: var(--accent-strong);
-    place-items: center;
-  }
-
-  .pdf-mobile-card__icon-box svg {
-    width: 1.7rem;
-    height: 1.7rem;
-  }
-
-  .pdf-mobile-card__info {
-    min-width: 0;
-    display: grid;
-    gap: 0.2rem;
-  }
-
-  .pdf-mobile-card__tag {
-    color: var(--accent);
     font-family: var(--font-condensed);
-    font-size: 0.66rem;
+    font-size: 0.68rem;
     font-weight: 800;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.05em;
+  }
+
+  .pdf-mobile-card__date {
+    color: var(--text-muted);
+    font-size: 0.72rem;
   }
 
   .pdf-mobile-card__title {
-    margin: 0;
+    margin: 0.2rem 0 0;
     color: var(--text-primary);
-    font-size: 0.95rem;
+    font-family: var(--font-serif);
+    font-size: 1.15rem;
     font-weight: 750;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+  }
+
+  .pdf-mobile-card__contacts {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .pdf-mobile-card__pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.6rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: 999px;
+    background: var(--surface-page);
+    color: var(--text-primary);
+    font-size: 0.72rem;
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .pdf-mobile-card__pill-icon {
+    width: 0.9rem;
+    height: 0.9rem;
+    flex: none;
+    color: var(--accent-strong);
+  }
+
+  .pdf-mobile-card__pill-label {
+    color: var(--text-muted);
+    font-size: 0.68rem;
+    font-weight: 600;
+  }
+
+  .pdf-mobile-card__pill-value {
+    font-weight: 600;
+    max-width: 11rem;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .pdf-mobile-card__sub {
-    margin: 0;
+  .pdf-mobile-card__pill-arrow {
     color: var(--text-muted);
-    font-size: 0.76rem;
+    font-size: 0.66rem;
+  }
+
+  .pdf-mobile-card__divider {
+    height: 1px;
+    background: var(--border-subtle);
   }
 
   .pdf-mobile-card__actions {
     display: grid;
-    gap: 0.65rem;
+    gap: 0.6rem;
   }
 
-  .pdf-mobile-card__btn {
+  .pdf-mobile-card__btn-main {
+    display: flex;
     width: 100%;
-    min-height: 2.75rem;
+    min-height: 2.85rem;
+    align-items: center;
+    justify-content: center;
     gap: 0.45rem;
     font-size: 0.82rem;
+    font-weight: 700;
+    text-decoration: none;
+  }
+
+  .pdf-mobile-card__btn-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+
+  .pdf-mobile-card__btn-sub {
+    display: flex;
+    width: 100%;
+    min-height: 2.5rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    font-size: 0.78rem;
     text-decoration: none;
   }
 
   .pdf-mobile-card__btn-icon {
-    width: 1.05rem;
-    height: 1.05rem;
+    width: 1rem;
+    height: 1rem;
+    flex: none;
   }
 
-  .pdf-mobile-card__tip {
-    margin: 0;
+  .pdf-mobile-card__footer {
+    display: flex;
+    justify-content: center;
+    padding-top: 0.25rem;
+  }
+
+  .pdf-mobile-card__back {
     color: var(--text-muted);
-    font-size: 0.72rem;
-    line-height: 1.5;
-    text-align: center;
+    font-size: 0.75rem;
   }
 }
 </style>

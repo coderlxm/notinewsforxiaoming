@@ -61,8 +61,8 @@ async function copyContact(item: SiteContactItem): Promise<void> {
     </div>
   </header>
 
-  <!-- 移动端（全部格式）或桌面端 Markdown：完整个人名片与联系方式 -->
-  <header class="resume-hero" :class="{ 'resume-hero--mobile-only': isPdf }">
+  <!-- Markdown 模式（桌面端及移动端）：完整个人名片与联系方式 -->
+  <header v-else class="resume-hero">
     <div class="resume-hero__profile">
       <img
         v-if="profile?.avatarUrl"
@@ -109,7 +109,7 @@ async function copyContact(item: SiteContactItem): Promise<void> {
     </div>
 
     <div class="resume-hero__meta">
-      <span class="resume-hero__meta-badge">{{ isPdf ? `PDF (${pageCount}P)` : 'Markdown' }}</span>
+      <span class="resume-hero__meta-badge">Markdown</span>
       <span class="resume-hero__meta-separator" aria-hidden="true">·</span>
       <span>更新于 {{ formattedDate }}</span>
       <span class="resume-hero__meta-separator" aria-hidden="true">·</span>
@@ -141,18 +141,6 @@ async function copyContact(item: SiteContactItem): Promise<void> {
 @media (max-width: 599px) {
   .resume-hero--desktop-compact {
     display: none;
-  }
-}
-
-.resume-hero--mobile-only {
-  display: none;
-}
-
-@media (max-width: 599px) {
-  .resume-hero--mobile-only {
-    display: grid;
-    margin-bottom: 1.25rem;
-    padding-bottom: 1.25rem;
   }
 }
 
