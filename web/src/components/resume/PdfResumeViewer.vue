@@ -80,11 +80,11 @@ defineProps<{
   opacity: 0;
 }
 
-:global(html[data-theme='dark']) .pdf-page__image--light {
+:global(html[data-theme='dark'] .pdf-page__image--light) {
   opacity: 0;
 }
 
-:global(html[data-theme='dark']) .pdf-page__image--dark {
+:global(html[data-theme='dark'] .pdf-page__image--dark) {
   opacity: 1;
 }
 
