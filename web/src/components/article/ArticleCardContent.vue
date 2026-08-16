@@ -112,36 +112,36 @@ function handleCardClick(event: MouseEvent): void {
       tone="surface"
     />
     <header class="article-card__header">
-      <div class="article-card__meta">
-        <CardDateSpine
-          :source-created-at="entry.sourceCreatedAt"
-          :pinned="display === 'full' && entry.pinned"
-          :visibility="entry.visibility"
-          :publication-status="entry.publicationStatus"
-          :show-status="editable"
-          :show-year="showYear"
-          :linkable="cardLinkable"
-          @open="openEntry"
-        />
+      <CardDateSpine
+        :source-created-at="entry.sourceCreatedAt"
+        :pinned="display === 'full' && entry.pinned"
+        :visibility="entry.visibility"
+        :publication-status="entry.publicationStatus"
+        :show-status="editable"
+        :show-year="showYear"
+        :linkable="cardLinkable"
+        @open="openEntry"
+      />
+      <div class="article-card__header-actions">
         <span
           v-if="display === 'summary' && entry.aiGenerated"
           class="article-card__ai-badge"
           aria-label="AI 生成"
         >AI 生成</span>
+        <CardActionMenu
+          v-if="editable && !confirmingDeletion"
+          :busy="busy"
+          :pinned="entry.pinned"
+          :public-id="entry.publicId"
+          :visibility="entry.visibility"
+          :publication-status="entry.publicationStatus"
+          @edit="emit('edit', entry.id)"
+          @edit-published-time="startPublishedTimeEditing"
+          @set-pinned="emit('setPinned', entry, $event)"
+          @request-access-settings="accessSettingsOpen = true"
+          @request-delete="startDeletion"
+        />
       </div>
-      <CardActionMenu
-        v-if="editable && !confirmingDeletion"
-        :busy="busy"
-        :pinned="entry.pinned"
-        :public-id="entry.publicId"
-        :visibility="entry.visibility"
-        :publication-status="entry.publicationStatus"
-        @edit="emit('edit', entry.id)"
-        @edit-published-time="startPublishedTimeEditing"
-        @set-pinned="emit('setPinned', entry, $event)"
-        @request-access-settings="accessSettingsOpen = true"
-        @request-delete="startDeletion"
-      />
     </header>
 
     <figure
@@ -313,10 +313,9 @@ function handleCardClick(event: MouseEvent): void {
   align-items: center;
 }
 
-.article-card__meta {
+.article-card__header-actions {
   display: flex;
-  min-width: 0;
-  flex: 1;
+  flex: none;
   align-items: center;
   gap: 0.5rem;
 }
