@@ -1058,6 +1058,45 @@ const migrations: JournalMigration[] = [
       `);
     },
   },
+  {
+    version: 17,
+    up(database) {
+      database.exec(`
+        CREATE TABLE journal_site_resume (
+          id INTEGER PRIMARY KEY CHECK (id = 1),
+          format TEXT NOT NULL
+            CHECK (format IN ('markdown', 'pdf')),
+          original_name TEXT NOT NULL,
+          content BLOB NOT NULL,
+          rendered_html TEXT,
+          access_mode TEXT NOT NULL DEFAULT 'private'
+            CHECK (access_mode IN ('private', 'protected', 'temporary', 'public')),
+          access_password_hash TEXT,
+          access_grant_id TEXT NOT NULL,
+          access_revision INTEGER NOT NULL DEFAULT 1
+            CHECK (access_revision > 0),
+          revision INTEGER NOT NULL
+            CHECK (revision > 0),
+          updated_at TEXT NOT NULL,
+          CHECK (
+            (format = 'markdown' AND rendered_html IS NOT NULL)
+            OR (format = 'pdf' AND rendered_html IS NULL)
+          ),
+          CHECK (
+            (access_mode = 'protected' AND access_password_hash IS NOT NULL)
+            OR (access_mode <> 'protected' AND access_password_hash IS NULL)
+          )
+        );
+
+        CREATE TABLE journal_resume_share_link (
+          id INTEGER PRIMARY KEY CHECK (id = 1),
+          token_hash TEXT NOT NULL UNIQUE,
+          expires_at TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
+      `);
+    },
+  },
 ];
 
 export function runJournalMigrations(database: Database.Database): void {

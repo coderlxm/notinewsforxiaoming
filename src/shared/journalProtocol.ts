@@ -516,6 +516,78 @@ export const journalChannelTagsSchema = z.object({
 });
 export type JournalChannelTags = z.infer<typeof journalChannelTagsSchema>;
 
+export const journalResumeFormatSchema = z.enum(['markdown', 'pdf']);
+export type JournalResumeFormat = z.infer<typeof journalResumeFormatSchema>;
+
+export const journalResumeAccessModeSchema = z.enum(['private', 'protected', 'temporary', 'public']);
+export type JournalResumeAccessMode = z.infer<typeof journalResumeAccessModeSchema>;
+
+export const journalResumeSummarySchema = z.object({
+  format: journalResumeFormatSchema,
+  originalName: z.string().min(1),
+  updatedAt: z.string().datetime(),
+  viewUrl: z.literal('/resume'),
+  accessMode: z.enum(['protected', 'public']),
+});
+export type JournalResumeSummary = z.infer<typeof journalResumeSummarySchema>;
+
+export const journalPublicResumeSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('locked'),
+    accessMode: z.literal('protected'),
+  }),
+  z.object({
+    kind: z.literal('resume'),
+    format: z.literal('markdown'),
+    accessMode: journalResumeAccessModeSchema,
+    originalName: z.string().min(1),
+    updatedAt: z.string().datetime(),
+    renderedHtml: z.string().min(1),
+    downloadUrl: z.string().min(1),
+  }),
+  z.object({
+    kind: z.literal('resume'),
+    format: z.literal('pdf'),
+    accessMode: journalResumeAccessModeSchema,
+    originalName: z.string().min(1),
+    updatedAt: z.string().datetime(),
+    contentUrl: z.string().min(1),
+    downloadUrl: z.string().min(1),
+  }),
+]);
+export type JournalPublicResume = z.infer<typeof journalPublicResumeSchema>;
+
+export const journalAdminResumeSummarySchema = z.object({
+  format: journalResumeFormatSchema,
+  originalName: z.string().min(1),
+  updatedAt: z.string().datetime(),
+  accessMode: journalResumeAccessModeSchema,
+  temporaryShare: z.object({
+    createdAt: z.string().datetime(),
+    expiresAt: z.string().datetime(),
+  }).nullable(),
+});
+export type JournalAdminResumeSummary = z.infer<typeof journalAdminResumeSummarySchema>;
+
+export const journalResumeAccessInputSchema = z.discriminatedUnion('accessMode', [
+  z.object({ accessMode: z.literal('private') }).strict(),
+  z.object({
+    accessMode: z.literal('protected'),
+    password: journalAccessPasswordSchema,
+  }).strict(),
+  z.object({
+    accessMode: z.literal('temporary'),
+    expiresAt: z.string().datetime({ offset: true }),
+  }).strict(),
+  z.object({ accessMode: z.literal('public') }).strict(),
+]);
+export type JournalResumeAccessInput = z.infer<typeof journalResumeAccessInputSchema>;
+
+export const journalResumeUnlockRequestSchema = z.object({
+  password: journalAccessPasswordSchema,
+});
+export type JournalResumeUnlockRequest = z.infer<typeof journalResumeUnlockRequestSchema>;
+
 export const journalSiteProfileSchema = z.object({
   bio: journalSiteProfileBioSchema,
   avatarUrl: z.string().min(1),
@@ -523,6 +595,7 @@ export const journalSiteProfileSchema = z.object({
   channelTags: journalChannelTagsSchema,
   aboutIntro: journalSiteProfileAboutIntroSchema,
   contactItems: journalSiteContactItemsSchema,
+  resume: journalResumeSummarySchema.nullable(),
   updatedAt: z.string().datetime(),
 });
 export type JournalSiteProfile = z.infer<typeof journalSiteProfileSchema>;

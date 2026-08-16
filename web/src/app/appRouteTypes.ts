@@ -10,6 +10,7 @@ import type {
 export type AppRoute =
   | { name: 'public'; key: string; channel: JournalChannel; tag: string }
   | { name: 'about'; key: string }
+  | { name: 'resume'; key: string }
   | { name: 'search'; key: string; query: string }
   | { name: 'archive'; key: string }
   | { name: 'archive-month'; key: string; year: string; month: string }

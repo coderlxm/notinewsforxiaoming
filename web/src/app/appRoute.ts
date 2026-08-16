@@ -57,6 +57,9 @@ export function parseAppRoute(
   if (route.name === 'about') {
     return { name: 'about', key: 'about' };
   }
+  if (route.name === 'resume') {
+    return { name: 'resume', key: 'resume' };
+  }
   if (route.name === 'search') {
     const query = route.query.q;
     if (query !== undefined && typeof query !== 'string') {

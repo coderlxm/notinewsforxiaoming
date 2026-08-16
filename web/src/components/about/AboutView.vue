@@ -3,6 +3,7 @@ import { storeToRefs } from 'pinia';
 import { computed } from 'vue';
 import { useSiteProfileStore } from '../../stores/siteProfile';
 import AboutContactList from './AboutContactList.vue';
+import AboutResumeCard from './AboutResumeCard.vue';
 
 defineOptions({ name: 'AboutView' });
 
@@ -28,6 +29,10 @@ const visibleContacts = computed(() =>
       <section v-if="profile.aboutIntro" class="about-view__section" aria-labelledby="about-intro-title">
         <h2 id="about-intro-title" class="about-view__section-title">你好</h2>
         <p class="about-view__introduction">{{ profile.aboutIntro }}</p>
+      </section>
+
+      <section v-if="profile.resume" class="about-view__section" aria-label="个人简历">
+        <AboutResumeCard :resume="profile.resume" />
       </section>
 
       <section v-if="visibleContacts.length" class="about-view__section" aria-labelledby="contact-title">

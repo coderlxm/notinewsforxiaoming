@@ -16,6 +16,11 @@ export const router = createRouter({
     { path: '/', name: 'public', component: FeedView },
     { path: '/about', name: 'about', component: AboutView },
     {
+      path: '/resume',
+      name: 'resume',
+      component: () => import('./components/resume/ResumeView.vue'),
+    },
+    {
       path: '/search',
       name: 'search',
       component: PublicSearchView,
@@ -85,5 +90,9 @@ export const router = createRouter({
 });
 
 router.afterEach((to) => {
-  document.title = to.name === 'about' ? '关于我 · 小明同学' : '小明同学';
+  document.title = to.name === 'about'
+    ? '关于我 · 小明同学'
+    : to.name === 'resume'
+      ? '个人简历 · 小明同学'
+      : '小明同学';
 });

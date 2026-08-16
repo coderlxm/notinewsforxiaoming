@@ -161,7 +161,59 @@ export interface SiteProfile {
   channelTags: ChannelTags;
   aboutIntro: string;
   contactItems: SiteContactItem[];
+  resume: JournalResumeSummary | null;
   updatedAt: string;
+}
+
+export type JournalResumeFormat = 'markdown' | 'pdf';
+export type JournalResumeAccessMode = 'private' | 'protected' | 'temporary' | 'public';
+
+export interface JournalResumeSummary {
+  format: JournalResumeFormat;
+  originalName: string;
+  updatedAt: string;
+  viewUrl: '/resume';
+  accessMode: 'protected' | 'public';
+}
+
+export type JournalPublicResume =
+  | { kind: 'locked'; accessMode: 'protected' }
+  | {
+      kind: 'resume';
+      format: 'markdown';
+      accessMode: JournalResumeAccessMode;
+      originalName: string;
+      updatedAt: string;
+      renderedHtml: string;
+      downloadUrl: string;
+    }
+  | {
+      kind: 'resume';
+      format: 'pdf';
+      accessMode: JournalResumeAccessMode;
+      originalName: string;
+      updatedAt: string;
+      contentUrl: string;
+      downloadUrl: string;
+    };
+
+export interface JournalAdminResumeSummary {
+  format: JournalResumeFormat;
+  originalName: string;
+  updatedAt: string;
+  accessMode: JournalResumeAccessMode;
+  temporaryShare: { createdAt: string; expiresAt: string } | null;
+}
+
+export type JournalResumeAccessInput =
+  | { accessMode: 'private' }
+  | { accessMode: 'protected'; password: string }
+  | { accessMode: 'temporary'; expiresAt: string }
+  | { accessMode: 'public' };
+
+export interface JournalResumeAccessUpdateResponse {
+  summary: JournalAdminResumeSummary;
+  shareUrl: string | null;
 }
 
 export interface AdminContributionLink {

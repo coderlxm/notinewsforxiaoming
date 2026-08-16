@@ -22,6 +22,8 @@ import type {
   JournalPublicationStatus,
   JournalPlainChannel,
   JournalProtectedEntryPreview,
+  JournalResumeAccessMode,
+  JournalResumeFormat,
   JournalRichDocument,
   JournalSiteContactItem,
   JournalSourceKind,
@@ -182,6 +184,34 @@ export interface JournalSiteProfileRecord {
   channelTags: JournalChannelTags;
   aboutIntro: string;
   contactItems: JournalSiteContactItem[];
+  updatedAt: string;
+}
+
+export interface JournalResumeRecord {
+  format: JournalResumeFormat;
+  originalName: string;
+  content: Buffer;
+  renderedHtml: string | null;
+  accessMode: JournalResumeAccessMode;
+  accessPasswordHash: string | null;
+  accessGrantId: string;
+  accessRevision: number;
+  revision: number;
+  updatedAt: string;
+}
+
+export interface JournalResumeShareLinkRecord {
+  tokenHash: string;
+  expiresAt: string;
+  createdAt: string;
+}
+
+export interface UpdateResumeAccessInput {
+  accessMode: JournalResumeAccessMode;
+  accessPasswordHash: string | null;
+  accessGrantId: string;
+  tokenHash: string | null;
+  shareExpiresAt: string | null;
   updatedAt: string;
 }
 
@@ -1798,6 +1828,133 @@ export class JournalRepository {
     });
     update();
     return this.getRequiredSiteProfile();
+  }
+
+  getResumeOrNull(): JournalResumeRecord | null {
+    const row = this.database.prepare(`
+      SELECT format, original_name, content, rendered_html, access_mode,
+             access_password_hash, access_grant_id, access_revision, revision, updated_at
+      FROM journal_site_resume
+      WHERE id = 1
+    `).get() as {
+      format: JournalResumeFormat;
+      original_name: string;
+      content: Buffer;
+      rendered_html: string | null;
+      access_mode: JournalResumeAccessMode;
+      access_password_hash: string | null;
+      access_grant_id: string;
+      access_revision: number;
+      revision: number;
+      updated_at: string;
+    } | undefined;
+    return row ? {
+      format: row.format,
+      originalName: row.original_name,
+      content: row.content,
+      renderedHtml: row.rendered_html,
+      accessMode: row.access_mode,
+      accessPasswordHash: row.access_password_hash,
+      accessGrantId: row.access_grant_id,
+      accessRevision: row.access_revision,
+      revision: row.revision,
+      updatedAt: row.updated_at,
+    } : null;
+  }
+
+  getResumeShareLinkOrNull(): JournalResumeShareLinkRecord | null {
+    const row = this.database.prepare(`
+      SELECT token_hash, expires_at, created_at
+      FROM journal_resume_share_link
+      WHERE id = 1
+    `).get() as {
+      token_hash: string;
+      expires_at: string;
+      created_at: string;
+    } | undefined;
+    return row ? {
+      tokenHash: row.token_hash,
+      expiresAt: row.expires_at,
+      createdAt: row.created_at,
+    } : null;
+  }
+
+  saveResume(input: {
+    format: JournalResumeFormat;
+    originalName: string;
+    content: Buffer;
+    renderedHtml: string | null;
+    accessGrantId: string;
+    updatedAt: string;
+  }): JournalResumeRecord {
+    this.database.prepare(`
+      INSERT INTO journal_site_resume (
+        id, format, original_name, content, rendered_html,
+        access_mode, access_password_hash, access_grant_id,
+        access_revision, revision, updated_at
+      ) VALUES (1, ?, ?, ?, ?, 'private', NULL, ?, 1, 1, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        format = excluded.format,
+        original_name = excluded.original_name,
+        content = excluded.content,
+        rendered_html = excluded.rendered_html,
+        revision = journal_site_resume.revision + 1,
+        updated_at = excluded.updated_at
+    `).run(
+      input.format,
+      input.originalName,
+      input.content,
+      input.renderedHtml,
+      input.accessGrantId,
+      input.updatedAt,
+    );
+    const record = this.getResumeOrNull();
+    if (!record) throw new Error('Journal resume was not stored.');
+    return record;
+  }
+
+  updateResumeAccess(input: UpdateResumeAccessInput): JournalResumeRecord {
+    const update = this.database.transaction(() => {
+      this.database.prepare(`
+        UPDATE journal_site_resume
+        SET access_mode = ?, access_password_hash = ?, access_grant_id = ?,
+            access_revision = access_revision + 1, updated_at = ?
+        WHERE id = 1
+      `).run(
+        input.accessMode,
+        input.accessPasswordHash,
+        input.accessGrantId,
+        input.updatedAt,
+      );
+      if (
+        input.accessMode === 'temporary'
+        && input.tokenHash !== null
+        && input.shareExpiresAt !== null
+      ) {
+        this.database.prepare(`
+          INSERT INTO journal_resume_share_link (id, token_hash, expires_at, created_at)
+          VALUES (1, ?, ?, ?)
+          ON CONFLICT(id) DO UPDATE SET
+            token_hash = excluded.token_hash,
+            expires_at = excluded.expires_at,
+            created_at = excluded.created_at
+        `).run(input.tokenHash, input.shareExpiresAt, input.updatedAt);
+      } else {
+        this.database.prepare('DELETE FROM journal_resume_share_link WHERE id = 1').run();
+      }
+    });
+    update();
+    const record = this.getResumeOrNull();
+    if (!record) throw new Error('Journal resume was not found.');
+    return record;
+  }
+
+  deleteResume(): void {
+    const remove = this.database.transaction(() => {
+      this.database.prepare('DELETE FROM journal_resume_share_link WHERE id = 1').run();
+      this.database.prepare('DELETE FROM journal_site_resume WHERE id = 1').run();
+    });
+    remove();
   }
 
   private getById(id: number): JournalEntry {

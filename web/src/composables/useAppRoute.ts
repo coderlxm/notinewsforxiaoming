@@ -30,6 +30,7 @@ export function useAppRoute(
   const publicShellActive = computed(() =>
     route.value.name === 'public'
     || route.value.name === 'about'
+    || route.value.name === 'resume'
     || route.value.name === 'search'
     || route.value.name === 'archive'
     || route.value.name === 'archive-month'

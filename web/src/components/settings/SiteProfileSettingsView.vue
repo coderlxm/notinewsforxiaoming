@@ -16,6 +16,7 @@ import { showMessage } from '../../utils/message';
 import SettingsChannelTagsPanel from './SettingsChannelTagsPanel.vue';
 import SettingsContactsPanel from './SettingsContactsPanel.vue';
 import SettingsPublicProfilePanel from './SettingsPublicProfilePanel.vue';
+import SettingsResumePanel from './SettingsResumePanel.vue';
 
 const MAX_BIO_LENGTH = 120;
 const MAX_ABOUT_INTRO_LENGTH = 1200;
@@ -28,6 +29,7 @@ const settingsSections = [
   { name: 'profile', label: '公开资料' },
   { name: 'contacts', label: '联系方式' },
   { name: 'tags', label: '频道标签' },
+  { name: 'resume', label: '个人简历' },
   { name: 'contribution', label: '投稿链接' },
 ] as const;
 
@@ -317,11 +319,12 @@ async function logout(): Promise<void> {
               v-model="editableChannelTags"
               :disabled="submitting"
             />
+            <SettingsResumePanel v-else-if="section.name === 'resume'" />
             <AdminContributionLinkSettings v-else />
           </ElTabPane>
         </ElTabs>
 
-        <div v-if="activeSection !== 'contribution'" class="settings-savebar">
+        <div v-if="activeSection !== 'contribution' && activeSection !== 'resume'" class="settings-savebar">
           <p aria-live="polite">
             {{ hasUnsavedChanges ? '有尚未保存的站点设置' : '当前设置已保存' }}
           </p>

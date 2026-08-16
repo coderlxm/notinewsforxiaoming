@@ -1,7 +1,12 @@
 import { shallowRef } from 'vue';
 import { defineStore } from 'pinia';
 import { fetchSiteProfile, updateSiteProfile } from '../api';
-import type { ChannelTags, SiteContactItem, SiteProfile } from '../types';
+import type {
+  ChannelTags,
+  JournalAdminResumeSummary,
+  SiteContactItem,
+  SiteProfile,
+} from '../types';
 
 export const useSiteProfileStore = defineStore('siteProfile', () => {
   const profile = shallowRef<SiteProfile | null>(null);
@@ -53,6 +58,20 @@ export const useSiteProfileStore = defineStore('siteProfile', () => {
     return updated;
   }
 
+  function setResumeFromAdmin(summary: JournalAdminResumeSummary | null): void {
+    if (profile.value === null) return;
+    const resume = summary?.accessMode === 'protected' || summary?.accessMode === 'public'
+      ? {
+          format: summary.format,
+          originalName: summary.originalName,
+          updatedAt: summary.updatedAt,
+          viewUrl: '/resume' as const,
+          accessMode: summary.accessMode,
+        }
+      : null;
+    profile.value = { ...profile.value, resume };
+  }
+
   return {
     profile,
     loading,
@@ -60,5 +79,6 @@ export const useSiteProfileStore = defineStore('siteProfile', () => {
     load,
     ensureLoaded,
     update,
+    setResumeFromAdmin,
   };
 });

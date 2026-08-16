@@ -1,6 +1,7 @@
 import path from 'node:path';
 import fastifyCookie from '@fastify/cookie';
 import fastifyMultipart from '@fastify/multipart';
+import fastifyRateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
 import Fastify, {
   type FastifyInstance,
@@ -24,6 +25,7 @@ import {
   JournalImagePreviewService,
 } from './imagePreview.js';
 import { JournalRepository } from './repository.js';
+import { JournalResumeService } from './resumeService.js';
 import { registerArticleRoutes } from './routes/articles.js';
 import { registerContributionRoutes } from './routes/contributions.js';
 import { registerFeedRoutes } from './routes/feeds.js';
@@ -33,6 +35,7 @@ import { registerPrivateContributionRoutes } from './routes/privateContributions
 import { registerPrivateEntryRoutes } from './routes/privateEntries.js';
 import { registerPublicDiscoveryRoutes } from './routes/publicDiscovery.js';
 import { registerPublicFeedRoutes } from './routes/publicFeed.js';
+import { registerResumeRoutes } from './routes/resume.js';
 import { registerSiteProfileRoutes } from './routes/siteProfile.js';
 import { registerTagSuggestionRoutes } from './routes/tagSuggestions.js';
 import { registerTopicSuggestionRoutes } from './routes/topicSuggestions.js';
@@ -54,12 +57,17 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
   const server = Fastify({ logger: true });
   const database = openJournalDatabase(config.dataDir);
   const repository = new JournalRepository(database);
-  const siteProfileService = new JournalSiteProfileService(repository);
+  const auth = new JournalAuth(config.ingestToken, config.adminPassword);
+  const resumeService = new JournalResumeService(
+    repository,
+    auth,
+    config.publicBaseUrl,
+  );
+  const siteProfileService = new JournalSiteProfileService(repository, resumeService);
   const weatherService = new JournalWeatherService(
     config.qweatherApiKey,
     config.qweatherCityId,
   );
-  const auth = new JournalAuth(config.ingestToken, config.adminPassword);
   const aiSuggestions = new JournalAiSuggestionService(config.deepseekApiKey);
   const storage = new JournalStorage(config.dataDir);
   await storage.initializeContributionStorage();
@@ -105,6 +113,11 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
   await server.register(fastifyCookie, { secret: config.cookieSecret });
   await server.register(fastifyMultipart, {
     limits: { fileSize: 20 * 1024 * 1024 },
+  });
+  await server.register(fastifyRateLimit, {
+    global: false,
+    max: 5,
+    timeWindow: 60_000,
   });
   server.addContentTypeParser(
     'application/offset+octet-stream',
@@ -167,6 +180,7 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
     dataDir: config.dataDir,
   });
   await registerSiteProfileRoutes(server, auth, siteProfileService);
+  await registerResumeRoutes(server, { auth, resumeService });
   await registerWeatherRoutes(server, weatherService);
   await registerFeedRoutes(server, repository, siteProfileService, config.publicBaseUrl);
 

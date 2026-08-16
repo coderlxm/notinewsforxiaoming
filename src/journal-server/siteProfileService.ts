@@ -11,6 +11,7 @@ import {
   journalSiteProfileBioSchema,
 } from '../shared/journalProtocol.js';
 import type { JournalRepository, JournalSiteProfileRecord } from './repository.js';
+import type { JournalResumeService } from './resumeService.js';
 
 export const maxSiteProfileAvatarBytes = 5 * 1024 * 1024;
 
@@ -28,7 +29,10 @@ export class JournalSiteProfileInputError extends Error {
 }
 
 export class JournalSiteProfileService {
-  constructor(private readonly repository: JournalRepository) {}
+  constructor(
+    private readonly repository: JournalRepository,
+    private readonly resumeService: JournalResumeService,
+  ) {}
 
   async initialize(initialAvatarPath: string): Promise<void> {
     if (this.repository.getSiteProfileOrNull()) return;
@@ -120,6 +124,7 @@ export class JournalSiteProfileService {
       channelTags: profile.channelTags,
       aboutIntro: profile.aboutIntro,
       contactItems: profile.contactItems,
+      resume: this.resumeService.publicSummary(),
       updatedAt: profile.updatedAt,
     };
   }
