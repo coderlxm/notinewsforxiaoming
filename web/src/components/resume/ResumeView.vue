@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { storeToRefs } from 'pinia';
 import { computed, onMounted, shallowRef } from 'vue';
 import { onBeforeRouteUpdate, useRoute, useRouter } from 'vue-router';
 import {
@@ -7,15 +8,20 @@ import {
   JournalRequestError,
   unlockResume,
 } from '../../api';
+import { useSiteProfileStore } from '../../stores/siteProfile';
 import type { JournalPublicResume } from '../../types';
-import { showMessage } from '../../utils/message';
 import JournalLoading from '../ui/JournalLoading.vue';
 import MarkdownResumeViewer from './MarkdownResumeViewer.vue';
 import PdfResumeViewer from './PdfResumeViewer.vue';
 import ResumeAccessGate from './ResumeAccessGate.vue';
+import ResumeFloatingDock from './ResumeFloatingDock.vue';
+import ResumeHero from './ResumeHero.vue';
 
 const route = useRoute();
 const router = useRouter();
+const siteProfile = useSiteProfileStore();
+const { profile } = storeToRefs(siteProfile);
+
 const loading = shallowRef(true);
 const busy = shallowRef(false);
 const unlockError = shallowRef<string | null>(null);
@@ -93,21 +99,6 @@ async function unlock(password: string): Promise<void> {
     busy.value = false;
   }
 }
-
-async function copyResumeLink(): Promise<void> {
-  if (fixedShareUrl.value === null) return;
-  await navigator.clipboard.writeText(fixedShareUrl.value);
-  showMessage({ message: '简历地址已复制', type: 'success' });
-}
-
-function formatDate(value: string): string {
-  return new Intl.DateTimeFormat('zh-CN', {
-    timeZone: 'Asia/Shanghai',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date(value));
-}
 </script>
 
 <template>
@@ -124,30 +115,25 @@ function formatDate(value: string): string {
     />
 
     <template v-else-if="resume">
-      <div class="resume-view__toolbar">
-        <RouterLink class="text-button" to="/about">← 返回关于我</RouterLink>
-        <div class="resume-view__actions">
-          <button
-            v-if="fixedShareUrl"
-            class="button button--quiet"
-            type="button"
-            @click="copyResumeLink"
-          >
-            复制地址
-          </button>
-          <a class="button button--quiet" :href="resume.downloadUrl">下载原文件</a>
-        </div>
-      </div>
+      <ResumeHero :profile="profile" :resume="resume" />
 
-      <div class="resume-view__meta">
-        <span class="resume-view__format">{{ resume.format === 'markdown' ? 'Markdown' : 'PDF' }}</span>
-        <span class="resume-view__separator" aria-hidden="true">·</span>
-        <span>更新于 {{ formatDate(resume.updatedAt) }}</span>
-        <span class="resume-view__name" :title="resume.originalName">{{ resume.originalName }}</span>
-      </div>
+      <section class="resume-view__content">
+        <MarkdownResumeViewer
+          v-if="resume.format === 'markdown'"
+          :html="resume.renderedHtml"
+        />
+        <PdfResumeViewer
+          v-else
+          :src="resume.contentUrl"
+        />
+      </section>
 
-      <MarkdownResumeViewer v-if="resume.format === 'markdown'" :html="resume.renderedHtml" />
-      <PdfResumeViewer v-else :src="resume.contentUrl" />
+      <ResumeFloatingDock
+        :format="resume.format"
+        :download-url="resume.downloadUrl"
+        :share-url="fixedShareUrl"
+        :content-url="resume.format === 'pdf' ? resume.contentUrl : undefined"
+      />
     </template>
 
     <div v-else-if="loadError" class="resume-view__error" role="alert">
@@ -160,7 +146,7 @@ function formatDate(value: string): string {
 .resume-view {
   width: min(calc(100% - (var(--page-gutter) * 2)), 960px);
   margin: 0 auto;
-  padding: clamp(1.6rem, 4vw, 3rem) 0 5rem;
+  padding: clamp(1.8rem, 4vw, 3.2rem) 0 6.5rem;
 }
 
 .resume-view__loading {
@@ -168,46 +154,8 @@ function formatDate(value: string): string {
   min-height: 55vh;
 }
 
-.resume-view__toolbar {
-  display: flex;
-  min-height: 2.5rem;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  color: var(--text-muted);
-  font-size: 0.78rem;
-}
-
-.resume-view__actions {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.resume-view__meta {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  margin: 0.6rem 0 1.4rem;
-  color: var(--text-muted);
-  font-family: var(--font-sans);
-  font-size: 0.74rem;
-}
-
-.resume-view__format {
-  color: var(--accent-strong);
-  font-weight: 700;
-}
-
-.resume-view__separator {
-  color: var(--border-strong);
-}
-
-.resume-view__name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.resume-view__content {
+  width: 100%;
 }
 
 .resume-view__error {
@@ -219,11 +167,8 @@ function formatDate(value: string): string {
 
 @media (max-width: 599px) {
   .resume-view {
-    padding-top: 1rem;
-  }
-
-  .resume-view__meta {
-    flex-wrap: wrap;
+    padding-top: 1.2rem;
+    padding-bottom: 5.5rem;
   }
 }
 </style>
