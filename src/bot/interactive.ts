@@ -1438,6 +1438,7 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
           'follow',
         );
         deleteStartggPendingEventsByVideogame(pending.videogame_id);
+        enableStartggPolling(bot, false);
         await ctx.editMessageText(
           `已关注项目：${escapeHtml(pending.videogame_name)}\n本届赛事已开始监控。`,
           { parse_mode: 'HTML' },
@@ -1445,6 +1446,7 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
       } else if (interestAction.action === 'event') {
         addStartggEventInterestOverride(pending.event_slug, pending.tournament_end_at);
         deleteStartggPendingEvent(pending.id);
+        enableStartggPolling(bot, false);
         await ctx.editMessageText(
           `仅关注本届赛事：${escapeHtml(pending.tournament_name)}`,
           { parse_mode: 'HTML' },
@@ -1463,11 +1465,6 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
         );
       }
 
-      const summary = await runStartggWatchNow(bot);
-      updateStartggFastWatch(bot, summary.activeEventSlugs);
-      if (interestAction.action !== 'ignore') {
-        enableStartggPolling(bot, false);
-      }
       return;
     }
 
