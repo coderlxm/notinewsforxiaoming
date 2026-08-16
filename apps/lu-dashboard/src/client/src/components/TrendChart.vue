@@ -25,11 +25,11 @@ const option = computed<EChartsCoreOption>(() => {
       borderColor: props.theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
       textStyle: { color: props.theme === 'dark' ? '#f0f6fc' : '#0f172a', fontSize: 12 },
     },
-    grid: { left: 32, right: 16, top: 16, bottom: 28, containLabel: true },
+    grid: { left: 20, right: 10, top: 10, bottom: 18, containLabel: true },
     xAxis: {
       type: 'category',
       data: props.data.map((point) => point.date.slice(5)),
-      axisLabel: { color: foreground, fontSize: 11 },
+      axisLabel: { color: foreground, fontSize: 10.5 },
       axisLine: { lineStyle: { color: grid } },
       axisTick: { show: false },
     },
@@ -37,7 +37,7 @@ const option = computed<EChartsCoreOption>(() => {
       type: 'value',
       min: 0,
       minInterval: 1,
-      axisLabel: { color: foreground, fontSize: 11 },
+      axisLabel: { color: foreground, fontSize: 10.5 },
       splitLine: { lineStyle: { color: grid, type: 'dashed' } },
     },
     series: [
