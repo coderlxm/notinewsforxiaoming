@@ -14,16 +14,28 @@ defineProps<{
         :key="page.pageNumber"
         class="pdf-page"
       >
-        <img
-          class="pdf-page__image"
-          :src="page.url"
-          :width="page.width"
-          :height="page.height"
-          :alt="`简历第 ${page.pageNumber} 页，共 ${pages.length} 页`"
-          :loading="page.pageNumber === 1 ? 'eager' : 'lazy'"
-          :fetchpriority="page.pageNumber === 1 ? 'high' : 'auto'"
-          decoding="async"
-        >
+        <div class="pdf-page__images">
+          <img
+            class="pdf-page__image pdf-page__image--light"
+            :src="page.lightUrl"
+            :width="page.width"
+            :height="page.height"
+            :alt="`简历第 ${page.pageNumber} 页，共 ${pages.length} 页`"
+            :loading="page.pageNumber === 1 ? 'eager' : 'lazy'"
+            :fetchpriority="page.pageNumber === 1 ? 'high' : 'auto'"
+            decoding="async"
+          >
+          <img
+            class="pdf-page__image pdf-page__image--dark"
+            :src="page.darkUrl"
+            :width="page.width"
+            :height="page.height"
+            alt=""
+            aria-hidden="true"
+            :loading="page.pageNumber === 1 ? 'eager' : 'lazy'"
+            decoding="async"
+          >
+        </div>
       </li>
     </ol>
   </section>
@@ -32,10 +44,6 @@ defineProps<{
 <style scoped>
 .pdf-stage {
   width: 100%;
-  padding: clamp(0.65rem, 2vw, 1.35rem);
-  border: 1px solid var(--border-subtle);
-  border-radius: calc(var(--radius-card) + 4px);
-  background: color-mix(in srgb, var(--surface-muted) 72%, var(--surface-page));
 }
 
 .pdf-pages {
@@ -50,10 +58,14 @@ defineProps<{
 .pdf-page {
   overflow: hidden;
   border-radius: 6px;
-  background: #ffffff;
+  background: var(--surface-card);
   box-shadow:
-    0 18px 42px color-mix(in srgb, var(--ink) 14%, transparent),
-    0 0 0 1px color-mix(in srgb, var(--ink) 8%, transparent);
+    0 12px 30px color-mix(in srgb, var(--ink) 10%, transparent),
+    0 0 0 1px var(--border-subtle);
+}
+
+.pdf-page__images {
+  position: relative;
 }
 
 .pdf-page__image {
@@ -62,12 +74,21 @@ defineProps<{
   height: auto;
 }
 
-@media (max-width: 599px) {
-  .pdf-stage {
-    padding: 0.4rem;
-    border-radius: 10px;
-  }
+.pdf-page__image--dark {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+}
 
+:global(html[data-theme='dark']) .pdf-page__image--light {
+  opacity: 0;
+}
+
+:global(html[data-theme='dark']) .pdf-page__image--dark {
+  opacity: 1;
+}
+
+@media (max-width: 599px) {
   .pdf-pages {
     gap: 0.75rem;
   }
@@ -75,8 +96,8 @@ defineProps<{
   .pdf-page {
     border-radius: 4px;
     box-shadow:
-      0 10px 24px color-mix(in srgb, var(--ink) 12%, transparent),
-      0 0 0 1px color-mix(in srgb, var(--ink) 7%, transparent);
+      0 8px 20px color-mix(in srgb, var(--ink) 9%, transparent),
+      0 0 0 1px var(--border-subtle);
   }
 }
 </style>

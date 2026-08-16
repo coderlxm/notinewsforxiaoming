@@ -208,14 +208,15 @@ export interface JournalResumeShareLinkRecord {
 
 export interface JournalResumePreviewPageRecord {
   pageNumber: number;
-  contentWebp: Buffer;
+  contentLightWebp: Buffer;
+  contentDarkWebp: Buffer;
   width: number;
   height: number;
 }
 
-export type JournalResumePreviewPageMetadata = Omit<
+export type JournalResumePreviewPageMetadata = Pick<
   JournalResumePreviewPageRecord,
-  'contentWebp'
+  'pageNumber' | 'width' | 'height'
 >;
 
 export interface UpdateResumeAccessInput {
@@ -1947,23 +1948,42 @@ export class JournalRepository {
     }));
   }
 
+  hasCompleteResumePreviewPages(): boolean {
+    const row = this.database.prepare(`
+      SELECT
+        COUNT(*) AS page_count,
+        COUNT(content_dark_webp) AS dark_page_count
+      FROM journal_resume_preview_pages
+    `).get() as {
+      page_count: number;
+      dark_page_count: number;
+    };
+    return row.page_count > 0 && row.page_count === row.dark_page_count;
+  }
+
   getResumePreviewPageOrNull(pageNumber: number): JournalResumePreviewPageRecord | null {
     const row = this.database.prepare(`
-      SELECT page_number, content_webp, width, height
+      SELECT page_number, content_webp, content_dark_webp, width, height
       FROM journal_resume_preview_pages
       WHERE page_number = ?
     `).get(pageNumber) as {
       page_number: number;
       content_webp: Buffer;
+      content_dark_webp: Buffer | null;
       width: number;
       height: number;
     } | undefined;
-    return row ? {
+    if (!row) return null;
+    if (!row.content_dark_webp) {
+      throw new Error(`Dark resume preview page ${pageNumber} is missing.`);
+    }
+    return {
       pageNumber: row.page_number,
-      contentWebp: row.content_webp,
+      contentLightWebp: row.content_webp,
+      contentDarkWebp: row.content_dark_webp,
       width: row.width,
       height: row.height,
-    } : null;
+    };
   }
 
   replaceResumePreviewPages(pages: JournalResumePreviewPageRecord[]): void {
@@ -2023,11 +2043,17 @@ export class JournalRepository {
     this.database.prepare('DELETE FROM journal_resume_preview_pages').run();
     const insert = this.database.prepare(`
       INSERT INTO journal_resume_preview_pages (
-        page_number, content_webp, width, height
-      ) VALUES (?, ?, ?, ?)
+        page_number, content_webp, content_dark_webp, width, height
+      ) VALUES (?, ?, ?, ?, ?)
     `);
     for (const page of pages) {
-      insert.run(page.pageNumber, page.contentWebp, page.width, page.height);
+      insert.run(
+        page.pageNumber,
+        page.contentLightWebp,
+        page.contentDarkWebp,
+        page.width,
+        page.height,
+      );
     }
   }
 

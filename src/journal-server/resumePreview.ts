@@ -12,6 +12,46 @@ import type {
 const execFileAsync = promisify(execFile);
 const previewDpi = 216;
 const previewFilePattern = /^page-(\d+)\.png$/;
+const darkPageBackground = [39, 39, 37] as const;
+const darkPageText = [242, 241, 237] as const;
+const neutralChromaThreshold = 18;
+
+async function createDarkPreview(sourcePath: string): Promise<Buffer> {
+  const source = await sharp(sourcePath)
+    .toColourspace('srgb')
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const pixels = source.data;
+  for (let index = 0; index < pixels.length; index += source.info.channels) {
+    const red = pixels[index];
+    const green = pixels[index + 1];
+    const blue = pixels[index + 2];
+    const chroma = Math.max(red, green, blue) - Math.min(red, green, blue);
+    if (chroma > neutralChromaThreshold) continue;
+
+    const luminance = (red * 54 + green * 183 + blue * 19) / 256;
+    const darkness = 1 - luminance / 255;
+    pixels[index] = Math.round(
+      darkPageBackground[0] + (darkPageText[0] - darkPageBackground[0]) * darkness,
+    );
+    pixels[index + 1] = Math.round(
+      darkPageBackground[1] + (darkPageText[1] - darkPageBackground[1]) * darkness,
+    );
+    pixels[index + 2] = Math.round(
+      darkPageBackground[2] + (darkPageText[2] - darkPageBackground[2]) * darkness,
+    );
+  }
+  return sharp(pixels, {
+    raw: {
+      width: source.info.width,
+      height: source.info.height,
+      channels: source.info.channels,
+    },
+  })
+    .webp({ lossless: true, effort: 4 })
+    .toBuffer();
+}
 
 export class JournalResumePreviewService {
   async generate(pdf: Buffer): Promise<JournalResumePreviewPageRecord[]> {
@@ -45,15 +85,17 @@ export class JournalResumePreviewService {
         if (sourcePage.pageNumber !== expectedPageNumber) {
           throw new Error(`PDF preview page ${expectedPageNumber} is missing.`);
         }
-        const result = await sharp(path.join(temporaryDirectory, sourcePage.filename))
+        const sourcePagePath = path.join(temporaryDirectory, sourcePage.filename);
+        const lightPreview = await sharp(sourcePagePath)
           .toColourspace('srgb')
           .webp({ lossless: true, effort: 4 })
           .toBuffer({ resolveWithObject: true });
         pages.push({
           pageNumber: sourcePage.pageNumber,
-          contentWebp: result.data,
-          width: result.info.width,
-          height: result.info.height,
+          contentLightWebp: lightPreview.data,
+          contentDarkWebp: await createDarkPreview(sourcePagePath),
+          width: lightPreview.info.width,
+          height: lightPreview.info.height,
         });
       }
       return pages;
@@ -73,7 +115,7 @@ export class JournalResumePreviewBackfillService {
     const resume = this.repository.getResumeOrNull();
     if (
       resume?.format !== 'pdf'
-      || this.repository.listResumePreviewPageMetadata().length > 0
+      || this.repository.hasCompleteResumePreviewPages()
     ) return;
     const pages = await this.previews.generate(resume.content);
     this.repository.replaceResumePreviewPages(pages);

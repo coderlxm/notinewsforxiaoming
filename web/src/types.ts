@@ -180,7 +180,8 @@ export interface JournalResumePreviewPage {
   pageNumber: number;
   width: number;
   height: number;
-  url: string;
+  lightUrl: string;
+  darkUrl: string;
 }
 
 export type JournalPublicResume =

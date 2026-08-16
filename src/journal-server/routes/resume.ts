@@ -21,6 +21,7 @@ const revisionQuerySchema = z.object({
 
 const previewPageParamsSchema = z.object({
   pageNumber: z.coerce.number().int().positive(),
+  theme: z.enum(['light', 'dark']),
 });
 
 export async function registerResumeRoutes(
@@ -50,10 +51,10 @@ export async function registerResumeRoutes(
     return reply.send(record.content);
   });
 
-  server.get('/api/resume/pages/:pageNumber', async (request, reply) => {
+  server.get('/api/resume/pages/:pageNumber/:theme', async (request, reply) => {
     revisionQuerySchema.parse(request.query);
-    const { pageNumber } = previewPageParamsSchema.parse(request.params);
-    const content = resumeService.resolvePreviewPage(request, pageNumber);
+    const { pageNumber, theme } = previewPageParamsSchema.parse(request.params);
+    const content = resumeService.resolvePreviewPage(request, pageNumber, theme);
     if (!content) return reply.code(404).send({ error: '简历预览页不存在或当前不可访问。' });
     reply.header('Cache-Control', 'private, no-store');
     reply.header('X-Content-Type-Options', 'nosniff');

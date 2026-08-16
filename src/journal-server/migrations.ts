@@ -1114,6 +1114,19 @@ const migrations: JournalMigration[] = [
       `);
     },
   },
+  {
+    version: 19,
+    up(database) {
+      database.exec(`
+        ALTER TABLE journal_resume_preview_pages
+        ADD COLUMN content_dark_webp BLOB
+          CHECK (
+            content_dark_webp IS NULL
+            OR length(content_dark_webp) > 0
+          );
+      `);
+    },
+  },
 ];
 
 export function runJournalMigrations(database: Database.Database): void {

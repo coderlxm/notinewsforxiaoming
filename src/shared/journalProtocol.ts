@@ -526,7 +526,8 @@ export const journalResumePreviewPageSchema = z.object({
   pageNumber: z.number().int().positive(),
   width: z.number().int().positive(),
   height: z.number().int().positive(),
-  url: z.string().min(1),
+  lightUrl: z.string().min(1),
+  darkUrl: z.string().min(1),
 });
 export type JournalResumePreviewPage = z.infer<typeof journalResumePreviewPageSchema>;
 

@@ -107,15 +107,22 @@ export class JournalResumeService {
         pageNumber: page.pageNumber,
         width: page.width,
         height: page.height,
-        url: this.previewPageUrl(page.pageNumber, record.revision),
+        lightUrl: this.previewPageUrl(page.pageNumber, 'light', record.revision),
+        darkUrl: this.previewPageUrl(page.pageNumber, 'dark', record.revision),
       })),
     };
   }
 
-  resolvePreviewPage(request: FastifyRequest, pageNumber: number): Buffer | null {
+  resolvePreviewPage(
+    request: FastifyRequest,
+    pageNumber: number,
+    theme: 'light' | 'dark',
+  ): Buffer | null {
     const record = this.authorize(request);
     if (!record || record.format !== 'pdf') return null;
-    return this.repository.getResumePreviewPageOrNull(pageNumber)?.contentWebp ?? null;
+    const page = this.repository.getResumePreviewPageOrNull(pageNumber);
+    if (!page) return null;
+    return theme === 'dark' ? page.contentDarkWebp : page.contentLightWebp;
   }
 
   authorize(request: FastifyRequest): JournalResumeRecord | null {
@@ -363,7 +370,11 @@ export class JournalResumeService {
     return `/api/resume/download?v=${revision}`;
   }
 
-  private previewPageUrl(pageNumber: number, revision: number): string {
-    return `/api/resume/pages/${pageNumber}?v=${revision}`;
+  private previewPageUrl(
+    pageNumber: number,
+    theme: 'light' | 'dark',
+    revision: number,
+  ): string {
+    return `/api/resume/pages/${pageNumber}/${theme}?v=${revision}`;
   }
 }
