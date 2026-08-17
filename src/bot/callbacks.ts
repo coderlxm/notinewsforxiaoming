@@ -128,7 +128,7 @@ export function parseStartggInterestCallbackData(
 }
 
 export type MasturbationCallback =
-  | { type: 'add' }
+  | { type: 'add'; referenceDate: string | null }
   | { type: 'stats' }
   | { type: 'undo'; recordId: number };
 
@@ -137,7 +137,10 @@ export function parseMasturbationCallbackData(data: string | undefined): Masturb
   const parts = data.split(':');
   if (parts[0] !== 'masturbation') return null;
   const action = parts[1];
-  if (parts.length === 2 && action === 'add') return { type: 'add' };
+  if (parts.length === 2 && action === 'add') return { type: 'add', referenceDate: null };
+  if (parts.length === 3 && action === 'add' && /^\d{4}-\d{2}-\d{2}$/.test(parts[2]!)) {
+    return { type: 'add', referenceDate: parts[2]! };
+  }
   if (parts.length === 2 && action === 'stats') return { type: 'stats' };
   if (action === 'undo') {
     if (parts.length !== 3) return null;

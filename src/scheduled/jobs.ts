@@ -2,7 +2,7 @@ import schedule from 'node-schedule';
 import type { Telegraf } from 'telegraf';
 import { config } from '../config/index.js';
 import { runMode } from './runMode.js';
-import { diffBjDays, getChinaDayOfWeek } from '../utils/time.js';
+import { bjDate, diffBjDays, getChinaDayOfWeek } from '../utils/time.js';
 import { isChinaWorkday } from '../calendar/chinaWorkday.js';
 import { runStartggWatchNow } from '../services/startggPresetSync.js';
 import { runStartggWatchOnce } from '../services/startgg/index.js';
@@ -262,7 +262,7 @@ export function registerFixedJobs(bot: Telegraf): void {
     if (buildSummary().todayCount > 0) return;
     await bot.telegram.sendMessage(config.tgChatId, formatMasturbationReminderCard(), {
       parse_mode: 'HTML',
-      ...buildMasturbationStatusButtons(),
+      ...buildMasturbationStatusButtons(bjDate()),
     });
   });
 

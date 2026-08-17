@@ -280,7 +280,8 @@ export function getDb(): Database.Database {
       CREATE TABLE IF NOT EXISTS masturbation_records (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         occurred_at TEXT NOT NULL,
-        created_at TEXT NOT NULL
+        created_at TEXT NOT NULL,
+        note TEXT
       );
 
       CREATE INDEX IF NOT EXISTS idx_masturbation_records_occurred_at

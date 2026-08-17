@@ -342,6 +342,32 @@ const MIGRATIONS: DbMigration[] = [
       `);
     },
   },
+  {
+    version: 18,
+    up(db) {
+      if (!tableHasColumn(db, 'masturbation_records', 'note')) {
+        db.exec(`ALTER TABLE masturbation_records ADD COLUMN note TEXT;`);
+      }
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS masturbation_capture_sessions (
+          chat_id TEXT PRIMARY KEY,
+          prompt_message_id INTEGER NOT NULL,
+          created_at TEXT NOT NULL
+        );
+      `);
+    },
+  },
+  {
+    version: 19,
+    up(db) {
+      if (!tableHasColumn(db, 'masturbation_capture_sessions', 'reference_date')) {
+        db.exec(`ALTER TABLE masturbation_capture_sessions ADD COLUMN reference_date TEXT;`);
+      }
+      if (!tableHasColumn(db, 'masturbation_capture_sessions', 'expires_at')) {
+        db.exec(`ALTER TABLE masturbation_capture_sessions ADD COLUMN expires_at TEXT;`);
+      }
+    },
+  },
 ];
 
 export function runDbMigrations(db: Database.Database): void {

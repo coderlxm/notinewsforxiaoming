@@ -131,12 +131,15 @@ import {
 } from '../formatters/steamPriceFormatter.js';
 import * as masturbationRepo from '../services/masturbationRepository.js';
 import { buildSummary } from '../services/masturbationTracker.js';
+import { parseMasturbationInput } from '../services/masturbationParser.js';
 import {
   formatMasturbationStatusCard,
   formatMasturbationConfirmCard,
   formatMasturbationUndoCard,
   formatMasturbationUndoCommand,
   formatMasturbationStatsCard,
+  formatMasturbationCapturePromptCard,
+  formatMasturbationCaptureCancelledCard,
   buildMasturbationStatusButtons,
   buildMasturbationConfirmButtons,
   buildMasturbationStatsButtons,
@@ -309,6 +312,29 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     const summary = await runStartggWatchOnce(bot);
     updateStartggFastWatch(bot, summary.activeEventSlugs);
   }
+
+  bot.use(async (ctx, next) => {
+    if (!isAuthorized(ctx)) return next();
+    const message = ctx.message;
+    if (!message || !('text' in message)) return next();
+    const commandEntity = message.entities?.[0];
+    if (commandEntity?.type !== 'bot_command' || commandEntity.offset !== 0) return next();
+    const command = message.text.slice(1, commandEntity.length).split('@')[0]?.toLowerCase();
+    if (command === 'cancel') return next();
+
+    const chatId = String(message.chat.id);
+    const session = masturbationRepo.findCaptureSession(chatId);
+    if (!session) return next();
+    masturbationRepo.deleteCaptureSession(chatId);
+    await ctx.telegram.editMessageText(
+      chatId,
+      session.prompt_message_id,
+      undefined,
+      formatMasturbationCaptureCancelledCard(),
+      { parse_mode: 'HTML' },
+    );
+    return next();
+  });
 
   bot.command('start', (ctx) => {
     if (!isAuthorized(ctx)) return;
@@ -1060,6 +1086,21 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     });
   });
 
+  bot.command('cancel', async (ctx) => {
+    if (!isAuthorized(ctx)) return;
+    const chatId = String(ctx.chat!.id);
+    const session = masturbationRepo.findCaptureSession(chatId);
+    if (!session) return;
+    masturbationRepo.deleteCaptureSession(chatId);
+    await ctx.telegram.editMessageText(
+      chatId,
+      session.prompt_message_id,
+      undefined,
+      formatMasturbationCaptureCancelledCard(),
+      { parse_mode: 'HTML' },
+    );
+  });
+
   bot.command('remind', async (ctx) => {
     if (!isAuthorized(ctx)) return;
 
@@ -1142,7 +1183,38 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     if (!isAuthorized(ctx)) return;
 
     const text = ctx.message && 'text' in ctx.message ? ctx.message.text : '';
-    if (!text || text.startsWith('/')) return;
+    if (!text) return;
+
+    const chatId = String(ctx.chat!.id);
+    const captureSession = masturbationRepo.findCaptureSession(chatId);
+    if (captureSession) {
+      if (text.startsWith('/') || text === '📝 撸了吗' || text === '撸了吗') {
+        masturbationRepo.deleteCaptureSession(chatId);
+      } else {
+        const result = await parseMasturbationInput(
+          text,
+          new Date(),
+          captureSession.reference_date ?? undefined,
+        );
+        if ('error' in result) {
+          await ctx.reply(result.error, { parse_mode: 'HTML' });
+          return;
+        }
+        const record = masturbationRepo.createRecord(result.occurredAt, result.note);
+        masturbationRepo.deleteCaptureSession(chatId);
+        const summary = buildSummary();
+        await ctx.telegram.editMessageText(
+          chatId,
+          captureSession.prompt_message_id,
+          undefined,
+          formatMasturbationConfirmCard(record, summary.todayCount),
+          { parse_mode: 'HTML', ...buildMasturbationConfirmButtons(record.id) },
+        );
+        return;
+      }
+    }
+
+    if (text.startsWith('/')) return;
 
     if (text === '📝 撸了吗' || text === '撸了吗') {
       const summary = buildSummary();
@@ -1273,12 +1345,18 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
       await ctx.answerCbQuery();
 
       if (masturbationAction.type === 'add') {
-        const record = masturbationRepo.createRecord(new Date());
-        const summary = buildSummary();
-        await ctx.editMessageText(formatMasturbationConfirmCard(record, summary.todayCount), {
-          parse_mode: 'HTML',
-          ...buildMasturbationConfirmButtons(record.id),
-        });
+        const chatId = String(ctx.chat!.id);
+        const promptMessageId = ctx.callbackQuery.message && 'message_id' in ctx.callbackQuery.message
+          ? ctx.callbackQuery.message.message_id
+          : undefined;
+        await ctx.editMessageText(formatMasturbationCapturePromptCard(), { parse_mode: 'HTML' });
+        if (promptMessageId) {
+          masturbationRepo.saveCaptureSession(
+            chatId,
+            promptMessageId,
+            masturbationAction.referenceDate,
+          );
+        }
         return;
       }
 
