@@ -1345,6 +1345,16 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
       await ctx.answerCbQuery();
 
       if (masturbationAction.type === 'add') {
+        if (!masturbationAction.referenceDate) {
+          const record = masturbationRepo.createRecord(new Date());
+          const summary = buildSummary();
+          await ctx.editMessageText(formatMasturbationConfirmCard(record, summary.todayCount), {
+            parse_mode: 'HTML',
+            ...buildMasturbationConfirmButtons(record.id),
+          });
+          return;
+        }
+
         const chatId = String(ctx.chat!.id);
         const promptMessageId = ctx.callbackQuery.message && 'message_id' in ctx.callbackQuery.message
           ? ctx.callbackQuery.message.message_id
