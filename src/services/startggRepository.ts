@@ -380,8 +380,8 @@ export function syncAutoDiscoveredStartggWatchEvents(events: StartggWatchEventIn
       SET active = 0, updated_at = ?
       WHERE active = 1
         AND subscription_source = 'auto'
-        AND tournament_end_at <= ?
-    `).run(now, now);
+        AND event_state = 'COMPLETED'
+    `).run(now);
 
     const upsert = db.prepare(`
       INSERT INTO startgg_watch_events (

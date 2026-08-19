@@ -79,13 +79,9 @@ async function runScheduledStartggFastWatch(bot: Telegraf, eventSlugs: string[])
 async function runScheduledStartggWatch(bot: Telegraf): Promise<void> {
   clearStartggFastWatch();
   const subscribedEvents = listActiveStartggWatchEvents();
-  const allTournamentsEnded = subscribedEvents.length > 0 && subscribedEvents.every((event) => {
-    if (!event.tournament_end_at) {
-      throw new Error(`start.gg active event missing tournament_end_at: ${event.event_slug}`);
-    }
-    return new Date(event.tournament_end_at).getTime() <= Date.now();
-  });
-  if (allTournamentsEnded) {
+  const allEventsCompleted = subscribedEvents.length > 0
+    && subscribedEvents.every((event) => event.event_state === 'COMPLETED');
+  if (allEventsCompleted) {
     disableStartggPolling();
     await bot.telegram.sendMessage(
       config.tgChatId,
