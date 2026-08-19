@@ -201,7 +201,7 @@ onScopeDispose(removeAfterEach);
   }
 
   .public-search__input {
-    font-size: 0.82rem;
+    font-size: 16px;
   }
 }
 </style>
