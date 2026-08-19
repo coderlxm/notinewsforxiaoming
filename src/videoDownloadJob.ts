@@ -24,7 +24,7 @@ const result = isBilibiliHost(url.hostname)
       cookiesFile: '/root/.config/yt-dlp/youtube-cookies.txt',
       extractorArgs: isYouTubeHost(url.hostname)
         ? [
-            'youtube:player-client=mweb',
+            'youtube:player-client=web_creator',
             'youtubepot-bgutilhttp:base_url=http://127.0.0.1:4416',
           ]
         : undefined,
