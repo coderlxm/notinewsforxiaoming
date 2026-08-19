@@ -195,6 +195,12 @@ const visibilityLabel = computed(() => props.entry.publicationStatus === 'draft'
   font-size: clamp(15rem, 90cqw, 28rem);
 }
 
+.text-poster--card .text-poster__text {
+  width: fit-content;
+  max-width: 100%;
+  justify-self: center;
+}
+
 .text-poster--card .text-poster__eyebrow,
 .text-poster--card .text-poster__footer {
   font-size: clamp(0.58rem, 2.8cqw, 0.72rem);
