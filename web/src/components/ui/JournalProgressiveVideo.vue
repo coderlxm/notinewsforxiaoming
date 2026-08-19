@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, shallowRef, useTemplateRef } from 'vue';
+import { acquireJournalVideo, releaseJournalVideo } from '../../utils/journalVideoPlayerPool';
 
 const props = withDefaults(defineProps<{
   src: string;
@@ -16,18 +17,14 @@ const emit = defineEmits<{
 const state = shallowRef<'loading' | 'ready' | 'error'>('loading');
 const root = useTemplateRef<HTMLElement>('root');
 let observer: IntersectionObserver;
-let preloader: HTMLVideoElement | null = null;
+let acquired = false;
 
 onMounted(() => {
   observer = new IntersectionObserver(([entry]) => {
     if (!entry.isIntersecting) return;
 
-    preloader = document.createElement('video');
-    preloader.preload = 'auto';
-    preloader.muted = true;
-    preloader.playsInline = true;
-    preloader.src = props.src;
-    preloader.load();
+    acquireJournalVideo(props.src);
+    acquired = true;
     observer.disconnect();
   }, {
     rootMargin: '240px 0px',
@@ -38,9 +35,10 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   observer.disconnect();
-  if (!preloader) return;
-  preloader.removeAttribute('src');
-  preloader.load();
+  if (acquired) {
+    releaseJournalVideo(props.src);
+    acquired = false;
+  }
 });
 
 function markPreviewReady(): void {

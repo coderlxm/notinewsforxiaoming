@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, shallowRef, useTemplateRef, watch } from 'vue';
+import { computed, onBeforeUnmount, shallowRef, watch } from 'vue';
 import type { CSSProperties } from 'vue';
 import type { JournalAsset } from '../../types';
 import { resolveJournalMediaType } from '../../utils/journalMedia';
+import { mountJournalVideo, releaseJournalVideo } from '../../utils/journalVideoPlayerPool';
 
 const props = defineProps<{
   assets: readonly JournalAsset[];
@@ -18,7 +19,6 @@ type StageAsset = JournalAsset & {
 
 const currentIndex = shallowRef(0);
 const videoReady = shallowRef(false);
-const activeVideo = useTemplateRef<HTMLVideoElement>('activeVideo');
 
 const stageAssets = computed<StageAsset[]>(() => props.assets.map((asset) => ({
   ...asset,
@@ -41,13 +41,69 @@ watch(currentAdaptiveAspectRatio, (aspectRatio) => {
   emit('aspectRatioChange', aspectRatio);
 }, { immediate: true });
 
-watch(() => currentAsset.value?.id, () => {
-  videoReady.value = currentAsset.value?.mediaType !== 'video';
-}, { immediate: true });
+let currentMountedVideo: HTMLVideoElement | null = null;
+let currentMountedUrl: string | null = null;
+let currentVideoHost: HTMLElement | null = null;
+
+function handleVideoReady(): void {
+  videoReady.value = true;
+}
+
+function handleVideoHostMount(container: HTMLElement | null): void {
+  const asset = currentAsset.value;
+  if (container === currentVideoHost && currentMountedUrl === asset?.url) return;
+
+  if (currentMountedVideo) {
+    currentMountedVideo.removeEventListener('loadeddata', handleVideoReady);
+    currentMountedVideo.removeEventListener('canplay', handleVideoReady);
+    currentMountedVideo.pause();
+    currentMountedVideo.remove();
+    currentMountedVideo = null;
+  }
+  if (currentMountedUrl) {
+    releaseJournalVideo(currentMountedUrl);
+    currentMountedUrl = null;
+  }
+
+  currentVideoHost = container;
+
+  if (!container || !asset || asset.mediaType !== 'video') {
+    videoReady.value = asset?.mediaType !== 'video';
+    return;
+  }
+
+  const video = mountJournalVideo(asset.url, container);
+  currentMountedVideo = video;
+  currentMountedUrl = asset.url;
+
+  video.controls = true;
+  video.autoplay = true;
+  video.muted = true;
+  video.playsInline = true;
+  if (asset.previewUrl && !video.poster) {
+    video.poster = asset.previewUrl;
+  }
+
+  if (video.readyState >= 2) {
+    videoReady.value = true;
+  } else {
+    videoReady.value = false;
+    video.addEventListener('loadeddata', handleVideoReady, { once: true });
+    video.addEventListener('canplay', handleVideoReady, { once: true });
+  }
+
+  video.play().catch(() => {
+    // Autoplay policy or fast navigation
+  });
+}
+
+const setVideoHostRef = (element: unknown): void => {
+  handleVideoHostMount(element as HTMLElement | null);
+};
 
 function goTo(index: number): void {
   if (index === currentIndex.value) return;
-  activeVideo.value?.pause();
+  currentMountedVideo?.pause();
   currentIndex.value = index;
 }
 
@@ -57,10 +113,6 @@ function previous(): void {
 
 function next(): void {
   goTo(currentIndex.value + 1);
-}
-
-function revealVideo(): void {
-  videoReady.value = true;
 }
 
 function handleKeyboard(event: KeyboardEvent): void {
@@ -75,7 +127,9 @@ function handleKeyboard(event: KeyboardEvent): void {
   }
 }
 
-onBeforeUnmount(() => activeVideo.value?.pause());
+onBeforeUnmount(() => {
+  handleVideoHostMount(null);
+});
 </script>
 
 <template>
@@ -105,20 +159,12 @@ onBeforeUnmount(() => activeVideo.value?.pause());
           alt=""
           draggable="false"
         >
-        <video
+        <div
           v-else
-          ref="activeVideo"
-          class="media-stage__media media-stage__video"
-          :class="{ 'media-stage__video--ready': videoReady }"
-          :src="currentAsset.url"
-          :poster="currentAsset.previewUrl!"
-          autoplay
-          controls
-          muted
-          playsinline
-          preload="auto"
+          :ref="setVideoHostRef"
+          class="media-stage__media media-stage__video-host"
+          :class="{ 'media-stage__video-host--ready': videoReady }"
           :aria-busy="!videoReady"
-          @loadeddata="revealVideo"
         />
       </div>
     </div>
@@ -224,12 +270,23 @@ onBeforeUnmount(() => activeVideo.value?.pause());
   object-fit: contain;
 }
 
-.media-stage__video {
+.media-stage__video-host {
   pointer-events: none;
+  overflow: hidden;
 }
 
-.media-stage__video--ready {
+.media-stage__video-host--ready {
   pointer-events: auto;
+}
+
+.media-stage__video-host :deep(video) {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  object-fit: inherit;
+  border-radius: inherit;
 }
 
 .media-stage__item--sticker .media-stage__media {
