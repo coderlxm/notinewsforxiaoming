@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { shallowRef } from 'vue';
+import { onBeforeUnmount, onMounted, shallowRef, useTemplateRef } from 'vue';
 
 const props = withDefaults(defineProps<{
+  src: string;
   previewSrc: string;
   fit?: 'cover' | 'contain';
 }>(), {
@@ -13,6 +14,34 @@ const emit = defineEmits<{
 }>();
 
 const state = shallowRef<'loading' | 'ready' | 'error'>('loading');
+const root = useTemplateRef<HTMLElement>('root');
+let observer: IntersectionObserver;
+let preloader: HTMLVideoElement | null = null;
+
+onMounted(() => {
+  observer = new IntersectionObserver(([entry]) => {
+    if (!entry.isIntersecting) return;
+
+    preloader = document.createElement('video');
+    preloader.preload = 'auto';
+    preloader.muted = true;
+    preloader.playsInline = true;
+    preloader.src = props.src;
+    preloader.load();
+    observer.disconnect();
+  }, {
+    rootMargin: '240px 0px',
+    threshold: 0,
+  });
+  observer.observe(root.value!);
+});
+
+onBeforeUnmount(() => {
+  observer.disconnect();
+  if (!preloader) return;
+  preloader.removeAttribute('src');
+  preloader.load();
+});
 
 function markPreviewReady(): void {
   state.value = 'ready';
@@ -25,6 +54,7 @@ function exposePreviewError(): void {
 
 <template>
   <span
+    ref="root"
     class="progressive-video"
     :class="[`progressive-video--${fit}`, `progressive-video--${state}`]"
     :aria-busy="state === 'loading'"
