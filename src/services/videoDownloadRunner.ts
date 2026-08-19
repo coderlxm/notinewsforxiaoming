@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, rm, stat } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
 import { lookup } from 'mime-types';
+import { z } from 'zod';
 import { bj } from '../utils/time.js';
 import type {
   VideoDownloadResult,
@@ -19,6 +20,7 @@ interface VideoDownloadRunnerOptions {
   workRoot: string;
   nodePath: string;
   cookiesFile?: string;
+  extractorArgs?: string[];
   onStage: (stage: VideoDownloadStage) => void | Promise<void>;
 }
 
@@ -27,6 +29,17 @@ interface ProcessResult {
   stderr: string;
 }
 
+const ytDlpSelectedFormatSchema = z.object({
+  format_id: z.string(),
+  format: z.string(),
+  resolution: z.string(),
+  fps: z.number().nullable(),
+  vcodec: z.string().nullable(),
+  acodec: z.string().nullable(),
+  ext: z.string(),
+  dynamic_range: z.string().nullable(),
+});
+
 export async function runLocalVideoDownload(
   options: VideoDownloadRunnerOptions,
 ): Promise<VideoDownloadResult> {
@@ -34,6 +47,7 @@ export async function runLocalVideoDownload(
   await mkdir(options.workRoot, { recursive: true, mode: 0o700 });
   const taskDirectory = await mkdtemp(join(options.workRoot, 'job-'));
   const downloadedPathFile = join(taskDirectory, 'downloaded-path.txt');
+  const selectedFormatFile = join(taskDirectory, 'selected-format.json');
   const startedAt = Date.now();
 
   try {
@@ -43,11 +57,16 @@ export async function runLocalVideoDownload(
       '--no-playlist',
       '--match-filter', '!is_live',
       '--max-filesize', '8G',
+      '--format', 'bestvideo*+bestaudio/best',
       '--no-progress',
       '--no-warnings',
       '--js-runtimes', `node:${options.nodePath}`,
       ...(options.cookiesFile ? ['--cookies', options.cookiesFile] : []),
+      ...(options.extractorArgs ?? []).flatMap((value) => ['--extractor-args', value]),
       '--print-to-file', 'after_move:filepath', downloadedPathFile,
+      '--print-to-file',
+      'after_move:%(.{format_id,format,resolution,fps,vcodec,acodec,ext,dynamic_range})j',
+      selectedFormatFile,
       '--paths', taskDirectory,
       '--output', '%(title).150B [%(id)s].%(ext)s',
       '--',
@@ -69,6 +88,9 @@ export async function runLocalVideoDownload(
     if (!contentType || !contentType.startsWith('video/')) {
       throw new Error(`下载结果不是可识别的视频文件：${fileName}`);
     }
+    const selectedFormat = ytDlpSelectedFormatSchema.parse(
+      JSON.parse((await readFile(selectedFormatFile, 'utf8')).trim()),
+    );
 
     await options.onStage('uploading');
     const driveDirectory = `NotiNewsDownloads/${bj().format('YYYY-MM')}`;
@@ -90,6 +112,16 @@ export async function runLocalVideoDownload(
       byteSize: fileStats.size,
       drivePath,
       elapsedMs: Math.max(1, Date.now() - startedAt),
+      selectedFormat: {
+        formatId: selectedFormat.format_id,
+        description: selectedFormat.format,
+        resolution: selectedFormat.resolution,
+        fps: selectedFormat.fps,
+        videoCodec: selectedFormat.vcodec,
+        audioCodec: selectedFormat.acodec,
+        container: selectedFormat.ext,
+        dynamicRange: selectedFormat.dynamic_range,
+      },
     };
   } finally {
     await rm(taskDirectory, { recursive: true, force: true });

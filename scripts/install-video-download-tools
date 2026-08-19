@@ -7,6 +7,18 @@ YTDLP_VERSION=2026.07.23.234303
 YTDLP_SHA256=737e0fe33019afee4ccfebc775dc492167382c20d845c5abd99bda410b2b5d74
 YTDLP_URL=https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/download/${YTDLP_VERSION}/yt-dlp_linux
 YTDLP_PATH=/usr/local/bin/yt-dlp
+BGUTIL_VERSION=1.3.1
+BGUTIL_PLUGIN_SHA256=b8ceec7f76143da172aaf5ebeec0c2d218e5680c063b931586bca48567069b38
+BGUTIL_PLUGIN_URL=https://github.com/Brainicism/bgutil-ytdlp-pot-provider/releases/download/${BGUTIL_VERSION}/bgutil-ytdlp-pot-provider.zip
+BGUTIL_PLUGIN_PATH=/etc/yt-dlp/plugins/bgutil-ytdlp-pot-provider.zip
+BGUTIL_IMAGE=brainicism/bgutil-ytdlp-pot-provider:${BGUTIL_VERSION}
+BGUTIL_CONTAINER=notinews-youtube-pot-provider
+
+cleanup() {
+  [[ -z ${DOWNLOAD_PATH:-} ]] || rm -f -- "${DOWNLOAD_PATH}"
+  [[ -z ${PLUGIN_DOWNLOAD_PATH:-} ]] || rm -f -- "${PLUGIN_DOWNLOAD_PATH}"
+}
+trap cleanup EXIT
 
 if ! command -v ffmpeg >/dev/null 2>&1 \
   || ! command -v curl >/dev/null 2>&1 \
@@ -21,10 +33,46 @@ fi
 
 if [[ ! -x ${YTDLP_PATH} ]] || [[ $("${YTDLP_PATH}" --version) != "${YTDLP_VERSION}" ]]; then
   DOWNLOAD_PATH=$(mktemp)
-  trap 'rm -f -- "${DOWNLOAD_PATH}"' EXIT
   curl -fsSL "${YTDLP_URL}" -o "${DOWNLOAD_PATH}"
   echo "${YTDLP_SHA256}  ${DOWNLOAD_PATH}" | sha256sum --check -
   install -m 755 "${DOWNLOAD_PATH}" "${YTDLP_PATH}"
+fi
+
+install -d -m 755 "$(dirname "${BGUTIL_PLUGIN_PATH}")"
+if [[ ! -f ${BGUTIL_PLUGIN_PATH} ]] \
+  || ! echo "${BGUTIL_PLUGIN_SHA256}  ${BGUTIL_PLUGIN_PATH}" | sha256sum --check --status; then
+  PLUGIN_DOWNLOAD_PATH=$(mktemp)
+  curl -fsSL "${BGUTIL_PLUGIN_URL}" -o "${PLUGIN_DOWNLOAD_PATH}"
+  echo "${BGUTIL_PLUGIN_SHA256}  ${PLUGIN_DOWNLOAD_PATH}" | sha256sum --check -
+  install -m 644 "${PLUGIN_DOWNLOAD_PATH}" "${BGUTIL_PLUGIN_PATH}"
+fi
+
+if ! command -v docker >/dev/null 2>&1; then
+  echo 'docker is missing on server' >&2
+  exit 1
+fi
+
+if ! docker image inspect "${BGUTIL_IMAGE}" >/dev/null 2>&1; then
+  docker pull "${BGUTIL_IMAGE}"
+fi
+
+if docker container inspect "${BGUTIL_CONTAINER}" >/dev/null 2>&1; then
+  CURRENT_BGUTIL_IMAGE=$(docker container inspect --format '{{.Config.Image}}' "${BGUTIL_CONTAINER}")
+  if [[ ${CURRENT_BGUTIL_IMAGE} != "${BGUTIL_IMAGE}" ]]; then
+    docker rm --force "${BGUTIL_CONTAINER}"
+  fi
+fi
+
+if ! docker container inspect "${BGUTIL_CONTAINER}" >/dev/null 2>&1; then
+  docker run \
+    --detach \
+    --name "${BGUTIL_CONTAINER}" \
+    --restart unless-stopped \
+    --init \
+    --publish 127.0.0.1:4416:4416 \
+    "${BGUTIL_IMAGE}"
+elif [[ $(docker container inspect --format '{{.State.Running}}' "${BGUTIL_CONTAINER}") != true ]]; then
+  docker start "${BGUTIL_CONTAINER}"
 fi
 
 if ! command -v rclone >/dev/null 2>&1; then

@@ -22,6 +22,12 @@ const result = isBilibiliHost(url.hostname)
       workRoot: '/var/lib/notinews-downloads',
       nodePath: '/usr/bin/node',
       cookiesFile: '/root/.config/yt-dlp/youtube-cookies.txt',
+      extractorArgs: isYouTubeHost(url.hostname)
+        ? [
+            'youtube:player-client=mweb',
+            'youtubepot-bgutilhttp:base_url=http://127.0.0.1:4416',
+          ]
+        : undefined,
       onStage(stage) {
         writeVideoDownloadEvent({ type: 'stage', stage });
       },
@@ -34,6 +40,15 @@ function isBilibiliHost(hostname: string): boolean {
   return host === 'b23.tv'
     || host === 'bilibili.com'
     || host.endsWith('.bilibili.com');
+}
+
+function isYouTubeHost(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  return host === 'youtu.be'
+    || host === 'youtube.com'
+    || host.endsWith('.youtube.com')
+    || host === 'youtube-nocookie.com'
+    || host.endsWith('.youtube-nocookie.com');
 }
 
 function runMacVideoDownload(url: string): Promise<VideoDownloadResult> {

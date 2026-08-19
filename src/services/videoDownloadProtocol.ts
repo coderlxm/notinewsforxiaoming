@@ -4,6 +4,17 @@ export const videoDownloadRequestSchema = z.object({
   url: z.string().url(),
 });
 
+export const videoSelectedFormatSchema = z.object({
+  formatId: z.string(),
+  description: z.string(),
+  resolution: z.string(),
+  fps: z.number().nullable(),
+  videoCodec: z.string().nullable(),
+  audioCodec: z.string().nullable(),
+  container: z.string(),
+  dynamicRange: z.string().nullable(),
+});
+
 export const videoDownloadEventSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('stage'),
@@ -15,6 +26,7 @@ export const videoDownloadEventSchema = z.discriminatedUnion('type', [
     byteSize: z.number().int().nonnegative(),
     drivePath: z.string(),
     elapsedMs: z.number().int().positive(),
+    selectedFormat: videoSelectedFormatSchema,
   }),
 ]);
 
