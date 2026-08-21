@@ -154,6 +154,15 @@ function toggleVideoPlayback(): void {
   currentMountedVideo.pause();
 }
 
+function handleVideoSurfaceClick(): void {
+  if (!currentMountedVideo || !videoReady.value) return;
+  if (!videoControlsActivated.value && window.matchMedia('(hover: none) and (pointer: coarse)').matches) {
+    videoControlsActivated.value = true;
+    return;
+  }
+  toggleVideoPlayback();
+}
+
 function seekVideo(event: Event): void {
   if (!currentMountedVideo) return;
   const input = event.currentTarget as HTMLInputElement;
@@ -225,7 +234,7 @@ onBeforeUnmount(() => {
           class="media-stage__media media-stage__video-host"
           :class="{ 'media-stage__video-host--ready': videoReady }"
           :aria-busy="!videoReady"
-          @click="toggleVideoPlayback"
+          @click="handleVideoSurfaceClick"
         />
         <button
           v-if="currentAsset.mediaType === 'video'"
