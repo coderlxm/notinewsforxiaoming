@@ -422,10 +422,10 @@ onBeforeUnmount(() => {
 .media-stage__progress {
   z-index: 2;
   width: calc(100% - 32px);
-  height: 16px;
+  height: 44px;
   align-self: end;
   padding: 0;
-  margin: 0 16px 12px;
+  margin: 0 16px;
   -webkit-appearance: none;
   appearance: none;
   border: 0;
@@ -434,6 +434,7 @@ onBeforeUnmount(() => {
   cursor: pointer;
   grid-area: 1 / 1;
   -webkit-tap-highlight-color: transparent;
+  touch-action: none;
 }
 
 .media-stage__progress::-webkit-slider-runnable-track {
