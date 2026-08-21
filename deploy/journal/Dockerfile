@@ -33,21 +33,21 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends ffmpeg libheif-examples poppler-utils \
   && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
-
-COPY --from=dependencies /app/node_modules ./node_modules
-COPY --from=dependencies /app/package.json ./package.json
-COPY --from=web-builder /app/web/dist ./web/dist
-COPY src/journal-server ./src/journal-server
-COPY src/shared ./src/shared
-COPY src/fetchers/qweatherCurrent.ts ./src/fetchers/qweatherCurrent.ts
-
 RUN printf '%s\n' \
   "fetch('http://127.0.0.1:3100/api/health')" \
   "  .then((response) => { if (!response.ok) process.exit(1); })" \
   "  .catch((error) => { console.error(error); process.exit(1); });" \
-  > /usr/local/bin/journal-healthcheck.mjs \
-  && chown -R node:node /app
+  > /usr/local/bin/journal-healthcheck.mjs
+
+WORKDIR /app
+RUN chown node:node /app
+
+COPY --from=dependencies --chown=node:node /app/node_modules ./node_modules
+COPY --from=dependencies --chown=node:node /app/package.json ./package.json
+COPY --from=web-builder --chown=node:node /app/web/dist ./web/dist
+COPY --chown=node:node src/journal-server ./src/journal-server
+COPY --chown=node:node src/shared ./src/shared
+COPY --chown=node:node src/fetchers/qweatherCurrent.ts ./src/fetchers/qweatherCurrent.ts
 
 USER node
 
