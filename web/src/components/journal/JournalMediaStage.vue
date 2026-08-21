@@ -244,8 +244,9 @@ onBeforeUnmount(() => {
           </svg>
         </button>
         <input
-          v-if="currentAsset.mediaType === 'video' && videoControlsActivated"
+          v-if="currentAsset.mediaType === 'video'"
           class="media-stage__progress"
+          :class="{ 'media-stage__progress--visible': videoControlsActivated }"
           type="range"
           min="0"
           :max="videoDuration"
@@ -433,8 +434,23 @@ onBeforeUnmount(() => {
   background: transparent;
   cursor: pointer;
   grid-area: 1 / 1;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
   -webkit-tap-highlight-color: transparent;
   touch-action: none;
+}
+
+.media-stage__progress--visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .media-stage__item:hover .media-stage__progress:not(:disabled) {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
 
 .media-stage__progress::-webkit-slider-runnable-track {
@@ -677,7 +693,8 @@ onBeforeUnmount(() => {
 
 @media (prefers-reduced-motion: reduce) {
   .media-stage__media,
-  .media-stage__playback-toggle {
+  .media-stage__playback-toggle,
+  .media-stage__progress {
     animation: none;
     transition: none;
   }
