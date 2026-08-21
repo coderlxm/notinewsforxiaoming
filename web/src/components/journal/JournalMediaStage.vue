@@ -19,6 +19,10 @@ type StageAsset = JournalAsset & {
 
 const currentIndex = shallowRef(0);
 const videoReady = shallowRef(false);
+const videoPlaying = shallowRef(false);
+const videoControlsActivated = shallowRef(false);
+const videoCurrentTime = shallowRef(0);
+const videoDuration = shallowRef(0);
 
 const stageAssets = computed<StageAsset[]>(() => props.assets.map((asset) => ({
   ...asset,
@@ -36,6 +40,9 @@ const stageStyle = computed<CSSProperties>(() => currentAdaptiveAspectRatio.valu
   ? { '--media-stage-aspect-ratio': String(currentAdaptiveAspectRatio.value) }
   : {});
 const currentAssetFullBleed = computed(() => currentAdaptiveAspectRatio.value !== null);
+const videoProgressStyle = computed(() => ({
+  '--video-progress': `${videoDuration.value > 0 ? (videoCurrentTime.value / videoDuration.value) * 100 : 0}%`,
+}));
 
 watch(currentAdaptiveAspectRatio, (aspectRatio) => {
   emit('aspectRatioChange', aspectRatio);
@@ -49,6 +56,25 @@ function handleVideoReady(): void {
   videoReady.value = true;
 }
 
+function handleVideoPlay(): void {
+  videoPlaying.value = true;
+}
+
+function handleVideoPause(): void {
+  videoPlaying.value = false;
+}
+
+function handleVideoEnded(): void {
+  videoPlaying.value = false;
+  videoControlsActivated.value = true;
+}
+
+function handleVideoTimelineChange(event: Event): void {
+  const video = event.currentTarget as HTMLVideoElement;
+  videoCurrentTime.value = video.currentTime;
+  videoDuration.value = Number.isFinite(video.duration) ? video.duration : 0;
+}
+
 function handleVideoHostMount(container: HTMLElement | null): void {
   const asset = currentAsset.value;
   if (container === currentVideoHost && currentMountedUrl === asset?.url) return;
@@ -56,6 +82,12 @@ function handleVideoHostMount(container: HTMLElement | null): void {
   if (currentMountedVideo) {
     currentMountedVideo.removeEventListener('loadeddata', handleVideoReady);
     currentMountedVideo.removeEventListener('canplay', handleVideoReady);
+    currentMountedVideo.removeEventListener('play', handleVideoPlay);
+    currentMountedVideo.removeEventListener('pause', handleVideoPause);
+    currentMountedVideo.removeEventListener('ended', handleVideoEnded);
+    currentMountedVideo.removeEventListener('timeupdate', handleVideoTimelineChange);
+    currentMountedVideo.removeEventListener('durationchange', handleVideoTimelineChange);
+    currentMountedVideo.removeEventListener('loadedmetadata', handleVideoTimelineChange);
     currentMountedVideo.pause();
     currentMountedVideo.remove();
     currentMountedVideo = null;
@@ -69,6 +101,10 @@ function handleVideoHostMount(container: HTMLElement | null): void {
 
   if (!container || !asset || asset.mediaType !== 'video') {
     videoReady.value = asset?.mediaType !== 'video';
+    videoPlaying.value = false;
+    videoControlsActivated.value = false;
+    videoCurrentTime.value = 0;
+    videoDuration.value = 0;
     return;
   }
 
@@ -76,7 +112,7 @@ function handleVideoHostMount(container: HTMLElement | null): void {
   currentMountedVideo = video;
   currentMountedUrl = asset.url;
 
-  video.controls = true;
+  video.controls = false;
   video.autoplay = true;
   video.muted = true;
   video.playsInline = true;
@@ -92,14 +128,38 @@ function handleVideoHostMount(container: HTMLElement | null): void {
     video.addEventListener('canplay', handleVideoReady, { once: true });
   }
 
-  video.play().catch(() => {
-    // Autoplay policy or fast navigation
-  });
+  videoPlaying.value = !video.paused && !video.ended;
+  videoCurrentTime.value = video.currentTime;
+  videoDuration.value = Number.isFinite(video.duration) ? video.duration : 0;
+  video.addEventListener('play', handleVideoPlay);
+  video.addEventListener('pause', handleVideoPause);
+  video.addEventListener('ended', handleVideoEnded);
+  video.addEventListener('timeupdate', handleVideoTimelineChange);
+  video.addEventListener('durationchange', handleVideoTimelineChange);
+  video.addEventListener('loadedmetadata', handleVideoTimelineChange);
+  void video.play();
 }
 
 const setVideoHostRef = (element: unknown): void => {
   handleVideoHostMount(element as HTMLElement | null);
 };
+
+function toggleVideoPlayback(): void {
+  if (!currentMountedVideo || !videoReady.value) return;
+  if (currentMountedVideo.paused || currentMountedVideo.ended) {
+    void currentMountedVideo.play();
+    return;
+  }
+  videoControlsActivated.value = true;
+  currentMountedVideo.pause();
+}
+
+function seekVideo(event: Event): void {
+  if (!currentMountedVideo) return;
+  const input = event.currentTarget as HTMLInputElement;
+  currentMountedVideo.currentTime = Number(input.value);
+  videoCurrentTime.value = currentMountedVideo.currentTime;
+}
 
 function goTo(index: number): void {
   if (index === currentIndex.value) return;
@@ -116,7 +176,7 @@ function next(): void {
 }
 
 function handleKeyboard(event: KeyboardEvent): void {
-  if (event.target instanceof HTMLMediaElement) return;
+  if (event.target instanceof HTMLMediaElement || event.target instanceof HTMLInputElement) return;
   if (event.key === 'ArrowLeft' && currentIndex.value > 0) {
     event.preventDefault();
     previous();
@@ -165,7 +225,37 @@ onBeforeUnmount(() => {
           class="media-stage__media media-stage__video-host"
           :class="{ 'media-stage__video-host--ready': videoReady }"
           :aria-busy="!videoReady"
+          @click="toggleVideoPlayback"
         />
+        <button
+          v-if="currentAsset.mediaType === 'video'"
+          class="media-stage__playback-toggle"
+          :class="{ 'media-stage__playback-toggle--playing': videoPlaying }"
+          type="button"
+          :aria-label="videoPlaying ? '暂停视频' : '播放视频'"
+          :disabled="!videoReady"
+          @click.stop="toggleVideoPlayback"
+        >
+          <svg v-if="videoPlaying" class="media-stage__playback-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M8 6v12M16 6v12" />
+          </svg>
+          <svg v-else class="media-stage__playback-icon media-stage__playback-icon--play" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="m9 6 9 6-9 6Z" />
+          </svg>
+        </button>
+        <input
+          v-if="currentAsset.mediaType === 'video' && videoControlsActivated"
+          class="media-stage__progress"
+          type="range"
+          min="0"
+          :max="videoDuration"
+          step="0.1"
+          :value="videoCurrentTime"
+          :style="videoProgressStyle"
+          aria-label="视频进度"
+          :disabled="!videoReady || videoDuration <= 0"
+          @input="seekVideo"
+        >
       </div>
     </div>
 
@@ -287,6 +377,118 @@ onBeforeUnmount(() => {
   min-height: 0;
   object-fit: inherit;
   border-radius: inherit;
+}
+
+.media-stage__playback-toggle {
+  z-index: 2;
+  display: grid;
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 36%);
+  border-radius: 50%;
+  grid-area: 1 / 1;
+  background: rgb(20 20 20 / 58%);
+  color: #fff;
+  cursor: pointer;
+  opacity: 1;
+  place-items: center;
+  transition: opacity 220ms ease, transform 220ms ease;
+}
+
+.media-stage__playback-toggle--playing,
+.media-stage__playback-toggle:disabled {
+  pointer-events: none;
+  opacity: 0;
+  transform: scale(0.9);
+}
+
+.media-stage__playback-icon {
+  display: block;
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.media-stage__playback-icon--play {
+  fill: currentColor;
+  stroke: none;
+}
+
+.media-stage__progress {
+  z-index: 2;
+  width: calc(100% - 32px);
+  height: 16px;
+  align-self: end;
+  padding: 0;
+  margin: 0 16px 12px;
+  -webkit-appearance: none;
+  appearance: none;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  cursor: pointer;
+  grid-area: 1 / 1;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.media-stage__progress::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    rgb(255 255 255 / 92%) 0 var(--video-progress),
+    rgb(255 255 255 / 32%) var(--video-progress) 100%
+  );
+}
+
+.media-stage__progress::-webkit-slider-thumb {
+  width: 13px;
+  height: 13px;
+  margin-top: -5px;
+  -webkit-appearance: none;
+  appearance: none;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 5px rgb(0 0 0 / 32%);
+}
+
+.media-stage__progress::-moz-range-track {
+  height: 3px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 32%);
+}
+
+.media-stage__progress::-moz-range-progress {
+  height: 3px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 92%);
+}
+
+.media-stage__progress::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 5px rgb(0 0 0 / 32%);
+}
+
+.media-stage__progress:disabled {
+  pointer-events: none;
+  opacity: 0;
+}
+
+.media-stage__progress:focus,
+.media-stage__progress:focus-visible {
+  border-color: transparent;
+  outline: none;
+  box-shadow: none;
 }
 
 .media-stage__item--sticker .media-stage__media {
@@ -473,7 +675,8 @@ onBeforeUnmount(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .media-stage__media {
+  .media-stage__media,
+  .media-stage__playback-toggle {
     animation: none;
     transition: none;
   }
