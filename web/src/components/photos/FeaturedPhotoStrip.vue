@@ -158,9 +158,31 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .featured-photo-strip {
+  position: relative;
   width: 100%;
   overflow: hidden;
   outline-offset: -2px;
+}
+
+.featured-photo-strip::before,
+.featured-photo-strip::after {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  bottom: 0;
+  width: clamp(1.75rem, 4vw, 3.5rem);
+  pointer-events: none;
+  content: '';
+}
+
+.featured-photo-strip::before {
+  left: 0;
+  background: linear-gradient(to right, var(--surface-page), transparent);
+}
+
+.featured-photo-strip::after {
+  right: 0;
+  background: linear-gradient(to left, var(--surface-page), transparent);
 }
 
 .featured-photo-strip--static {
