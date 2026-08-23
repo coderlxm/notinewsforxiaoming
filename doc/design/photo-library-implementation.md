@@ -21,7 +21,7 @@
 
 截至 2026-08-23，Drive 侧开发条件已经就绪：
 
-- Google Drive 已创建唯一照片根目录 `NotiNewsPhotos`，固定 folderId 为 `1TswxfDr5IhcLLXQ_soMSmBN0UEQoHs1U`。
+- Google Drive 已创建唯一照片根目录 `NotiNewsPhotos`；实际 root folderId 已核对并只保存在 rndc02 的 Journal 环境配置中。
 - rndc02 上的现有 OAuth grant 已由 `drive.file` 调整为 `drive.readonly`，并已确认能够只读发现和列举该根目录。
 - 根目录下已创建 `验收样片` 相册，没有把照片直接放在根目录。
 - 相册内已有横图 `unsplash-mountain-lake.jpg`（1800×1112）和竖图 `unsplash-city-street.jpg`（1400×2100），可直接覆盖首页、相册详情和 PhotoSwipe 的首轮验收。
@@ -526,7 +526,7 @@ API、HTML 和图片响应都不得出现 Google URL。Drive API 的 3xx、认�
 - OAuth client ID。
 - OAuth client secret。
 - 新的 refresh token。
-- `NotiNewsPhotos` folderId：`1TswxfDr5IhcLLXQ_soMSmBN0UEQoHs1U`。
+- `NotiNewsPhotos` 的实际 root folderId；不得使用第一层相册 `验收样片` 的 folderId 代替。
 
 这些值不写入仓库、部署归档、API 响应或日志。
 
@@ -560,7 +560,7 @@ API、HTML 和图片响应都不得出现 Google URL。Drive API 的 3xx、认�
 首次上线按以下依赖顺序进行：
 
 1. 已完成：在 Drive 创建非空 `NotiNewsPhotos` 和符合契约的 `验收样片` 相册。
-2. 已完成：记录固定 root folderId `1TswxfDr5IhcLLXQ_soMSmBN0UEQoHs1U`。
+2. 已完成：核对唯一 `NotiNewsPhotos` 的实际 root folderId，并写入 rndc02 环境配置。
 3. 已完成：取得并确认 `drive.readonly` 授权；代码实施时把现有授权信息和 root folderId 写入 rndc02 现有 `/opt/journal/.env`。
 4. 完成服务端和前端代码实现，形成符合项目格式的一次发布提交。
 5. push 到 `main`，沿用现有 GitHub Actions 自动发布路径。
