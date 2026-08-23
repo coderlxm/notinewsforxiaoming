@@ -130,6 +130,9 @@ const showProfileNavigation = computed(() => isPrivateRoute.value || ownerAuthen
 const publicNavActive = computed(() =>
   route.value.name === 'public' || route.value.name === 'detail',
 );
+const photosActive = computed(() =>
+  route.value.name === 'photos' || route.value.name === 'photo-album',
+);
 
 function changePublicChannel(channel: JournalChannel): void {
   navigate(publicFeedPath(channel));
@@ -137,6 +140,10 @@ function changePublicChannel(channel: JournalChannel): void {
 
 function openAbout(): void {
   navigate('/about');
+}
+
+function openPhotos(): void {
+  navigate('/photos');
 }
 
 onMounted(() => {
@@ -169,8 +176,10 @@ onUnmounted(() => {
         v-if="publicShellActive"
         :channel="publicFeedRoute?.channel ?? null"
         :about-active="route.name === 'about'"
+        :photos-active="photosActive"
         @select="changePublicChannel"
         @select-about="openAbout"
+        @select-photos="openPhotos"
       />
 
       <AppRouteViewport

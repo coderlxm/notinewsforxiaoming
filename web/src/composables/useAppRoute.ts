@@ -34,6 +34,8 @@ export function useAppRoute(
     || route.value.name === 'search'
     || route.value.name === 'archive'
     || route.value.name === 'archive-month'
+    || route.value.name === 'photos'
+    || route.value.name === 'photo-album'
     || route.value.name === 'detail',
   );
 

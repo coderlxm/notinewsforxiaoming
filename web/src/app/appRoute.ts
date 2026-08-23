@@ -16,6 +16,7 @@ import type {
 export const PUBLIC_FEED_CACHE_LIMIT = 30;
 export const MAX_PUBLIC_SEARCH_QUERY_LENGTH = 80;
 const APP_ROUTE_BASE_URL = 'https://journal.local';
+const PHOTO_ALBUM_ID_PATTERN = /^[0-9a-f]{64}$/;
 
 export function parseAppRoute(
   route: RouteLocationNormalizedLoaded,
@@ -88,6 +89,20 @@ export function parseAppRoute(
       month,
     };
   }
+  if (route.name === 'photos') {
+    return { name: 'photos', key: 'photos' };
+  }
+  if (route.name === 'photo-album') {
+    const albumId = String(route.params.albumId);
+    if (!PHOTO_ALBUM_ID_PATTERN.test(albumId)) {
+      return { name: 'not-found', key: route.fullPath };
+    }
+    return {
+      name: 'photo-album',
+      key: `photo-album:${albumId}`,
+      albumId,
+    };
+  }
   if (route.name === 'article-new') {
     return { name: 'article-new', key: 'article-new' };
   }
@@ -154,6 +169,9 @@ export function persistentFeedKey(path: string): string | null {
   ) {
     return `discovery:${url.pathname}`;
   }
+  if (url.pathname === '/photos') return 'photos';
+  const photoAlbumMatch = url.pathname.match(/^\/photos\/([0-9a-f]{64})$/);
+  if (photoAlbumMatch) return `photo-album:${photoAlbumMatch[1]}`;
   return null;
 }
 

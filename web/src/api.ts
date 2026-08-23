@@ -28,6 +28,10 @@ import type {
   SiteContactItem,
   SiteProfile,
 } from './types';
+import type {
+  PhotoAlbumDetail,
+  PhotoLibraryOverview,
+} from '../../src/shared/photoLibraryProtocol';
 
 export type JournalTagSuggestionRequest =
   | {
@@ -152,6 +156,16 @@ export function fetchPublicFeed(options: {
   if (options.tag) params.set('tag', options.tag);
   const query = params.size ? `?${params.toString()}` : '';
   return requestJson<PublicJournalFeed>(`/api/feed${query}`);
+}
+
+export function fetchPhotoLibrary(): Promise<PhotoLibraryOverview> {
+  return requestJson<PhotoLibraryOverview>('/api/photos');
+}
+
+export function fetchPhotoAlbum(albumId: string): Promise<PhotoAlbumDetail> {
+  return requestJson<PhotoAlbumDetail>(
+    `/api/photos/albums/${encodeURIComponent(albumId)}`,
+  );
 }
 
 export function fetchPublicEntry(publicId: string): Promise<PublicJournalEntryResponse> {

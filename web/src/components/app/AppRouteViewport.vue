@@ -163,6 +163,19 @@ function forwardDiscoveryTag(channel: JournalChannel, tag: string): void {
         @layout-ready="emit('layoutReady')"
         @open-entry="emit('openDiscoveryEntry', $event)"
       />
+      <component
+        :is="Component"
+        v-else-if="route.name === 'photos'"
+        :key="route.key"
+        @layout-ready="emit('layoutReady')"
+      />
+      <component
+        :is="Component"
+        v-else-if="route.name === 'photo-album'"
+        :key="route.key"
+        :album-id="route.albumId"
+        @layout-ready="emit('layoutReady')"
+      />
       <NotFoundView
         v-else-if="route.name === 'not-found' && !rawNotFound"
         :key="route.key"

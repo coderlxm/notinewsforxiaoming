@@ -6,11 +6,13 @@ import AboutNavigationIcon from '../about/AboutNavigationIcon.vue';
 defineProps<{
   channel: JournalChannel | null;
   aboutActive: boolean;
+  photosActive: boolean;
 }>();
 
 const emit = defineEmits<{
   select: [channel: JournalChannel];
   selectAbout: [];
+  selectPhotos: [];
 }>();
 </script>
 
@@ -29,6 +31,16 @@ const emit = defineEmits<{
         >
           <span class="channel-sidebar__marker" aria-hidden="true" />
           <span>{{ item.label }}</span>
+        </button>
+        <button
+          class="channel-sidebar__item"
+          :class="{ 'channel-sidebar__item--active': photosActive }"
+          type="button"
+          :aria-current="photosActive ? 'page' : undefined"
+          @click="emit('selectPhotos')"
+        >
+          <span class="channel-sidebar__marker" aria-hidden="true" />
+          <span>照片墙</span>
         </button>
       </div>
       <button
@@ -135,7 +147,7 @@ const emit = defineEmits<{
     display: grid;
     width: 100%;
     height: auto;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 0.18rem;
   }
 

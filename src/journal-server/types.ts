@@ -10,6 +10,10 @@ export interface JournalServerConfig {
   deepseekApiKey: string;
   qweatherApiKey: string;
   qweatherCityId: string;
+  photoDriveClientId: string;
+  photoDriveClientSecret: string;
+  photoDriveRefreshToken: string;
+  photoDriveRootFolderId: string;
   port: number;
   host: string;
   dataDir: string;

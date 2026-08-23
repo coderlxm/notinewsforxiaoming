@@ -41,6 +41,17 @@ export const router = createRouter({
       component: PublicArchiveMonthView,
       props: true,
     },
+    {
+      path: '/photos',
+      name: 'photos',
+      component: () => import('./components/photos/PhotoLibraryView.vue'),
+    },
+    {
+      path: '/photos/:albumId',
+      name: 'photo-album',
+      component: () => import('./components/photos/PhotoAlbumView.vue'),
+      props: true,
+    },
     { path: '/me', name: 'private', component: FeedView },
     {
       path: '/me/settings',
@@ -94,5 +105,7 @@ router.afterEach((to) => {
     ? '关于我 · 小明同学'
     : to.name === 'resume'
       ? '个人简历 · 小明同学'
-      : '小明同学';
+      : to.name === 'photos' || to.name === 'photo-album'
+        ? '照片墙 · 小明同学'
+        : '小明同学';
 });

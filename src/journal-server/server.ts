@@ -20,6 +20,8 @@ import { JournalContributionService } from './contributionService.js';
 import { openJournalDatabase } from './database.js';
 import { JournalDeletionService } from './deletion.js';
 import { JournalIngestService } from './ingest.js';
+import { JournalPhotoDriveClient } from './photoDriveClient.js';
+import { JournalPhotoLibraryService } from './photoLibraryService.js';
 import {
   JournalImagePreviewBackfillService,
   JournalImagePreviewService,
@@ -35,6 +37,7 @@ import { registerContributionRoutes } from './routes/contributions.js';
 import { registerFeedRoutes } from './routes/feeds.js';
 import { registerInternalRoutes } from './routes/internal.js';
 import { registerMediaRoutes } from './routes/media.js';
+import { registerPhotoRoutes } from './routes/photos.js';
 import { registerPrivateContributionRoutes } from './routes/privateContributions.js';
 import { registerPrivateEntryRoutes } from './routes/privateEntries.js';
 import { registerPublicDiscoveryRoutes } from './routes/publicDiscovery.js';
@@ -75,6 +78,14 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
     config.qweatherCityId,
   );
   const aiSuggestions = new JournalAiSuggestionService(config.deepseekApiKey);
+  const photoLibrary = new JournalPhotoLibraryService(
+    new JournalPhotoDriveClient({
+      clientId: config.photoDriveClientId,
+      clientSecret: config.photoDriveClientSecret,
+      refreshToken: config.photoDriveRefreshToken,
+    }),
+    config.photoDriveRootFolderId,
+  );
   const storage = new JournalStorage(config.dataDir);
   await storage.initializeContributionStorage();
   const previews = new JournalImagePreviewService();
@@ -116,6 +127,7 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
   await new JournalVideoPreviewBackfillService(repository, storage, videoPreviews).run();
   await new JournalResumePreviewBackfillService(repository, resumePreviews).run();
   await siteProfileService.initialize(path.join(config.webRoot, 'avatar-ming.png'));
+  await photoLibrary.initialize();
 
   await server.register(fastifyCookie, { secret: config.cookieSecret });
   await server.register(fastifyMultipart, {
@@ -179,6 +191,7 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
   webEntryUploads.registerRoutes(server);
   await registerArticleRoutes(server, auth, articleService);
   await registerMediaRoutes(server, auth, repository, config.dataDir);
+  await registerPhotoRoutes(server, photoLibrary);
   await registerPrivateContributionRoutes(server, {
     auth,
     links: contributionLinks,
