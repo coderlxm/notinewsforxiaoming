@@ -4,6 +4,7 @@ import { storeToRefs } from 'pinia';
 import { computed, nextTick, onBeforeUnmount, watch } from 'vue';
 import { usePhotoLibraryStore } from '../../stores/photoLibrary';
 import JournalLoading from '../ui/JournalLoading.vue';
+import PhotoAlbumFloatingToolbar from './PhotoAlbumFloatingToolbar.vue';
 import PhotoJustifiedGallery from './PhotoJustifiedGallery.vue';
 
 defineOptions({ name: 'PhotoAlbumView' });
@@ -73,20 +74,11 @@ onBeforeUnmount(() => {
     </section>
 
     <div v-else-if="album" class="photo-album-view__content">
-      <header class="photo-album-view__header">
-        <RouterLink class="photo-album-view__back" to="/photos">
-          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="m15 5-7 7 7 7" />
-          </svg>
-          返回照片墙
-        </RouterLink>
-        <p class="photo-album-view__eyebrow">PHOTO ALBUM</p>
-        <h1 class="photo-album-view__title">{{ album.album.name }}</h1>
-        <p class="photo-album-view__summary">
-          <span>{{ album.album.photoCount }} 张照片</span>
-          <span v-if="dateRange">{{ dateRange }}</span>
-        </p>
-      </header>
+      <PhotoAlbumFloatingToolbar
+        :name="album.album.name"
+        :photo-count="album.album.photoCount"
+        :date-range="dateRange"
+      />
 
       <PhotoJustifiedGallery
         :key="album.album.id"
@@ -99,83 +91,28 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .photo-album-view {
-  width: min(calc(100% - (var(--page-gutter) * 2)), 1320px);
-  margin: 0 auto;
-  padding: clamp(2rem, 5vw, 4.5rem) 0 5rem;
+  width: 100%;
+  min-height: 100%;
+  padding:
+    0
+    max(var(--photo-edge), env(safe-area-inset-right))
+    clamp(3.5rem, 7vw, 6rem)
+    max(var(--photo-edge), env(safe-area-inset-left));
+  background: var(--photo-canvas);
+  color: var(--photo-text-primary);
 }
 
 .photo-album-view__content {
-  display: grid;
-  gap: clamp(2.2rem, 5vw, 4rem);
-}
-
-.photo-album-view__header {
-  display: grid;
-  gap: 0.42rem;
-}
-
-.photo-album-view__back {
-  display: inline-flex;
-  width: max-content;
-  align-items: center;
-  gap: 0.22rem;
-  margin-bottom: 1.4rem;
-  color: var(--text-muted);
-  font-size: 0.72rem;
-  text-decoration: none;
-}
-
-.photo-album-view__back:hover {
-  color: var(--accent-strong);
-}
-
-.photo-album-view__back svg {
-  width: 1rem;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.8;
-}
-
-.photo-album-view__eyebrow,
-.photo-album-view__title,
-.photo-album-view__summary,
-.photo-album-view__state h1,
-.photo-album-view__state p {
-  margin: 0;
-}
-
-.photo-album-view__eyebrow {
-  color: var(--accent-strong);
-  font-size: 0.66rem;
-  font-weight: 780;
-  letter-spacing: 0.2em;
-}
-
-.photo-album-view__title,
-.photo-album-view__state h1 {
-  font-family: var(--font-serif);
-}
-
-.photo-album-view__title {
-  font-size: clamp(1.8rem, 4vw, 2.7rem);
-  line-height: 1.28;
-}
-
-.photo-album-view__summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.3rem 0.9rem;
-  color: var(--text-muted);
-  font-size: 0.74rem;
-  line-height: 1.7;
+  position: relative;
 }
 
 .photo-album-view__state {
   display: grid;
+  width: min(42rem, 100%);
   min-height: 22rem;
   align-content: center;
   gap: 0.65rem;
+  margin: clamp(2rem, 5vw, 4.5rem) auto 0;
   padding: clamp(1.4rem, 4vw, 2.2rem);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-card);
@@ -183,7 +120,13 @@ onBeforeUnmount(() => {
 }
 
 .photo-album-view__state h1 {
+  margin: 0;
+  font-family: var(--font-serif);
   font-size: 1.2rem;
+}
+
+.photo-album-view__state p {
+  margin: 0;
 }
 
 .photo-album-view__state p,
@@ -203,11 +146,7 @@ onBeforeUnmount(() => {
 
 @media (max-width: 599px) {
   .photo-album-view {
-    padding: 1.5rem 0 4rem;
-  }
-
-  .photo-album-view__back {
-    margin-bottom: 1rem;
+    padding-bottom: 3.5rem;
   }
 }
 </style>

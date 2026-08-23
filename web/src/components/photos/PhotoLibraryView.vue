@@ -6,6 +6,7 @@ import { usePhotoLibraryStore } from '../../stores/photoLibrary';
 import JournalLoading from '../ui/JournalLoading.vue';
 import FeaturedPhotoStrip from './FeaturedPhotoStrip.vue';
 import PhotoAlbumGrid from './PhotoAlbumGrid.vue';
+import PhotoHeroBillboard from './PhotoHeroBillboard.vue';
 
 defineOptions({ name: 'PhotoLibraryView' });
 
@@ -16,8 +17,18 @@ const emit = defineEmits<{
 const store = usePhotoLibraryStore();
 const { overview, overviewLoading, overviewError } = storeToRefs(store);
 const featured = computed(() => overview.value?.featured ?? []);
+const heroPhoto = computed(() => featured.value[0] ?? null);
+const stripPhotos = computed(() => featured.value.slice(1));
 const lightbox = usePhotoLightbox(featured);
 let active = true;
+
+function openHeroPhoto(): void {
+  lightbox.open(0);
+}
+
+function openStripPhoto(index: number): void {
+  lightbox.open(index + 1);
+}
 
 onMounted(async () => {
   await store.ensureOverview();
@@ -35,14 +46,6 @@ onBeforeUnmount(() => {
 
 <template>
   <main class="photo-library-view">
-    <header class="photo-library-view__header">
-      <p class="photo-library-view__eyebrow">PHOTOGRAPHY</p>
-      <h1 class="photo-library-view__title">照片墙</h1>
-      <p class="photo-library-view__description">
-        把途中遇见的光、风景和生活片段，留在这里慢慢回看。
-      </p>
-    </header>
-
     <JournalLoading
       v-if="overviewLoading && !overview"
       variant="canvas"
@@ -54,19 +57,29 @@ onBeforeUnmount(() => {
       class="photo-library-view__state photo-library-view__state--error"
       role="alert"
     >
-      <h2>照片墙没有加载完成</h2>
+      <h1>照片墙没有加载完成</h1>
       <p>{{ overviewError }}</p>
     </section>
 
     <div v-else-if="overview" class="photo-library-view__content">
-      <section class="photo-library-view__featured" aria-labelledby="featured-photos-title">
+      <PhotoHeroBillboard
+        v-if="heroPhoto"
+        :photo="heroPhoto"
+        @open-photo="openHeroPhoto"
+      />
+
+      <section
+        v-if="stripPhotos.length > 0"
+        class="photo-library-view__featured"
+        aria-labelledby="featured-photos-title"
+      >
         <div class="photo-library-view__section-heading">
           <p>RECENT FRAMES</p>
           <h2 id="featured-photos-title">近期精选</h2>
         </div>
         <FeaturedPhotoStrip
-          :photos="overview.featured"
-          @open-photo="lightbox.open"
+          :photos="stripPhotos"
+          @open-photo="openStripPhoto"
         />
       </section>
 
@@ -84,34 +97,26 @@ onBeforeUnmount(() => {
 <style scoped>
 .photo-library-view {
   width: 100%;
-  padding: clamp(2rem, 5vw, 4.5rem) 0 5rem;
+  min-height: 100%;
+  padding: 0 0 clamp(3.5rem, 7vw, 6rem);
+  background: var(--photo-canvas);
+  color: var(--photo-text-primary);
 }
 
-.photo-library-view__header,
 .photo-library-view__albums,
 .photo-library-view__state {
-  width: min(calc(100% - (var(--page-gutter) * 2)), 1220px);
+  width: calc(100% - (var(--photo-edge) * 2));
   margin-right: auto;
   margin-left: auto;
 }
 
-.photo-library-view__header {
-  display: grid;
-  gap: 0.5rem;
-  margin-bottom: clamp(2.4rem, 5vw, 4rem);
-}
-
-.photo-library-view__eyebrow,
-.photo-library-view__title,
-.photo-library-view__description,
 .photo-library-view__section-heading p,
 .photo-library-view__section-heading h2,
-.photo-library-view__state h2,
+.photo-library-view__state h1,
 .photo-library-view__state p {
   margin: 0;
 }
 
-.photo-library-view__eyebrow,
 .photo-library-view__section-heading p {
   color: var(--accent-strong);
   font-size: 0.66rem;
@@ -119,28 +124,14 @@ onBeforeUnmount(() => {
   letter-spacing: 0.2em;
 }
 
-.photo-library-view__title,
 .photo-library-view__section-heading h2,
-.photo-library-view__state h2 {
+.photo-library-view__state h1 {
   font-family: var(--font-serif);
-}
-
-.photo-library-view__title {
-  font-size: clamp(1.9rem, 4vw, 2.8rem);
-  line-height: 1.24;
-}
-
-.photo-library-view__description {
-  max-width: 34rem;
-  color: var(--text-muted);
-  font-family: var(--font-serif);
-  font-size: 0.9rem;
-  line-height: 1.8;
 }
 
 .photo-library-view__content {
   display: grid;
-  gap: clamp(4rem, 8vw, 7rem);
+  gap: clamp(2.7rem, 5vw, 4.8rem);
 }
 
 .photo-library-view__featured {
@@ -150,7 +141,7 @@ onBeforeUnmount(() => {
 
 .photo-library-view__section-heading {
   display: grid;
-  width: min(calc(100% - (var(--page-gutter) * 2)), 1220px);
+  width: calc(100% - (var(--photo-edge) * 2));
   margin: 0 auto;
   gap: 0.28rem;
 }
@@ -179,7 +170,7 @@ onBeforeUnmount(() => {
   background: var(--surface-card);
 }
 
-.photo-library-view__state h2 {
+.photo-library-view__state h1 {
   font-size: 1.15rem;
 }
 
@@ -193,22 +184,18 @@ onBeforeUnmount(() => {
   border-color: color-mix(in srgb, var(--danger) 32%, var(--border-subtle));
 }
 
-.photo-library-view__state--error h2,
+.photo-library-view__state--error h1,
 .photo-library-view__state--error p {
   color: var(--danger);
 }
 
 @media (max-width: 599px) {
   .photo-library-view {
-    padding: 1.5rem 0 4rem;
-  }
-
-  .photo-library-view__header {
-    margin-bottom: 2.6rem;
+    padding-bottom: 3.5rem;
   }
 
   .photo-library-view__content {
-    gap: 4.5rem;
+    gap: 2.8rem;
   }
 }
 </style>

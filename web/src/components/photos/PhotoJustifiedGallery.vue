@@ -32,14 +32,13 @@ onMounted(async () => {
   if (!active) return;
 
   grid = new JustifiedGrid(gallery.value!, {
-    gap: 10,
-    columnRange: [1, 5],
-    sizeRange: [160, 320],
+    gap: 6,
+    columnRange: [1, 7],
+    sizeRange: [140, 260],
     isCroppedSize: false,
     stretch: false,
     passUnstretchRow: true,
     useResizeObserver: true,
-    observeChildren: true,
     useTransform: true,
   });
   grid.on('renderComplete', handleRenderComplete);

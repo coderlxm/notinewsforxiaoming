@@ -124,7 +124,7 @@ onBeforeUnmount(() => {
             :preview-src="photo.preview.url"
             :alt="photo.title"
             fit="cover"
-            :loading="index < 3 ? 'eager' : 'lazy'"
+            loading="lazy"
           />
           <FeaturedPhotoExif :metadata="photo.metadata" />
         </button>
@@ -180,12 +180,12 @@ onBeforeUnmount(() => {
 
 .featured-photo-strip::before {
   left: 0;
-  background: linear-gradient(to right, var(--surface-page), transparent);
+  background: linear-gradient(to right, var(--photo-canvas), transparent);
 }
 
 .featured-photo-strip::after {
   right: 0;
-  background: linear-gradient(to left, var(--surface-page), transparent);
+  background: linear-gradient(to left, var(--photo-canvas), transparent);
 }
 
 .featured-photo-strip--static {
@@ -201,15 +201,15 @@ onBeforeUnmount(() => {
 }
 
 .featured-photo-strip--static .featured-photo-strip__track {
-  padding: 0 var(--page-gutter);
+  padding: 0 var(--photo-edge);
   will-change: auto;
 }
 
 .featured-photo-strip__group {
   display: flex;
   flex-shrink: 0;
-  gap: 1rem;
-  padding-right: 1rem;
+  gap: 0.6rem;
+  padding-right: 0.6rem;
 }
 
 .featured-photo-strip--static .featured-photo-strip__group {
@@ -219,13 +219,13 @@ onBeforeUnmount(() => {
 .featured-photo-strip__frame {
   position: relative;
   display: block;
-  height: clamp(13rem, 24vw, 19rem);
+  height: clamp(11rem, 18vw, 16rem);
   flex: 0 0 auto;
   padding: 0;
   overflow: hidden;
   border: 0;
-  border-radius: var(--radius-media);
-  background: var(--surface-muted);
+  border-radius: 6px;
+  background: var(--photo-surface);
   cursor: zoom-in;
 }
 
@@ -241,12 +241,12 @@ onBeforeUnmount(() => {
 
 @media (max-width: 599px) {
   .featured-photo-strip__group {
-    gap: 0.65rem;
-    padding-right: 0.65rem;
+    gap: 0.5rem;
+    padding-right: 0.5rem;
   }
 
   .featured-photo-strip__frame {
-    height: 11.5rem;
+    height: 11rem;
   }
 }
 

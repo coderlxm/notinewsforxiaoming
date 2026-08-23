@@ -100,8 +100,8 @@ const parallaxStyle = computed(() => ({
   padding: 0;
   overflow: hidden;
   border: 0;
-  border-radius: var(--radius-media);
-  background: var(--surface-muted);
+  border-radius: 6px;
+  background: var(--photo-surface);
   cursor: zoom-in;
 }
 

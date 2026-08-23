@@ -133,6 +133,7 @@ const publicNavActive = computed(() =>
 const photosActive = computed(() =>
   route.value.name === 'photos' || route.value.name === 'photo-album',
 );
+const photoImmersiveActive = computed(() => photosActive.value);
 
 function changePublicChannel(channel: JournalChannel): void {
   navigate(publicFeedPath(channel));
@@ -158,8 +159,12 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="app-shell">
+  <div
+    class="app-shell"
+    :class="{ 'app-shell--photo-immersive': photoImmersiveActive }"
+  >
     <AppHeader
+      v-if="!photoImmersiveActive"
       :profile="profile"
       :profile-load-error="profileLoadError"
       :public-mode="publicShellActive"
@@ -171,12 +176,20 @@ onUnmounted(() => {
       @navigate="navigate"
     />
 
-    <div class="app-main" :class="{ 'app-main--public': publicShellActive }">
+    <div
+      class="app-main"
+      :class="{
+        'app-main--public': publicShellActive,
+        'app-main--photo-immersive': photoImmersiveActive,
+      }"
+    >
       <PublicChannelNavigation
         v-if="publicShellActive"
+        :key="photoImmersiveActive ? 'photo-immersive' : 'fixed'"
         :channel="publicFeedRoute?.channel ?? null"
         :about-active="route.name === 'about'"
         :photos-active="photosActive"
+        :immersive="photoImmersiveActive"
         @select="changePublicChannel"
         @select-about="openAbout"
         @select-photos="openPhotos"
@@ -230,6 +243,30 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
+.app-shell--photo-immersive {
+  --photo-canvas: #0c0c0c;
+  --photo-surface: #171717;
+  --photo-surface-hover: #222;
+  --photo-text-primary: #fff;
+  --photo-text-secondary: rgb(255 255 255 / 70%);
+  --photo-text-muted: rgb(255 255 255 / 45%);
+  --photo-glass-bg: rgb(20 20 20 / 75%);
+  --photo-border: rgb(255 255 255 / 8%);
+  --photo-gap: clamp(0.5rem, 0.8vw, 0.8rem);
+  --photo-edge: clamp(1rem, 2.2vw, 2.5rem);
+  --surface-page: var(--photo-canvas);
+  --surface-card: var(--photo-surface);
+  --surface-muted: var(--photo-surface-hover);
+  --text-primary: var(--photo-text-primary);
+  --text-muted: var(--photo-text-secondary);
+  --border-subtle: var(--photo-border);
+  --border-strong: rgb(255 255 255 / 18%);
+
+  grid-template-rows: minmax(0, 1fr);
+  background: var(--photo-canvas);
+  color: var(--photo-text-primary);
+}
+
 .app-main {
   display: grid;
   min-width: 0;
@@ -243,6 +280,18 @@ onUnmounted(() => {
   margin: 0 auto;
   grid-template-columns: var(--public-sidebar-width) minmax(0, 1fr);
   gap: var(--public-layout-gap);
+}
+
+.app-main--photo-immersive {
+  width: 100%;
+  margin: 0;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  background: var(--photo-canvas);
+}
+
+.app-main--photo-immersive > .app-route-viewport {
+  grid-column: 1;
 }
 
 @media (max-width: 799px) {
