@@ -285,16 +285,18 @@ export class JournalPhotoLibraryService {
 
     const albums: IndexedAlbum[] = [];
     for (const folder of rootChildren) {
+      if (folder.mimeType !== driveFolderMimeType) continue;
+
       const folderId = requireString(folder.id, 'Photo album folder id');
       const folderName = requireString(folder.name, 'Photo album folder name');
-      if (folder.mimeType !== driveFolderMimeType) {
-        throw new Error(`Photo library root item ${folderName} is not an album folder.`);
-      }
 
       const albumId = sha256(folderId);
       const drivePhotos = await this.drive.listChildren(folderId);
       if (drivePhotos.length === 0) throw new Error(`Photo album ${folderName} is empty.`);
-      const photos = drivePhotos.map(file => this.indexPhoto(file, albumId, folderName));
+      const photos = drivePhotos
+        .filter(file => file.mimeType === jpegMimeType && /\.jpe?g$/i.test(file.name ?? ''))
+        .map(file => this.indexPhoto(file, albumId, folderName));
+      if (photos.length === 0) continue;
       photos.sort(compareNullableTakenAtAscending);
 
       const takenTimes = photos
@@ -379,9 +381,6 @@ export class JournalPhotoLibraryService {
   ): IndexedPhoto {
     const fileId = requireString(file.id, `Photo in album ${albumName} id`);
     const fileName = requireString(file.name, `Photo name in album ${albumName}`);
-    if (file.mimeType !== jpegMimeType || !/\.jpe?g$/i.test(fileName)) {
-      throw new Error(`Photo album ${albumName} item ${fileName} is not a JPEG file.`);
-    }
     if (file.capabilities?.canDownload !== true) {
       throw new Error(`Photo ${fileName} in album ${albumName} cannot be downloaded.`);
     }
