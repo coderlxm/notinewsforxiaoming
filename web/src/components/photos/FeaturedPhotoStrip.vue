@@ -3,6 +3,7 @@ import { nextTick, onBeforeUnmount, onMounted, useTemplateRef, watch } from 'vue
 import { useAnimate, useReducedMotion } from 'motion-v';
 import type { PhotoLibraryPhoto } from '../../../../src/shared/photoLibraryProtocol';
 import JournalProgressiveImage from '../ui/JournalProgressiveImage.vue';
+import FeaturedPhotoExif from './FeaturedPhotoExif.vue';
 
 defineProps<{
   photos: readonly PhotoLibraryPhoto[];
@@ -125,6 +126,7 @@ onBeforeUnmount(() => {
             fit="cover"
             :loading="index < 3 ? 'eager' : 'lazy'"
           />
+          <FeaturedPhotoExif :metadata="photo.metadata" />
         </button>
       </div>
 
@@ -150,6 +152,7 @@ onBeforeUnmount(() => {
             fit="cover"
             loading="lazy"
           />
+          <FeaturedPhotoExif :metadata="photo.metadata" />
         </button>
       </div>
     </div>
@@ -167,7 +170,7 @@ onBeforeUnmount(() => {
 .featured-photo-strip::before,
 .featured-photo-strip::after {
   position: absolute;
-  z-index: 1;
+  z-index: 2;
   top: 0;
   bottom: 0;
   width: clamp(1.75rem, 4vw, 3.5rem);
