@@ -1,8 +1,10 @@
+import { buffer } from 'node:stream/consumers';
 import { pipeline } from 'node:stream/promises';
 import type { FastifyInstance } from 'fastify';
 import sharp from 'sharp';
 import { z } from 'zod';
 import { photoImageVariantNames } from '../../shared/photoLibraryProtocol.js';
+import { decodeHeicImage } from '../photoHeicDecoder.js';
 import type { JournalPhotoLibraryService } from '../photoLibraryService.js';
 
 const publicIdSchema = z.string().regex(/^[0-9a-f]{64}$/);
@@ -50,18 +52,32 @@ export async function registerPhotoRoutes(
       reply.raw.setHeader('X-Content-Type-Options', 'nosniff');
       reply.raw.setHeader('X-Accel-Buffering', 'no');
       reply.hijack();
-      await pipeline(
-        media.source,
-        sharp({ animated: false })
-          .autoOrient()
+      await media.withSource(async (source) => {
+        const decoded = media.sourceFormat === 'heic'
+          ? await decodeHeicImage(await buffer(source))
+          : null;
+        const transformer = decoded
+          ? sharp(decoded.data, {
+              raw: {
+                width: decoded.width,
+                height: decoded.height,
+                channels: 4,
+              },
+            })
+          : sharp({ animated: false }).autoOrient();
+        const output = transformer
           .resize({
             ...media.resize,
             fit: 'inside',
             withoutEnlargement: true,
           })
-          .webp({ quality: media.quality }),
-        reply.raw,
-      );
+          .webp({ quality: media.quality });
+        if (decoded) {
+          await pipeline(output, reply.raw);
+        } else {
+          await pipeline(source, output, reply.raw);
+        }
+      });
     } finally {
       request.raw.off('aborted', abort);
     }

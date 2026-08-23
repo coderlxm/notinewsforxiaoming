@@ -3,6 +3,7 @@ import type { Readable } from 'node:stream';
 import dayjs from 'dayjs';
 import customParseFormat from 'dayjs/plugin/customParseFormat.js';
 import type { drive_v3 } from 'googleapis';
+import pLimit from 'p-limit';
 import type {
   PhotoAlbumDetail,
   PhotoAlbumSummary,
@@ -18,7 +19,10 @@ dayjs.extend(customParseFormat);
 
 const driveFolderMimeType = 'application/vnd.google-apps.folder';
 const jpegMimeType = 'image/jpeg';
+const heicMimeTypes = new Set(['image/heic', 'image/heif']);
 const indexFreshnessMs = 5 * 60 * 1000;
+
+type PhotoSourceFormat = 'jpeg' | 'heic';
 
 const variantSpecifications = {
   preview: { width: 64, quality: 35 },
@@ -33,6 +37,7 @@ const variantSpecifications = {
 interface IndexedPhoto {
   driveFileId: string;
   driveName: string;
+  sourceFormat: PhotoSourceFormat;
   contentRevision: string;
   publicPhoto: PhotoLibraryPhoto;
   snapshot: object;
@@ -54,16 +59,24 @@ interface PhotoLibraryIndex {
 }
 
 export interface JournalPhotoMedia {
-  source: Readable;
+  sourceFormat: PhotoSourceFormat;
   resize: {
     width: number;
     height?: number;
   };
   quality: number;
+  withSource<T>(operation: (source: Readable) => Promise<T>): Promise<T>;
 }
 
 function sha256(value: string): string {
   return createHash('sha256').update(value, 'utf8').digest('hex');
+}
+
+function photoSourceFormat(file: drive_v3.Schema$File): PhotoSourceFormat | null {
+  const fileName = file.name ?? '';
+  if (file.mimeType === jpegMimeType && /\.jpe?g$/i.test(fileName)) return 'jpeg';
+  if (heicMimeTypes.has(file.mimeType ?? '') && /\.hei[cf]$/i.test(fileName)) return 'heic';
+  return null;
 }
 
 function requireString(value: string | null | undefined, label: string): string {
@@ -222,6 +235,7 @@ export class JournalPhotoLibraryService {
   private currentIndex: PhotoLibraryIndex | null = null;
   private refreshedAt = 0;
   private pendingRefresh: Promise<PhotoLibraryIndex> | null = null;
+  private readonly heicConversionLimit = pLimit(1);
 
   constructor(
     private readonly drive: JournalPhotoDriveClient,
@@ -252,13 +266,27 @@ export class JournalPhotoLibraryService {
     if (!photo || photo.contentRevision !== contentRevision) return null;
     const specification = variantSpecifications[variant];
     return {
-      source: await this.drive.openFile(photo.driveFileId, signal),
+      sourceFormat: photo.sourceFormat,
       resize: {
         width: specification.width,
         ...('height' in specification ? { height: specification.height } : {}),
       },
       quality: specification.quality,
+      withSource: async operation => await this.withPhotoSource(photo, signal, operation),
     };
+  }
+
+  private async withPhotoSource<T>(
+    photo: IndexedPhoto,
+    signal: AbortSignal,
+    operation: (source: Readable) => Promise<T>,
+  ): Promise<T> {
+    const openAndProcess = async () => operation(
+      await this.drive.openFile(photo.driveFileId, signal),
+    );
+    return photo.sourceFormat === 'heic'
+      ? await this.heicConversionLimit(openAndProcess)
+      : await openAndProcess();
   }
 
   private async getCurrentIndex(): Promise<PhotoLibraryIndex> {
@@ -293,9 +321,12 @@ export class JournalPhotoLibraryService {
       const albumId = sha256(folderId);
       const drivePhotos = await this.drive.listChildren(folderId);
       if (drivePhotos.length === 0) throw new Error(`Photo album ${folderName} is empty.`);
-      const photos = drivePhotos
-        .filter(file => file.mimeType === jpegMimeType && /\.jpe?g$/i.test(file.name ?? ''))
-        .map(file => this.indexPhoto(file, albumId, folderName));
+      const photos: IndexedPhoto[] = [];
+      for (const file of drivePhotos) {
+        const sourceFormat = photoSourceFormat(file);
+        if (!sourceFormat) continue;
+        photos.push(this.indexPhoto(file, albumId, folderName, sourceFormat));
+      }
       if (photos.length === 0) continue;
       photos.sort(compareNullableTakenAtAscending);
 
@@ -378,6 +409,7 @@ export class JournalPhotoLibraryService {
     file: drive_v3.Schema$File,
     albumId: string,
     albumName: string,
+    sourceFormat: PhotoSourceFormat,
   ): IndexedPhoto {
     const fileId = requireString(file.id, `Photo in album ${albumName} id`);
     const fileName = requireString(file.name, `Photo name in album ${albumName}`);
@@ -422,6 +454,7 @@ export class JournalPhotoLibraryService {
     return {
       driveFileId: fileId,
       driveName: fileName,
+      sourceFormat,
       contentRevision,
       publicPhoto,
       snapshot: {
