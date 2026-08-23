@@ -1,0 +1,1509 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light" />
+    <title>照片墙 · NotiNews 视觉原型</title>
+    <style>
+      :root {
+        --paper: #f7f7f5;
+        --surface: #ffffff;
+        --surface-muted: #efefec;
+        --ink: #20201e;
+        --graphite: #72716c;
+        --line: #deded9;
+        --line-strong: #c9c9c3;
+        --accent: #c43b46;
+        --accent-soft: #f3e3e5;
+        --serif: "Noto Serif SC", "Songti SC", STSong, serif;
+        --sans: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        --header-height: 76px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+      }
+
+      body {
+        overflow: hidden;
+        color: var(--ink);
+        background: var(--paper);
+        font-family: var(--sans);
+        -webkit-font-smoothing: antialiased;
+      }
+
+      button,
+      input {
+        color: inherit;
+        font: inherit;
+      }
+
+      button {
+        border: 0;
+      }
+
+      button:focus-visible,
+      a:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 3px;
+      }
+
+      img {
+        display: block;
+        max-width: 100%;
+      }
+
+      .prototype {
+        display: grid;
+        grid-template-rows: var(--header-height) minmax(0, 1fr);
+        height: 100dvh;
+      }
+
+      .site-header {
+        position: relative;
+        z-index: 20;
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        padding: 0 30px;
+        border-bottom: 1px solid var(--line);
+        background: color-mix(in srgb, var(--paper) 91%, transparent);
+        backdrop-filter: blur(14px);
+      }
+
+      .identity {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .avatar {
+        width: 42px;
+        height: 42px;
+        flex: 0 0 auto;
+        border: 1px solid var(--line-strong);
+        border-radius: 50%;
+        object-fit: cover;
+      }
+
+      .identity-copy {
+        min-width: 0;
+      }
+
+      .identity-name {
+        margin: 0;
+        overflow: hidden;
+        font-family: var(--serif);
+        font-size: 16px;
+        font-weight: 600;
+        line-height: 1.2;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .identity-note {
+        margin: 4px 0 0;
+        color: var(--graphite);
+        font-size: 11px;
+        letter-spacing: 0.04em;
+      }
+
+      .header-divider {
+        width: 1px;
+        height: 26px;
+        background: var(--line);
+      }
+
+      .site-whisper {
+        color: var(--graphite);
+        font-family: var(--serif);
+        font-size: 12px;
+        letter-spacing: 0.08em;
+      }
+
+      .search {
+        position: relative;
+        width: min(330px, 28vw);
+        margin-left: auto;
+      }
+
+      .search svg {
+        position: absolute;
+        top: 50%;
+        left: 13px;
+        width: 16px;
+        height: 16px;
+        color: var(--graphite);
+        transform: translateY(-50%);
+      }
+
+      .search input {
+        width: 100%;
+        height: 38px;
+        padding: 0 14px 0 38px;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        outline: 0;
+        background: var(--surface);
+        font-size: 13px;
+      }
+
+      .search input:focus {
+        border-color: var(--accent);
+      }
+
+      .shell {
+        display: grid;
+        min-height: 0;
+        grid-template-columns: 180px minmax(0, 1fr);
+        gap: 28px;
+        padding: 0 30px;
+      }
+
+      .sidebar {
+        display: flex;
+        min-height: 0;
+        flex-direction: column;
+        padding: 38px 12px 28px 0;
+      }
+
+      .nav-title {
+        margin: 0 0 13px 14px;
+        color: #9c9b95;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      .nav-list {
+        display: grid;
+        gap: 4px;
+      }
+
+      .nav-item {
+        position: relative;
+        display: flex;
+        width: 100%;
+        height: 43px;
+        align-items: center;
+        gap: 11px;
+        padding: 0 13px;
+        border-radius: 4px;
+        background: transparent;
+        cursor: pointer;
+        text-align: left;
+      }
+
+      .nav-item::before {
+        position: absolute;
+        top: 10px;
+        bottom: 10px;
+        left: 0;
+        width: 2px;
+        border-radius: 2px;
+        background: transparent;
+        content: "";
+      }
+
+      .nav-item:hover {
+        background: var(--surface-muted);
+      }
+
+      .nav-item.active {
+        color: var(--accent);
+        background: var(--accent-soft);
+        font-weight: 650;
+      }
+
+      .nav-item.active::before {
+        background: var(--accent);
+      }
+
+      .nav-icon {
+        display: grid;
+        width: 18px;
+        height: 18px;
+        place-items: center;
+      }
+
+      .nav-icon svg {
+        width: 17px;
+        height: 17px;
+        stroke-width: 1.65;
+      }
+
+      .nav-label {
+        font-size: 13px;
+      }
+
+      .about-link {
+        margin-top: auto;
+      }
+
+      .main-scroll {
+        min-width: 0;
+        overflow-x: hidden;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        scroll-behavior: smooth;
+        scrollbar-color: #c9c9c3 transparent;
+        scrollbar-width: thin;
+      }
+
+      .view {
+        width: min(100%, 1460px);
+        margin: 0 auto;
+        padding: 58px 42px 108px 14px;
+      }
+
+      .overview-view[hidden],
+      .album-view[hidden] {
+        display: none;
+      }
+
+      .page-hero {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 40px;
+        margin-bottom: 52px;
+      }
+
+      .eyebrow {
+        margin: 0 0 13px;
+        color: var(--accent);
+        font-size: 10px;
+        font-weight: 750;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        margin-bottom: 15px;
+        font-family: var(--serif);
+        font-size: clamp(48px, 5.2vw, 76px);
+        font-weight: 500;
+        letter-spacing: -0.055em;
+        line-height: 0.98;
+      }
+
+      .hero-description {
+        max-width: 610px;
+        margin-bottom: 0;
+        color: var(--graphite);
+        font-family: var(--serif);
+        font-size: 15px;
+        line-height: 1.9;
+      }
+
+      .prototype-guide {
+        flex: 0 0 auto;
+        padding: 12px 14px;
+        border-left: 2px solid var(--accent);
+        color: var(--graphite);
+        background: color-mix(in srgb, var(--surface) 72%, transparent);
+        font-size: 11px;
+        line-height: 1.7;
+      }
+
+      .prototype-guide strong {
+        display: block;
+        margin-bottom: 2px;
+        color: var(--ink);
+        font-size: 11px;
+        letter-spacing: 0.04em;
+      }
+
+      .section {
+        margin-top: 68px;
+      }
+
+      .section-heading {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 24px;
+        margin-bottom: 21px;
+      }
+
+      .section-heading h2 {
+        margin-bottom: 0;
+        font-family: var(--serif);
+        font-size: 26px;
+        font-weight: 550;
+        letter-spacing: -0.03em;
+      }
+
+      .section-kicker {
+        margin-bottom: 6px;
+        color: var(--accent);
+        font-size: 10px;
+        font-weight: 750;
+        letter-spacing: 0.17em;
+        text-transform: uppercase;
+      }
+
+      .section-note {
+        margin-bottom: 2px;
+        color: var(--graphite);
+        font-size: 11px;
+      }
+
+      .featured-window {
+        width: 100%;
+        overflow: hidden;
+        mask-image: linear-gradient(to right, transparent, #000 3%, #000 97%, transparent);
+      }
+
+      .featured-track {
+        display: flex;
+        width: max-content;
+        animation: featured-loop 54s linear infinite;
+      }
+
+      .featured-window:hover .featured-track,
+      .featured-window:focus-within .featured-track {
+        animation-play-state: paused;
+      }
+
+      .featured-set {
+        display: flex;
+        gap: 12px;
+        padding-right: 12px;
+      }
+
+      .featured-photo {
+        position: relative;
+        width: var(--width);
+        height: 300px;
+        flex: 0 0 auto;
+        overflow: hidden;
+        border: 1px solid #d7d7d2;
+        border-radius: 3px;
+        background: #e5e5e0;
+        cursor: zoom-in;
+      }
+
+      .featured-photo img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transition: transform 800ms cubic-bezier(0.2, 0.8, 0.2, 1), filter 300ms ease;
+      }
+
+      .featured-photo::after {
+        position: absolute;
+        inset: auto 0 0;
+        height: 44%;
+        background: linear-gradient(to top, rgb(17 17 15 / 58%), transparent);
+        content: "";
+        opacity: 0;
+        transition: opacity 240ms ease;
+      }
+
+      .featured-caption {
+        position: absolute;
+        z-index: 1;
+        right: 15px;
+        bottom: 13px;
+        left: 15px;
+        color: #fff;
+        font-size: 12px;
+        opacity: 0;
+        transform: translateY(5px);
+        transition: opacity 240ms ease, transform 240ms ease;
+      }
+
+      .featured-caption span {
+        display: block;
+        margin-top: 3px;
+        color: rgb(255 255 255 / 75%);
+        font-size: 10px;
+      }
+
+      .featured-photo:hover img {
+        filter: saturate(1.04);
+        transform: scale(1.025);
+      }
+
+      .featured-photo:hover::after,
+      .featured-photo:hover .featured-caption,
+      .featured-photo:focus-visible::after,
+      .featured-photo:focus-visible .featured-caption {
+        opacity: 1;
+        transform: none;
+      }
+
+      @keyframes featured-loop {
+        to {
+          transform: translateX(-50%);
+        }
+      }
+
+      .album-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 42px 22px;
+      }
+
+      .album-card {
+        width: 100%;
+        padding: 0;
+        background: transparent;
+        cursor: pointer;
+        text-align: left;
+      }
+
+      .album-cover {
+        position: relative;
+        overflow: hidden;
+        border: 1px solid #d7d7d2;
+        border-radius: 3px;
+        aspect-ratio: 16 / 10;
+        background: #e5e5e0;
+      }
+
+      .album-cover img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transition: transform 700ms cubic-bezier(0.2, 0.8, 0.2, 1);
+      }
+
+      .album-number {
+        position: absolute;
+        top: 13px;
+        right: 13px;
+        display: grid;
+        min-width: 38px;
+        height: 25px;
+        padding: 0 8px;
+        place-items: center;
+        border: 1px solid rgb(255 255 255 / 35%);
+        border-radius: 999px;
+        color: #fff;
+        background: rgb(25 25 23 / 52%);
+        backdrop-filter: blur(8px);
+        font-size: 10px;
+      }
+
+      .album-copy {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 16px;
+        padding-top: 15px;
+        border-top: 1px solid transparent;
+      }
+
+      .album-copy h3 {
+        margin-bottom: 5px;
+        font-family: var(--serif);
+        font-size: 19px;
+        font-weight: 550;
+        letter-spacing: -0.025em;
+      }
+
+      .album-copy p,
+      .album-enter {
+        margin-bottom: 0;
+        color: var(--graphite);
+        font-size: 11px;
+      }
+
+      .album-enter {
+        align-self: center;
+        transition: transform 200ms ease, color 200ms ease;
+      }
+
+      .album-card:hover .album-cover img {
+        transform: scale(1.025);
+      }
+
+      .album-card:hover .album-enter {
+        color: var(--accent);
+        transform: translateX(3px);
+      }
+
+      .album-view {
+        padding-top: 43px;
+      }
+
+      .back-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 45px;
+        padding: 7px 0;
+        color: var(--graphite);
+        background: transparent;
+        cursor: pointer;
+        font-size: 12px;
+      }
+
+      .back-button svg {
+        width: 15px;
+        transition: transform 180ms ease;
+      }
+
+      .back-button:hover {
+        color: var(--accent);
+      }
+
+      .back-button:hover svg {
+        transform: translateX(-3px);
+      }
+
+      .album-hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 36px;
+        align-items: end;
+        padding-bottom: 30px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .album-hero h1 {
+        margin-bottom: 12px;
+        font-size: clamp(44px, 4.6vw, 68px);
+      }
+
+      .album-summary {
+        margin-bottom: 0;
+        color: var(--graphite);
+        font-family: var(--serif);
+        font-size: 14px;
+        line-height: 1.8;
+      }
+
+      .album-stats {
+        display: flex;
+        gap: 30px;
+        padding-bottom: 5px;
+      }
+
+      .stat {
+        min-width: 76px;
+      }
+
+      .stat-label {
+        display: block;
+        margin-bottom: 7px;
+        color: #9a9994;
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.13em;
+        text-transform: uppercase;
+      }
+
+      .stat-value {
+        font-family: var(--serif);
+        font-size: 14px;
+      }
+
+      .gallery {
+        display: grid;
+        gap: 9px;
+        margin-top: 42px;
+      }
+
+      .gallery-row {
+        display: flex;
+        gap: 9px;
+      }
+
+      .gallery-photo {
+        position: relative;
+        height: clamp(210px, 21vw, 320px);
+        flex: var(--ratio) 1 0;
+        overflow: hidden;
+        padding: 0;
+        border-radius: 2px;
+        background: #e5e5e0;
+        cursor: zoom-in;
+        opacity: 0;
+        transform: translateY(14px);
+        transition: opacity 650ms ease var(--delay), transform 750ms cubic-bezier(0.2, 0.75, 0.2, 1) var(--delay);
+      }
+
+      .gallery-photo.is-visible {
+        opacity: 1;
+        transform: none;
+      }
+
+      .gallery-photo img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transition: transform 800ms cubic-bezier(0.2, 0.8, 0.2, 1), filter 300ms ease;
+      }
+
+      .gallery-photo::after {
+        position: absolute;
+        inset: 0;
+        border: 1px solid rgb(24 24 22 / 9%);
+        content: "";
+        pointer-events: none;
+      }
+
+      .gallery-photo:hover img {
+        filter: brightness(0.96);
+        transform: scale(1.018);
+      }
+
+      .gallery-hint {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 9px;
+        margin-top: 20px;
+        color: var(--graphite);
+        font-size: 10px;
+        letter-spacing: 0.04em;
+      }
+
+      .gallery-hint::before,
+      .gallery-hint::after {
+        width: 28px;
+        height: 1px;
+        background: var(--line-strong);
+        content: "";
+      }
+
+      dialog {
+        width: 100vw;
+        max-width: none;
+        height: 100dvh;
+        max-height: none;
+        margin: 0;
+        padding: 0;
+        border: 0;
+        color: #f7f7f5;
+        background: #11110f;
+      }
+
+      dialog::backdrop {
+        background: #11110f;
+      }
+
+      .lightbox {
+        display: grid;
+        height: 100%;
+        grid-template-rows: minmax(0, 1fr) auto;
+      }
+
+      .lightbox-stage {
+        position: relative;
+        display: grid;
+        min-height: 0;
+        place-items: center;
+        padding: 34px 88px 22px;
+      }
+
+      .lightbox-image {
+        width: auto;
+        max-width: min(86vw, 1500px);
+        height: auto;
+        max-height: calc(100dvh - 175px);
+        object-fit: contain;
+        box-shadow: 0 20px 70px rgb(0 0 0 / 38%);
+        touch-action: pan-y;
+        user-select: none;
+      }
+
+      .lightbox-button {
+        position: absolute;
+        z-index: 2;
+        display: grid;
+        width: 42px;
+        height: 42px;
+        place-items: center;
+        border: 1px solid rgb(255 255 255 / 17%);
+        border-radius: 50%;
+        color: #fff;
+        background: rgb(255 255 255 / 7%);
+        cursor: pointer;
+        transition: border-color 180ms ease, background 180ms ease;
+      }
+
+      .lightbox-button:hover {
+        border-color: rgb(255 255 255 / 42%);
+        background: rgb(255 255 255 / 13%);
+      }
+
+      .lightbox-button svg {
+        width: 18px;
+        height: 18px;
+      }
+
+      .lightbox-close {
+        top: 22px;
+        right: 24px;
+      }
+
+      .lightbox-prev {
+        top: 50%;
+        left: 25px;
+        transform: translateY(-50%);
+      }
+
+      .lightbox-next {
+        top: 50%;
+        right: 25px;
+        transform: translateY(-50%);
+      }
+
+      .lightbox-caption {
+        display: grid;
+        grid-template-columns: minmax(180px, 1fr) auto;
+        gap: 30px;
+        align-items: center;
+        padding: 20px 30px 24px;
+        border-top: 1px solid rgb(255 255 255 / 12%);
+        background: #171715;
+      }
+
+      .lightbox-title {
+        margin-bottom: 5px;
+        font-family: var(--serif);
+        font-size: 17px;
+        font-weight: 500;
+      }
+
+      .lightbox-date {
+        color: rgb(255 255 255 / 52%);
+        font-size: 10px;
+        letter-spacing: 0.06em;
+      }
+
+      .lightbox-meta {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: end;
+        gap: 7px 18px;
+      }
+
+      .meta-item {
+        color: rgb(255 255 255 / 68%);
+        font-size: 10px;
+        white-space: nowrap;
+      }
+
+      .meta-item b {
+        margin-right: 5px;
+        color: rgb(255 255 255 / 38%);
+        font-size: 8px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .mobile-label {
+        display: none;
+      }
+
+      @media (max-width: 980px) {
+        .shell {
+          gap: 18px;
+          padding: 0 20px;
+        }
+
+        .view {
+          padding-right: 22px;
+        }
+
+        .page-hero {
+          display: block;
+        }
+
+        .prototype-guide {
+          width: max-content;
+          margin-top: 24px;
+        }
+
+        .featured-photo {
+          height: 260px;
+        }
+
+        .album-stats {
+          gap: 18px;
+        }
+
+        .lightbox-caption {
+          grid-template-columns: 1fr;
+          gap: 13px;
+        }
+
+        .lightbox-meta {
+          justify-content: start;
+        }
+      }
+
+      @media (max-width: 799px) {
+        :root {
+          --header-height: 68px;
+        }
+
+        .site-header {
+          padding: 0 15px;
+        }
+
+        .avatar {
+          width: 36px;
+          height: 36px;
+        }
+
+        .identity-note,
+        .site-whisper,
+        .header-divider {
+          display: none;
+        }
+
+        .identity-name {
+          font-size: 14px;
+        }
+
+        .search {
+          width: min(43vw, 260px);
+        }
+
+        .search input {
+          height: 36px;
+        }
+
+        .shell {
+          display: block;
+          padding: 0;
+        }
+
+        .sidebar {
+          position: fixed;
+          z-index: 30;
+          right: 0;
+          bottom: 0;
+          left: 0;
+          display: block;
+          height: 68px;
+          padding: 0;
+          border-top: 1px solid var(--line);
+          background: color-mix(in srgb, var(--paper) 95%, transparent);
+          backdrop-filter: blur(14px);
+        }
+
+        .nav-title {
+          display: none;
+        }
+
+        .nav-list {
+          display: grid;
+          height: 100%;
+          grid-template-columns: repeat(5, 1fr);
+          gap: 0;
+        }
+
+        .nav-item {
+          display: grid;
+          height: 100%;
+          place-content: center;
+          justify-items: center;
+          gap: 5px;
+          padding: 7px 2px 6px;
+          border-radius: 0;
+          text-align: center;
+        }
+
+        .nav-item::before {
+          top: 0;
+          right: 29%;
+          bottom: auto;
+          left: 29%;
+          width: auto;
+          height: 2px;
+        }
+
+        .nav-item.active {
+          background: transparent;
+        }
+
+        .nav-label {
+          font-size: 10px;
+        }
+
+        .about-link {
+          margin-top: 0;
+        }
+
+        .main-scroll {
+          height: 100%;
+          padding-bottom: 68px;
+        }
+
+        .view {
+          width: 100%;
+          padding: 42px 16px 82px;
+        }
+
+        .page-hero {
+          margin-bottom: 40px;
+        }
+
+        h1 {
+          font-size: 50px;
+        }
+
+        .hero-description {
+          font-size: 14px;
+          line-height: 1.75;
+        }
+
+        .prototype-guide {
+          display: none;
+        }
+
+        .section {
+          margin-top: 52px;
+        }
+
+        .section-heading {
+          align-items: start;
+        }
+
+        .section-note {
+          max-width: 120px;
+          text-align: right;
+        }
+
+        .featured-window {
+          width: calc(100% + 32px);
+          margin-left: -16px;
+          mask-image: none;
+        }
+
+        .featured-photo {
+          width: calc(var(--width) * 0.7);
+          height: 220px;
+        }
+
+        .album-grid {
+          grid-template-columns: 1fr;
+          gap: 34px;
+        }
+
+        .album-cover {
+          aspect-ratio: 4 / 3;
+        }
+
+        .album-view {
+          padding-top: 30px;
+        }
+
+        .back-button {
+          margin-bottom: 31px;
+        }
+
+        .album-hero {
+          display: block;
+        }
+
+        .album-hero h1 {
+          font-size: 45px;
+        }
+
+        .album-stats {
+          margin-top: 25px;
+        }
+
+        .gallery {
+          gap: 6px;
+          margin-top: 28px;
+        }
+
+        .gallery-row {
+          gap: 6px;
+        }
+
+        .gallery-photo {
+          height: clamp(120px, 38vw, 190px);
+        }
+
+        .lightbox-stage {
+          padding: 58px 12px 12px;
+        }
+
+        .lightbox-image {
+          max-width: calc(100vw - 24px);
+          max-height: calc(100dvh - 225px);
+        }
+
+        .lightbox-prev,
+        .lightbox-next {
+          top: auto;
+          bottom: 15px;
+        }
+
+        .lightbox-prev {
+          left: 16px;
+        }
+
+        .lightbox-next {
+          right: 16px;
+        }
+
+        .lightbox-close {
+          top: 12px;
+          right: 12px;
+        }
+
+        .lightbox-caption {
+          padding: 17px 18px 20px;
+        }
+
+        .lightbox-meta {
+          gap: 6px 13px;
+        }
+      }
+
+      @media (max-width: 440px) {
+        .identity-copy {
+          display: none;
+        }
+
+        .search {
+          width: calc(100% - 51px);
+        }
+
+        .section-heading h2 {
+          font-size: 23px;
+        }
+
+        .section-note {
+          font-size: 9px;
+        }
+
+        .gallery-row:nth-child(2) .gallery-photo {
+          height: 136px;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+          transition-duration: 0.01ms !important;
+        }
+
+        .featured-track {
+          animation: none;
+        }
+
+        .gallery-photo {
+          opacity: 1;
+          transform: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="prototype">
+      <header class="site-header">
+        <div class="identity">
+          <img class="avatar" src="../../web/public/avatar-ming.png" alt="小明的头像" />
+          <div class="identity-copy">
+            <p class="identity-name">小明的 Journal</p>
+            <p class="identity-note">记录日常与所见</p>
+          </div>
+        </div>
+        <div class="header-divider" aria-hidden="true"></div>
+        <span class="site-whisper">慢慢记录，认真生活</span>
+        <label class="search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+            <circle cx="11" cy="11" r="6.5"></circle>
+            <path d="m16 16 4 4"></path>
+          </svg>
+          <input type="search" aria-label="搜索" placeholder="搜索记录、文章与照片" />
+        </label>
+      </header>
+
+      <div class="shell">
+        <aside class="sidebar" aria-label="公共导航">
+          <p class="nav-title">Journal</p>
+          <nav class="nav-list">
+            <button class="nav-item" type="button">
+              <span class="nav-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path d="M4 5.5h16v13H4z"></path><path d="M7.5 9h9M7.5 12.5h6M7.5 16h4"></path>
+                </svg>
+              </span>
+              <span class="nav-label">生活</span>
+            </button>
+            <button class="nav-item" type="button">
+              <span class="nav-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path d="M6 3.5h9l3 3V20H6z"></path><path d="M14.5 3.5V7H18M9 11h6M9 14.5h6"></path>
+                </svg>
+              </span>
+              <span class="nav-label">文章</span>
+            </button>
+            <button class="nav-item" type="button">
+              <span class="nav-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path d="M12 20.5s7-4 7-10.2A3.8 3.8 0 0 0 12 8a3.8 3.8 0 0 0-7 2.3c0 6.2 7 10.2 7 10.2Z"></path>
+                </svg>
+              </span>
+              <span class="nav-label">兴趣</span>
+            </button>
+            <button class="nav-item active" type="button" data-action="overview" aria-current="page">
+              <span class="nav-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <rect x="3.5" y="5" width="17" height="14" rx="1.5"></rect><circle cx="9" cy="10" r="1.5"></circle><path d="m5.5 17 4.2-4.3 3.1 3 2.3-2.2 3.4 3.5"></path>
+                </svg>
+              </span>
+              <span class="nav-label">照片墙</span>
+            </button>
+            <button class="nav-item about-link" type="button">
+              <span class="nav-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <circle cx="12" cy="12" r="8.5"></circle><path d="M12 10.5v6M12 7.5h.01"></path>
+                </svg>
+              </span>
+              <span class="nav-label">关于我</span>
+            </button>
+          </nav>
+        </aside>
+
+        <main class="main-scroll" id="main-scroll">
+          <section class="view overview-view" id="overview-view">
+            <div class="page-hero">
+              <div>
+                <p class="eyebrow">Photo Library · 2026</p>
+                <h1>照片墙</h1>
+                <p class="hero-description">不按时间线匆忙经过，而是把那些值得停留的光线、街道和远方，重新编成一册可以慢慢翻看的照片集。</p>
+              </div>
+              <div class="prototype-guide">
+                <strong>这是可操作的效果原型</strong>
+                悬停精选带可暂停 · 点击相册进入详情<br />点击任意照片打开沉浸查看
+              </div>
+            </div>
+
+            <section>
+              <div class="section-heading">
+                <div>
+                  <p class="section-kicker">Recently Selected</p>
+                  <h2>近期精选</h2>
+                </div>
+                <p class="section-note">来自全部相册的最近 12 张作品</p>
+              </div>
+
+              <div class="featured-window">
+                <div class="featured-track">
+                  <div class="featured-set photo-collection">
+                    <button class="featured-photo js-photo" style="--width: 450px" type="button" data-full="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&amp;fit=max&amp;w=2400&amp;q=90" data-title="翻过垭口之前" data-date="2026.05.18 · 18:42" data-camera="FUJIFILM X-T5" data-lens="XF 16-55mm F2.8" data-exposure="35mm · ƒ/5.6 · 1/500s · ISO 160">
+                      <img src="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&amp;fit=crop&amp;w=1000&amp;q=82" alt="山峰与云层" />
+                      <span class="featured-caption">翻过垭口之前<span>川西 · 2026</span></span>
+                    </button>
+                    <button class="featured-photo js-photo" style="--width: 230px" type="button" data-full="https://images.unsplash.com/photo-1522383225653-ed111181a951?auto=format&amp;fit=max&amp;w=1800&amp;q=90" data-title="春风经过枝头" data-date="2026.03.29 · 09:16" data-camera="FUJIFILM X-T5" data-lens="XF 33mm F1.4" data-exposure="33mm · ƒ/2 · 1/1000s · ISO 125">
+                      <img src="https://images.unsplash.com/photo-1522383225653-ed111181a951?auto=format&amp;fit=crop&amp;w=700&amp;q=82" alt="春日樱花" />
+                      <span class="featured-caption">春风经过枝头<span>杭州 · 2026</span></span>
+                    </button>
+                    <button class="featured-photo js-photo" style="--width: 452px" type="button" data-full="https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&amp;fit=max&amp;w=2400&amp;q=90" data-title="雨后的城市切片" data-date="2026.02.07 · 20:11" data-camera="SONY α7 IV" data-lens="FE 35mm F1.4 GM" data-exposure="35mm · ƒ/2 · 1/125s · ISO 1250">
+                      <img src="https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&amp;fit=crop&amp;w=1000&amp;q=82" alt="夜晚的东京街头" />
+                      <span class="featured-caption">雨后的城市切片<span>东京 · 2026</span></span>
+                    </button>
+                    <button class="featured-photo js-photo" style="--width: 450px" type="button" data-full="https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&amp;fit=max&amp;w=2400&amp;q=90" data-title="湖面没有回答" data-date="2025.10.04 · 07:38" data-camera="FUJIFILM X100VI" data-lens="23mm F2" data-exposure="23mm · ƒ/8 · 1/250s · ISO 125">
+                      <img src="https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&amp;fit=crop&amp;w=1000&amp;q=82" alt="山谷中的湖泊" />
+                      <span class="featured-caption">湖面没有回答<span>秋日短途 · 2025</span></span>
+                    </button>
+                    <button class="featured-photo js-photo" style="--width: 240px" type="button" data-full="https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&amp;fit=max&amp;w=1800&amp;q=90" data-title="巷口的旧时间" data-date="2025.09.16 · 16:53" data-camera="FUJIFILM X-T5" data-lens="XF 23mm F1.4" data-exposure="23mm · ƒ/4 · 1/320s · ISO 320">
+                      <img src="https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&amp;fit=crop&amp;w=700&amp;q=82" alt="京都传统街巷" />
+                      <span class="featured-caption">巷口的旧时间<span>京都 · 2025</span></span>
+                    </button>
+                    <button class="featured-photo js-photo" style="--width: 450px" type="button" data-full="https://images.unsplash.com/photo-1501854140801-50d01698950b?auto=format&amp;fit=max&amp;w=2400&amp;q=90" data-title="绿色向远处生长" data-date="2025.08.12 · 14:07" data-camera="DJI FC8482" data-lens="24mm F2.8" data-exposure="24mm · ƒ/4 · 1/640s · ISO 100">
+                      <img src="https://images.unsplash.com/photo-1501854140801-50d01698950b?auto=format&amp;fit=crop&amp;w=1000&amp;q=82" alt="俯瞰绿色山野" />
+                      <span class="featured-caption">绿色向远处生长<span>夏日山野 · 2025</span></span>
+                    </button>
+                  </div>
+
+                  <div class="featured-set photo-collection" aria-hidden="true">
+                    <button class="featured-photo js-photo" style="--width: 450px" type="button" tabindex="-1" data-full="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&amp;fit=max&amp;w=2400&amp;q=90" data-title="翻过垭口之前" data-date="2026.05.18 · 18:42" data-camera="FUJIFILM X-T5" data-lens="XF 16-55mm F2.8" data-exposure="35mm · ƒ/5.6 · 1/500s · ISO 160">
+                      <img src="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&amp;fit=crop&amp;w=1000&amp;q=82" alt="" />
+                      <span class="featured-caption">翻过垭口之前<span>川西 · 2026</span></span>
+                    </button>
+                    <button class="featured-photo js-photo" style="--width: 230px" type="button" tabindex="-1" data-full="https://images.unsplash.com/photo-1522383225653-ed111181a951?auto=format&amp;fit=max&amp;w=1800&amp;q=90" data-title="春风经过枝头" data-date="2026.03.29 · 09:16" data-camera="FUJIFILM X-T5" data-lens="XF 33mm F1.4" data-exposure="33mm · ƒ/2 · 1/1000s · ISO 125">
+                      <img src="https://images.unsplash.com/photo-1522383225653-ed111181a951?auto=format&amp;fit=crop&amp;w=700&amp;q=82" alt="" />
+                      <span class="featured-caption">春风经过枝头<span>杭州 · 2026</span></span>
+                    </button>
+                    <button class="featured-photo js-photo" style="--width: 452px" type="button" tabindex="-1" data-full="https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&amp;fit=max&amp;w=2400&amp;q=90" data-title="雨后的城市切片" data-date="2026.02.07 · 20:11" data-camera="SONY α7 IV" data-lens="FE 35mm F1.4 GM" data-exposure="35mm · ƒ/2 · 1/125s · ISO 1250">
+                      <img src="https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&amp;fit=crop&amp;w=1000&amp;q=82" alt="" />
+                      <span class="featured-caption">雨后的城市切片<span>东京 · 2026</span></span>
+                    </button>
+                    <button class="featured-photo js-photo" style="--width: 450px" type="button" tabindex="-1" data-full="https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&amp;fit=max&amp;w=2400&amp;q=90" data-title="湖面没有回答" data-date="2025.10.04 · 07:38" data-camera="FUJIFILM X100VI" data-lens="23mm F2" data-exposure="23mm · ƒ/8 · 1/250s · ISO 125">
+                      <img src="https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&amp;fit=crop&amp;w=1000&amp;q=82" alt="" />
+                      <span class="featured-caption">湖面没有回答<span>秋日短途 · 2025</span></span>
+                    </button>
+                    <button class="featured-photo js-photo" style="--width: 240px" type="button" tabindex="-1" data-full="https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&amp;fit=max&amp;w=1800&amp;q=90" data-title="巷口的旧时间" data-date="2025.09.16 · 16:53" data-camera="FUJIFILM X-T5" data-lens="XF 23mm F1.4" data-exposure="23mm · ƒ/4 · 1/320s · ISO 320">
+                      <img src="https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&amp;fit=crop&amp;w=700&amp;q=82" alt="" />
+                      <span class="featured-caption">巷口的旧时间<span>京都 · 2025</span></span>
+                    </button>
+                    <button class="featured-photo js-photo" style="--width: 450px" type="button" tabindex="-1" data-full="https://images.unsplash.com/photo-1501854140801-50d01698950b?auto=format&amp;fit=max&amp;w=2400&amp;q=90" data-title="绿色向远处生长" data-date="2025.08.12 · 14:07" data-camera="DJI FC8482" data-lens="24mm F2.8" data-exposure="24mm · ƒ/4 · 1/640s · ISO 100">
+                      <img src="https://images.unsplash.com/photo-1501854140801-50d01698950b?auto=format&amp;fit=crop&amp;w=1000&amp;q=82" alt="" />
+                      <span class="featured-caption">绿色向远处生长<span>夏日山野 · 2025</span></span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="section">
+              <div class="section-heading">
+                <div>
+                  <p class="section-kicker">Albums</p>
+                  <h2>相册</h2>
+                </div>
+                <p class="section-note">按最近拍摄时间排列</p>
+              </div>
+
+              <div class="album-grid">
+                <button class="album-card" type="button" data-action="album">
+                  <span class="album-cover">
+                    <img src="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&amp;fit=crop&amp;w=1400&amp;q=82" alt="雪山相册封面" />
+                    <span class="album-number">18 张</span>
+                  </span>
+                  <span class="album-copy">
+                    <span><h3>川西 · 云与山</h3><p>2026.05.12 — 2026.05.20</p></span>
+                    <span class="album-enter">查看相册 →</span>
+                  </span>
+                </button>
+
+                <button class="album-card" type="button" data-action="album">
+                  <span class="album-cover">
+                    <img src="https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&amp;fit=crop&amp;w=1400&amp;q=82" alt="东京夜景相册封面" />
+                    <span class="album-number">24 张</span>
+                  </span>
+                  <span class="album-copy">
+                    <span><h3>东京夜行</h3><p>2026.02.03 — 2026.02.09</p></span>
+                    <span class="album-enter">查看相册 →</span>
+                  </span>
+                </button>
+
+                <button class="album-card" type="button" data-action="album">
+                  <span class="album-cover">
+                    <img src="https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&amp;fit=crop&amp;w=1400&amp;q=82" alt="山谷湖泊相册封面" />
+                    <span class="album-number">11 张</span>
+                  </span>
+                  <span class="album-copy">
+                    <span><h3>秋日短途</h3><p>2025.10.02 — 2025.10.05</p></span>
+                    <span class="album-enter">查看相册 →</span>
+                  </span>
+                </button>
+
+                <button class="album-card" type="button" data-action="album">
+                  <span class="album-cover">
+                    <img src="https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&amp;fit=crop&amp;w=1400&amp;q=82" alt="京都街道相册封面" />
+                    <span class="album-number">16 张</span>
+                  </span>
+                  <span class="album-copy">
+                    <span><h3>关西散步</h3><p>2025.09.12 — 2025.09.18</p></span>
+                    <span class="album-enter">查看相册 →</span>
+                  </span>
+                </button>
+              </div>
+            </section>
+          </section>
+
+          <section class="view album-view photo-collection" id="album-view" hidden>
+            <button class="back-button" type="button" data-action="overview">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="m15 5-7 7 7 7"></path></svg>
+              返回照片墙
+            </button>
+
+            <div class="album-hero">
+              <div>
+                <p class="eyebrow">Album · No. 01</p>
+                <h1>川西 · 云与山</h1>
+                <p class="album-summary">公路拐进群山以后，天气和光线开始变得比行程更重要。</p>
+              </div>
+              <div class="album-stats">
+                <div class="stat"><span class="stat-label">Date</span><span class="stat-value">2026.05.12 — 05.20</span></div>
+                <div class="stat"><span class="stat-label">Photos</span><span class="stat-value">18</span></div>
+              </div>
+            </div>
+
+            <div class="gallery">
+              <div class="gallery-row">
+                <button class="gallery-photo js-photo" type="button" style="--ratio: 1.5; --delay: 0ms" data-full="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&amp;fit=max&amp;w=2400&amp;q=90" data-title="翻过垭口之前" data-date="2026.05.18 · 18:42" data-camera="FUJIFILM X-T5" data-lens="XF 16-55mm F2.8" data-exposure="35mm · ƒ/5.6 · 1/500s · ISO 160">
+                  <img src="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&amp;fit=crop&amp;w=1200&amp;q=82" alt="云层中的雪山" />
+                </button>
+                <button class="gallery-photo js-photo" type="button" style="--ratio: 1; --delay: 80ms" data-full="https://images.unsplash.com/photo-1500534623283-312aade485b7?auto=format&amp;fit=max&amp;w=1800&amp;q=90" data-title="风从山脊落下" data-date="2026.05.18 · 19:06" data-camera="FUJIFILM X-T5" data-lens="XF 50-140mm F2.8" data-exposure="90mm · ƒ/5.6 · 1/640s · ISO 200">
+                  <img src="https://images.unsplash.com/photo-1500534623283-312aade485b7?auto=format&amp;fit=crop&amp;w=900&amp;q=82" alt="山脊与远峰" />
+                </button>
+                <button class="gallery-photo js-photo" type="button" style="--ratio: 1.5; --delay: 160ms" data-full="https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&amp;fit=max&amp;w=2400&amp;q=90" data-title="荒原留给黄昏" data-date="2026.05.17 · 20:02" data-camera="FUJIFILM X-T5" data-lens="XF 16-55mm F2.8" data-exposure="24mm · ƒ/8 · 1/250s · ISO 320">
+                  <img src="https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&amp;fit=crop&amp;w=1200&amp;q=82" alt="黄昏荒原" />
+                </button>
+              </div>
+
+              <div class="gallery-row">
+                <button class="gallery-photo js-photo" type="button" style="--ratio: 1.78; --delay: 0ms" data-full="https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&amp;fit=max&amp;w=2400&amp;q=90" data-title="沿着水声往前" data-date="2026.05.16 · 08:21" data-camera="FUJIFILM X-T5" data-lens="XF 16-55mm F2.8" data-exposure="18mm · ƒ/8 · 1/160s · ISO 125">
+                  <img src="https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&amp;fit=crop&amp;w=1400&amp;q=82" alt="山中河流与森林" />
+                </button>
+                <button class="gallery-photo js-photo" type="button" style="--ratio: 1.5; --delay: 90ms" data-full="https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&amp;fit=max&amp;w=2400&amp;q=90" data-title="湖面没有回答" data-date="2026.05.16 · 09:14" data-camera="FUJIFILM X-T5" data-lens="XF 16-55mm F2.8" data-exposure="23mm · ƒ/8 · 1/250s · ISO 125">
+                  <img src="https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&amp;fit=crop&amp;w=1200&amp;q=82" alt="倒映山峰的湖面" />
+                </button>
+              </div>
+
+              <div class="gallery-row">
+                <button class="gallery-photo js-photo" type="button" style="--ratio: 1; --delay: 0ms" data-full="https://images.unsplash.com/photo-1470252649378-9c29740c9fa8?auto=format&amp;fit=max&amp;w=1800&amp;q=90" data-title="日落落进草场" data-date="2026.05.15 · 19:47" data-camera="FUJIFILM X-T5" data-lens="XF 33mm F1.4" data-exposure="33mm · ƒ/4 · 1/500s · ISO 160">
+                  <img src="https://images.unsplash.com/photo-1470252649378-9c29740c9fa8?auto=format&amp;fit=crop&amp;w=900&amp;q=82" alt="草场日落" />
+                </button>
+                <button class="gallery-photo js-photo" type="button" style="--ratio: 1.5; --delay: 70ms" data-full="https://images.unsplash.com/photo-1501854140801-50d01698950b?auto=format&amp;fit=max&amp;w=2400&amp;q=90" data-title="绿色向远处生长" data-date="2026.05.15 · 14:07" data-camera="DJI FC8482" data-lens="24mm F2.8" data-exposure="24mm · ƒ/4 · 1/640s · ISO 100">
+                  <img src="https://images.unsplash.com/photo-1501854140801-50d01698950b?auto=format&amp;fit=crop&amp;w=1200&amp;q=82" alt="俯瞰绿色山野" />
+                </button>
+                <button class="gallery-photo js-photo" type="button" style="--ratio: 1.25; --delay: 140ms" data-full="https://images.unsplash.com/photo-1443632864897-14973fa006cf?auto=format&amp;fit=max&amp;w=2000&amp;q=90" data-title="薄雾停在路边" data-date="2026.05.14 · 07:32" data-camera="FUJIFILM X-T5" data-lens="XF 16-55mm F2.8" data-exposure="44mm · ƒ/5.6 · 1/320s · ISO 400">
+                  <img src="https://images.unsplash.com/photo-1443632864897-14973fa006cf?auto=format&amp;fit=crop&amp;w=1000&amp;q=82" alt="雾中的山路" />
+                </button>
+              </div>
+            </div>
+            <p class="gallery-hint">保留原始比例，不裁切主体</p>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <dialog id="photo-dialog" aria-label="照片沉浸查看">
+      <div class="lightbox">
+        <div class="lightbox-stage">
+          <button class="lightbox-button lightbox-close" type="button" data-lightbox-action="close" aria-label="关闭">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m6 6 12 12M18 6 6 18"></path></svg>
+          </button>
+          <button class="lightbox-button lightbox-prev" type="button" data-lightbox-action="prev" aria-label="上一张">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m15 5-7 7 7 7"></path></svg>
+          </button>
+          <img class="lightbox-image" id="lightbox-image" src="" alt="" />
+          <button class="lightbox-button lightbox-next" type="button" data-lightbox-action="next" aria-label="下一张">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m9 5 7 7-7 7"></path></svg>
+          </button>
+        </div>
+        <div class="lightbox-caption">
+          <div>
+            <div class="lightbox-title" id="lightbox-title"></div>
+            <div class="lightbox-date" id="lightbox-date"></div>
+          </div>
+          <div class="lightbox-meta">
+            <span class="meta-item"><b>Camera</b><span id="meta-camera"></span></span>
+            <span class="meta-item"><b>Lens</b><span id="meta-lens"></span></span>
+            <span class="meta-item"><b>Exposure</b><span id="meta-exposure"></span></span>
+          </div>
+        </div>
+      </div>
+    </dialog>
+
+    <script>
+      const mainScroll = document.querySelector('#main-scroll');
+      const overviewView = document.querySelector('#overview-view');
+      const albumView = document.querySelector('#album-view');
+      const dialog = document.querySelector('#photo-dialog');
+      const lightboxImage = document.querySelector('#lightbox-image');
+      const lightboxTitle = document.querySelector('#lightbox-title');
+      const lightboxDate = document.querySelector('#lightbox-date');
+      const metaCamera = document.querySelector('#meta-camera');
+      const metaLens = document.querySelector('#meta-lens');
+      const metaExposure = document.querySelector('#meta-exposure');
+      const galleryPhotos = [...document.querySelectorAll('.gallery-photo')];
+
+      let activePhotos = [];
+      let activeIndex = 0;
+      let pointerStartX = 0;
+
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('is-visible');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { root: mainScroll, threshold: 0.12 });
+
+      galleryPhotos.forEach((photo) => revealObserver.observe(photo));
+
+      function showOverview() {
+        albumView.hidden = true;
+        overviewView.hidden = false;
+        mainScroll.scrollTop = 0;
+      }
+
+      function showAlbum() {
+        overviewView.hidden = true;
+        albumView.hidden = false;
+        mainScroll.scrollTop = 0;
+        galleryPhotos.forEach((photo) => revealObserver.observe(photo));
+      }
+
+      function renderLightbox() {
+        const photo = activePhotos[activeIndex];
+        lightboxImage.src = photo.dataset.full;
+        lightboxImage.alt = photo.querySelector('img').alt;
+        lightboxTitle.textContent = photo.dataset.title;
+        lightboxDate.textContent = photo.dataset.date;
+        metaCamera.textContent = photo.dataset.camera;
+        metaLens.textContent = photo.dataset.lens;
+        metaExposure.textContent = photo.dataset.exposure;
+      }
+
+      function openLightbox(photo) {
+        activePhotos = [...photo.closest('.photo-collection').querySelectorAll('.js-photo')];
+        activeIndex = activePhotos.indexOf(photo);
+        renderLightbox();
+        dialog.showModal();
+      }
+
+      function moveLightbox(step) {
+        activeIndex = (activeIndex + step + activePhotos.length) % activePhotos.length;
+        renderLightbox();
+      }
+
+      document.addEventListener('click', (event) => {
+        const action = event.target.closest('[data-action]')?.dataset.action;
+        const photo = event.target.closest('.js-photo');
+        const lightboxAction = event.target.closest('[data-lightbox-action]')?.dataset.lightboxAction;
+
+        if (action === 'overview') showOverview();
+        if (action === 'album') showAlbum();
+        if (photo) openLightbox(photo);
+        if (lightboxAction === 'close') dialog.close();
+        if (lightboxAction === 'prev') moveLightbox(-1);
+        if (lightboxAction === 'next') moveLightbox(1);
+      });
+
+      dialog.addEventListener('keydown', (event) => {
+        if (event.key === 'ArrowLeft') moveLightbox(-1);
+        if (event.key === 'ArrowRight') moveLightbox(1);
+      });
+
+      lightboxImage.addEventListener('pointerdown', (event) => {
+        pointerStartX = event.clientX;
+      });
+
+      lightboxImage.addEventListener('pointerup', (event) => {
+        const distance = event.clientX - pointerStartX;
+        if (distance > 56) moveLightbox(-1);
+        if (distance < -56) moveLightbox(1);
+      });
+    </script>
+  </body>
+</html>
