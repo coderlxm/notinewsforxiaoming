@@ -57,7 +57,7 @@ const metadataItems = computed(() => [
 .photo-hero {
   position: relative;
   width: 100%;
-  height: clamp(22rem, 48vh, 35rem);
+  height: clamp(20rem, 44vh, 32rem);
   overflow: hidden;
   background: var(--photo-surface);
 }
@@ -109,11 +109,11 @@ const metadataItems = computed(() => [
 .photo-hero__copy {
   position: absolute;
   z-index: 2;
-  bottom: clamp(2.2rem, 5vw, 4.5rem);
+  bottom: clamp(1.5rem, 3vw, 2.6rem);
   left: var(--photo-edge);
   display: grid;
   width: min(38rem, calc(100% - (var(--photo-edge) * 2)));
-  gap: 0.55rem;
+  gap: 0.45rem;
   pointer-events: none;
 }
 

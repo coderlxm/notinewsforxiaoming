@@ -98,7 +98,7 @@ onBeforeUnmount(() => {
 .photo-library-view {
   width: 100%;
   min-height: 100%;
-  padding: 0 0 clamp(3.5rem, 7vw, 6rem);
+  padding: 0 0 clamp(1.2rem, 2.5vw, 2rem);
   background: var(--photo-canvas);
   color: var(--photo-text-primary);
 }
@@ -131,19 +131,19 @@ onBeforeUnmount(() => {
 
 .photo-library-view__content {
   display: grid;
-  gap: clamp(2.7rem, 5vw, 4.8rem);
+  gap: clamp(1.5rem, 2.6vw, 2.6rem);
 }
 
 .photo-library-view__featured {
   display: grid;
-  gap: 1.25rem;
+  gap: 0.85rem;
 }
 
 .photo-library-view__section-heading {
   display: grid;
   width: calc(100% - (var(--photo-edge) * 2));
   margin: 0 auto;
-  gap: 0.28rem;
+  gap: 0.22rem;
 }
 
 .photo-library-view__section-heading h2 {
@@ -152,7 +152,7 @@ onBeforeUnmount(() => {
 
 .photo-library-view__albums {
   display: grid;
-  gap: 1.5rem;
+  gap: 1rem;
 }
 
 .photo-library-view__albums .photo-library-view__section-heading {
@@ -191,11 +191,11 @@ onBeforeUnmount(() => {
 
 @media (max-width: 599px) {
   .photo-library-view {
-    padding-bottom: 3.5rem;
+    padding-bottom: 1.5rem;
   }
 
   .photo-library-view__content {
-    gap: 2.8rem;
+    gap: 1.6rem;
   }
 }
 </style>
