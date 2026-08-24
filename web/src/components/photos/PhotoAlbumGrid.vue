@@ -22,32 +22,35 @@ defineProps<{
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   align-items: start;
-  gap: 12px;
+  gap: 24px 16px;
+  padding: 4px 2px 12px;
 }
 
 @media (max-width: 1439px) {
   .photo-album-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 10px;
+    gap: 22px 14px;
   }
 }
 
 @media (max-width: 1099px) {
   .photo-album-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 20px 12px;
   }
 }
 
 @media (max-width: 799px) {
   .photo-album-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
+    gap: 16px 10px;
   }
 }
 
 @media (max-width: 359px) {
   .photo-album-grid {
     grid-template-columns: 1fr;
+    gap: 16px;
   }
 }
 </style>
