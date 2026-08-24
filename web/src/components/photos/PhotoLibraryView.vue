@@ -17,13 +17,12 @@ const emit = defineEmits<{
 const store = usePhotoLibraryStore();
 const { overview, overviewLoading, overviewError } = storeToRefs(store);
 const featured = computed(() => overview.value?.featured ?? []);
-const heroPhoto = computed(() => featured.value[0] ?? null);
 const stripPhotos = computed(() => featured.value.slice(1));
 const lightbox = usePhotoLightbox(featured);
 let active = true;
 
-function openHeroPhoto(): void {
-  lightbox.open(0);
+function openHeroPhoto(index = 0): void {
+  lightbox.open(index);
 }
 
 function openStripPhoto(index: number): void {
@@ -63,8 +62,8 @@ onBeforeUnmount(() => {
 
     <div v-else-if="overview" class="photo-library-view__content">
       <PhotoHeroBillboard
-        v-if="heroPhoto"
-        :photo="heroPhoto"
+        v-if="featured.length > 0"
+        :photos="featured"
         @open-photo="openHeroPhoto"
       />
 
