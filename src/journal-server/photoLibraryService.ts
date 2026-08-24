@@ -189,7 +189,28 @@ interface FeaturedPhotoCandidate {
   photo: IndexedPhoto;
 }
 
-function compareFeatured(left: FeaturedPhotoCandidate, right: FeaturedPhotoCandidate) {
+const PHONE_DEVICE_PATTERN = /\b(apple|iphone|xiaomi|redmi|huawei|honor|samsung|oppo|vivo|oneplus|pixel|meizu|zte)\b/i;
+const DEDICATED_CAMERA_PATTERN = /\b(sony|canon|nikon|fujifilm|fuji|leica|panasonic|lumix|hasselblad|ricoh|pentax|olympus|om system|sigma|zeiss)\b/i;
+
+function featuredPhotoTier(candidate: FeaturedPhotoCandidate): number {
+  const { view, metadata } = candidate.photo.publicPhoto;
+  const isLandscape = view.width > view.height && (view.width / view.height) >= 1.2;
+  const camera = (metadata.camera ?? '').toLowerCase();
+  const lens = (metadata.lens ?? '').toLowerCase();
+  const isPhone = PHONE_DEVICE_PATTERN.test(camera) || PHONE_DEVICE_PATTERN.test(lens);
+  const isDedicatedCamera = DEDICATED_CAMERA_PATTERN.test(camera) || (Boolean(metadata.lens) && !isPhone);
+
+  if (isLandscape && isDedicatedCamera) return 0; // Tier 0: 专用相机拍摄的横屏高质量照片
+  if (isLandscape && !isPhone) return 1; // Tier 1: 非手机设备的横屏照片
+  if (isLandscape) return 2; // Tier 2: 手机拍摄的横屏照片
+  return 3; // Tier 3: 竖屏/非横屏照片
+}
+
+function compareFeatured(left: FeaturedPhotoCandidate, right: FeaturedPhotoCandidate): number {
+  const leftTier = featuredPhotoTier(left);
+  const rightTier = featuredPhotoTier(right);
+  if (leftTier !== rightTier) return leftTier - rightTier;
+
   const leftTime = left.photo.publicPhoto.metadata.takenAt;
   const rightTime = right.photo.publicPhoto.metadata.takenAt;
   if (leftTime && rightTime && leftTime !== rightTime) return rightTime.localeCompare(leftTime);

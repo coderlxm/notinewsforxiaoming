@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia';
 import { computed, nextTick, onBeforeUnmount, onMounted } from 'vue';
+import type { PhotoLibraryPhoto } from '../../../../src/shared/photoLibraryProtocol';
 import { usePhotoLightbox } from '../../composables/usePhotoLightbox';
 import { usePhotoLibraryStore } from '../../stores/photoLibrary';
 import JournalLoading from '../ui/JournalLoading.vue';
@@ -14,15 +15,37 @@ const emit = defineEmits<{
   layoutReady: [];
 }>();
 
+const PHONE_DEVICE_PATTERN = /\b(apple|iphone|xiaomi|redmi|huawei|honor|samsung|oppo|vivo|oneplus|pixel|meizu|zte)\b/i;
+
+function isHeroEligiblePhoto(photo: PhotoLibraryPhoto): boolean {
+  const isLandscape = photo.view.width > photo.view.height && (photo.view.width / photo.view.height) >= 1.2;
+  if (!isLandscape) return false;
+  const camera = (photo.metadata.camera ?? '').toLowerCase();
+  const lens = (photo.metadata.lens ?? '').toLowerCase();
+  return !PHONE_DEVICE_PATTERN.test(camera) && !PHONE_DEVICE_PATTERN.test(lens);
+}
+
 const store = usePhotoLibraryStore();
 const { overview, overviewLoading, overviewError } = storeToRefs(store);
 const featured = computed(() => overview.value?.featured ?? []);
+const heroPhotos = computed(() => {
+  const cameraLandscapePhotos = featured.value.filter(isHeroEligiblePhoto);
+  if (cameraLandscapePhotos.length > 0) return cameraLandscapePhotos;
+  const anyLandscapePhotos = featured.value.filter(p => p.view.width > p.view.height);
+  return anyLandscapePhotos.length > 0 ? anyLandscapePhotos : featured.value;
+});
 const stripPhotos = computed(() => featured.value.slice(1));
 const lightbox = usePhotoLightbox(featured);
 let active = true;
 
 function openHeroPhoto(index = 0): void {
-  lightbox.open(index);
+  const photo = heroPhotos.value[index];
+  if (!photo) {
+    lightbox.open(0);
+    return;
+  }
+  const targetIndex = featured.value.findIndex(p => p.id === photo.id);
+  lightbox.open(targetIndex !== -1 ? targetIndex : 0);
 }
 
 function openStripPhoto(index: number): void {
@@ -62,8 +85,8 @@ onBeforeUnmount(() => {
 
     <div v-else-if="overview" class="photo-library-view__content">
       <PhotoHeroBillboard
-        v-if="featured.length > 0"
-        :photos="featured"
+        v-if="heroPhotos.length > 0"
+        :photos="heroPhotos"
         @open-photo="openHeroPhoto"
       />
 
