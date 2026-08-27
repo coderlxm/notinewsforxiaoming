@@ -24,6 +24,7 @@ import {
 } from '../services/workCheckinReminder.js';
 
 const VITAMIN_WORKDAY_RANDOM_WINDOW_MS = 15 * 60 * 1000;
+const PHOTO_WORKDAY_RANDOM_WINDOW_MS = 15 * 60 * 1000;
 const STARTGG_FAST_WATCH_INTERVAL_MS = 2 * 60 * 1000;
 const GITHUB_PUSH_ANCHOR_DATE = '1970-01-01';
 
@@ -39,6 +40,13 @@ function scheduleWorkdayVitamin(bot: Telegraf): void {
   const delay = Math.floor(Math.random() * VITAMIN_WORKDAY_RANDOM_WINDOW_MS);
   setTimeout(async () => {
     await runMode('vitamin', getChinaDayOfWeek(), bot);
+  }, delay);
+}
+
+function scheduleWorkdayPhotoReminder(bot: Telegraf): void {
+  const delay = Math.floor(Math.random() * PHOTO_WORKDAY_RANDOM_WINDOW_MS);
+  setTimeout(async () => {
+    await bot.telegram.sendMessage(config.tgChatId, '📸 记得拍张照片，记录一下今天。不要忘记上传到相册。');
   }, delay);
 }
 
@@ -193,6 +201,12 @@ export function registerFixedJobs(bot: Telegraf): void {
   // english: 13:30
   schedule.scheduleJob({ hour: 13, minute: 30, tz: 'Asia/Shanghai' }, async () => {
     await runMode('english', getChinaDayOfWeek(), bot);
+  });
+
+  // photo reminder: random between 12:55 and 13:10 on China workdays
+  schedule.scheduleJob({ hour: 12, minute: 55, tz: 'Asia/Shanghai' }, () => {
+    if (!isChinaWorkday(new Date())) return;
+    scheduleWorkdayPhotoReminder(bot);
   });
 
   // github: 15:00 every other day
