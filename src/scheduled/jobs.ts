@@ -24,7 +24,7 @@ import {
 } from '../services/workCheckinReminder.js';
 
 const VITAMIN_WORKDAY_RANDOM_WINDOW_MS = 15 * 60 * 1000;
-const PHOTO_WORKDAY_RANDOM_WINDOW_MS = 15 * 60 * 1000;
+const PHOTO_WORKDAY_RANDOM_WINDOW_MS = 65 * 60 * 1000;
 const STARTGG_FAST_WATCH_INTERVAL_MS = 2 * 60 * 1000;
 const GITHUB_PUSH_ANCHOR_DATE = '1970-01-01';
 
@@ -203,7 +203,7 @@ export function registerFixedJobs(bot: Telegraf): void {
     await runMode('english', getChinaDayOfWeek(), bot);
   });
 
-  // photo reminder: random between 12:55 and 13:10 on China workdays
+  // photo reminder: random between 12:55 and 14:00 on China workdays
   schedule.scheduleJob({ hour: 12, minute: 55, tz: 'Asia/Shanghai' }, () => {
     if (!isChinaWorkday(new Date())) return;
     scheduleWorkdayPhotoReminder(bot);
