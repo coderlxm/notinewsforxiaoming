@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { List } from 'vant';
 import PublicArticleFeed from '../../article/PublicArticleFeed.vue';
-import type { PublicJournalFeedItem } from '../../../types';
+import type { JournalEntry, PublicJournalFeedItem } from '../../../types';
 import JournalLoading from '../../ui/JournalLoading.vue';
 import WaterfallFeed from '../WaterfallFeed.vue';
 
@@ -16,6 +16,7 @@ defineProps<{
   error: string | null;
   initialTag: string;
   mutationEntryId: number | null;
+  reactionPendingPublicId: string | null;
 }>();
 
 const emit = defineEmits<{
@@ -23,6 +24,8 @@ const emit = defineEmits<{
   layoutReady: [];
   openEntry: [entry: PublicJournalFeedItem];
   selectTag: [tag: string];
+  toggleReaction: [entry: JournalEntry];
+  openComments: [entry: JournalEntry];
 }>();
 </script>
 
@@ -41,9 +44,12 @@ const emit = defineEmits<{
         v-if="layout === 'article'"
         :entries="entries"
         :loading="loading"
+        :reaction-pending-public-id="reactionPendingPublicId"
         @layout-ready="emit('layoutReady')"
         @open-entry="emit('openEntry', $event)"
         @select-tag="emit('selectTag', $event)"
+        @toggle-reaction="emit('toggleReaction', $event)"
+        @open-comments="emit('openComments', $event)"
       />
       <WaterfallFeed
         v-else
@@ -51,9 +57,12 @@ const emit = defineEmits<{
         :loading="loading"
         mode="public"
         :mutation-entry-id="mutationEntryId"
+        :reaction-pending-public-id="reactionPendingPublicId"
         @layout-ready="emit('layoutReady')"
         @open-entry="emit('openEntry', $event)"
         @select-tag="emit('selectTag', $event)"
+        @toggle-reaction="emit('toggleReaction', $event)"
+        @open-comments="emit('openComments', $event)"
       />
 
       <p

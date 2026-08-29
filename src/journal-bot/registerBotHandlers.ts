@@ -12,6 +12,7 @@ import type { RegisterJournalBotHandlersOptions } from './types.js';
 const JOURNAL_COMMAND_PATTERN = /^\/(?:note|post)(?:@[A-Za-z0-9_]+)?(?:\s+([\s\S]*))?$/i;
 const JOURNAL_VISIBILITY_CALLBACK_PATTERN = /^journal:visibility:([0-9a-f-]{36}):(private|public)$/;
 const JOURNAL_DELETE_CALLBACK_PATTERN = /^jd:(ask|confirm|cancel):([0-9a-f-]{36}):(p|r)$/;
+const JOURNAL_COMMENT_CALLBACK_PATTERN = /^jc:(h|p):(\d+)$/;
 
 const CAPTURABLE_MESSAGE_FIELDS = new Set([
   'text',
@@ -137,6 +138,16 @@ function deleteConfirmationButtons(publicId: string, visibilityMarker: 'p' | 'r'
 
 function visibilityFromMarker(marker: 'p' | 'r'): JournalVisibility {
   return marker === 'p' ? 'public' : 'private';
+}
+
+function commentNotificationKeyboard(commentId: number, hidden: boolean, adminUrl: string) {
+  return Markup.inlineKeyboard([[
+    Markup.button.url('打开管理', adminUrl),
+    Markup.button.callback(
+      hidden ? '恢复公开' : '隐藏评论',
+      `jc:${hidden ? 'p' : 'h'}:${commentId}`,
+    ),
+  ]]);
 }
 
 export function registerJournalBotHandlers(
@@ -360,6 +371,29 @@ export function registerJournalBotHandlers(
     } catch (error) {
       if (!(error instanceof JournalClientError)) throw error;
       await ctx.answerCbQuery(`Journal 删除失败：${error.message}`, { show_alert: true });
+    }
+  });
+
+  bot.action(JOURNAL_COMMENT_CALLBACK_PATTERN, async (ctx) => {
+    if (!isAuthorized(ctx, options.allowedChatId)) return;
+    const match = JOURNAL_COMMENT_CALLBACK_PATTERN.exec(ctx.match[0]);
+    if (!match?.[1] || !match[2]) return;
+    const hidden = match[1] === 'h';
+    const commentId = Number(match[2]);
+
+    try {
+      const response = await api.updateCommentStatus(commentId, hidden ? 'hidden' : 'published');
+      await ctx.answerCbQuery(hidden ? '已隐藏该评论组' : '已恢复公开该评论组');
+      await ctx.editMessageReplyMarkup(
+        commentNotificationKeyboard(
+          commentId,
+          hidden,
+          `${publicBaseUrl}/me?entry=${response.entryId}#comments`,
+        ).reply_markup,
+      );
+    } catch (error) {
+      if (!(error instanceof JournalClientError)) throw error;
+      await ctx.answerCbQuery(`Journal 操作失败：${error.message}`, { show_alert: true });
     }
   });
 }

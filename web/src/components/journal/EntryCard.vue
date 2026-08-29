@@ -14,6 +14,7 @@ import PublishedTimeDialog from './PublishedTimeDialog.vue';
 import AccessSettingsDialog from './AccessSettingsDialog.vue';
 import type { AccessSettingsInput } from './accessSettings';
 import CardStatusIndicator from './CardStatusIndicator.vue';
+import EntryInteractionSummary from '../interaction/EntryInteractionSummary.vue';
 
 const props = withDefaults(defineProps<{
   entry: JournalEntry;
@@ -22,12 +23,14 @@ const props = withDefaults(defineProps<{
   linkable?: boolean;
   channelEditable?: boolean;
   showYear?: boolean;
+  reactionPending?: boolean;
 }>(), {
   editable: false,
   busy: false,
   linkable: true,
   channelEditable: false,
   showYear: false,
+  reactionPending: false,
 });
 
 const emit = defineEmits<{
@@ -40,6 +43,8 @@ const emit = defineEmits<{
   setChannel: [entry: JournalEntry, channel: JournalPlainChannel];
   setPinned: [entry: JournalEntry, pinned: boolean];
   deleteEntry: [entry: JournalEntry];
+  toggleReaction: [entry: JournalEntry];
+  openComments: [entry: JournalEntry];
 }>();
 
 const editing = shallowRef(false);
@@ -119,6 +124,7 @@ const statusLabel = computed(() => isDraft.value
       ? '公开'
       : (props.entry.visibility === 'protected' ? '加密' : '私有')));
 const canSave = computed(() => draft.value !== props.entry.contentText && !props.busy);
+const showInteractions = computed(() => props.entry.publicationStatus === 'published');
 const deletionMessage = computed(() => {
   if (props.entry.assets.length === 0) return '永久删除这条记录？此操作无法撤销。';
   if (props.entry.assets.length === 1) return '永久删除这条记录及其附件？此操作无法撤销。';
@@ -310,6 +316,14 @@ function handleCardClick(event: MouseEvent): void {
             @request-access-settings="openAccessSettings"
             @set-channel="emit('setChannel', entry, $event)"
             @request-delete="startDeletion"
+          />
+          <EntryInteractionSummary
+            v-if="showInteractions"
+            :summary="entry.interactions"
+            :interactive="isPublicFeedCard"
+            :reaction-pending="reactionPending"
+            @toggle-reaction="emit('toggleReaction', entry)"
+            @open-comments="emit('openComments', entry)"
           />
           <time class="entry__meta-time" :datetime="entry.sourceCreatedAt">{{ formattedTime }}</time>
         </div>

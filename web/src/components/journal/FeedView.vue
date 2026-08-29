@@ -4,6 +4,7 @@ import type {
   AssetView,
   JournalChannel,
   JournalEntry,
+  JournalInteractionSummary,
   ProtectedJournalEntryPreview,
   PublicJournalFeedItem,
 } from '../../types';
@@ -41,6 +42,7 @@ const emit = defineEmits<{
   openEntry: [entry: PublicJournalFeedItem];
   detailLoaded: [entry: JournalEntry];
   detailUnlocked: [entry: JournalEntry];
+  interactionsChange: [publicId: string, summary: JournalInteractionSummary];
   closeOverlay: [];
   removeDeletedOverlay: [];
   returnToFeed: [];
@@ -49,6 +51,13 @@ const emit = defineEmits<{
 }>();
 
 const isDetail = computed(() => props.mode === 'public' && props.detailId !== undefined);
+
+function forwardInteractionsChange(
+  publicId: string,
+  summary: JournalInteractionSummary,
+): void {
+  emit('interactionsChange', publicId, summary);
+}
 </script>
 
 <template>
@@ -72,6 +81,7 @@ const isDetail = computed(() => props.mode === 'public' && props.detailId !== un
     :detail-id="detailId as string"
     @detail-loaded="emit('detailLoaded', $event)"
     @detail-unlocked="emit('detailUnlocked', $event)"
+    @interactions-change="forwardInteractionsChange"
     @return-to-feed="emit('returnToFeed')"
   />
   <PublicFeedView

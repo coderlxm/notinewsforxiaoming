@@ -1,11 +1,15 @@
 import axios from 'axios';
 import type { ZodType } from 'zod';
 import {
+  journalAdminCommentMutationResponseSchema,
   journalApiErrorSchema,
+  journalCommentStatusRequestSchema,
   journalDeletionResultSchema,
   journalEntrySchema,
   journalIngestRequestSchema,
   journalVisibilityRequestSchema,
+  type JournalAdminCommentMutationResponse,
+  type JournalCommentStatusRequest,
   type JournalDeletionResult,
   type JournalEntry,
   type JournalIngestRequest,
@@ -55,6 +59,19 @@ export class JournalApiClient {
       'delete',
       undefined,
       journalDeletionResultSchema,
+    );
+  }
+
+  async updateCommentStatus(
+    commentId: number,
+    status: JournalCommentStatusRequest['status'],
+  ): Promise<JournalAdminCommentMutationResponse> {
+    const request = journalCommentStatusRequestSchema.parse({ status });
+    return this.request(
+      `${this.baseUrl}/api/internal/comments/${commentId}/status`,
+      'patch',
+      request,
+      journalAdminCommentMutationResponseSchema,
     );
   }
 

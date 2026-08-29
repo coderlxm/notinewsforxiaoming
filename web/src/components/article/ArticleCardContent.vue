@@ -11,6 +11,7 @@ import CardActionMenu from '../journal/CardActionMenu.vue';
 import CardDateSpine from '../journal/CardDateSpine.vue';
 import PublishedTimeDialog from '../journal/PublishedTimeDialog.vue';
 import CardStatusIndicator from '../journal/CardStatusIndicator.vue';
+import EntryInteractionSummary from '../interaction/EntryInteractionSummary.vue';
 import ArticleRichBody from './ArticleRichBody.vue';
 import RichArticleRenderer from './RichArticleRenderer.vue';
 
@@ -23,6 +24,7 @@ const props = withDefaults(defineProps<{
   anchored?: boolean;
   showYear?: boolean;
   showAiBadge?: boolean;
+  reactionPending?: boolean;
 }>(), {
   editable: false,
   busy: false,
@@ -31,6 +33,7 @@ const props = withDefaults(defineProps<{
   anchored: false,
   showYear: false,
   showAiBadge: true,
+  reactionPending: false,
 });
 
 const emit = defineEmits<{
@@ -41,6 +44,8 @@ const emit = defineEmits<{
   saveAccessSettings: [entry: JournalEntry, settings: AccessSettingsInput];
   setPinned: [entry: JournalEntry, pinned: boolean];
   deleteEntry: [entry: JournalEntry];
+  toggleReaction: [entry: JournalEntry];
+  openComments: [entry: JournalEntry];
 }>();
 
 const confirmingDeletion = shallowRef(false);
@@ -67,6 +72,7 @@ const deletionMessage = computed(() => {
   if (props.entry.assets.length === 1) return '永久删除这篇文章及其附件？此操作无法撤销。';
   return `永久删除这篇文章及其 ${props.entry.assets.length} 个附件？此操作无法撤销。`;
 });
+const showInteractions = computed(() => props.entry.publicationStatus === 'published');
 
 function startDeletion(): void {
   editingPublishedTime.value = false;
@@ -228,6 +234,16 @@ function handleCardClick(event: MouseEvent): void {
         #{{ tag }}
       </button>
     </div>
+
+    <footer v-if="display === 'summary' && showInteractions" class="article-card__interaction-footer">
+      <EntryInteractionSummary
+        :summary="entry.interactions"
+        :interactive="!editable"
+        :reaction-pending="reactionPending"
+        @toggle-reaction="emit('toggleReaction', entry)"
+        @open-comments="emit('openComments', entry)"
+      />
+    </footer>
 
     <footer v-if="editable && confirmingDeletion" class="article-card__delete-confirmation" role="alert">
       <p class="article-card__delete-message">{{ deletionMessage }}</p>
@@ -478,6 +494,11 @@ function handleCardClick(event: MouseEvent): void {
 .article-card__tags {
   gap: 0.15rem;
   flex-wrap: wrap;
+}
+
+.article-card__interaction-footer {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .article-card__tag {

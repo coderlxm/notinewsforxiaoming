@@ -86,6 +86,13 @@ export const journalAssetSchema = z.object({
 });
 export type JournalAsset = z.infer<typeof journalAssetSchema>;
 
+export const journalInteractionSummarySchema = z.object({
+  reactionCount: z.number().int().nonnegative(),
+  commentCount: z.number().int().nonnegative(),
+  viewerReacted: z.boolean(),
+});
+export type JournalInteractionSummary = z.infer<typeof journalInteractionSummarySchema>;
+
 export const journalEntrySchema = z.object({
   id: z.number().int().positive(),
   publicId: z.string().uuid(),
@@ -106,8 +113,123 @@ export const journalEntrySchema = z.object({
   capturedAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
   assets: z.array(journalAssetSchema),
+  interactions: journalInteractionSummarySchema,
 });
 export type JournalEntry = z.infer<typeof journalEntrySchema>;
+
+export const journalPublicCommentSchema: z.ZodType<JournalPublicComment> = z.lazy(() => z.object({
+  id: z.number().int().positive(),
+  parentId: z.number().int().positive().nullable(),
+  authorName: z.string().min(1),
+  authorRole: z.enum(['visitor', 'owner']),
+  contentHtml: z.string(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+  replies: z.array(journalPublicCommentSchema),
+}));
+export interface JournalPublicComment {
+  id: number;
+  parentId: number | null;
+  authorName: string;
+  authorRole: 'visitor' | 'owner';
+  contentHtml: string;
+  createdAt: string;
+  updatedAt: string;
+  replies: JournalPublicComment[];
+}
+
+export const journalAdminCommentSchema: z.ZodType<JournalAdminComment> = z.lazy(() => z.object({
+  id: z.number().int().positive(),
+  parentId: z.number().int().positive().nullable(),
+  authorName: z.string().min(1),
+  authorRole: z.enum(['visitor', 'owner']),
+  contentHtml: z.string(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+  replies: z.array(journalAdminCommentSchema),
+  status: z.enum(['published', 'hidden']),
+}));
+export interface JournalAdminComment extends JournalPublicComment {
+  status: 'published' | 'hidden';
+}
+
+export const journalCommentStatusSchema = z.enum(['published', 'hidden']);
+export type JournalCommentStatus = z.infer<typeof journalCommentStatusSchema>;
+
+export const journalPublicInteractionsResponseSchema = z.object({
+  summary: journalInteractionSummarySchema,
+  comments: z.array(journalPublicCommentSchema),
+});
+export type JournalPublicInteractionsResponse = z.infer<
+  typeof journalPublicInteractionsResponseSchema
+>;
+
+export const journalAdminInteractionsResponseSchema = z.object({
+  summary: journalInteractionSummarySchema,
+  comments: z.array(journalAdminCommentSchema),
+});
+export type JournalAdminInteractionsResponse = z.infer<
+  typeof journalAdminInteractionsResponseSchema
+>;
+
+export const journalReactionResponseSchema = z.object({
+  reactionCount: z.number().int().nonnegative(),
+  viewerReacted: z.boolean(),
+});
+export type JournalReactionResponse = z.infer<typeof journalReactionResponseSchema>;
+
+export const journalVisitorCommentRequestSchema = z.object({
+  authorName: z.string().trim().min(1).refine(
+    (value) => [...value].length <= 24,
+    { message: 'Comment author name must not exceed 24 Unicode characters.' },
+  ),
+  content: z.string().trim().min(1).refine(
+    (value) => [...value].length <= 1000,
+    { message: 'Comment content must not exceed 1,000 Unicode characters.' },
+  ),
+  website: z.string().refine(
+    (value) => value === '',
+    { message: 'Comment form contained an unexpected field.' },
+  ),
+});
+export type JournalVisitorCommentRequest = z.infer<typeof journalVisitorCommentRequestSchema>;
+
+export const journalVisitorCommentResponseSchema = z.object({
+  comment: journalPublicCommentSchema,
+  summary: journalInteractionSummarySchema,
+});
+export type JournalVisitorCommentResponse = z.infer<typeof journalVisitorCommentResponseSchema>;
+
+export const journalOwnerReplyRequestSchema = z.object({
+  parentId: z.number().int().positive(),
+  content: z.string().trim().min(1).refine(
+    (value) => [...value].length <= 1000,
+    { message: 'Reply content must not exceed 1,000 Unicode characters.' },
+  ),
+});
+export type JournalOwnerReplyRequest = z.infer<typeof journalOwnerReplyRequestSchema>;
+
+export const journalCommentStatusRequestSchema = z.object({
+  status: journalCommentStatusSchema,
+});
+export type JournalCommentStatusRequest = z.infer<typeof journalCommentStatusRequestSchema>;
+
+export const journalAdminCommentMutationResponseSchema = z.object({
+  entryId: z.number().int().positive(),
+  comment: journalAdminCommentSchema,
+  summary: journalInteractionSummarySchema,
+});
+export type JournalAdminCommentMutationResponse = z.infer<
+  typeof journalAdminCommentMutationResponseSchema
+>;
+
+export const journalAdminCommentDeletionResponseSchema = z.object({
+  entryId: z.number().int().positive(),
+  summary: journalInteractionSummarySchema,
+});
+export type JournalAdminCommentDeletionResponse = z.infer<
+  typeof journalAdminCommentDeletionResponseSchema
+>;
 
 export const journalArticleTagsSchema = z.array(z.string().trim().min(1).max(32)).max(20);
 export type JournalArticleTags = z.infer<typeof journalArticleTagsSchema>;

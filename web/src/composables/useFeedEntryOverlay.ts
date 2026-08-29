@@ -19,6 +19,7 @@ import {
   isProtectedJournalEntry,
   type AssetView,
   type JournalEntry,
+  type JournalInteractionSummary,
   type ProtectedJournalEntryPreview,
   type PublicJournalFeedItem,
 } from '../types';
@@ -183,6 +184,23 @@ export function useFeedEntryOverlay(options: UseFeedEntryOverlayOptions) {
 
   function handlePublicDetailUnlocked(entry: JournalEntry): void {
     revealedPublicEntries.value = new Map(revealedPublicEntries.value).set(entry.publicId, entry);
+    if (
+      options.route.value.name === 'detail'
+      && options.route.value.publicId === entry.publicId
+    ) {
+      directPublicEntry.value = entry;
+    }
+  }
+
+  function handlePublicInteractionsChange(
+    publicId: string,
+    summary: JournalInteractionSummary,
+  ): void {
+    const entry = directPublicEntry.value;
+    if (entry?.publicId !== publicId) return;
+    const updated = { ...entry, interactions: summary };
+    directPublicEntry.value = updated;
+    revealedPublicEntries.value = new Map(revealedPublicEntries.value).set(publicId, updated);
   }
 
   function changeAssetView(assetView: AssetView): void {
@@ -242,6 +260,7 @@ export function useFeedEntryOverlay(options: UseFeedEntryOverlayOptions) {
     returnFromDetail,
     handlePublicDetailLoaded,
     handlePublicDetailUnlocked,
+    handlePublicInteractionsChange,
     changeAssetView,
     changePrivatePage,
     clearOverlay,

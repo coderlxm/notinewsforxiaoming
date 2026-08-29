@@ -18,6 +18,7 @@ const props = defineProps<{
   loading: boolean;
   mode: 'public' | 'private';
   mutationEntryId: number | null;
+  reactionPendingPublicId?: string | null;
 }>();
 
 const emit = defineEmits<{
@@ -32,6 +33,8 @@ const emit = defineEmits<{
   setChannel: [entry: JournalEntry, channel: JournalPlainChannel];
   setPinned: [entry: JournalEntry, pinned: boolean];
   deleteEntry: [entry: JournalEntry];
+  toggleReaction: [entry: JournalEntry];
+  openComments: [entry: JournalEntry];
 }>();
 
 const gridElement = useTemplateRef<HTMLDivElement>('grid');
@@ -210,6 +213,7 @@ onBeforeUnmount(() => {
             :busy="mutationEntryId === entry.id"
             :show-ai-badge="mode !== 'private'"
             :show-year="mode === 'public'"
+            :reaction-pending="mode === 'public' && props.reactionPendingPublicId === entry.publicId"
             @open-entry="emit('openEntry', $event)"
             @select-tag="emit('selectTag', $event)"
             @edit="emit('editArticle', $event)"
@@ -217,6 +221,8 @@ onBeforeUnmount(() => {
             @save-access-settings="forwardAccessSettings"
             @set-pinned="forwardPinned"
             @delete-entry="emit('deleteEntry', $event)"
+            @toggle-reaction="emit('toggleReaction', $event)"
+            @open-comments="emit('openComments', $event)"
           />
           <EntryCard
             v-else
@@ -225,6 +231,7 @@ onBeforeUnmount(() => {
             :busy="mutationEntryId === entry.id"
             :channel-editable="mode === 'private'"
             :show-year="mode === 'public'"
+            :reaction-pending="mode === 'public' && props.reactionPendingPublicId === entry.publicId"
             @open-entry="emit('openEntry', $event)"
             @continue-draft="emit('continueDraft', $event)"
             @select-tag="emit('selectTag', $event)"
@@ -234,6 +241,8 @@ onBeforeUnmount(() => {
             @set-channel="forwardChannel"
             @set-pinned="forwardPinned"
             @delete-entry="emit('deleteEntry', $event)"
+            @toggle-reaction="emit('toggleReaction', $event)"
+            @open-comments="emit('openComments', $event)"
           />
         </div>
       </div>

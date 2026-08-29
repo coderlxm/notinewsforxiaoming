@@ -9,6 +9,7 @@ import {
   JournalRequestError,
   login as loginRequest,
   logout as logoutRequest,
+  setEntryReaction,
   unlockPublicEntry,
   updateEntryContent,
   updateEntryChannel,
@@ -21,11 +22,14 @@ import type {
   FeedFilters,
   JournalChannel,
   JournalEntry,
+  JournalInteractionSummary,
   JournalPlainChannel,
   ProtectedJournalEntryPreview,
   PublicJournalFeedItem,
   JournalVisibility,
 } from '../types';
+import { showMessage } from '../utils/message';
+import { getOrCreateJournalVisitorId } from '../utils/journalVisitorIdentity';
 
 type AuthenticationState = 'checking' | 'authenticated' | 'anonymous';
 
@@ -42,6 +46,7 @@ export function useJournalApi() {
   const unlocking = shallowRef(false);
   const unlockError = shallowRef<string | null>(null);
   const mutationEntryId = shallowRef<number | null>(null);
+  const reactionPendingPublicId = shallowRef<string | null>(null);
   const authenticationState = shallowRef<AuthenticationState>('checking');
 
   function exposeError(reason: unknown): void {
@@ -75,7 +80,10 @@ export function useJournalApi() {
     loading.value = true;
     error.value = null;
     try {
-      const feed = await fetchPublicFeed(options);
+      const feed = await fetchPublicFeed({
+        ...options,
+        visitorId: getOrCreateJournalVisitorId(),
+      });
       publicEntries.value = feed.entries;
       nextCursor.value = feed.nextCursor;
     }
@@ -94,7 +102,7 @@ export function useJournalApi() {
     detail.value = null;
     protectedDetail.value = null;
     try {
-      const response = await fetchPublicEntry(publicId);
+      const response = await fetchPublicEntry(publicId, getOrCreateJournalVisitorId());
       if (isProtectedJournalEntry(response)) protectedDetail.value = response;
       else detail.value = response;
     }
@@ -112,7 +120,11 @@ export function useJournalApi() {
     unlocking.value = true;
     unlockError.value = null;
     try {
-      const unlockedEntry = await unlockPublicEntry(protectedEntry.publicId, password);
+      const unlockedEntry = await unlockPublicEntry(
+        protectedEntry.publicId,
+        password,
+        getOrCreateJournalVisitorId(),
+      );
       detail.value = unlockedEntry;
       publicEntries.value = publicEntries.value.map(entry =>
         entry.publicId === unlockedEntry.publicId ? unlockedEntry : entry,
@@ -208,7 +220,11 @@ export function useJournalApi() {
     loadingMore.value = true;
     error.value = null;
     try {
-      const feed = await fetchPublicFeed({ ...options, cursor: nextCursor.value });
+      const feed = await fetchPublicFeed({
+        ...options,
+        cursor: nextCursor.value,
+        visitorId: getOrCreateJournalVisitorId(),
+      });
       publicEntries.value = [...publicEntries.value, ...feed.entries];
       nextCursor.value = feed.nextCursor;
     }
@@ -392,6 +408,84 @@ export function useJournalApi() {
     entries.value = entries.value.filter(entry => entry.id !== id);
   }
 
+  function replacePublicInteractions(
+    publicId: string,
+    summary: JournalInteractionSummary,
+  ): void {
+    publicEntries.value = publicEntries.value.map(entry => (
+      entry.publicId === publicId && !isProtectedJournalEntry(entry)
+      ? { ...entry, interactions: summary }
+      : entry
+    ));
+    if (detail.value?.publicId === publicId) {
+      detail.value = { ...detail.value, interactions: summary };
+    }
+  }
+
+  function replacePrivateInteractions(id: number, summary: JournalInteractionSummary): void {
+    entries.value = entries.value.map(entry => entry.id === id
+      ? { ...entry, interactions: summary }
+      : entry);
+    if (detail.value?.id === id) {
+      detail.value = { ...detail.value, interactions: summary };
+    }
+  }
+
+  function mergeRevealedPublicEntries(
+    revealedEntries: ReadonlyMap<string, JournalEntry> | undefined,
+  ): void {
+    if (!revealedEntries?.size) return;
+    publicEntries.value = publicEntries.value.map(entry => (
+      revealedEntries.get(entry.publicId) ?? entry
+    ));
+  }
+
+  async function togglePublicEntryReaction(publicId: string): Promise<void> {
+    if (reactionPendingPublicId.value !== null) return;
+    const entry = publicEntries.value.find(item => item.publicId === publicId);
+    if (!entry || isProtectedJournalEntry(entry)) return;
+    const target = !entry.interactions.viewerReacted;
+    const previous = entry.interactions;
+    const applySummary = (summary: JournalInteractionSummary): void => {
+      publicEntries.value = publicEntries.value.map(item => (
+        item.publicId === publicId && !isProtectedJournalEntry(item)
+        ? { ...item, interactions: summary }
+        : item
+      ));
+    };
+    reactionPendingPublicId.value = publicId;
+    applySummary({
+      ...previous,
+      reactionCount: previous.reactionCount + (target ? 1 : -1),
+      viewerReacted: target,
+    });
+    const visitorId = getOrCreateJournalVisitorId();
+    if (!visitorId) {
+      applySummary(previous);
+      reactionPendingPublicId.value = null;
+      showMessage({ message: '浏览器匿名身份不可用，无法保存点赞。', type: 'error' });
+      return;
+    }
+    try {
+      const response = await setEntryReaction(publicId, visitorId, target);
+      applySummary({
+        ...entry.interactions,
+        reactionCount: response.reactionCount,
+        viewerReacted: response.viewerReacted,
+      });
+    }
+    catch (reason) {
+      applySummary(previous);
+      showMessage({
+        message: reason instanceof Error ? reason.message : String(reason),
+        type: 'error',
+      });
+    }
+    finally {
+      reactionPendingPublicId.value = null;
+    }
+  }
+
   return {
     entries: shallowReadonly(entries),
     publicEntries: shallowReadonly(publicEntries),
@@ -405,6 +499,7 @@ export function useJournalApi() {
     unlocking: readonly(unlocking),
     unlockError: readonly(unlockError),
     mutationEntryId: readonly(mutationEntryId),
+    reactionPendingPublicId: readonly(reactionPendingPublicId),
     authenticationState: readonly(authenticationState),
     loadPublic,
     loadPublicDetail,
@@ -427,5 +522,9 @@ export function useJournalApi() {
     setPinned,
     deleteEntry,
     removeEntryFromResults,
+    replacePublicInteractions,
+    replacePrivateInteractions,
+    mergeRevealedPublicEntries,
+    togglePublicEntryReaction,
   };
 }

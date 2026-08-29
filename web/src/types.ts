@@ -60,6 +60,61 @@ export interface JournalEntry {
   capturedAt: string;
   updatedAt: string;
   assets: JournalAsset[];
+  interactions: JournalInteractionSummary;
+}
+
+export interface JournalInteractionSummary {
+  reactionCount: number;
+  commentCount: number;
+  viewerReacted: boolean;
+}
+
+export type JournalAdminCommentStatus = 'published' | 'hidden';
+
+export interface JournalPublicComment {
+  id: number;
+  parentId: number | null;
+  authorName: string;
+  authorRole: 'visitor' | 'owner';
+  contentHtml: string;
+  createdAt: string;
+  updatedAt: string;
+  replies: JournalPublicComment[];
+}
+
+export interface JournalAdminComment extends JournalPublicComment {
+  status: JournalAdminCommentStatus;
+}
+
+export interface JournalPublicInteractionsResponse {
+  summary: JournalInteractionSummary;
+  comments: JournalPublicComment[];
+}
+
+export interface JournalAdminInteractionsResponse {
+  summary: JournalInteractionSummary;
+  comments: JournalAdminComment[];
+}
+
+export interface JournalReactionResponse {
+  reactionCount: number;
+  viewerReacted: boolean;
+}
+
+export interface JournalVisitorCommentResponse {
+  comment: JournalPublicComment;
+  summary: JournalInteractionSummary;
+}
+
+export interface JournalAdminCommentMutationResponse {
+  entryId: number;
+  comment: JournalAdminComment;
+  summary: JournalInteractionSummary;
+}
+
+export interface JournalAdminCommentDeletionResponse {
+  entryId: number;
+  summary: JournalInteractionSummary;
 }
 
 export interface ProtectedJournalEntryPreview {

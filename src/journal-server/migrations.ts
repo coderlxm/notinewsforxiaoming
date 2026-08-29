@@ -1127,6 +1127,52 @@ const migrations: JournalMigration[] = [
       `);
     },
   },
+  {
+    version: 20,
+    up(database) {
+      database.exec(`
+        CREATE TABLE journal_entry_reactions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          entry_id INTEGER NOT NULL,
+          client_hash TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          FOREIGN KEY (entry_id) REFERENCES journal_entries(id) ON DELETE CASCADE,
+          UNIQUE (entry_id, client_hash)
+        );
+
+        CREATE TABLE journal_entry_comments (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          entry_id INTEGER NOT NULL,
+          parent_id INTEGER,
+          author_role TEXT NOT NULL
+            CHECK (author_role IN ('visitor', 'owner')),
+          author_name TEXT NOT NULL,
+          content_markdown TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'published'
+            CHECK (status IN ('published', 'hidden')),
+          client_hash TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          UNIQUE (id, entry_id),
+          FOREIGN KEY (entry_id) REFERENCES journal_entries(id) ON DELETE CASCADE,
+          FOREIGN KEY (parent_id, entry_id)
+            REFERENCES journal_entry_comments(id, entry_id) ON DELETE CASCADE,
+          CHECK (
+            (author_role = 'visitor' AND parent_id IS NULL AND client_hash IS NOT NULL)
+            OR
+            (author_role = 'owner' AND parent_id IS NOT NULL AND client_hash IS NULL)
+          )
+        );
+
+        CREATE INDEX idx_journal_entry_comments_public
+        ON journal_entry_comments(entry_id, status, created_at, id);
+
+        CREATE INDEX idx_journal_entry_comments_parent
+        ON journal_entry_comments(parent_id, created_at, id)
+        WHERE parent_id IS NOT NULL;
+      `);
+    },
+  },
 ];
 
 export function runJournalMigrations(database: Database.Database): void {

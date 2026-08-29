@@ -96,6 +96,7 @@ const {
   changePrivatePage,
   handlePublicDetailLoaded,
   handlePublicDetailUnlocked: recordPublicDetailUnlocked,
+  handlePublicInteractionsChange,
   returnFromDetail,
 } = feedOverlay;
 
@@ -221,6 +222,7 @@ onUnmounted(() => {
         @change-page="changePrivatePage"
         @detail-loaded="handlePublicDetailLoaded"
         @detail-unlocked="handlePublicDetailUnlocked"
+        @interactions-change="handlePublicInteractionsChange"
         @return-to-feed="returnFromDetail"
         @open-discovery-entry="openDiscoveryEntry"
         @close-discovery-overlay="closeDiscoveryOverlay"

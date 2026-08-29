@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onActivated, onBeforeUnmount, onMounted, reactive, shallowRef, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { useJournalErrorMessage } from '../../../composables/useJournalErrorMessage';
 import { useJournalApi } from '../../../composables/useJournalApi';
 import { usePrivateAssetTable } from '../../../composables/usePrivateAssetTable';
@@ -12,6 +12,7 @@ import {
   type AssetView,
   type FeedFilters,
   type JournalEntry,
+  type JournalInteractionSummary,
   type JournalPlainChannel,
   type ProtectedJournalEntryPreview,
   type PublicJournalFeedItem,
@@ -55,6 +56,7 @@ const session = useSessionStore();
 const journal = useJournalApi();
 const table = usePrivateAssetTable();
 const router = useRouter();
+const route = useRoute();
 const initialLoadPending = shallowRef(true);
 const listReplacing = shallowRef(false);
 const refreshing = shallowRef(false);
@@ -89,6 +91,8 @@ const overlayVisible = computed(() => isOverlay.value && (
   || props.overlayProtectedEntry !== undefined
   || (props.directOverlay && journal.authenticationState.value === 'authenticated')
 ));
+const overlayFocusComments = computed(() =>
+  props.directOverlay && route.hash === '#comments');
 const feedEntries = computed<readonly JournalEntry[]>(() => journal.entries.value);
 const paginationLoading = computed(() =>
   journal.loadingMore.value || paginationLayoutPending.value,
@@ -344,6 +348,12 @@ async function unlockDetail(password: string): Promise<void> {
   await journal.unlockDetail(password);
 }
 
+function handleInteractionsChange(summary: JournalInteractionSummary): void {
+  const entry = currentOverlayEntry.value;
+  if (!entry || isProtectedJournalEntry(entry)) return;
+  journal.replacePrivateInteractions(entry.id, summary);
+}
+
 function changeAssetView(view: AssetView): void {
   feedLayoutReady.value = false;
   emit('changeAssetView', view);
@@ -525,9 +535,11 @@ async function deleteEntry(entry: JournalEntry): Promise<void> {
     :loading="(directOverlay || overlayProtectedEntry !== undefined) && journal.loading.value"
     :unlocking="journal.unlocking.value"
     :unlock-error="journal.unlockError.value"
+    :focus-comments="overlayFocusComments"
     @close="emit('closeOverlay')"
     @unlock="unlockDetail"
     @select-tag="selectTag"
+    @interactions-change="handleInteractionsChange"
     @edit="editArticle($event.id)"
     @continue-draft="editDraft"
     @save-content="saveContent"

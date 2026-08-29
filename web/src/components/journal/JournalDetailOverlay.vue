@@ -5,6 +5,7 @@ import JournalLoading from '../ui/JournalLoading.vue';
 import type {
   JournalAsset,
   JournalEntry,
+  JournalInteractionSummary,
   JournalPlainChannel,
   ProtectedJournalEntryPreview,
 } from '../../types';
@@ -13,7 +14,7 @@ import { resolveJournalMediaType } from '../../utils/journalMedia';
 import JournalDetailLayout from './JournalDetailLayout.vue';
 import ProtectedEntryUnlock from './ProtectedEntryUnlock.vue';
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   entry?: JournalEntry;
   protectedEntry?: ProtectedJournalEntryPreview;
   mode: 'public' | 'private';
@@ -21,7 +22,10 @@ const props = defineProps<{
   loading?: boolean;
   unlocking?: boolean;
   unlockError?: string | null;
-}>();
+  focusComments?: boolean;
+}>(), {
+  focusComments: false,
+});
 
 const emit = defineEmits<{
   close: [];
@@ -35,6 +39,7 @@ const emit = defineEmits<{
   setChannel: [entry: JournalEntry, channel: JournalPlainChannel];
   setPinned: [entry: JournalEntry, pinned: boolean];
   deleteEntry: [entry: JournalEntry];
+  interactionsChange: [summary: JournalInteractionSummary];
 }>();
 
 const dialog = useTemplateRef<HTMLDialogElement>('dialog');
@@ -209,6 +214,7 @@ function forwardPinned(entry: JournalEntry, pinned: boolean): void {
           :entry="entry"
           :mode="mode"
           :busy="busy"
+          :focus-comments="focusComments"
           @stage-aspect-ratio-change="updateStageAspectRatio"
           @select-tag="emit('selectTag', $event)"
           @edit="emit('edit', $event)"
@@ -219,6 +225,7 @@ function forwardPinned(entry: JournalEntry, pinned: boolean): void {
           @set-channel="forwardChannel"
           @set-pinned="forwardPinned"
           @delete-entry="emit('deleteEntry', $event)"
+          @interactions-change="emit('interactionsChange', $event)"
         />
         <ProtectedEntryUnlock
           v-else-if="protectedEntry"

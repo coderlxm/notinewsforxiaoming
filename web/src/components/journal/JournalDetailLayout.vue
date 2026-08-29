@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, shallowRef, useTemplateRef } from
 import type {
   JournalAsset,
   JournalEntry,
+  JournalInteractionSummary,
   JournalPlainChannel,
 } from '../../types';
 import type { AccessSettingsInput } from './accessSettings';
@@ -11,11 +12,14 @@ import JournalDetailPeek from './JournalDetailPeek.vue';
 import JournalMediaStage from './JournalMediaStage.vue';
 import JournalTextPoster from './JournalTextPoster.vue';
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   entry: JournalEntry;
   mode: 'public' | 'private';
   busy: boolean;
-}>();
+  focusComments?: boolean;
+}>(), {
+  focusComments: false,
+});
 
 const emit = defineEmits<{
   stageAspectRatioChange: [aspectRatio: number | null];
@@ -28,6 +32,7 @@ const emit = defineEmits<{
   setChannel: [entry: JournalEntry, channel: JournalPlainChannel];
   setPinned: [entry: JournalEntry, pinned: boolean];
   deleteEntry: [entry: JournalEntry];
+  interactionsChange: [summary: JournalInteractionSummary];
 }>();
 
 function isVisualAsset(asset: JournalAsset): boolean {
@@ -114,6 +119,7 @@ function forwardPinned(entry: JournalEntry, pinned: boolean): void {
         :has-leading-stage="hasLeadingStage"
         :has-text-poster="hasTextPoster"
         :supplemental-assets="supplementalAssets"
+        :focus-comments="focusComments"
         @select-tag="emit('selectTag', $event)"
         @edit="emit('edit', $event)"
         @continue-draft="emit('continueDraft', $event)"
@@ -123,6 +129,7 @@ function forwardPinned(entry: JournalEntry, pinned: boolean): void {
         @set-channel="forwardChannel"
         @set-pinned="forwardPinned"
         @delete-entry="emit('deleteEntry', $event)"
+        @interactions-change="emit('interactionsChange', $event)"
       />
     </div>
     <Transition name="detail-peek">

@@ -20,6 +20,8 @@ import { JournalContributionService } from './contributionService.js';
 import { openJournalDatabase } from './database.js';
 import { JournalDeletionService } from './deletion.js';
 import { JournalIngestService } from './ingest.js';
+import { JournalCommentNotificationService } from './interactionNotification.js';
+import { JournalInteractionService } from './interactionService.js';
 import { JournalPhotoDriveClient } from './photoDriveClient.js';
 import { JournalPhotoLibraryService } from './photoLibraryService.js';
 import {
@@ -36,6 +38,7 @@ import { registerArticleRoutes } from './routes/articles.js';
 import { registerContributionRoutes } from './routes/contributions.js';
 import { registerFeedRoutes } from './routes/feeds.js';
 import { registerInternalRoutes } from './routes/internal.js';
+import { registerInteractionRoutes } from './routes/interactions.js';
 import { registerMediaRoutes } from './routes/media.js';
 import { registerPhotoRoutes } from './routes/photos.js';
 import { registerPrivateContributionRoutes } from './routes/privateContributions.js';
@@ -123,6 +126,12 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
     previews,
     videoPreviews,
   );
+  const commentNotifications = new JournalCommentNotificationService(
+    config.telegramToken,
+    config.allowedChatId,
+    config.publicBaseUrl,
+  );
+  const interactionService = new JournalInteractionService(repository, commentNotifications);
   await new JournalImagePreviewBackfillService(repository, storage, previews).run();
   await new JournalVideoPreviewBackfillService(repository, storage, videoPreviews).run();
   await new JournalResumePreviewBackfillService(repository, resumePreviews).run();
@@ -170,6 +179,12 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
   });
 
   await registerInternalRoutes(server, { auth, deletionService, ingestService, repository });
+  await registerInteractionRoutes(server, {
+    auth,
+    repository,
+    service: interactionService,
+    visitorSecret: config.cookieSecret,
+  });
   await registerContributionRoutes(server, {
     links: contributionLinks,
     contributions: contributionService,
@@ -177,7 +192,7 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
     storage,
   });
   await registerPublicDiscoveryRoutes(server, auth, repository);
-  await registerPublicFeedRoutes(server, auth, repository);
+  await registerPublicFeedRoutes(server, auth, repository, config.cookieSecret);
   await registerPrivateEntryRoutes(
     server,
     auth,

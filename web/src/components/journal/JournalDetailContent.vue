@@ -8,6 +8,7 @@ import { useSiteProfileStore } from '../../stores/siteProfile';
 import type {
   JournalAsset,
   JournalEntry,
+  JournalInteractionSummary,
   JournalPlainChannel,
 } from '../../types';
 import { formatEntryTime, formatStructuredValue } from '../../utils/formatters';
@@ -16,15 +17,19 @@ import MediaGallery from './MediaGallery.vue';
 import PublishedTimeDialog from './PublishedTimeDialog.vue';
 import AccessSettingsDialog from './AccessSettingsDialog.vue';
 import type { AccessSettingsInput } from './accessSettings';
+import JournalInteractions from '../interaction/JournalInteractions.vue';
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   entry: JournalEntry;
   mode: 'public' | 'private';
   busy: boolean;
   hasLeadingStage: boolean;
   hasTextPoster: boolean;
   supplementalAssets: readonly JournalAsset[];
-}>();
+  focusComments?: boolean;
+}>(), {
+  focusComments: false,
+});
 
 const siteProfile = useSiteProfileStore();
 const { profile } = storeToRefs(siteProfile);
@@ -39,6 +44,7 @@ const emit = defineEmits<{
   setChannel: [entry: JournalEntry, channel: JournalPlainChannel];
   setPinned: [entry: JournalEntry, pinned: boolean];
   deleteEntry: [entry: JournalEntry];
+  interactionsChange: [summary: JournalInteractionSummary];
 }>();
 
 const editing = shallowRef(false);
@@ -62,6 +68,8 @@ const cover = computed(() => isRich.value
   ? props.entry.assets.find((asset) => asset.role === 'cover') ?? null
   : null);
 const canSave = computed(() => draft.value !== props.entry.contentText && !props.busy);
+const showInteractions = computed(() => !(isPrivateMode.value
+  && props.entry.publicationStatus === 'draft'));
 const deletionMessage = computed(() => {
   const subject = isRich.value ? '这篇文章' : '这条记录';
   if (props.entry.assets.length === 0) return `永久删除${subject}？此操作无法撤销。`;
@@ -227,6 +235,15 @@ function saveAccessSettings(settings: AccessSettingsInput): void {
         #{{ tag }}
       </button>
     </div>
+
+    <JournalInteractions
+      v-if="showInteractions"
+      :key="entry.publicId"
+      :entry="entry"
+      :mode="mode"
+      :focus-on-mount="focusComments"
+      @summary-change="emit('interactionsChange', $event)"
+    />
 
     <footer v-if="isPrivateMode && confirmingDeletion" class="detail-content__delete-confirmation" role="alert">
       <p class="detail-content__delete-message">{{ deletionMessage }}</p>

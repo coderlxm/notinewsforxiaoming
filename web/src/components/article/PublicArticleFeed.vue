@@ -3,6 +3,7 @@ import { MasonryGrid } from '@egjs/grid';
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, onUpdated, shallowRef, useTemplateRef } from 'vue';
 import {
   isProtectedJournalEntry,
+  type JournalEntry,
   type PublicJournalFeedItem,
 } from '../../types';
 import ProtectedEntryCard from '../journal/ProtectedEntryCard.vue';
@@ -12,12 +13,15 @@ import JournalArticleFeedPlaceholder from './JournalArticleFeedPlaceholder.vue';
 const props = defineProps<{
   entries: readonly PublicJournalFeedItem[];
   loading: boolean;
+  reactionPendingPublicId?: string | null;
 }>();
 
 const emit = defineEmits<{
   layoutReady: [];
   openEntry: [entry: PublicJournalFeedItem];
   selectTag: [tag: string];
+  toggleReaction: [entry: JournalEntry];
+  openComments: [entry: JournalEntry];
 }>();
 
 const gridElement = useTemplateRef<HTMLDivElement>('grid');
@@ -152,8 +156,11 @@ onBeforeUnmount(() => {
             v-else
             :entry="entry"
             show-year
+            :reaction-pending="props.reactionPendingPublicId === entry.publicId"
             @open-entry="emit('openEntry', $event)"
             @select-tag="emit('selectTag', $event)"
+            @toggle-reaction="emit('toggleReaction', $event)"
+            @open-comments="emit('openComments', $event)"
           />
         </div>
       </div>

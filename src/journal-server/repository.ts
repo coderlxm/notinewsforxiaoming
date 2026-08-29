@@ -11,6 +11,7 @@ import type {
   JournalContributionAssetKind,
   JournalContributionDetail,
   JournalContributionSummary,
+  JournalCommentStatus,
   JournalDeletionResult,
   JournalDiscoveryArchiveMonthResponse,
   JournalDiscoveryArchiveOverview,
@@ -18,6 +19,7 @@ import type {
   JournalDiscoverySearchResponse,
   JournalEntry,
   JournalFeed,
+  JournalInteractionSummary,
   JournalPage,
   JournalPublicationStatus,
   JournalPlainChannel,
@@ -318,6 +320,37 @@ export interface JournalPublishedAccess {
   entry: JournalEntry;
 }
 
+export interface JournalCommentRow {
+  id: number;
+  entryId: number;
+  parentId: number | null;
+  authorRole: 'visitor' | 'owner';
+  authorName: string;
+  contentMarkdown: string;
+  status: JournalCommentStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface JournalCommentContext {
+  entryId: number;
+  parentId: number | null;
+  authorRole: 'visitor' | 'owner';
+  status: JournalCommentStatus;
+}
+
+interface CommentRow {
+  id: number;
+  entry_id: number;
+  parent_id: number | null;
+  author_role: 'visitor' | 'owner';
+  author_name: string;
+  content_markdown: string;
+  status: JournalCommentStatus;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface JournalEntryFeed {
   entries: JournalEntry[];
   nextCursor: string | null;
@@ -487,6 +520,8 @@ function toDiscoveryEntrySummary(
 }
 
 export class JournalRepository {
+  private readonly ownerCommentName = '小明同学';
+
   constructor(private readonly database: Database.Database) {}
 
   findBySource(chatId: string, sourceMessageId: number): JournalEntry | null {
@@ -983,7 +1018,10 @@ export class JournalRepository {
     return access?.visibility === 'public' ? access.entry : null;
   }
 
-  getPublishedAccessByPublicId(publicId: string): JournalPublishedAccess | null {
+  getPublishedAccessByPublicId(
+    publicId: string,
+    viewerClientHash: string | null = null,
+  ): JournalPublishedAccess | null {
     const requested = this.findRowByPublicId(publicId);
     if (!requested) return null;
     const row = this.representativeRow(requested);
@@ -993,7 +1031,167 @@ export class JournalRepository {
       visibility: row.visibility,
       accessPasswordHash: row.access_password_hash,
       accessRevision: row.access_revision,
-      entry: this.toEntry(row),
+      entry: this.toEntry(row, viewerClientHash),
+    };
+  }
+
+  getInteractionSummary(entryId: number, clientHash: string | null = null): JournalInteractionSummary {
+    return this.interactionSummary(entryId, clientHash);
+  }
+
+  addReaction(entryId: number, clientHash: string, createdAt: string): void {
+    this.database.prepare(`
+      INSERT INTO journal_entry_reactions (entry_id, client_hash, created_at)
+      VALUES (?, ?, ?)
+      ON CONFLICT(entry_id, client_hash) DO NOTHING
+    `).run(entryId, clientHash, createdAt);
+  }
+
+  removeReaction(entryId: number, clientHash: string): void {
+    this.database.prepare(`
+      DELETE FROM journal_entry_reactions
+      WHERE entry_id = ? AND client_hash = ?
+    `).run(entryId, clientHash);
+  }
+
+  createVisitorComment(input: {
+    entryId: number;
+    clientHash: string;
+    authorName: string;
+    contentMarkdown: string;
+    createdAt: string;
+  }): JournalCommentRow {
+    const result = this.database.prepare(`
+      INSERT INTO journal_entry_comments (
+        entry_id, parent_id, author_role, author_name, content_markdown,
+        status, client_hash, created_at, updated_at
+      ) VALUES (?, NULL, 'visitor', ?, ?, 'published', ?, ?, ?)
+    `).run(
+      input.entryId,
+      input.authorName,
+      input.contentMarkdown,
+      input.clientHash,
+      input.createdAt,
+      input.createdAt,
+    );
+    return this.getCommentRow(Number(result.lastInsertRowid));
+  }
+
+  createOwnerReply(input: {
+    entryId: number;
+    parentId: number;
+    contentMarkdown: string;
+    createdAt: string;
+  }): JournalCommentRow {
+    const result = this.database.prepare(`
+      INSERT INTO journal_entry_comments (
+        entry_id, parent_id, author_role, author_name, content_markdown,
+        status, client_hash, created_at, updated_at
+      ) VALUES (?, ?, 'owner', ?, ?, 'published', NULL, ?, ?)
+    `).run(
+      input.entryId,
+      input.parentId,
+      this.ownerCommentName,
+      input.contentMarkdown,
+      input.createdAt,
+      input.createdAt,
+    );
+    return this.getCommentRow(Number(result.lastInsertRowid));
+  }
+
+  getPublicCommentRows(entryId: number): JournalCommentRow[] {
+    const rows = this.database.prepare(`
+      SELECT * FROM journal_entry_comments
+      WHERE entry_id = ?
+        AND status = 'published'
+        AND (
+          parent_id IS NULL
+          OR parent_id IN (
+            SELECT id FROM journal_entry_comments
+            WHERE entry_id = ? AND status = 'published' AND parent_id IS NULL
+          )
+        )
+      ORDER BY created_at ASC, id ASC
+    `).all(entryId, entryId) as CommentRow[];
+    return rows.map(row => this.toComment(row));
+  }
+
+  getAdminCommentRows(entryId: number): JournalCommentRow[] {
+    const rows = this.database.prepare(`
+      SELECT * FROM journal_entry_comments
+      WHERE entry_id = ?
+      ORDER BY created_at ASC, id ASC
+    `).all(entryId) as CommentRow[];
+    return rows.map(row => this.toComment(row));
+  }
+
+  getCommentRow(commentId: number): JournalCommentRow {
+    const row = this.database.prepare(
+      'SELECT * FROM journal_entry_comments WHERE id = ?',
+    ).get(commentId) as CommentRow | undefined;
+    if (!row) throw new Error(`Journal comment ${commentId} does not exist.`);
+    return this.toComment(row);
+  }
+
+  getCommentContext(commentId: number): JournalCommentContext | null {
+    const row = this.database.prepare(`
+      SELECT entry_id, parent_id, author_role, status
+      FROM journal_entry_comments
+      WHERE id = ?
+    `).get(commentId) as Pick<CommentRow, 'entry_id' | 'parent_id' | 'author_role' | 'status'> | undefined;
+    return row ? {
+      entryId: row.entry_id,
+      parentId: row.parent_id,
+      authorRole: row.author_role,
+      status: row.status,
+    } : null;
+  }
+
+  updateCommentStatus(commentId: number, status: JournalCommentStatus, updatedAt: string): boolean {
+    const result = this.database.prepare(`
+      UPDATE journal_entry_comments
+      SET status = ?, updated_at = ?
+      WHERE id = ?
+    `).run(status, updatedAt, commentId);
+    return result.changes > 0;
+  }
+
+  deleteComment(commentId: number): boolean {
+    const result = this.database.prepare(
+      'DELETE FROM journal_entry_comments WHERE id = ?',
+    ).run(commentId);
+    return result.changes > 0;
+  }
+
+  private interactionSummary(entryId: number, clientHash: string | null): JournalInteractionSummary {
+    const counts = this.database.prepare(`
+      SELECT
+        (
+          SELECT COUNT(*) FROM journal_entry_reactions
+          WHERE entry_id = ?
+        ) AS reaction_count,
+        (
+          SELECT COUNT(*) FROM journal_entry_comments c
+          WHERE c.entry_id = ?
+            AND c.status = 'published'
+            AND (
+              c.parent_id IS NULL
+              OR EXISTS (
+                SELECT 1 FROM journal_entry_comments p
+                WHERE p.id = c.parent_id AND p.status = 'published'
+              )
+            )
+        ) AS comment_count
+    `).get(entryId, entryId) as { reaction_count: number; comment_count: number };
+    return {
+      reactionCount: counts.reaction_count,
+      commentCount: counts.comment_count,
+      viewerReacted: clientHash !== null
+        && this.database.prepare(`
+          SELECT 1 FROM journal_entry_reactions
+          WHERE entry_id = ? AND client_hash = ?
+          LIMIT 1
+        `).get(entryId, clientHash) !== undefined,
     };
   }
 
@@ -1043,6 +1241,7 @@ export class JournalRepository {
     channel: JournalChannel;
     tag?: string;
     limit: number;
+    visitorClientHash?: string | null;
     canReadProtectedContent: (publicId: string, accessRevision: number) => boolean;
   }): JournalFeed {
     const conditions = [
@@ -1086,7 +1285,7 @@ export class JournalRepository {
       entries: pageRows.map((row) => row.visibility === 'protected'
         && !filters.canReadProtectedContent(row.public_id, row.access_revision)
         ? this.toProtectedPreview(row)
-        : this.toEntry(row)),
+        : this.toEntry(row, filters.visitorClientHash ?? null)),
       nextCursor: hasNext && pageRows.length > 0
         ? encodeCursor(pageRows[pageRows.length - 1] as EntryRow)
         : null,
@@ -2250,7 +2449,7 @@ export class JournalRepository {
     };
   }
 
-  private toEntry(row: EntryRow): JournalEntry {
+  private toEntry(row: EntryRow, viewerClientHash: string | null = null): JournalEntry {
     const assets = this.assetsFor(row);
     const richBody = row.rich_body_json === null
       ? null
@@ -2293,6 +2492,21 @@ export class JournalRepository {
         height: asset.height,
         duration: asset.duration,
       })),
+      interactions: this.interactionSummary(row.id, viewerClientHash),
+    };
+  }
+
+  private toComment(row: CommentRow): JournalCommentRow {
+    return {
+      id: row.id,
+      entryId: row.entry_id,
+      parentId: row.parent_id,
+      authorRole: row.author_role,
+      authorName: row.author_name,
+      contentMarkdown: row.content_markdown,
+      status: row.status,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
     };
   }
 

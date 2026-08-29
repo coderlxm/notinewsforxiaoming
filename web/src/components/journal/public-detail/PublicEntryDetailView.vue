@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, shallowRef } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import ArticleCardContent from '../../article/ArticleCardContent.vue';
 import { useDeferredLoading } from '../../../composables/useDeferredLoading';
 import { useJournalErrorMessage } from '../../../composables/useJournalErrorMessage';
@@ -9,10 +9,12 @@ import { publicFeedPath } from '../../../journalChannels';
 import type {
   JournalChannel,
   JournalEntry,
+  JournalInteractionSummary,
   ProtectedJournalEntryPreview,
 } from '../../../types';
 import JournalLoading from '../../ui/JournalLoading.vue';
 import JournalPullRefresh from '../../ui/JournalPullRefresh.vue';
+import JournalInteractions from '../../interaction/JournalInteractions.vue';
 import EntryCard from '../EntryCard.vue';
 import ProtectedEntryUnlock from '../ProtectedEntryUnlock.vue';
 
@@ -23,10 +25,12 @@ const props = defineProps<{
 const emit = defineEmits<{
   detailLoaded: [entry: JournalEntry];
   detailUnlocked: [entry: JournalEntry];
+  interactionsChange: [publicId: string, summary: JournalInteractionSummary];
   returnToFeed: [];
 }>();
 
 const journal = useJournalApi();
+const route = useRoute();
 const router = useRouter();
 const initialLoadPending = shallowRef(true);
 const refreshing = shallowRef(false);
@@ -114,6 +118,13 @@ function returnFromDetail(): void {
   }
   emit('returnToFeed');
 }
+
+function handleInteractionsChange(summary: JournalInteractionSummary): void {
+  const entry = journal.detail.value;
+  if (!entry) return;
+  journal.replacePublicInteractions(entry.publicId, summary);
+  emit('interactionsChange', entry.publicId, summary);
+}
 </script>
 
 <template>
@@ -159,6 +170,16 @@ function returnFromDetail(): void {
           />
           <div v-else key="reserve" class="feed__reading-reserve" aria-hidden="true"></div>
         </Transition>
+
+        <JournalInteractions
+          v-if="journal.detail.value && !journal.error.value"
+          :key="journal.detail.value.publicId"
+          class="feed__detail-interactions"
+          :entry="journal.detail.value"
+          mode="public"
+          :focus-on-mount="route.hash === '#comments'"
+          @summary-change="handleInteractionsChange"
+        />
       </div>
     </main>
   </JournalPullRefresh>
@@ -195,6 +216,13 @@ function returnFromDetail(): void {
   display: grid;
 }
 
+.feed__detail-interactions {
+  padding: 1.5rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
+}
+
 .feed-stage-enter-active {
   transition: opacity var(--dur-content-enter) var(--ease-card), transform var(--dur-content-enter) var(--ease-card);
 }
@@ -210,5 +238,11 @@ function returnFromDetail(): void {
 
 .feed-stage-leave-to {
   opacity: 0;
+}
+
+@media (max-width: 599px) {
+  .feed__detail-interactions {
+    padding: 1rem;
+  }
 }
 </style>

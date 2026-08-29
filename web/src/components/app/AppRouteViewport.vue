@@ -13,6 +13,7 @@ import type {
   JournalChannel,
   JournalDiscoveryListItem,
   JournalEntry,
+  JournalInteractionSummary,
   ProtectedJournalEntryPreview,
   PublicJournalFeedItem,
 } from '../../types';
@@ -46,6 +47,7 @@ const emit = defineEmits<{
   changePage: [page: number];
   detailLoaded: [entry: JournalEntry];
   detailUnlocked: [entry: JournalEntry];
+  interactionsChange: [publicId: string, summary: JournalInteractionSummary];
   returnToFeed: [];
   openDiscoveryEntry: [entry: JournalDiscoveryListItem];
   closeDiscoveryOverlay: [];
@@ -60,6 +62,13 @@ defineExpose({ scrollContainer });
 
 function forwardDiscoveryTag(channel: JournalChannel, tag: string): void {
   emit('selectDiscoveryTag', channel, tag);
+}
+
+function forwardInteractionsChange(
+  publicId: string,
+  summary: JournalInteractionSummary,
+): void {
+  emit('interactionsChange', publicId, summary);
 }
 </script>
 
@@ -153,6 +162,7 @@ function forwardDiscoveryTag(channel: JournalChannel, tag: string): void {
         :detail-id="route.publicId"
         @detail-loaded="emit('detailLoaded', $event)"
         @detail-unlocked="emit('detailUnlocked', $event)"
+        @interactions-change="forwardInteractionsChange"
         @return-to-feed="emit('returnToFeed')"
       />
       <component

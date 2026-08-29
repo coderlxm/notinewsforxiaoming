@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, shallowRef } from 'vue';
+import { computed, nextTick, onActivated, onMounted, shallowRef } from 'vue';
 import { useRouter } from 'vue-router';
 import { useJournalErrorMessage } from '../../../composables/useJournalErrorMessage';
 import { useJournalApi } from '../../../composables/useJournalApi';
@@ -9,6 +9,7 @@ import {
   isProtectedJournalEntry,
   type JournalChannel,
   type JournalEntry,
+  type JournalInteractionSummary,
   type ProtectedJournalEntryPreview,
   type PublicJournalFeedItem,
 } from '../../../types';
@@ -41,6 +42,7 @@ const refreshing = shallowRef(false);
 const refreshRequestComplete = shallowRef(false);
 const paginationLayoutPending = shallowRef(false);
 const feedLayoutReady = shallowRef(false);
+const overlayFocusComments = shallowRef(false);
 
 const isOverlay = computed(() =>
   props.overlayEntryId !== undefined || props.overlayProtectedEntry !== undefined,
@@ -64,8 +66,14 @@ const overlayVisible = computed(() => isOverlay.value && (
 ));
 const feedEntries = computed<readonly PublicJournalFeedItem[]>(() => {
   const revealedEntries = props.revealedPublicEntries;
-  if (!revealedEntries?.size) return journal.publicEntries.value;
-  return journal.publicEntries.value.map(entry => revealedEntries.get(entry.publicId) ?? entry);
+  const base = journal.publicEntries.value;
+  if (!revealedEntries?.size) return base;
+  return base.map((entry) => {
+    const revealed = revealedEntries.get(entry.publicId);
+    if (!revealed) return entry;
+    if (isProtectedJournalEntry(entry)) return revealed;
+    return entry;
+  });
 });
 const publicChannelTags = computed<readonly string[]>(() => {
   if (siteProfile.profile === null) return [];
@@ -105,9 +113,14 @@ useJournalErrorMessage(journal.error, () =>
 onMounted(async () => {
   try {
     await journal.loadPublic({ channel: props.channel, tag: props.initialTag });
+    journal.mergeRevealedPublicEntries(props.revealedPublicEntries);
   } finally {
     initialLoadPending.value = false;
   }
+});
+
+onActivated(() => {
+  journal.mergeRevealedPublicEntries(props.revealedPublicEntries);
 });
 
 function isArticleEntry(entry: PublicJournalFeedItem): entry is JournalEntry {
@@ -149,7 +162,38 @@ function openEntry(entry: PublicJournalFeedItem): void {
     return;
   }
   journal.selectDetail(entry);
+  overlayFocusComments.value = false;
   emit('openEntry', entry);
+}
+
+function openEntryComments(entry: JournalEntry): void {
+  if (isArticleEntry(entry)) {
+    void router.push({
+      name: 'detail',
+      params: { publicId: entry.publicId },
+      hash: '#comments',
+      state: { journalDetailFromFeed: true },
+    });
+    return;
+  }
+  journal.selectDetail(entry);
+  overlayFocusComments.value = true;
+  emit('openEntry', entry);
+}
+
+async function toggleEntryReaction(entry: JournalEntry): Promise<void> {
+  await journal.togglePublicEntryReaction(entry.publicId);
+}
+
+function handleInteractionsChange(summary: JournalInteractionSummary): void {
+  const entry = currentOverlayEntry.value;
+  if (!entry || isProtectedJournalEntry(entry)) return;
+  journal.replacePublicInteractions(entry.publicId, summary);
+}
+
+function closeOverlay(): void {
+  overlayFocusComments.value = false;
+  emit('closeOverlay');
 }
 
 async function unlockDetail(password: string): Promise<void> {
@@ -161,6 +205,7 @@ async function loadMore(): Promise<void> {
   paginationLayoutPending.value = true;
 
   await journal.loadMorePublic({ channel: props.channel, tag: props.initialTag });
+  journal.mergeRevealedPublicEntries(props.revealedPublicEntries);
 
   if (journal.error.value || feedEntries.value.length === previousEntryCount) {
     paginationLayoutPending.value = false;
@@ -183,6 +228,7 @@ async function refreshFeed(): Promise<void> {
   refreshRequestComplete.value = false;
 
   await journal.loadPublic({ channel: props.channel, tag: props.initialTag });
+  journal.mergeRevealedPublicEntries(props.revealedPublicEntries);
 
   refreshRequestComplete.value = true;
   if (journal.error.value || feedEntries.value.length === 0) {
@@ -233,9 +279,12 @@ async function handleLayoutReady(): Promise<void> {
         :error="journal.error.value"
         :initial-tag="initialTag"
         :mutation-entry-id="journal.mutationEntryId.value"
+        :reaction-pending-public-id="journal.reactionPendingPublicId.value"
         @load="loadMore"
         @layout-ready="handleLayoutReady"
         @open-entry="openEntry"
+        @open-comments="openEntryComments"
+        @toggle-reaction="toggleEntryReaction"
         @select-tag="selectTag"
       />
     </main>
@@ -252,9 +301,11 @@ async function handleLayoutReady(): Promise<void> {
     :loading="overlayProtectedEntry !== undefined && journal.loading.value"
     :unlocking="journal.unlocking.value"
     :unlock-error="journal.unlockError.value"
-    @close="emit('closeOverlay')"
+    :focus-comments="overlayFocusComments"
+    @close="closeOverlay"
     @unlock="unlockDetail"
     @select-tag="selectTag"
+    @interactions-change="handleInteractionsChange"
   />
 </template>
 

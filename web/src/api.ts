@@ -5,6 +5,10 @@ import type {
   AdminContributionListResponse,
   ChannelTags,
   FeedFilters,
+  JournalAdminCommentDeletionResponse,
+  JournalAdminCommentMutationResponse,
+  JournalAdminCommentStatus,
+  JournalAdminInteractionsResponse,
   JournalApiError,
   JournalArticleAssetResponse,
   JournalDeletionResult,
@@ -16,10 +20,13 @@ import type {
   JournalPage,
   JournalChannel,
   JournalPlainChannel,
+  JournalPublicInteractionsResponse,
   JournalPublicResume,
+  JournalReactionResponse,
   JournalResumeAccessInput,
   JournalResumeAccessUpdateResponse,
   JournalAdminResumeSummary,
+  JournalVisitorCommentResponse,
   PublicJournalEntryResponse,
   PublicJournalFeed,
   JournalRichDocument,
@@ -127,6 +134,17 @@ function appendFilterParams(params: URLSearchParams, filters: FeedFilters): void
   if (filters.to) params.set('to', filters.to);
 }
 
+function withVisitorId(init: RequestInit, visitorId: string | null | undefined): RequestInit {
+  if (!visitorId) return init;
+  return {
+    ...init,
+    headers: {
+      ...(init.headers as Record<string, string> | undefined),
+      'X-Journal-Visitor-Id': visitorId,
+    },
+  };
+}
+
 export function requestTagSuggestions(
   input: JournalTagSuggestionRequest,
 ): Promise<JournalTagSuggestionResponse> {
@@ -149,13 +167,17 @@ export function fetchPublicFeed(options: {
   channel: JournalChannel;
   cursor?: string;
   tag?: string;
+  visitorId?: string | null;
 }): Promise<PublicJournalFeed> {
   const params = new URLSearchParams();
   params.set('channel', options.channel);
   if (options.cursor) params.set('cursor', options.cursor);
   if (options.tag) params.set('tag', options.tag);
   const query = params.size ? `?${params.toString()}` : '';
-  return requestJson<PublicJournalFeed>(`/api/feed${query}`);
+  return requestJson<PublicJournalFeed>(
+    `/api/feed${query}`,
+    withVisitorId({}, options.visitorId),
+  );
 }
 
 export function fetchPhotoLibrary(): Promise<PhotoLibraryOverview> {
@@ -168,8 +190,83 @@ export function fetchPhotoAlbum(albumId: string): Promise<PhotoAlbumDetail> {
   );
 }
 
-export function fetchPublicEntry(publicId: string): Promise<PublicJournalEntryResponse> {
-  return requestJson<PublicJournalEntryResponse>(`/api/entries/${encodeURIComponent(publicId)}`);
+export function fetchPublicEntry(
+  publicId: string,
+  visitorId?: string | null,
+): Promise<PublicJournalEntryResponse> {
+  return requestJson<PublicJournalEntryResponse>(
+    `/api/entries/${encodeURIComponent(publicId)}`,
+    withVisitorId({}, visitorId),
+  );
+}
+
+export function fetchEntryInteractions(
+  publicId: string,
+  visitorId?: string | null,
+): Promise<JournalPublicInteractionsResponse> {
+  return requestJson<JournalPublicInteractionsResponse>(
+    `/api/entries/${encodeURIComponent(publicId)}/interactions`,
+    withVisitorId({}, visitorId),
+  );
+}
+
+export function setEntryReaction(
+  publicId: string,
+  visitorId: string | null,
+  reacted: boolean,
+): Promise<JournalReactionResponse> {
+  return requestJson<JournalReactionResponse>(
+    `/api/entries/${encodeURIComponent(publicId)}/reaction`,
+    withVisitorId({ method: reacted ? 'PUT' : 'DELETE' }, visitorId),
+  );
+}
+
+export function createEntryComment(
+  publicId: string,
+  visitorId: string | null,
+  input: { authorName: string; content: string; website: string },
+): Promise<JournalVisitorCommentResponse> {
+  return requestJson<JournalVisitorCommentResponse>(
+    `/api/entries/${encodeURIComponent(publicId)}/comments`,
+    withVisitorId(jsonRequest('POST', input), visitorId),
+  );
+}
+
+export function fetchAdminEntryInteractions(
+  entryId: number,
+): Promise<JournalAdminInteractionsResponse> {
+  return requestJson<JournalAdminInteractionsResponse>(
+    `/api/me/entries/${entryId}/interactions`,
+  );
+}
+
+export function createOwnerCommentReply(
+  entryId: number,
+  input: { parentId: number; content: string },
+): Promise<JournalAdminCommentMutationResponse> {
+  return requestJson<JournalAdminCommentMutationResponse>(
+    `/api/me/entries/${entryId}/comments`,
+    jsonRequest('POST', input),
+  );
+}
+
+export function updateAdminCommentStatus(
+  commentId: number,
+  status: JournalAdminCommentStatus,
+): Promise<JournalAdminCommentMutationResponse> {
+  return requestJson<JournalAdminCommentMutationResponse>(
+    `/api/me/comments/${commentId}/status`,
+    jsonRequest('PATCH', { status }),
+  );
+}
+
+export function deleteAdminComment(
+  commentId: number,
+): Promise<JournalAdminCommentDeletionResponse> {
+  return requestJson<JournalAdminCommentDeletionResponse>(
+    `/api/me/comments/${commentId}`,
+    { method: 'DELETE' },
+  );
 }
 
 export function fetchPublicDiscoverySearch(options: {
@@ -200,10 +297,14 @@ export function fetchPublicDiscoveryArchiveMonth(options: {
   );
 }
 
-export function unlockPublicEntry(publicId: string, password: string): Promise<JournalEntry> {
+export function unlockPublicEntry(
+  publicId: string,
+  password: string,
+  visitorId?: string | null,
+): Promise<JournalEntry> {
   return requestJson<JournalEntry>(
     `/api/entries/${encodeURIComponent(publicId)}/unlock`,
-    jsonRequest('POST', { password }),
+    withVisitorId(jsonRequest('POST', { password }), visitorId),
   );
 }
 
