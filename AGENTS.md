@@ -194,7 +194,7 @@ NotiNewsForXiaoming 的现有发布路径是：
 - 不引入与当前业务无关的抽象。
 - 不把一次排查中的临时方案沉淀为长期代码。
 - 默认严禁任何兜底、重试、fallback；如果确实需要，必须先得到用户明确同意。
-- 除非watch符合官方的使用规范并且会带来明显收益，否则严禁使用 `watch`。
+- 除非watch符合官方的使用规范并且会带来明显收益，否则不得使用 `watch`或者`watchEffect`。
 - 任何情况下都严禁使用 `requestAnimationFrame`、`cancelAnimationFrame` 或任何 RAF 别名。
 
 ## Git 提交格式
