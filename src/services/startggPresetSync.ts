@@ -41,11 +41,12 @@ import {
 import {
   deactivateStartggWatchEventBySlug,
   deleteExpiredStartggInterestState,
-  findStartggVideogamePreference,
+  followStartggVideogame,
   hasStartggEventInterestOverride,
+  isStartggEventDismissed,
+  isStartggVideogameFollowed,
   listStartggPendingEventsNeedingPrompt,
   markStartggPendingEventPrompted,
-  setStartggVideogamePreference,
   updateStartggWatchEventVideogame,
   upsertStartggPendingEvent,
 } from './startggInterestRepository.js';
@@ -68,7 +69,11 @@ export type StartggGoResult =
   | {
       status: 'interest_pending';
       syncedPlayers: number;
-      pendingEvents: number;
+      pendingProjects: number;
+    }
+  | {
+      status: 'interest_dismissed';
+      syncedPlayers: number;
     }
   | {
       status: 'started';
@@ -187,10 +192,11 @@ async function filterDiscoveredEventsByInterest(
   bot: Telegraf | undefined,
   events: StartggDiscoveredEvent[],
   players: StartggWatchPlayer[],
-): Promise<StartggDiscoveredEvent[]> {
+): Promise<{ allowedEvents: StartggDiscoveredEvent[]; pendingProjects: number }> {
   deleteExpiredStartggInterestState();
   const playerNames = new Map(players.map((player) => [player.id, player.player_name]));
-  const allowed: StartggDiscoveredEvent[] = [];
+  const allowedEvents: StartggDiscoveredEvent[] = [];
+  const pendingVideogameIds = new Set<number>();
 
   for (const event of events) {
     updateStartggWatchEventVideogame(
@@ -198,13 +204,12 @@ async function filterDiscoveredEventsByInterest(
       event.videogameId,
       event.videogameName,
     );
-    const preference = findStartggVideogamePreference(event.videogameId);
-    if (preference === 'follow' || hasStartggEventInterestOverride(event.eventSlug)) {
-      allowed.push(event);
+    if (isStartggVideogameFollowed(event.videogameId) || hasStartggEventInterestOverride(event.eventSlug)) {
+      allowedEvents.push(event);
       continue;
     }
     deactivateStartggWatchEventBySlug(event.eventSlug);
-    if (preference === 'ignore') continue;
+    if (isStartggEventDismissed(event.eventSlug)) continue;
 
     upsertStartggPendingEvent({
       eventSlug: event.eventSlug,
@@ -221,6 +226,7 @@ async function filterDiscoveredEventsByInterest(
         return name;
       }),
     });
+    pendingVideogameIds.add(event.videogameId);
   }
 
   const pendingPrompts = listStartggPendingEventsNeedingPrompt();
@@ -243,7 +249,10 @@ async function filterDiscoveredEventsByInterest(
     markStartggPendingEventPrompted(pending.id, message.message_id);
   }
 
-  return allowed;
+  return {
+    allowedEvents,
+    pendingProjects: pendingVideogameIds.size,
+  };
 }
 
 export async function syncStartggPresetPlayers(): Promise<number> {
@@ -312,7 +321,7 @@ export async function runStartggWatchNow(bot?: Telegraf): Promise<{
   await syncStartggPresetPlayers();
   const players = listEnabledStartggWatchPlayers();
   const discoveredEvents = await discoverStartggActiveEventsForPlayers(players);
-  const allowedEvents = await filterDiscoveredEventsByInterest(bot, discoveredEvents, players);
+  const { allowedEvents } = await filterDiscoveredEventsByInterest(bot, discoveredEvents, players);
   syncAutoDiscoveredStartggWatchEvents(allowedEvents.map(toWatchEventInput));
   await syncFeaturedEntrantsForActiveEvents();
   const watchSummary = await runStartggWatchOnce(bot);
@@ -377,12 +386,18 @@ export async function runStartggGo(bot: Telegraf | undefined, keyword: string): 
   const candidates = groupDiscoveredEventsByTournament(events);
   const trimmedKeyword = keyword.trim();
   if (!trimmedKeyword) {
-    const allowedEvents = await filterDiscoveredEventsByInterest(bot, events, players);
+    const { allowedEvents, pendingProjects } = await filterDiscoveredEventsByInterest(bot, events, players);
     if (allowedEvents.length === 0) {
+      if (pendingProjects === 0) {
+        return {
+          status: 'interest_dismissed',
+          syncedPlayers,
+        };
+      }
       return {
         status: 'interest_pending',
         syncedPlayers,
-        pendingEvents: events.length,
+        pendingProjects,
       };
     }
     replaceActiveStartggWatchEvents(allowedEvents.map(toWatchEventInput), 'auto');
@@ -427,7 +442,7 @@ export async function runStartggGo(bot: Telegraf | undefined, keyword: string): 
 
   const matchedTournament = matchedCandidates[0]!;
   for (const event of matchedTournament.events) {
-    setStartggVideogamePreference(event.videogameId, event.videogameName, 'follow');
+    followStartggVideogame(event.videogameId, event.videogameName);
   }
   replaceActiveStartggWatchEvents(matchedTournament.events.map(toWatchEventInput), 'manual');
   await syncFeaturedEntrantsForActiveEvents();

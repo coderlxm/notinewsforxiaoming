@@ -368,6 +368,36 @@ const MIGRATIONS: DbMigration[] = [
       }
     },
   },
+  {
+    version: 20,
+    up(db) {
+      db.exec(`
+        CREATE TABLE startgg_videogame_preferences_next (
+          videogame_id INTEGER PRIMARY KEY,
+          videogame_name TEXT NOT NULL,
+          preference TEXT NOT NULL CHECK (preference = 'follow'),
+          updated_at TEXT NOT NULL
+        );
+
+        INSERT INTO startgg_videogame_preferences_next (
+          videogame_id, videogame_name, preference, updated_at
+        )
+        SELECT videogame_id, videogame_name, preference, updated_at
+        FROM startgg_videogame_preferences
+        WHERE preference = 'follow';
+
+        DROP TABLE startgg_videogame_preferences;
+        ALTER TABLE startgg_videogame_preferences_next
+          RENAME TO startgg_videogame_preferences;
+
+        CREATE TABLE IF NOT EXISTS startgg_event_interest_dismissals (
+          event_slug TEXT PRIMARY KEY,
+          tournament_end_at TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
+      `);
+    },
+  },
 ];
 
 export function runDbMigrations(db: Database.Database): void {

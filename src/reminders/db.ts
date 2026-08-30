@@ -253,7 +253,7 @@ export function getDb(): Database.Database {
       CREATE TABLE IF NOT EXISTS startgg_videogame_preferences (
         videogame_id INTEGER PRIMARY KEY,
         videogame_name TEXT NOT NULL,
-        preference TEXT NOT NULL CHECK (preference IN ('follow', 'ignore')),
+        preference TEXT NOT NULL CHECK (preference = 'follow'),
         updated_at TEXT NOT NULL
       );
 
@@ -272,6 +272,12 @@ export function getDb(): Database.Database {
       );
 
       CREATE TABLE IF NOT EXISTS startgg_event_interest_overrides (
+        event_slug TEXT PRIMARY KEY,
+        tournament_end_at TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS startgg_event_interest_dismissals (
         event_slug TEXT PRIMARY KEY,
         tournament_end_at TEXT NOT NULL,
         created_at TEXT NOT NULL

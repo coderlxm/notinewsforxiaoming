@@ -1,7 +1,5 @@
 import { getDb } from '../reminders/db.js';
 
-export type StartggVideogamePreference = 'follow' | 'ignore';
-
 export interface StartggPendingEvent {
   id: number;
   event_slug: string;
@@ -16,16 +14,14 @@ export interface StartggPendingEvent {
   updated_at: string;
 }
 
-export function findStartggVideogamePreference(
-  videogameId: number,
-): StartggVideogamePreference | null {
+export function isStartggVideogameFollowed(videogameId: number): boolean {
   const row = getDb().prepare(`
-    SELECT preference
+    SELECT 1
     FROM startgg_videogame_preferences
-    WHERE videogame_id = ?
+    WHERE videogame_id = ? AND preference = 'follow'
     LIMIT 1
-  `).get(videogameId) as { preference: StartggVideogamePreference } | undefined;
-  return row?.preference ?? null;
+  `).get(videogameId);
+  return Boolean(row);
 }
 
 export function updateStartggWatchEventVideogame(
@@ -40,21 +36,19 @@ export function updateStartggWatchEventVideogame(
   `).run(videogameId, videogameName, new Date().toISOString(), eventSlug);
 }
 
-export function setStartggVideogamePreference(
+export function followStartggVideogame(
   videogameId: number,
   videogameName: string,
-  preference: StartggVideogamePreference,
 ): void {
   getDb().prepare(`
     INSERT INTO startgg_videogame_preferences (
       videogame_id, videogame_name, preference, updated_at
     )
-    VALUES (?, ?, ?, ?)
+    VALUES (?, ?, 'follow', ?)
     ON CONFLICT(videogame_id) DO UPDATE SET
       videogame_name = excluded.videogame_name,
-      preference = excluded.preference,
       updated_at = excluded.updated_at
-  `).run(videogameId, videogameName, preference, new Date().toISOString());
+  `).run(videogameId, videogameName, new Date().toISOString());
 }
 
 export function hasStartggEventInterestOverride(eventSlug: string): boolean {
@@ -72,6 +66,26 @@ export function addStartggEventInterestOverride(
 ): void {
   getDb().prepare(`
     INSERT INTO startgg_event_interest_overrides (
+      event_slug, tournament_end_at, created_at
+    )
+    VALUES (?, ?, ?)
+    ON CONFLICT(event_slug) DO UPDATE SET
+      tournament_end_at = excluded.tournament_end_at
+  `).run(eventSlug, tournamentEndAt, new Date().toISOString());
+}
+
+export function isStartggEventDismissed(eventSlug: string): boolean {
+  return Boolean(getDb().prepare(`
+    SELECT 1
+    FROM startgg_event_interest_dismissals
+    WHERE event_slug = ? AND tournament_end_at > ?
+    LIMIT 1
+  `).get(eventSlug, new Date().toISOString()));
+}
+
+export function dismissStartggEvent(eventSlug: string, tournamentEndAt: string): void {
+  getDb().prepare(`
+    INSERT INTO startgg_event_interest_dismissals (
       event_slug, tournament_end_at, created_at
     )
     VALUES (?, ?, ?)
@@ -191,16 +205,12 @@ export function deleteExpiredStartggInterestState(): void {
       DELETE FROM startgg_event_interest_overrides
       WHERE tournament_end_at <= ?
     `).run(now);
+    db.prepare(`
+      DELETE FROM startgg_event_interest_dismissals
+      WHERE tournament_end_at <= ?
+    `).run(now);
   });
   clear();
-}
-
-export function deactivateStartggWatchEventsByVideogame(videogameId: number): void {
-  getDb().prepare(`
-    UPDATE startgg_watch_events
-    SET active = 0, updated_at = ?
-    WHERE videogame_id = ?
-  `).run(new Date().toISOString(), videogameId);
 }
 
 export function deactivateStartggWatchEventBySlug(eventSlug: string): void {

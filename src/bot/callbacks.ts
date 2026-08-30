@@ -110,7 +110,7 @@ export function parseStartggSeedsCallbackData(data: string | undefined): Startgg
 }
 
 export interface StartggInterestCallback {
-  action: 'follow' | 'event' | 'ignore';
+  action: 'follow' | 'event' | 'dismiss';
   pendingEventId: number;
 }
 
@@ -121,7 +121,7 @@ export function parseStartggInterestCallbackData(
   const parts = data.split(':');
   if (parts.length !== 3 || parts[0] !== 'sginterest') return null;
   const action = parts[1];
-  if (action !== 'follow' && action !== 'event' && action !== 'ignore') return null;
+  if (action !== 'follow' && action !== 'event' && action !== 'dismiss') return null;
   const pendingEventId = Number(parts[2]);
   if (!Number.isInteger(pendingEventId) || pendingEventId <= 0) return null;
   return { action, pendingEventId };

@@ -662,10 +662,10 @@ export function buildStartggInterestPromptButtons(
   return {
     reply_markup: {
       inline_keyboard: [
-        [{ text: '关注这个项目', callback_data: `sginterest:follow:${pendingEventId}` }],
+        [{ text: '长期关注该游戏', callback_data: `sginterest:follow:${pendingEventId}` }],
         [
           { text: '仅关注本届', callback_data: `sginterest:event:${pendingEventId}` },
-          { text: '忽略这个项目', callback_data: `sginterest:ignore:${pendingEventId}` },
+          { text: '不关注本届', callback_data: `sginterest:dismiss:${pendingEventId}` },
         ],
       ],
     },
