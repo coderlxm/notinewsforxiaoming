@@ -16,6 +16,11 @@ const scoreThemeClass = computed(() => {
   if (props.game.rating >= 8.0) return 'score-badge--great';
   return 'score-badge--good';
 });
+
+const displayDate = computed(() => {
+  if (!props.game.completedAt) return '';
+  return props.game.completedAt.replace(/-/g, '.');
+});
 </script>
 
 <template>
@@ -85,8 +90,8 @@ const scoreThemeClass = computed(() => {
       </p>
 
       <div class="game-card__footer">
-        <span class="game-card__genre">{{ game.genre[0] }}</span>
-        <span v-if="game.completedAt" class="game-card__date">{{ game.completedAt }}</span>
+        <span class="game-card__genre" :title="game.genre[0]">{{ game.genre[0] }}</span>
+        <span v-if="displayDate" class="game-card__date">{{ displayDate }}</span>
       </div>
     </div>
   </article>
@@ -293,14 +298,44 @@ const scoreThemeClass = computed(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 0.35rem;
   margin-top: 0.4rem;
   font-size: 0.72rem;
   color: rgba(255, 255, 255, 0.4);
+  white-space: nowrap;
 }
 
 .game-card__genre {
   padding: 0.15rem 0.4rem;
   background: rgba(255, 255, 255, 0.05);
   border-radius: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 55%;
+  flex-shrink: 1;
+}
+
+.game-card__date {
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.68rem;
+  letter-spacing: -0.01em;
+}
+
+@media (max-width: 540px) {
+  .game-card__info {
+    padding: 0.65rem 0.75rem;
+  }
+  .game-card__title {
+    font-size: 0.88rem;
+  }
+  .game-card__original {
+    font-size: 0.7rem;
+  }
+  .game-card__footer {
+    font-size: 0.68rem;
+  }
 }
 </style>

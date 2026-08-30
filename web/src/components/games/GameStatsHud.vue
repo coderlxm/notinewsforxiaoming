@@ -64,31 +64,13 @@ const platinumRate = computed(() => {
         <div class="stats-hud__label">生涯平均评分</div>
       </div>
     </div>
-
-    <div class="stats-hud__card stats-hud__card--platforms">
-      <div class="stats-hud__platforms">
-        <div class="platform-tag platform-tag--ps5">
-          <span class="platform-tag__name">PS5</span>
-          <span class="platform-tag__count">{{ stats.platformCounts.PS5 }}</span>
-        </div>
-        <div class="platform-tag platform-tag--pc">
-          <span class="platform-tag__name">Steam</span>
-          <span class="platform-tag__count">{{ stats.platformCounts.PC }}</span>
-        </div>
-        <div class="platform-tag platform-tag--switch">
-          <span class="platform-tag__name">Switch</span>
-          <span class="platform-tag__count">{{ stats.platformCounts.Switch }}</span>
-        </div>
-      </div>
-      <div class="stats-hud__label stats-hud__label--right">主要阵地</div>
-    </div>
   </section>
 </template>
 
 <style scoped>
 .stats-hud {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: clamp(0.75rem, 1.2vw, 1.25rem);
   margin-bottom: clamp(1.5rem, 2vw, 2rem);
 }
@@ -176,54 +158,47 @@ const platinumRate = computed(() => {
   font-weight: 500;
 }
 
-.stats-hud__card--platforms {
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  gap: 0.5rem;
+@media (max-width: 960px) and (min-width: 681px) {
+  .stats-hud {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
-.stats-hud__platforms {
-  display: flex;
-  gap: 0.5rem;
-  width: 100%;
-}
+@media (max-width: 680px) {
+  .stats-hud {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.6rem;
+    margin-bottom: 1.25rem;
+  }
 
-.platform-tag {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.25rem 0.5rem;
-  border-radius: 6px;
-  font-size: 0.75rem;
-  font-weight: 600;
-}
+  .stats-hud__card {
+    padding: 0.75rem 0.85rem;
+    gap: 0.65rem;
+    border-radius: 12px;
+  }
 
-.platform-tag--ps5 {
-  background: rgba(0, 112, 209, 0.2);
-  color: #60a5fa;
-  border: 1px solid rgba(0, 112, 209, 0.4);
-}
+  .stats-hud__icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+  }
 
-.platform-tag--pc {
-  background: rgba(23, 26, 33, 0.8);
-  color: #cbd5e1;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-}
+  .stats-hud__icon svg {
+    width: 18px;
+    height: 18px;
+  }
 
-.platform-tag--switch {
-  background: rgba(230, 0, 18, 0.18);
-  color: #f87171;
-  border: 1px solid rgba(230, 0, 18, 0.35);
-}
+  .stats-hud__value {
+    font-size: 1.25rem;
+  }
 
-.platform-tag__count {
-  font-family: ui-monospace, SFMono-Regular, monospace;
-  font-size: 0.8rem;
-  opacity: 0.9;
-}
+  .stats-hud__sub {
+    font-size: 0.72rem;
+  }
 
-.stats-hud__label--right {
-  margin-top: 0;
+  .stats-hud__label {
+    font-size: 0.68rem;
+    margin-top: 0.15rem;
+  }
 }
 </style>

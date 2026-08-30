@@ -151,32 +151,33 @@ onBeforeUnmount(() => {
 
 <template>
   <main class="game-library">
-    <div class="game-library__container">
-      <JournalLoading
-        v-if="!games && !loadError"
-        variant="canvas"
-        label="正在整理游戏成就…"
+    <JournalLoading
+      v-if="!games && !loadError"
+      variant="canvas"
+      label="正在整理游戏成就…"
+    />
+
+    <section v-else-if="loadError && !games" class="game-library__state" role="alert">
+      <h1>游戏成就墙没有加载完成</h1>
+      <p>{{ loadError }}</p>
+    </section>
+
+    <template v-else>
+      <!-- 1. Hero 殿堂精选 / GOTY Showcase (Full-Bleed 100% 宽幅海报) -->
+      <GameHeroBillboard
+        :games="loadedGames"
+        @select-game="handleSelectGame"
       />
 
-      <section v-else-if="loadError && !games" class="game-library__state" role="alert">
-        <h1>游戏成就墙没有加载完成</h1>
-        <p>{{ loadError }}</p>
-      </section>
-
-      <template v-else>
-        <!-- 1. Hero 殿堂精选 / GOTY Showcase -->
-        <GameHeroBillboard
-          :games="loadedGames"
-          @select-game="handleSelectGame"
-        />
-
-        <!-- 2. 生涯统计 HUD (XiaoHeiHe / PSN style) -->
+      <!-- 2. 下方流式内容区 (满宽自适应网格) -->
+      <div class="game-library__content">
+        <!-- 生涯统计 HUD (XiaoHeiHe / PSN style) -->
         <GameStatsHud
           :stats="stats"
           :games="loadedGames"
         />
 
-        <!-- 3. 筛选与操作栏 (Filter & Quick Add) -->
+        <!-- 筛选与操作栏 (Filter & Quick Add) -->
         <GameFilterToolbar
           v-model:selected-status="selectedStatus"
           v-model:selected-platform="selectedPlatform"
@@ -186,15 +187,15 @@ onBeforeUnmount(() => {
           @open-quick-add="openCreateModal"
         />
 
-        <!-- 4. 游戏成就画廊 Grid -->
+        <!-- 游戏成就画廊 Grid -->
         <GameCardGrid
           :games="filteredGames"
           @select-game="handleSelectGame"
         />
-      </template>
-    </div>
+      </div>
+    </template>
 
-    <!-- 5. 沉浸式游戏档案详情弹层 (IGN Style Verdict) -->
+    <!-- 3. 沉浸式游戏档案详情弹层 (IGN Style Verdict) -->
     <GameDetailModal
       v-if="activeDetailGame"
       :game="activeDetailGame"
@@ -203,7 +204,7 @@ onBeforeUnmount(() => {
       @edit="openEditModal"
     />
 
-    <!-- 6. 快捷录入与编辑弹层 -->
+    <!-- 4. 快捷录入与编辑弹层 -->
     <GameQuickAddModal
       v-if="isAddModalOpen"
       :key="editingGame?.id ?? 'create'"
@@ -220,6 +221,7 @@ onBeforeUnmount(() => {
   --game-canvas: #090a0f;
   --game-surface: #10141d;
   --game-border: rgba(255, 255, 255, 0.08);
+  --game-edge: clamp(1rem, 2.5vw, 3rem);
 
   width: 100%;
   min-height: 100%;
@@ -228,10 +230,10 @@ onBeforeUnmount(() => {
   padding-bottom: 4rem;
 }
 
-.game-library__container {
-  width: min(100% - 2rem, 1380px);
-  margin: 0 auto;
-  padding-top: clamp(1rem, 2vw, 1.75rem);
+.game-library__content {
+  width: 100%;
+  padding: 0 var(--game-edge);
+  box-sizing: border-box;
 }
 
 .game-library__state {

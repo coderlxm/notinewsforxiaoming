@@ -86,10 +86,10 @@ onBeforeUnmount(stopTimer);
       <!-- Badges Row -->
       <div class="game-hero__badges">
         <span v-if="activeGame.isGoty" class="badge badge--goty">
-          ★ 殿堂神作 / GOTY
+          ★ 殿堂神作
         </span>
         <span v-if="activeGame.platinumTrophy" class="badge badge--platinum">
-          🏆 白金 100% 全成就
+          🏆 白金 100%
         </span>
         <span v-else-if="activeGame.status === 'completed' || activeGame.status === 'mastered'" class="badge badge--completed">
           ✓ 已通关 · {{ activeGame.playtimeHours }}h
@@ -186,14 +186,14 @@ onBeforeUnmount(stopTimer);
 .game-hero {
   position: relative;
   width: 100%;
-  min-height: clamp(380px, 48vh, 520px);
+  min-height: clamp(380px, 56vh, 560px);
   display: flex;
   align-items: flex-end;
-  border-radius: clamp(12px, 1.6vw, 20px);
+  border-radius: 0;
   overflow: hidden;
   margin-bottom: clamp(1.5rem, 2.5vw, 2.5rem);
-  box-shadow: 0 20px 50px -15px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.08);
   background: #090a0f;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .game-hero__backdrop {
@@ -224,9 +224,9 @@ onBeforeUnmount(stopTimer);
 .game-hero__gradient--bottom {
   background: linear-gradient(
     to top,
-    #0b0d13 0%,
-    rgba(11, 13, 19, 0.88) 35%,
-    rgba(11, 13, 19, 0.3) 70%,
+    #090a0f 0%,
+    rgba(9, 10, 15, 0.92) 28%,
+    rgba(9, 10, 15, 0.35) 65%,
     transparent 100%
   );
 }
@@ -234,8 +234,8 @@ onBeforeUnmount(stopTimer);
 .game-hero__gradient--left {
   background: linear-gradient(
     to right,
-    rgba(11, 13, 19, 0.95) 0%,
-    rgba(11, 13, 19, 0.7) 40%,
+    rgba(9, 10, 15, 0.95) 0%,
+    rgba(9, 10, 15, 0.7) 40%,
     transparent 100%
   );
 }
@@ -243,7 +243,7 @@ onBeforeUnmount(stopTimer);
 .game-hero__gradient--radial {
   background: radial-gradient(
     circle at 20% 80%,
-    rgba(11, 13, 19, 0.8) 0%,
+    rgba(9, 10, 15, 0.8) 0%,
     transparent 60%
   );
 }
@@ -251,8 +251,8 @@ onBeforeUnmount(stopTimer);
 .game-hero__content {
   position: relative;
   z-index: 2;
-  padding: clamp(1.5rem, 3vw, 2.75rem);
-  max-width: min(850px, 90%);
+  padding: clamp(1.5rem, 3vw, 3rem) clamp(1rem, 2.5vw, 3rem);
+  max-width: min(900px, 90%);
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
@@ -260,19 +260,32 @@ onBeforeUnmount(stopTimer);
 
 .game-hero__badges {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.45rem;
+  max-width: 100%;
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+
+.game-hero__badges::-webkit-scrollbar {
+  display: none;
 }
 
 .badge {
   display: inline-flex;
   align-items: center;
-  padding: 0.25rem 0.65rem;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 0.22rem 0.6rem;
   border-radius: 6px;
   font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.02em;
+  white-space: nowrap;
+  flex-shrink: 0;
   backdrop-filter: blur(12px);
 }
 
@@ -412,8 +425,8 @@ onBeforeUnmount(stopTimer);
 
 .game-hero__controls {
   position: absolute;
-  right: clamp(1.5rem, 3vw, 2.75rem);
-  bottom: clamp(1.5rem, 3vw, 2.75rem);
+  right: clamp(1rem, 2.5vw, 3rem);
+  bottom: clamp(1.5rem, 3vw, 3rem);
   z-index: 3;
   display: flex;
   align-items: center;

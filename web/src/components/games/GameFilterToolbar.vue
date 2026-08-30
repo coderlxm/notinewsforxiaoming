@@ -65,31 +65,33 @@ const PLATFORM_OPTIONS: Array<{ label: string; value: GamePlatform | 'all' }> = 
 
     <!-- Right Controls: Search, Sort & Quick Add -->
     <div class="filter-toolbar__right">
-      <!-- Search Input -->
-      <div class="search-box">
-        <svg viewBox="0 0 20 20" fill="currentColor" class="search-box__icon">
-          <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
-        </svg>
-        <input
-          type="text"
-          :value="searchQuery"
-          placeholder="搜索游戏名称、开发商..."
-          class="search-box__input"
-          @input="emit('update:searchQuery', ($event.target as HTMLInputElement).value)"
-        />
-      </div>
+      <div class="filter-toolbar__controls-row">
+        <!-- Search Input -->
+        <div class="search-box">
+          <svg viewBox="0 0 20 20" fill="currentColor" class="search-box__icon">
+            <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
+          </svg>
+          <input
+            type="text"
+            :value="searchQuery"
+            placeholder="搜索游戏名称、开发商..."
+            class="search-box__input"
+            @input="emit('update:searchQuery', ($event.target as HTMLInputElement).value)"
+          />
+        </div>
 
-      <!-- Sort Selector -->
-      <div class="sort-selector">
-        <select
-          :value="sortBy"
-          class="sort-selector__select"
-          @change="emit('update:sortBy', ($event.target as HTMLSelectElement).value as any)"
-        >
-          <option value="date">按通关时间排序</option>
-          <option value="rating">按个人评分排序</option>
-          <option value="hours">按游玩时长排序</option>
-        </select>
+        <!-- Sort Selector -->
+        <div class="sort-selector">
+          <select
+            :value="sortBy"
+            class="sort-selector__select"
+            @change="emit('update:sortBy', ($event.target as HTMLSelectElement).value as any)"
+          >
+            <option value="date">通关时间</option>
+            <option value="rating">个人评分</option>
+            <option value="hours">游玩时长</option>
+          </select>
+        </div>
       </div>
 
       <!-- Quick Add Button -->
@@ -138,6 +140,10 @@ const PLATFORM_OPTIONS: Array<{ label: string; value: GamePlatform | 'all' }> = 
 }
 
 .pill-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
   padding: 0.4rem 0.8rem;
   border-radius: 8px;
   background: transparent;
@@ -146,6 +152,8 @@ const PLATFORM_OPTIONS: Array<{ label: string; value: GamePlatform | 'all' }> = 
   font-size: 0.85rem;
   font-weight: 500;
   cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
   transition: all 0.2s ease;
 }
 
@@ -179,6 +187,12 @@ const PLATFORM_OPTIONS: Array<{ label: string; value: GamePlatform | 'all' }> = 
   flex-wrap: wrap;
   align-items: center;
   gap: 0.75rem;
+}
+
+.filter-toolbar__controls-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
 }
 
 .search-box {
@@ -219,6 +233,11 @@ const PLATFORM_OPTIONS: Array<{ label: string; value: GamePlatform | 'all' }> = 
   color: rgba(255, 255, 255, 0.35);
 }
 
+.sort-selector {
+  display: flex;
+  align-items: center;
+}
+
 .sort-selector__select {
   padding: 0.45rem 0.75rem;
   background: rgba(0, 0, 0, 0.35);
@@ -228,6 +247,7 @@ const PLATFORM_OPTIONS: Array<{ label: string; value: GamePlatform | 'all' }> = 
   font-size: 0.82rem;
   outline: none;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .sort-selector__select:focus {
@@ -237,6 +257,7 @@ const PLATFORM_OPTIONS: Array<{ label: string; value: GamePlatform | 'all' }> = 
 .add-game-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.35rem;
   padding: 0.45rem 0.85rem;
   background: linear-gradient(135deg, rgba(234, 179, 8, 0.2), rgba(202, 138, 4, 0.35));
@@ -246,6 +267,7 @@ const PLATFORM_OPTIONS: Array<{ label: string; value: GamePlatform | 'all' }> = 
   font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
+  white-space: nowrap;
   transition: all 0.2s ease;
 }
 
@@ -264,20 +286,90 @@ const PLATFORM_OPTIONS: Array<{ label: string; value: GamePlatform | 'all' }> = 
   .filter-toolbar {
     flex-direction: column;
     align-items: stretch;
+    padding: 0.65rem 0.75rem;
+    gap: 0.65rem;
   }
-  .filter-toolbar__left,
+
+  .filter-toolbar__left {
+    width: 100%;
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+
+  .status-pills,
+  .platform-pills {
+    width: 100%;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 3px 1rem 3px 0;
+    gap: 0.45rem;
+  }
+
+  .status-pills::after,
+  .platform-pills::after {
+    content: '';
+    display: block;
+    width: 0.75rem;
+    height: 1px;
+    flex-shrink: 0;
+  }
+
+  .status-pills::-webkit-scrollbar,
+  .platform-pills::-webkit-scrollbar {
+    display: none;
+  }
+
+  .pill-btn {
+    padding: 0.35rem 0.75rem;
+    font-size: 0.8rem;
+  }
+
+  .pill-btn--small {
+    padding: 0.28rem 0.65rem;
+    font-size: 0.74rem;
+  }
+
   .filter-toolbar__right {
     width: 100%;
-    justify-content: space-between;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
   }
+
+  .filter-toolbar__controls-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+  }
+
   .search-box {
     flex: 1;
+    min-width: 0;
   }
+
   .search-box__input {
     width: 100%;
+    font-size: 0.8rem;
   }
+
   .search-box__input:focus {
     width: 100%;
+  }
+
+  .sort-selector {
+    flex-shrink: 0;
+  }
+
+  .sort-selector__select {
+    font-size: 0.78rem;
+  }
+
+  .add-game-btn {
+    width: 100%;
+    padding: 0.55rem 0.85rem;
   }
 }
 </style>
