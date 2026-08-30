@@ -11,7 +11,11 @@ import 'element-plus/es/components/table/style/css';
 import 'element-plus/es/components/table-column/style/css';
 import 'element-plus/es/components/tooltip/style/css';
 
-createApp(App)
-  .use(createPinia())
-  .use(router)
-  .mount('#app');
+const app = createApp(App);
+
+app.use(createPinia());
+app.use(router);
+
+void router.isReady().then(() => {
+  app.mount('#app');
+});
