@@ -1,21 +1,29 @@
 <script setup lang="ts">
 import { onClickOutside, useMediaQuery } from '@vueuse/core';
-import { computed, shallowRef, useTemplateRef } from 'vue';
+import { computed, onUnmounted, shallowRef, useTemplateRef } from 'vue';
 import { journalChannels } from '../../journalChannels';
 import type { JournalChannel } from '../../types';
 import AboutNavigationIcon from '../about/AboutNavigationIcon.vue';
+import AINavigationIcon from '../ai/AINavigationIcon.vue';
 
-const props = defineProps<{
-  channel: JournalChannel | null;
-  aboutActive: boolean;
-  photosActive: boolean;
-  immersive: boolean;
-}>();
+const props = withDefaults(
+  defineProps<{
+    channel: JournalChannel | null;
+    aboutActive: boolean;
+    photosActive: boolean;
+    immersive: boolean;
+    aiActive?: boolean;
+  }>(),
+  {
+    aiActive: false,
+  },
+);
 
 const emit = defineEmits<{
   select: [channel: JournalChannel];
   selectAbout: [];
   selectPhotos: [];
+  selectAi: [];
 }>();
 
 const sidebar = useTemplateRef<HTMLElement>('sidebar');
@@ -23,6 +31,8 @@ const edgeTrigger = useTemplateRef<HTMLButtonElement>('edgeTrigger');
 const desktopNavigation = useMediaQuery('(min-width: 800px)');
 const immersiveDrawer = computed(() => props.immersive && desktopNavigation.value);
 const drawerOpen = shallowRef(false);
+const aiNoticeVisible = shallowRef(false);
+let toastTimer: ReturnType<typeof setTimeout> | null = null;
 
 function openDrawer(): void {
   if (immersiveDrawer.value) drawerOpen.value = true;
@@ -61,10 +71,25 @@ function selectPhotos(): void {
   emit('selectPhotos');
 }
 
+function selectAi(): void {
+  closeDrawer();
+  emit('selectAi');
+  aiNoticeVisible.value = true;
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    aiNoticeVisible.value = false;
+    toastTimer = null;
+  }, 2200);
+}
+
 function selectAbout(): void {
   closeDrawer();
   emit('selectAbout');
 }
+
+onUnmounted(() => {
+  if (toastTimer) clearTimeout(toastTimer);
+});
 
 onClickOutside(sidebar, closeDrawer);
 </script>
@@ -110,9 +135,9 @@ onClickOutside(sidebar, closeDrawer);
             v-for="item in journalChannels"
             :key="item.value"
             class="channel-sidebar__item"
-            :class="{ 'channel-sidebar__item--active': channel === item.value && !aboutActive }"
+            :class="{ 'channel-sidebar__item--active': channel === item.value && !aboutActive && !aiActive }"
             type="button"
-            :aria-current="channel === item.value && !aboutActive ? 'page' : undefined"
+            :aria-current="channel === item.value && !aboutActive && !aiActive ? 'page' : undefined"
             @click="selectChannel(item.value)"
           >
             <span class="channel-sidebar__marker" aria-hidden="true" />
@@ -128,6 +153,16 @@ onClickOutside(sidebar, closeDrawer);
             <span class="channel-sidebar__marker" aria-hidden="true" />
             <span>照片墙</span>
           </button>
+          <button
+            class="channel-sidebar__item channel-sidebar__item--ai"
+            :class="{ 'channel-sidebar__item--active': aiActive }"
+            type="button"
+            :aria-current="aiActive ? 'page' : undefined"
+            @click="selectAi"
+          >
+            <AINavigationIcon class="channel-sidebar__ai-icon" />
+            <span>AI</span>
+          </button>
         </div>
         <button
           class="channel-sidebar__item channel-sidebar__about"
@@ -141,6 +176,20 @@ onClickOutside(sidebar, closeDrawer);
         </button>
       </nav>
     </div>
+
+    <Teleport to="body">
+      <Transition name="ai-toast">
+        <div
+          v-if="aiNoticeVisible"
+          class="ai-toast-banner"
+          role="status"
+          aria-live="polite"
+        >
+          <AINavigationIcon class="ai-toast-banner__icon" />
+          <span>开发中，敬请期待</span>
+        </div>
+      </Transition>
+    </Teleport>
   </aside>
 </template>
 
@@ -222,6 +271,23 @@ onClickOutside(sidebar, closeDrawer);
 
 .channel-sidebar__item--active .channel-sidebar__about-icon {
   color: var(--accent);
+}
+
+.channel-sidebar__ai-icon {
+  width: 1.35rem;
+  height: 1.35rem;
+  flex: none;
+  filter: drop-shadow(0 0 4px rgb(139 92 246 / 20%));
+  transition: filter 180ms ease, transform 180ms ease;
+}
+
+.channel-sidebar__item--ai:hover .channel-sidebar__ai-icon {
+  filter: drop-shadow(0 0 8px rgb(139 92 246 / 55%));
+  transform: scale(1.06);
+}
+
+.channel-sidebar__item--ai.channel-sidebar__item--active .channel-sidebar__ai-icon {
+  filter: drop-shadow(0 0 10px rgb(139 92 246 / 70%));
 }
 
 @media (min-width: 800px) {
@@ -355,7 +421,7 @@ onClickOutside(sidebar, closeDrawer);
     display: grid;
     width: 100%;
     height: auto;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 0.18rem;
   }
 
@@ -385,6 +451,10 @@ onClickOutside(sidebar, closeDrawer);
     display: none;
   }
 
+  .channel-sidebar__ai-icon {
+    display: none;
+  }
+
   .channel-sidebar__item.channel-sidebar__item--active,
   .channel-sidebar__item.channel-sidebar__item--active:hover {
     background: var(--accent-soft);
@@ -392,9 +462,55 @@ onClickOutside(sidebar, closeDrawer);
   }
 }
 
+.ai-toast-banner {
+  position: fixed;
+  z-index: 1200;
+  top: 1.5rem;
+  left: 50%;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.65rem 1.15rem;
+  border: 1px solid rgb(255 255 255 / 16%);
+  border-radius: 999px;
+  background: rgb(20 20 22 / 85%);
+  color: rgb(244 244 245);
+  box-shadow:
+    0 12px 32px rgb(0 0 0 / 40%),
+    0 0 20px rgb(139 92 246 / 22%);
+  font-size: 0.88rem;
+  font-weight: 550;
+  letter-spacing: 0.01em;
+  pointer-events: none;
+  transform: translateX(-50%);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+
+.ai-toast-banner__icon {
+  width: 1.15rem;
+  height: 1.15rem;
+  flex: none;
+}
+
+.ai-toast-enter-active,
+.ai-toast-leave-active {
+  transition:
+    opacity 240ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ai-toast-enter-from,
+.ai-toast-leave-to {
+  opacity: 0;
+  transform: translate(-50%, -14px) scale(0.92);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .channel-sidebar--immersive .channel-sidebar__edge-trigger,
-  .channel-sidebar--immersive .channel-sidebar__panel {
+  .channel-sidebar--immersive .channel-sidebar__panel,
+  .ai-toast-enter-active,
+  .ai-toast-leave-active {
     transition: none;
   }
 }
