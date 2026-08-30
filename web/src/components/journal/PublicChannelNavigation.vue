@@ -153,6 +153,9 @@ onClickOutside(sidebar, closeDrawer);
             <span class="channel-sidebar__marker" aria-hidden="true" />
             <span>照片墙</span>
           </button>
+        </div>
+
+        <div class="channel-sidebar__footer">
           <button
             class="channel-sidebar__item channel-sidebar__item--ai"
             :class="{ 'channel-sidebar__item--active': aiActive }"
@@ -163,17 +166,17 @@ onClickOutside(sidebar, closeDrawer);
             <AINavigationIcon class="channel-sidebar__ai-icon" />
             <span>AI</span>
           </button>
+          <button
+            class="channel-sidebar__item channel-sidebar__about"
+            :class="{ 'channel-sidebar__item--active': aboutActive }"
+            type="button"
+            :aria-current="aboutActive ? 'page' : undefined"
+            @click="selectAbout"
+          >
+            <AboutNavigationIcon class="channel-sidebar__about-icon" />
+            <span>关于我</span>
+          </button>
         </div>
-        <button
-          class="channel-sidebar__item channel-sidebar__about"
-          :class="{ 'channel-sidebar__item--active': aboutActive }"
-          type="button"
-          :aria-current="aboutActive ? 'page' : undefined"
-          @click="selectAbout"
-        >
-          <AboutNavigationIcon class="channel-sidebar__about-icon" />
-          <span>关于我</span>
-        </button>
       </nav>
     </div>
 
@@ -219,8 +222,10 @@ onClickOutside(sidebar, closeDrawer);
   gap: 0.45rem;
 }
 
-.channel-sidebar__about {
+.channel-sidebar__footer {
   margin-top: auto;
+  display: grid;
+  gap: 0.45rem;
 }
 
 .channel-sidebar__item {
@@ -425,12 +430,9 @@ onClickOutside(sidebar, closeDrawer);
     gap: 0.18rem;
   }
 
-  .channel-sidebar__channels {
+  .channel-sidebar__channels,
+  .channel-sidebar__footer {
     display: contents;
-  }
-
-  .channel-sidebar__about {
-    margin-top: 0;
   }
 
   .channel-sidebar__item {
