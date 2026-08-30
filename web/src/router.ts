@@ -52,6 +52,11 @@ export const router = createRouter({
       component: () => import('./components/photos/PhotoAlbumView.vue'),
       props: true,
     },
+    {
+      path: '/games',
+      name: 'games',
+      component: () => import('./components/games/GameLibraryView.vue'),
+    },
     { path: '/me', name: 'private', component: FeedView },
     {
       path: '/me/settings',
@@ -107,5 +112,7 @@ router.afterEach((to) => {
       ? '个人简历 · 小明同学'
       : to.name === 'photos' || to.name === 'photo-album'
         ? '照片墙 · 小明同学'
-        : '小明同学';
+        : to.name === 'games'
+          ? '游戏墙 · 小明同学'
+          : '小明同学';
 });

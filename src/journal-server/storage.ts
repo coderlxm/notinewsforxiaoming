@@ -203,6 +203,15 @@ export class JournalStorage {
     return path.posix.join(relativeDir, filename);
   }
 
+  async writeGameImage(gameId: string, assetId: string, data: Buffer): Promise<string> {
+    const relativeDir = path.posix.join('assets', 'games', gameId);
+    const absoluteDir = path.join(this.assetsDir, 'games', gameId);
+    await fs.promises.mkdir(absoluteDir, { recursive: true });
+    const absolutePath = path.join(absoluteDir, assetId);
+    await fs.promises.writeFile(absolutePath, data, { flag: 'wx' });
+    return path.posix.join(relativeDir, assetId);
+  }
+
   async deleteAsset(relativePath: string): Promise<void> {
     await fs.promises.rm(this.absoluteAssetPath(relativePath));
   }

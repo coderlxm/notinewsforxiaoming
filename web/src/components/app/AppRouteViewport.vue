@@ -186,6 +186,12 @@ function forwardInteractionsChange(
         :album-id="route.albumId"
         @layout-ready="emit('layoutReady')"
       />
+      <component
+        :is="Component"
+        v-else-if="route.name === 'games'"
+        :key="route.key"
+        @layout-ready="emit('layoutReady')"
+      />
       <NotFoundView
         v-else-if="route.name === 'not-found' && !rawNotFound"
         :key="route.key"

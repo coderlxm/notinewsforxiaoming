@@ -92,6 +92,9 @@ export function parseAppRoute(
   if (route.name === 'photos') {
     return { name: 'photos', key: 'photos' };
   }
+  if (route.name === 'games') {
+    return { name: 'games', key: 'games' };
+  }
   if (route.name === 'photo-album') {
     const albumId = String(route.params.albumId);
     if (!PHOTO_ALBUM_ID_PATTERN.test(albumId)) {
@@ -170,6 +173,7 @@ export function persistentFeedKey(path: string): string | null {
     return `discovery:${url.pathname}`;
   }
   if (url.pathname === '/photos') return 'photos';
+  if (url.pathname === '/games') return 'games';
   const photoAlbumMatch = url.pathname.match(/^\/photos\/([0-9a-f]{64})$/);
   if (photoAlbumMatch) return `photo-album:${photoAlbumMatch[1]}`;
   return null;

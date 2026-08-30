@@ -16,6 +16,7 @@ export type AppRoute =
   | { name: 'archive-month'; key: string; year: string; month: string }
   | { name: 'photos'; key: string }
   | { name: 'photo-album'; key: string; albumId: string }
+  | { name: 'games'; key: string }
   | { name: 'detail'; key: string; publicId: string }
   | { name: 'private'; key: string; entryId: number | null; assetView: AssetView; page: number }
   | { name: 'entry-new'; key: string }

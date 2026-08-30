@@ -11,10 +11,12 @@ const props = withDefaults(
     channel: JournalChannel | null;
     aboutActive: boolean;
     photosActive: boolean;
+    gamesActive?: boolean;
     immersive: boolean;
     aiActive?: boolean;
   }>(),
   {
+    gamesActive: false,
     aiActive: false,
   },
 );
@@ -23,6 +25,7 @@ const emit = defineEmits<{
   select: [channel: JournalChannel];
   selectAbout: [];
   selectPhotos: [];
+  selectGames: [];
   selectAi: [];
 }>();
 
@@ -69,6 +72,11 @@ function selectChannel(channel: JournalChannel): void {
 function selectPhotos(): void {
   closeDrawer();
   emit('selectPhotos');
+}
+
+function selectGames(): void {
+  closeDrawer();
+  emit('selectGames');
 }
 
 function selectAi(): void {
@@ -152,6 +160,16 @@ onClickOutside(sidebar, closeDrawer);
           >
             <span class="channel-sidebar__marker" aria-hidden="true" />
             <span>照片墙</span>
+          </button>
+          <button
+            class="channel-sidebar__item"
+            :class="{ 'channel-sidebar__item--active': gamesActive }"
+            type="button"
+            :aria-current="gamesActive ? 'page' : undefined"
+            @click="selectGames"
+          >
+            <span class="channel-sidebar__marker" aria-hidden="true" />
+            <span>游戏墙</span>
           </button>
         </div>
 

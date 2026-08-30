@@ -134,7 +134,12 @@ const publicNavActive = computed(() =>
 const photosActive = computed(() =>
   route.value.name === 'photos' || route.value.name === 'photo-album',
 );
+const gamesActive = computed(() =>
+  route.value.name === 'games',
+);
 const photoImmersiveActive = computed(() => photosActive.value);
+const gameImmersiveActive = computed(() => gamesActive.value);
+const immersiveActive = computed(() => photosActive.value || gamesActive.value);
 
 function changePublicChannel(channel: JournalChannel): void {
   navigate(publicFeedPath(channel));
@@ -146,6 +151,10 @@ function openAbout(): void {
 
 function openPhotos(): void {
   navigate('/photos');
+}
+
+function openGames(): void {
+  navigate('/games');
 }
 
 onMounted(() => {
@@ -162,10 +171,13 @@ onUnmounted(() => {
 <template>
   <div
     class="app-shell"
-    :class="{ 'app-shell--photo-immersive': photoImmersiveActive }"
+    :class="{
+      'app-shell--photo-immersive': photoImmersiveActive,
+      'app-shell--game-immersive': gameImmersiveActive,
+    }"
   >
     <AppHeader
-      v-if="!photoImmersiveActive"
+      v-if="!immersiveActive"
       :profile="profile"
       :profile-load-error="profileLoadError"
       :public-mode="publicShellActive"
@@ -182,18 +194,21 @@ onUnmounted(() => {
       :class="{
         'app-main--public': publicShellActive,
         'app-main--photo-immersive': photoImmersiveActive,
+        'app-main--game-immersive': gameImmersiveActive,
       }"
     >
       <PublicChannelNavigation
         v-if="publicShellActive"
-        :key="photoImmersiveActive ? 'photo-immersive' : 'fixed'"
+        :key="immersiveActive ? 'immersive' : 'fixed'"
         :channel="publicFeedRoute?.channel ?? null"
         :about-active="route.name === 'about'"
         :photos-active="photosActive"
-        :immersive="photoImmersiveActive"
+        :games-active="gamesActive"
+        :immersive="immersiveActive"
         @select="changePublicChannel"
         @select-about="openAbout"
         @select-photos="openPhotos"
+        @select-games="openGames"
       />
 
       <AppRouteViewport
@@ -245,7 +260,8 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-.app-shell--photo-immersive {
+.app-shell--photo-immersive,
+.app-shell--game-immersive {
   --photo-canvas: #0c0c0c;
   --photo-surface: #171717;
   --photo-surface-hover: #222;
@@ -269,6 +285,10 @@ onUnmounted(() => {
   color: var(--photo-text-primary);
 }
 
+.app-shell--game-immersive {
+  background: #090a0f;
+}
+
 .app-main {
   display: grid;
   min-width: 0;
@@ -284,7 +304,8 @@ onUnmounted(() => {
   gap: var(--public-layout-gap);
 }
 
-.app-main--photo-immersive {
+.app-main--photo-immersive,
+.app-main--game-immersive {
   width: 100%;
   margin: 0;
   grid-template-columns: minmax(0, 1fr);
@@ -292,7 +313,12 @@ onUnmounted(() => {
   background: var(--photo-canvas);
 }
 
-.app-main--photo-immersive > .app-route-viewport {
+.app-main--game-immersive {
+  background: #090a0f;
+}
+
+.app-main--photo-immersive > .app-route-viewport,
+.app-main--game-immersive > .app-route-viewport {
   grid-column: 1;
 }
 

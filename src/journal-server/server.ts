@@ -19,6 +19,8 @@ import { JournalContributionNotificationService } from './contributionNotificati
 import { JournalContributionService } from './contributionService.js';
 import { openJournalDatabase } from './database.js';
 import { JournalDeletionService } from './deletion.js';
+import { GameRepository } from './gameRepository.js';
+import { GameService } from './gameService.js';
 import { JournalIngestService } from './ingest.js';
 import { JournalCommentNotificationService } from './interactionNotification.js';
 import { JournalInteractionService } from './interactionService.js';
@@ -37,6 +39,7 @@ import { JournalResumeService } from './resumeService.js';
 import { registerArticleRoutes } from './routes/articles.js';
 import { registerContributionRoutes } from './routes/contributions.js';
 import { registerFeedRoutes } from './routes/feeds.js';
+import { registerGameRoutes } from './routes/games.js';
 import { registerInternalRoutes } from './routes/internal.js';
 import { registerInteractionRoutes } from './routes/interactions.js';
 import { registerMediaRoutes } from './routes/media.js';
@@ -67,6 +70,7 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
   const server = Fastify({ logger: true });
   const database = openJournalDatabase(config.dataDir);
   const repository = new JournalRepository(database);
+  const gameRepository = new GameRepository(database);
   const auth = new JournalAuth(config.ingestToken, config.adminPassword);
   const resumePreviews = new JournalResumePreviewService();
   const resumeService = new JournalResumeService(
@@ -96,6 +100,7 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
   const videoNormalization = new JournalVideoNormalizationService(storage, videoPreviews);
   const articleService = new JournalArticleService(repository, storage, previews);
   const webEntryService = new JournalWebEntryService(repository, storage);
+  const gameService = new GameService(gameRepository, storage);
   const webEntryUploads = new JournalWebEntryUploadService(
     repository,
     storage,
@@ -218,6 +223,12 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
   await registerResumeRoutes(server, { auth, resumeService });
   await registerWeatherRoutes(server, weatherService);
   await registerFeedRoutes(server, repository, siteProfileService, config.publicBaseUrl);
+  await registerGameRoutes(server, {
+    auth,
+    repository: gameRepository,
+    service: gameService,
+    dataDir: config.dataDir,
+  });
 
   const sendApplication = async (_request: FastifyRequest, reply: FastifyReply) => {
     reply.header('Cache-Control', 'no-cache');

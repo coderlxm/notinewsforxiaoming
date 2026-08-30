@@ -1173,6 +1173,184 @@ const migrations: JournalMigration[] = [
       `);
     },
   },
+  {
+    version: 21,
+    up(database) {
+      database.exec(`
+        CREATE TABLE journal_games (
+          id TEXT PRIMARY KEY,
+          title TEXT NOT NULL,
+          original_title TEXT NOT NULL,
+          cover_url TEXT NOT NULL,
+          banner_url TEXT NOT NULL,
+          platforms_json TEXT NOT NULL,
+          genre_json TEXT NOT NULL,
+          developer TEXT NOT NULL,
+          publisher TEXT,
+          release_year INTEGER NOT NULL,
+          status TEXT NOT NULL
+            CHECK (status IN ('completed', 'mastered', 'playing', 'shelved', 'backlog')),
+          completed_at TEXT,
+          playtime_hours REAL NOT NULL CHECK (playtime_hours >= 0),
+          difficulty TEXT,
+          is_goty INTEGER NOT NULL CHECK (is_goty IN (0, 1)),
+          platinum_trophy INTEGER NOT NULL CHECK (platinum_trophy IN (0, 1)),
+          rating REAL NOT NULL CHECK (rating >= 0 AND rating <= 10),
+          verdict_title TEXT NOT NULL,
+          punchline TEXT NOT NULL,
+          pros_json TEXT NOT NULL,
+          cons_json TEXT NOT NULL,
+          dimension_ratings_json TEXT NOT NULL,
+          review_markdown TEXT NOT NULL,
+          screenshots_json TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+
+        CREATE INDEX idx_journal_games_completed
+        ON journal_games(completed_at DESC, created_at DESC);
+
+        CREATE TABLE journal_game_images (
+          id TEXT PRIMARY KEY,
+          game_id TEXT NOT NULL,
+          role TEXT NOT NULL CHECK (role IN ('cover', 'banner', 'screenshot')),
+          relative_path TEXT NOT NULL UNIQUE,
+          original_name TEXT,
+          mime_type TEXT NOT NULL,
+          byte_size INTEGER NOT NULL CHECK (byte_size > 0),
+          created_at TEXT NOT NULL,
+          FOREIGN KEY (game_id) REFERENCES journal_games(id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX idx_journal_game_images_game
+        ON journal_game_images(game_id, created_at);
+      `);
+
+      const insertGame = database.prepare(`
+        INSERT INTO journal_games (
+          id, title, original_title, cover_url, banner_url, platforms_json, genre_json,
+          developer, publisher, release_year, status, completed_at, playtime_hours,
+          difficulty, is_goty, platinum_trophy, rating, verdict_title, punchline,
+          pros_json, cons_json, dimension_ratings_json, review_markdown, screenshots_json,
+          created_at, updated_at
+        ) VALUES (
+          @id, @title, @originalTitle, @coverUrl, @bannerUrl, @platformsJson, @genreJson,
+          @developer, NULL, @releaseYear, @status, @completedAt, @playtimeHours,
+          @difficulty, 1, 1, @rating, 'MASTERPIECE', @punchline,
+          @prosJson, @consJson, @dimensionRatingsJson, @reviewMarkdown, @screenshotsJson,
+          @createdAt, @updatedAt
+        )
+      `);
+      insertGame.run({
+        id: '11111111-1111-4111-8111-111111111111',
+        title: '黑神话：悟空',
+        originalTitle: 'Black Myth: Wukong',
+        coverUrl: 'https://images.unsplash.com/photo-1579373903781-fd5c0c30c4cd?auto=format&fit=crop&w=800&q=80',
+        bannerUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1920&q=80',
+        platformsJson: JSON.stringify(['PC', 'PS5']),
+        genreJson: JSON.stringify(['动作角色扮演', '神话', '魂系体验']),
+        developer: '游戏科学 (Game Science)',
+        releaseYear: 2024,
+        status: 'mastered',
+        completedAt: '2024-09-12',
+        playtimeHours: 78,
+        difficulty: '默认难度（全隐藏Boss全成就）',
+        rating: 9.8,
+        punchline: '中国单机游戏史上的不朽里程碑，极具东方美学神韵的西游史诗。',
+        prosJson: JSON.stringify([
+          '登峰造极的东方中式古建、造像与美术表现力',
+          '极其丰满的 Boss 战阵型与独特的定身/变身战斗体系',
+          '每章结尾动画及陕北说书等顶级文化视听呈现',
+          '隐藏地图与六道轮回剧情挖掘极具深度',
+        ]),
+        consJson: JSON.stringify([
+          '部分地图空气墙影响探索沉浸感',
+          '个别高速移动 Boss 锁定视角偶有轻微镜头抖动',
+        ]),
+        dimensionRatingsJson: JSON.stringify({
+          gameplay: 9.6,
+          story: 9.8,
+          visuals: 10,
+          music: 9.9,
+          performance: 9.2,
+        }),
+        reviewMarkdown: `踏上西行重走之路的那一刻，那种跨越千年的文化共鸣瞬间被点燃。
+
+游戏科学将中国传统佛道造像、石窟艺术与虚幻5引擎的极致光影结合，呈现出真正意义上的“东方魔幻史诗”。黄风岭的苍凉与陕北说书的激昂，小西天的冰雪与亢金龙的长啸，每一幕都让人驻足凝视。
+
+战斗系统以轻重棍法搭配铜头铁臂、定身法与七十二变，打出了极具辨识度的中式动作节奏。在经历了与大圣残躯的终极决战后，那首《敢问路在何方》响起时，眼眶真正湿润了。这是属于每一位中国玩家的西游梦。`,
+        screenshotsJson: JSON.stringify([
+          {
+            id: 'bmw-1',
+            url: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1200&q=80',
+            caption: '浮屠塔壁画前的冥想时刻',
+          },
+          {
+            id: 'bmw-2',
+            url: 'https://images.unsplash.com/photo-1579373903781-fd5c0c30c4cd?auto=format&fit=crop&w=1200&q=80',
+            caption: '踏破凌霄，重走西游路',
+          },
+          {
+            id: 'bmw-3',
+            url: 'https://images.unsplash.com/photo-1538481199705-c710c4e965fc?auto=format&fit=crop&w=1200&q=80',
+            caption: '白雪皑皑间的小西天古刹',
+          },
+        ]),
+        createdAt: '2024-09-12T14:30:00Z',
+        updatedAt: '2024-09-12T14:30:00Z',
+      });
+      insertGame.run({
+        id: '22222222-2222-4222-8222-222222222222',
+        title: '艾尔登法环：黄金树幽影',
+        originalTitle: 'Elden Ring: Shadow of the Erdtree',
+        coverUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80',
+        bannerUrl: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=1920&q=80',
+        platformsJson: JSON.stringify(['PS5', 'PC']),
+        genreJson: JSON.stringify(['开放世界', '暗黑奇幻', 'ARPG']),
+        developer: 'FromSoftware',
+        releaseYear: 2024,
+        status: 'mastered',
+        completedAt: '2024-07-28',
+        playtimeHours: 145,
+        difficulty: '多周目全搜集',
+        rating: 10,
+        punchline: '箱庭与开放世界探索的极致结合，FromSoftware 奉献的又一座游戏设计神殿。',
+        prosJson: JSON.stringify([
+          '纵向立体感极强的幽影之地地图架构，探索感无出其右',
+          '海量全新武器、战灰与法术极大拓展了 build 流派',
+          '梅瑟莫与狂龙贝勒等 Boss 战演出震撼绝伦',
+          '宏大而苍凉的叙事与史诗感十足的交响配乐',
+        ]),
+        consJson: JSON.stringify([
+          '最终 Boss 数值压迫感较强，对玩家 build 与翻滚时机要求苛刻',
+        ]),
+        dimensionRatingsJson: JSON.stringify({
+          gameplay: 10,
+          story: 9.8,
+          visuals: 9.9,
+          music: 10,
+          performance: 9.4,
+        }),
+        reviewMarkdown: `宫崎英高再次证明了在现代游戏工业中，对于“探索未知”这一纯粹乐趣的掌控力。
+
+幽影之地并非简单的平铺地图，而是如同多层折叠的立体艺术品。当你穿过青蓝海岸、登上塔之镇，或是从幽影古城底部潜入深渊，每揭开一层帷幕，都会被那令人屏息的宏大奇观所震撼。全成就通关后，依然对交界地与幽影之地的往事回味无穷。`,
+        screenshotsJson: JSON.stringify([
+          {
+            id: 'er-1',
+            url: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=1200&q=80',
+            caption: '黄金树凋零之下的幽影之城',
+          },
+          {
+            id: 'er-2',
+            url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
+            caption: '青蓝海岸的花海与彼岸棺柩',
+          },
+        ]),
+        createdAt: '2024-07-28T20:10:00Z',
+        updatedAt: '2024-07-28T20:10:00Z',
+      });
+    },
+  },
 ];
 
 export function runJournalMigrations(database: Database.Database): void {
