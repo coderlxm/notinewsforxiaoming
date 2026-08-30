@@ -318,7 +318,7 @@ function handleCardClick(event: MouseEvent): void {
             @request-delete="startDeletion"
           />
           <EntryInteractionSummary
-            v-if="showInteractions"
+            v-if="showInteractions && isPublicFeedCard"
             :summary="entry.interactions"
             :interactive="isPublicFeedCard"
             :reaction-pending="reactionPending"

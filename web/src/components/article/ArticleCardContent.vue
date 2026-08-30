@@ -235,7 +235,10 @@ function handleCardClick(event: MouseEvent): void {
       </button>
     </div>
 
-    <footer v-if="display === 'summary' && showInteractions" class="article-card__interaction-footer">
+    <footer
+      v-if="display === 'summary' && showInteractions && !editable"
+      class="article-card__interaction-footer"
+    >
       <EntryInteractionSummary
         :summary="entry.interactions"
         :interactive="!editable"
