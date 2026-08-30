@@ -261,6 +261,10 @@ function preserveAssetRatio(asset: DisplayAsset): { aspectRatio: string } | unde
   gap: 0;
 }
 
+.media--card .media__visuals {
+  min-height: 154px;
+}
+
 .media--card .media__visuals--single .media__visual {
   width: 100%;
   max-height: var(--media-card-max-height);

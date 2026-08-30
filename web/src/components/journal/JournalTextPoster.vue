@@ -184,6 +184,7 @@ const visibilityLabel = computed(() => props.entry.publicationStatus === 'draft'
 
 .text-poster--card .text-poster__sheet {
   height: auto;
+  min-height: 154px;
   aspect-ratio: auto;
   grid-template-rows: auto auto auto;
   row-gap: clamp(1rem, 6cqw, 2rem);
