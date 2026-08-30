@@ -1,4 +1,5 @@
 import schedule from 'node-schedule';
+import dayjs from 'dayjs';
 import type { Telegraf } from 'telegraf';
 import { config } from '../config/index.js';
 import { runMode } from './runMode.js';
@@ -26,6 +27,7 @@ import {
 const VITAMIN_WORKDAY_RANDOM_WINDOW_MS = 15 * 60 * 1000;
 const PHOTO_WORKDAY_RANDOM_WINDOW_MS = 65 * 60 * 1000;
 const STARTGG_FAST_WATCH_INTERVAL_MS = 2 * 60 * 1000;
+const STARTGG_TOURNAMENT_CLOSE_GRACE_HOURS = 6;
 const GITHUB_PUSH_ANCHOR_DATE = '1970-01-01';
 
 let startggFastWatchTimer: ReturnType<typeof setTimeout> | null = null;
@@ -87,13 +89,24 @@ async function runScheduledStartggFastWatch(bot: Telegraf, eventSlugs: string[])
 async function runScheduledStartggWatch(bot: Telegraf): Promise<void> {
   clearStartggFastWatch();
   const subscribedEvents = listActiveStartggWatchEvents();
-  const allEventsCompleted = subscribedEvents.length > 0
-    && subscribedEvents.every((event) => event.event_state === 'COMPLETED');
-  if (allEventsCompleted) {
+  const now = dayjs();
+  const closedByDeadline = subscribedEvents.filter((event) =>
+    event.event_state !== 'COMPLETED'
+    && event.tournament_end_at !== null
+    && !now.isBefore(dayjs(event.tournament_end_at).add(STARTGG_TOURNAMENT_CLOSE_GRACE_HOURS, 'hour')),
+  );
+  const allEventsClosed = subscribedEvents.length > 0
+    && subscribedEvents.every((event) =>
+      event.event_state === 'COMPLETED'
+      || closedByDeadline.includes(event),
+    );
+  if (allEventsClosed) {
     disableStartggPolling();
     await bot.telegram.sendMessage(
       config.tgChatId,
-      'start.gg 当前订阅赛事已结束，自动轮询已关闭。',
+      closedByDeadline.length > 0
+        ? `start.gg 存在未标记完成的订阅赛事已超过结束时间 ${STARTGG_TOURNAMENT_CLOSE_GRACE_HOURS} 小时，自动轮询已关闭。`
+        : 'start.gg 当前订阅赛事已结束，自动轮询已关闭。',
     );
     return;
   }
