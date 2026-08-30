@@ -5,6 +5,8 @@ import { journalChannels } from '../../journalChannels';
 import type { JournalChannel } from '../../types';
 import AboutNavigationIcon from '../about/AboutNavigationIcon.vue';
 import AINavigationIcon from '../ai/AINavigationIcon.vue';
+import GameNavigationIcon from '../games/GameNavigationIcon.vue';
+import PhotoNavigationIcon from '../photos/PhotoNavigationIcon.vue';
 
 const props = withDefaults(
   defineProps<{
@@ -181,24 +183,24 @@ onClickOutside(sidebar, () => {
 
           <!-- 桌面端专属频道项 (照片墙、游戏墙) -->
           <button
-            class="channel-sidebar__item channel-sidebar__item--desktop"
+            class="channel-sidebar__item channel-sidebar__item--desktop channel-sidebar__photo"
             :class="{ 'channel-sidebar__item--active': photosActive }"
             type="button"
             :aria-current="photosActive ? 'page' : undefined"
             @click="selectPhotos"
           >
-            <span class="channel-sidebar__marker" aria-hidden="true" />
+            <PhotoNavigationIcon class="channel-sidebar__photo-icon" />
             <span>照片墙</span>
           </button>
 
           <button
-            class="channel-sidebar__item channel-sidebar__item--desktop"
+            class="channel-sidebar__item channel-sidebar__item--desktop channel-sidebar__game"
             :class="{ 'channel-sidebar__item--active': gamesActive }"
             type="button"
             :aria-current="gamesActive ? 'page' : undefined"
             @click="selectGames"
           >
-            <span class="channel-sidebar__marker" aria-hidden="true" />
+            <GameNavigationIcon class="channel-sidebar__game-icon" />
             <span>游戏墙</span>
           </button>
 
@@ -279,11 +281,7 @@ onClickOutside(sidebar, () => {
                 @click="selectPhotos"
               >
                 <div class="mobile-more-card__icon mobile-more-card__icon--photo">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="3" y="3" width="18" height="18" rx="3" />
-                    <circle cx="8.5" cy="8.5" r="1.5" />
-                    <path d="M21 15l-5-5L5 21" />
-                  </svg>
+                  <PhotoNavigationIcon class="mobile-more-card__photo-svg" />
                 </div>
                 <div class="mobile-more-card__label">照片墙</div>
                 <div class="mobile-more-card__desc">摄影与精选集</div>
@@ -296,10 +294,7 @@ onClickOutside(sidebar, () => {
                 @click="selectGames"
               >
                 <div class="mobile-more-card__icon mobile-more-card__icon--game">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="2" y="6" width="20" height="12" rx="4" />
-                    <path d="M6 12h4m-2-2v4m7-1h.01m3-2h.01" stroke-linecap="round" stroke-linejoin="round" />
-                  </svg>
+                  <GameNavigationIcon class="mobile-more-card__game-svg" />
                 </div>
                 <div class="mobile-more-card__label">游戏墙</div>
                 <div class="mobile-more-card__desc">通关记录与成就</div>
@@ -440,6 +435,19 @@ onClickOutside(sidebar, () => {
   height: 1.35rem;
   flex: none;
   color: var(--border-strong);
+}
+
+.channel-sidebar__photo-icon,
+.channel-sidebar__game-icon {
+  width: 1.35rem;
+  height: 1.35rem;
+  flex: none;
+  transition: transform 160ms var(--ease-card);
+}
+
+.channel-sidebar__item:hover .channel-sidebar__photo-icon,
+.channel-sidebar__item:hover .channel-sidebar__game-icon {
+  transform: scale(1.08);
 }
 
 .channel-sidebar__item--active .channel-sidebar__ai-icon {
@@ -614,7 +622,9 @@ onClickOutside(sidebar, () => {
   }
 
   .channel-sidebar__about-icon,
-  .channel-sidebar__ai-icon {
+  .channel-sidebar__ai-icon,
+  .channel-sidebar__photo-icon,
+  .channel-sidebar__game-icon {
     display: none;
   }
 
@@ -756,10 +766,12 @@ onClickOutside(sidebar, () => {
   color: #c084fc;
 }
 
+.mobile-more-card__photo-svg,
+.mobile-more-card__game-svg,
 .mobile-more-card__ai-svg,
 .mobile-more-card__about-svg {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
 }
 
 .mobile-more-card__icon--about {
