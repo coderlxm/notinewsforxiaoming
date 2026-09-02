@@ -23,6 +23,7 @@ import {
   completeWorkCheckin,
   sendWorkCheckinFollowUpIfPending,
 } from '../services/workCheckinReminder.js';
+import { triggerBusReminder } from '../services/busReminder.js';
 
 const VITAMIN_WORKDAY_RANDOM_WINDOW_MS = 15 * 60 * 1000;
 const PHOTO_WORKDAY_RANDOM_WINDOW_MS = 65 * 60 * 1000;
@@ -198,6 +199,12 @@ export function registerFixedJobs(bot: Telegraf): void {
   schedule.scheduleJob({ hour: 9, minute: 59, tz: 'Asia/Shanghai' }, async () => {
     if (!isChinaWorkday(new Date())) return;
     await sendWorkCheckinFollowUpIfPending(bot);
+  });
+
+  // bus get-off reminder: 09:22 on China workdays
+  schedule.scheduleJob({ hour: 9, minute: 22, tz: 'Asia/Shanghai' }, async () => {
+    if (!isChinaWorkday(new Date())) return;
+    await triggerBusReminder(bot);
   });
 
   // work check-in closes automatically: 10:00 on China workdays

@@ -77,6 +77,12 @@ export function parseWorkCheckinCallbackData(data: string | undefined): string |
   return match?.[1] ?? null;
 }
 
+export function parseBusReminderCallbackData(data: string | undefined): string | null {
+  if (!data) return null;
+  const match = /^bus-reminder:done:(\d{4}-\d{2}-\d{2})$/.exec(data);
+  return match?.[1] ?? null;
+}
+
 export interface StartggWatchCallbackData {
   eventRowId: number;
   playerId: number;

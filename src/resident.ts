@@ -7,6 +7,7 @@ import { schedulePendingReminders, schedulePendingRecurringRules } from './remin
 import { registerFixedJobs, restoreStartggPolling } from './scheduled/jobs.js';
 import { restoreVitaminLoop } from './services/vitaminReminder.js';
 import { closeExpiredWorkCheckin } from './services/workCheckinReminder.js';
+import { restoreBusReminderLoop } from './services/busReminder.js';
 
 async function main() {
   if (!config.journalApiBaseUrl || !config.journalIngestToken || !config.journalPublicBaseUrl) {
@@ -26,6 +27,7 @@ async function main() {
   registerFixedJobs(bot);
   restoreStartggPolling(bot);
   restoreVitaminLoop(bot);
+  restoreBusReminderLoop(bot);
   await closeExpiredWorkCheckin(bot);
 
   bot.launch({

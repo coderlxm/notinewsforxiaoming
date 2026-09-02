@@ -154,6 +154,21 @@ export function getDb(): Database.Database {
         FOREIGN KEY(date_key) REFERENCES work_checkins(date_key)
       );
 
+      CREATE TABLE IF NOT EXISTS bus_reminders (
+        date_key TEXT PRIMARY KEY,
+        completed INTEGER NOT NULL DEFAULT 0 CHECK (completed IN (0, 1)),
+        count INTEGER NOT NULL DEFAULT 0,
+        loop_active INTEGER NOT NULL DEFAULT 0,
+        next_trigger_at TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS bus_reminder_messages (
+        date_key TEXT NOT NULL,
+        message_id INTEGER NOT NULL,
+        PRIMARY KEY (date_key, message_id),
+        FOREIGN KEY(date_key) REFERENCES bus_reminders(date_key)
+      );
+
       CREATE TABLE IF NOT EXISTS startgg_watch_players (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         player_id INTEGER NOT NULL UNIQUE,

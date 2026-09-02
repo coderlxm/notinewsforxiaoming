@@ -40,6 +40,7 @@ import {
   parseNaturalCancelCallbackData,
   parseVitaminCallbackData,
   parseWorkCheckinCallbackData,
+  parseBusReminderCallbackData,
   parseStartggWatchCallbackData,
   parseMasturbationCallbackData,
   parseStartggSeedsCallbackData,
@@ -52,6 +53,7 @@ import { runAvFetchOnce } from '../services/avTracker.js';
 import { buildAvTargetUrl, getAvTargetTypeLabel } from '../services/avTargets.js';
 import { markVitaminEatenToday, scheduleVitaminSnooze, getAndClearVitaminSentMessages } from '../services/vitaminReminder.js';
 import { completeWorkCheckin } from '../services/workCheckinReminder.js';
+import { completeBusReminder } from '../services/busReminder.js';
 import { findPresetByText, STARTGG_GO_SHORTCUT } from '../reminders/presets.js';
 import {
   buildStartggWatchCandidateButtons,
@@ -1349,6 +1351,13 @@ export function registerInteractiveHandlers(bot: Telegraf): void {
     if (workCheckinDate) {
       const completed = await completeWorkCheckin(bot, workCheckinDate);
       await ctx.answerCbQuery(completed ? '已记录打卡' : '这次打卡已经处理');
+      return;
+    }
+
+    const busReminderDate = parseBusReminderCallbackData(cbData);
+    if (busReminderDate) {
+      const completed = await completeBusReminder(bot, busReminderDate);
+      await ctx.answerCbQuery(completed ? '已记录下车' : '这次提醒已经处理');
       return;
     }
 

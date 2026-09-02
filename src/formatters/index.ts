@@ -183,6 +183,20 @@ export function buildWorkCheckinButtons(dateKey: string): { reply_markup: Inline
   };
 }
 
+export function formatBusReminderMessage(): string {
+  return '🚌 <b>下车提醒</b>\n\n快到站了，记得拿好随身物品，下车注意安全。';
+}
+
+export function buildBusReminderButtons(dateKey: string): { reply_markup: InlineKeyboardMarkup } {
+  return {
+    reply_markup: {
+      inline_keyboard: [[
+        { text: '✅ 已下车', callback_data: `bus-reminder:done:${dateKey}` },
+      ]],
+    },
+  };
+}
+
 export function buildVitaminButtons(): { reply_markup: InlineKeyboardMarkup } {
   return {
     reply_markup: {

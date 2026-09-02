@@ -398,6 +398,27 @@ const MIGRATIONS: DbMigration[] = [
       `);
     },
   },
+  {
+    version: 21,
+    up(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS bus_reminders (
+          date_key TEXT PRIMARY KEY,
+          completed INTEGER NOT NULL DEFAULT 0 CHECK (completed IN (0, 1)),
+          count INTEGER NOT NULL DEFAULT 0,
+          loop_active INTEGER NOT NULL DEFAULT 0,
+          next_trigger_at TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS bus_reminder_messages (
+          date_key TEXT NOT NULL,
+          message_id INTEGER NOT NULL,
+          PRIMARY KEY (date_key, message_id),
+          FOREIGN KEY(date_key) REFERENCES bus_reminders(date_key)
+        );
+      `);
+    },
+  },
 ];
 
 export function runDbMigrations(db: Database.Database): void {
