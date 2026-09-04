@@ -6,6 +6,7 @@ import type { JournalChannel } from '../../types';
 import AboutNavigationIcon from '../about/AboutNavigationIcon.vue';
 import AINavigationIcon from '../ai/AINavigationIcon.vue';
 import GameNavigationIcon from '../games/GameNavigationIcon.vue';
+import GuestbookNavigationIcon from '../guestbook/GuestbookNavigationIcon.vue';
 import PhotoNavigationIcon from '../photos/PhotoNavigationIcon.vue';
 
 const props = withDefaults(
@@ -14,11 +15,13 @@ const props = withDefaults(
     aboutActive: boolean;
     photosActive: boolean;
     gamesActive?: boolean;
+    guestbookActive?: boolean;
     immersive: boolean;
     aiActive?: boolean;
   }>(),
   {
     gamesActive: false,
+    guestbookActive: false,
     aiActive: false,
   },
 );
@@ -28,6 +31,7 @@ const emit = defineEmits<{
   selectAbout: [];
   selectPhotos: [];
   selectGames: [];
+  selectGuestbook: [];
   selectAi: [];
 }>();
 
@@ -41,7 +45,7 @@ const aiNoticeVisible = shallowRef(false);
 let toastTimer: ReturnType<typeof setTimeout> | null = null;
 
 const isMoreActive = computed(() =>
-  props.photosActive || props.gamesActive || props.aboutActive || props.aiActive,
+  props.photosActive || props.gamesActive || props.guestbookActive || props.aboutActive || props.aiActive,
 );
 
 function toggleMore(): void {
@@ -100,6 +104,12 @@ function selectGames(): void {
   closeDrawer();
   closeMore();
   emit('selectGames');
+}
+
+function selectGuestbook(): void {
+  closeDrawer();
+  closeMore();
+  emit('selectGuestbook');
 }
 
 function selectAi(): void {
@@ -204,6 +214,17 @@ onClickOutside(sidebar, () => {
             <span>游戏墙</span>
           </button>
 
+          <button
+            class="channel-sidebar__item channel-sidebar__item--desktop channel-sidebar__guestbook"
+            :class="{ 'channel-sidebar__item--active': guestbookActive }"
+            type="button"
+            :aria-current="guestbookActive ? 'page' : undefined"
+            @click="selectGuestbook"
+          >
+            <GuestbookNavigationIcon class="channel-sidebar__guestbook-icon" />
+            <span>留言板</span>
+          </button>
+
           <!-- 移动端专属 “更多” 聚合入口 (点击弹出照片墙/游戏墙/AI/关于我) -->
           <button
             class="channel-sidebar__item channel-sidebar__item--mobile-more"
@@ -298,6 +319,19 @@ onClickOutside(sidebar, () => {
                 </div>
                 <div class="mobile-more-card__label">游戏墙</div>
                 <div class="mobile-more-card__desc">通关记录与成就</div>
+              </button>
+
+              <button
+                class="mobile-more-card"
+                :class="{ 'mobile-more-card--active': guestbookActive }"
+                type="button"
+                @click="selectGuestbook"
+              >
+                <div class="mobile-more-card__icon mobile-more-card__icon--guestbook">
+                  <GuestbookNavigationIcon class="mobile-more-card__guestbook-svg" />
+                </div>
+                <div class="mobile-more-card__label">留言板</div>
+                <div class="mobile-more-card__desc">与博主打个招呼</div>
               </button>
 
               <button
@@ -438,7 +472,8 @@ onClickOutside(sidebar, () => {
 }
 
 .channel-sidebar__photo-icon,
-.channel-sidebar__game-icon {
+.channel-sidebar__game-icon,
+.channel-sidebar__guestbook-icon {
   width: 1.35rem;
   height: 1.35rem;
   flex: none;
@@ -446,7 +481,8 @@ onClickOutside(sidebar, () => {
 }
 
 .channel-sidebar__item:hover .channel-sidebar__photo-icon,
-.channel-sidebar__item:hover .channel-sidebar__game-icon {
+.channel-sidebar__item:hover .channel-sidebar__game-icon,
+.channel-sidebar__item:hover .channel-sidebar__guestbook-icon {
   transform: scale(1.08);
 }
 
@@ -624,7 +660,8 @@ onClickOutside(sidebar, () => {
   .channel-sidebar__about-icon,
   .channel-sidebar__ai-icon,
   .channel-sidebar__photo-icon,
-  .channel-sidebar__game-icon {
+  .channel-sidebar__game-icon,
+  .channel-sidebar__guestbook-icon {
     display: none;
   }
 
@@ -766,8 +803,14 @@ onClickOutside(sidebar, () => {
   color: #c084fc;
 }
 
+.mobile-more-card__icon--guestbook {
+  background: rgba(244, 114, 182, 0.15);
+  color: #f472b6;
+}
+
 .mobile-more-card__photo-svg,
 .mobile-more-card__game-svg,
+.mobile-more-card__guestbook-svg,
 .mobile-more-card__ai-svg,
 .mobile-more-card__about-svg {
   width: 22px;

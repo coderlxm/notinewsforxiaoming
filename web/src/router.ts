@@ -57,6 +57,11 @@ export const router = createRouter({
       name: 'games',
       component: () => import('./components/games/GameLibraryView.vue'),
     },
+    {
+      path: '/guestbook',
+      name: 'guestbook',
+      component: () => import('./components/guestbook/GuestbookView.vue'),
+    },
     { path: '/me', name: 'private', component: FeedView },
     {
       path: '/me/settings',
@@ -114,5 +119,7 @@ router.afterEach((to) => {
         ? '照片墙 · 小明同学'
         : to.name === 'games'
           ? '游戏墙 · 小明同学'
-          : '小明同学';
+          : to.name === 'guestbook'
+            ? '留言板 · 小明同学'
+            : '小明同学';
 });

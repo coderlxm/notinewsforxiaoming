@@ -1,6 +1,12 @@
 import axios from 'axios';
 import type { ZodType } from 'zod';
 import {
+  guestbookStatusMutationResponseSchema,
+  guestbookStatusRequestSchema,
+  type GuestbookStatusMutationResponse,
+  type GuestbookStatusRequest,
+} from '../shared/guestbookProtocol.js';
+import {
   journalAdminCommentMutationResponseSchema,
   journalApiErrorSchema,
   journalCommentStatusRequestSchema,
@@ -72,6 +78,19 @@ export class JournalApiClient {
       'patch',
       request,
       journalAdminCommentMutationResponseSchema,
+    );
+  }
+
+  async updateGuestbookStatus(
+    id: number,
+    status: GuestbookStatusRequest['status'],
+  ): Promise<GuestbookStatusMutationResponse> {
+    const request = guestbookStatusRequestSchema.parse({ status });
+    return this.request(
+      `${this.baseUrl}/api/internal/guestbook/${id}/status`,
+      'patch',
+      request,
+      guestbookStatusMutationResponseSchema,
     );
   }
 

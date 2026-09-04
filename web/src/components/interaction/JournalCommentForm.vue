@@ -1,16 +1,26 @@
 <script setup lang="ts">
 import { computed, shallowRef } from 'vue';
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   mode: 'visitor' | 'owner';
   busy: boolean;
   replyToName?: string;
   initialAuthorName?: string;
-}>();
+  context?: 'comment' | 'guestbook';
+  disabled?: boolean;
+}>(), {
+  replyToName: undefined,
+  initialAuthorName: undefined,
+  context: 'comment',
+  disabled: false,
+});
 
 const emit = defineEmits<{
   submit: [input: { authorName: string; content: string; website: string }];
 }>();
+
+const isGuestbook = computed(() => props.context === 'guestbook');
+const nameInputId = computed(() => (isGuestbook.value ? 'guestbook-author-name' : 'comment-author-name'));
 
 const authorName = shallowRef(props.initialAuthorName ?? '');
 const content = shallowRef('');
@@ -26,7 +36,8 @@ const expanded = computed(() => props.mode === 'owner'
 
 const canSubmit = computed(() => content.value.trim() !== ''
   && (props.mode === 'owner' || authorName.value.trim() !== '')
-  && !props.busy);
+  && !props.busy
+  && !props.disabled);
 
 function submit(): void {
   if (!canSubmit.value) return;
@@ -80,12 +91,12 @@ defineExpose({ clearContent, markFailed });
     <textarea
       v-model="content"
       class="comment-form__content"
-      :aria-label="mode === 'owner' ? '回复内容' : '评论内容'"
-      :name="mode === 'owner' ? 'reply-content' : 'comment-content'"
+      :aria-label="mode === 'owner' ? '回复内容' : isGuestbook ? '留言内容' : '评论内容'"
+      :name="mode === 'owner' ? 'reply-content' : isGuestbook ? 'guestbook-content' : 'comment-content'"
       :rows="mode === 'owner' ? 3 : 2"
-      :placeholder="mode === 'owner' ? '写下你的回复……' : '留下你的想法……'"
+      :placeholder="mode === 'owner' ? '写下你的回复……' : isGuestbook ? '写下你想对小明说的话……' : '留下你的想法……'"
       maxlength="1000"
-      :disabled="busy"
+      :disabled="busy || disabled"
       @input="handleInput"
       @keydown="handleKeydown"
     />
@@ -100,16 +111,16 @@ defineExpose({ clearContent, markFailed });
     >
     <div v-if="expanded" class="comment-form__auxiliary">
       <template v-if="mode === 'visitor'">
-        <label class="comment-form__name-label" for="comment-author-name">昵称</label>
+        <label class="comment-form__name-label" :for="nameInputId">昵称</label>
         <input
-          id="comment-author-name"
+          :id="nameInputId"
           v-model="authorName"
           class="comment-form__name"
           type="text"
-          name="comment-author-name"
+          :name="nameInputId"
           maxlength="24"
           placeholder="怎么称呼你？"
-          :disabled="busy"
+          :disabled="busy || disabled"
           autocomplete="name"
         >
       </template>
@@ -128,7 +139,7 @@ defineExpose({ clearContent, markFailed });
         :disabled="!canSubmit"
         :aria-busy="busy"
       >
-        {{ mode === 'owner' ? '发送回复' : '发送评论' }}
+        {{ mode === 'owner' ? '发送回复' : isGuestbook ? '发送留言' : '发送评论' }}
       </button>
     </div>
     <ul v-if="expanded && markdownHintOpen" class="comment-form__hint">

@@ -21,6 +21,9 @@ import { openJournalDatabase } from './database.js';
 import { JournalDeletionService } from './deletion.js';
 import { GameRepository } from './gameRepository.js';
 import { GameService } from './gameService.js';
+import { GuestbookRepository } from './guestbookRepository.js';
+import { GuestbookService } from './guestbookService.js';
+import { JournalGuestbookNotificationService } from './guestbookNotification.js';
 import { JournalIngestService } from './ingest.js';
 import { JournalCommentNotificationService } from './interactionNotification.js';
 import { JournalInteractionService } from './interactionService.js';
@@ -40,6 +43,7 @@ import { registerArticleRoutes } from './routes/articles.js';
 import { registerContributionRoutes } from './routes/contributions.js';
 import { registerFeedRoutes } from './routes/feeds.js';
 import { registerGameRoutes } from './routes/games.js';
+import { registerGuestbookRoutes } from './routes/guestbook.js';
 import { registerInternalRoutes } from './routes/internal.js';
 import { registerInteractionRoutes } from './routes/interactions.js';
 import { registerMediaRoutes } from './routes/media.js';
@@ -137,6 +141,14 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
     config.publicBaseUrl,
   );
   const interactionService = new JournalInteractionService(repository, commentNotifications);
+  const guestbookService = new GuestbookService(
+    new GuestbookRepository(database),
+    new JournalGuestbookNotificationService(
+      config.telegramToken,
+      config.allowedChatId,
+      config.publicBaseUrl,
+    ),
+  );
   await new JournalImagePreviewBackfillService(repository, storage, previews).run();
   await new JournalVideoPreviewBackfillService(repository, storage, videoPreviews).run();
   await new JournalResumePreviewBackfillService(repository, resumePreviews).run();
@@ -190,6 +202,7 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
     service: interactionService,
     visitorSecret: config.cookieSecret,
   });
+  await registerGuestbookRoutes(server, { auth, service: guestbookService });
   await registerContributionRoutes(server, {
     links: contributionLinks,
     contributions: contributionService,

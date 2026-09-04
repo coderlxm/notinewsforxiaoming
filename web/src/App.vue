@@ -137,6 +137,7 @@ const photosActive = computed(() =>
 const gamesActive = computed(() =>
   route.value.name === 'games',
 );
+const guestbookActive = computed(() => route.value.name === 'guestbook');
 const photoImmersiveActive = computed(() => photosActive.value);
 const gameImmersiveActive = computed(() => gamesActive.value);
 const immersiveActive = computed(() => photosActive.value || gamesActive.value);
@@ -155,6 +156,10 @@ function openPhotos(): void {
 
 function openGames(): void {
   navigate('/games');
+}
+
+function openGuestbook(): void {
+  navigate('/guestbook');
 }
 
 onMounted(() => {
@@ -204,11 +209,13 @@ onUnmounted(() => {
         :about-active="route.name === 'about'"
         :photos-active="photosActive"
         :games-active="gamesActive"
+        :guestbook-active="guestbookActive"
         :immersive="immersiveActive"
         @select="changePublicChannel"
         @select-about="openAbout"
         @select-photos="openPhotos"
         @select-games="openGames"
+        @select-guestbook="openGuestbook"
       />
 
       <AppRouteViewport

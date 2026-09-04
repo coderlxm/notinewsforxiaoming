@@ -95,6 +95,9 @@ export function parseAppRoute(
   if (route.name === 'games') {
     return { name: 'games', key: 'games' };
   }
+  if (route.name === 'guestbook') {
+    return { name: 'guestbook', key: 'guestbook' };
+  }
   if (route.name === 'photo-album') {
     const albumId = String(route.params.albumId);
     if (!PHOTO_ALBUM_ID_PATTERN.test(albumId)) {

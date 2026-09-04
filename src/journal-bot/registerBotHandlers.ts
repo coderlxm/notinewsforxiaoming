@@ -13,6 +13,7 @@ const JOURNAL_COMMAND_PATTERN = /^\/(?:note|post)(?:@[A-Za-z0-9_]+)?(?:\s+([\s\S
 const JOURNAL_VISIBILITY_CALLBACK_PATTERN = /^journal:visibility:([0-9a-f-]{36}):(private|public)$/;
 const JOURNAL_DELETE_CALLBACK_PATTERN = /^jd:(ask|confirm|cancel):([0-9a-f-]{36}):(p|r)$/;
 const JOURNAL_COMMENT_CALLBACK_PATTERN = /^jc:(h|p):(\d+)$/;
+const JOURNAL_GUESTBOOK_CALLBACK_PATTERN = /^jg:(h|p):(\d+)$/;
 
 const CAPTURABLE_MESSAGE_FIELDS = new Set([
   'text',
@@ -146,6 +147,16 @@ function commentNotificationKeyboard(commentId: number, hidden: boolean, adminUr
     Markup.button.callback(
       hidden ? '恢复公开' : '隐藏评论',
       `jc:${hidden ? 'p' : 'h'}:${commentId}`,
+    ),
+  ]]);
+}
+
+function guestbookNotificationKeyboard(messageId: number, hidden: boolean, guestbookUrl: string) {
+  return Markup.inlineKeyboard([[
+    Markup.button.url('打开留言板', guestbookUrl),
+    Markup.button.callback(
+      hidden ? '恢复公开' : '隐藏留言',
+      `jg:${hidden ? 'p' : 'h'}:${messageId}`,
     ),
   ]]);
 }
@@ -389,6 +400,29 @@ export function registerJournalBotHandlers(
           commentId,
           hidden,
           `${publicBaseUrl}/me?entry=${response.entryId}#comments`,
+        ).reply_markup,
+      );
+    } catch (error) {
+      if (!(error instanceof JournalClientError)) throw error;
+      await ctx.answerCbQuery(`Journal 操作失败：${error.message}`, { show_alert: true });
+    }
+  });
+
+  bot.action(JOURNAL_GUESTBOOK_CALLBACK_PATTERN, async (ctx) => {
+    if (!isAuthorized(ctx, options.allowedChatId)) return;
+    const match = JOURNAL_GUESTBOOK_CALLBACK_PATTERN.exec(ctx.match[0]);
+    if (!match?.[1] || !match[2]) return;
+    const hidden = match[1] === 'h';
+    const messageId = Number(match[2]);
+
+    try {
+      await api.updateGuestbookStatus(messageId, hidden ? 'hidden' : 'published');
+      await ctx.answerCbQuery(hidden ? '已隐藏该留言组' : '已恢复公开该留言组');
+      await ctx.editMessageReplyMarkup(
+        guestbookNotificationKeyboard(
+          messageId,
+          hidden,
+          `${publicBaseUrl}/guestbook`,
         ).reply_markup,
       );
     } catch (error) {

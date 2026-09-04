@@ -37,6 +37,7 @@ export function useAppRoute(
     || route.value.name === 'photos'
     || route.value.name === 'photo-album'
     || route.value.name === 'games'
+    || route.value.name === 'guestbook'
     || route.value.name === 'detail',
   );
 

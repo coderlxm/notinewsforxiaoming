@@ -1351,6 +1351,59 @@ const migrations: JournalMigration[] = [
       });
     },
   },
+  {
+    version: 22,
+    up(database) {
+      database.exec(`
+        CREATE TABLE journal_guestbook_messages (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          parent_id INTEGER,
+          author_role TEXT NOT NULL
+            CHECK (author_role IN ('visitor', 'owner')),
+          author_name TEXT NOT NULL,
+          content_markdown TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'published'
+            CHECK (status IN ('published', 'hidden')),
+          pinned INTEGER NOT NULL DEFAULT 0
+            CHECK (pinned IN (0, 1)),
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (parent_id)
+            REFERENCES journal_guestbook_messages(id) ON DELETE CASCADE,
+          CHECK (
+            (
+              author_role = 'visitor'
+              AND parent_id IS NULL
+            )
+            OR
+            (
+              author_role = 'owner'
+              AND parent_id IS NOT NULL
+              AND pinned = 0
+            )
+          )
+        );
+
+        CREATE INDEX idx_journal_guestbook_public
+        ON journal_guestbook_messages(
+          status,
+          pinned DESC,
+          created_at DESC,
+          id DESC
+        )
+        WHERE parent_id IS NULL;
+
+        CREATE INDEX idx_journal_guestbook_parent
+        ON journal_guestbook_messages(
+          parent_id,
+          status,
+          created_at ASC,
+          id ASC
+        )
+        WHERE parent_id IS NOT NULL;
+      `);
+    },
+  },
 ];
 
 export function runJournalMigrations(database: Database.Database): void {
