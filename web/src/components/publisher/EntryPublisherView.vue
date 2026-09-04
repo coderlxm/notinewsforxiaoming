@@ -304,10 +304,11 @@ async function generateTopic(): Promise<void> {
 
 <template>
   <main class="publisher-view">
-    <div class="publisher-view__heading">
+    <header class="publisher-view__heading">
       <button class="text-button" type="button" @click="returnToAssets">← 返回我的全部记录</button>
-      <span>{{ isEditing ? '编辑记录' : '发布内容' }}</span>
-    </div>
+      <h1>{{ isEditing ? '编辑记录' : '写一条新记录' }}</h1>
+      <p>{{ isEditing ? '继续整理文字，留住想记下的细节。' : '生活里的小事，也值得被记下来。' }}</p>
+    </header>
 
     <aside v-if="stalledPublishProbe" class="publisher-view__probe">
       <span>检测到上次发布在刷新前停留于</span>
@@ -361,19 +362,19 @@ async function generateTopic(): Promise<void> {
               :existing-assets="existingAssets"
               :disabled="busy"
             />
+
+            <EntryMediaPreviewGrid
+              v-if="existingAssets.length || newMedia.length"
+              v-model="newMedia"
+              class="publisher-view__previews"
+              :existing-assets="existingAssets"
+              :disabled="busy || !mediaEditable"
+              @remove-existing="removeExisting"
+            />
           </div>
 
-          <EntryMediaPreviewGrid
-            v-if="existingAssets.length || newMedia.length"
-            v-model="newMedia"
-            class="publisher-view__previews"
-            :existing-assets="existingAssets"
-            :disabled="busy || !mediaEditable"
-            @remove-existing="removeExisting"
-          />
-
           <aside class="publisher-view__sidebar">
-            <h2 class="publisher-view__sidebar-title">发布设置</h2>
+            <h2 class="publisher-view__sidebar-title">这条记录</h2>
             <div class="publisher-view__settings">
               <div class="publisher-view__fields-row">
                 <EntryChannelField v-model="channel" :disabled="busy" />
@@ -434,20 +435,32 @@ async function generateTopic(): Promise<void> {
 
 <style scoped>
 .publisher-view {
-  display: grid;
-  gap: 1rem;
   width: min(calc(100% - (var(--page-gutter) * 2)), var(--editor-workspace-width));
   margin: 0 auto;
-  padding: 1.3rem 0 4rem;
+  padding: 2rem 0 4rem;
 }
 
 .publisher-view__heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 0.15rem;
+  margin-bottom: 2rem;
+}
+
+.publisher-view__heading .text-button {
   color: var(--text-muted);
-  font-size: 0.78rem;
+}
+
+.publisher-view__heading h1 {
+  margin: 1.5rem 0 0.5rem;
+  font-family: var(--font-serif);
+  font-size: clamp(1.6rem, 3vw, 2rem);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.publisher-view__heading p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  line-height: 1.7;
 }
 
 .publisher-view__probe {
@@ -455,10 +468,9 @@ async function generateTopic(): Promise<void> {
   flex-wrap: wrap;
   gap: 0.35rem 0.6rem;
   align-items: baseline;
-  padding: 0.75rem 0.9rem;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-card);
-  background: var(--surface-card);
+  margin-bottom: 1.5rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border-subtle);
   color: var(--text-muted);
   font-size: 0.78rem;
 }
@@ -468,15 +480,11 @@ async function generateTopic(): Promise<void> {
   font-weight: 650;
 }
 
-.publisher-view__stage {
-  display: grid;
-}
-
 .publisher-view__form {
   --el-color-primary: var(--accent-strong);
   display: grid;
-  grid-template-columns: minmax(0, var(--editor-width)) minmax(18rem, 1fr);
-  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr) 19rem;
+  gap: 2.5rem;
   align-items: start;
 }
 
@@ -486,127 +494,271 @@ async function generateTopic(): Promise<void> {
 
 .publisher-view__manuscript {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  grid-column: 1;
-  grid-row: 1;
-  gap: 1rem;
+  gap: 1.75rem;
   min-width: 0;
-  height: 33.4rem;
+  padding: 2rem;
+  border-radius: 4px;
+  background: var(--surface-card);
 }
 
 .publisher-view__copy {
   display: grid;
-  gap: 0.75rem;
+  gap: 1.75rem;
+}
+
+.publisher-view__copy :deep(.topic-field) {
+  gap: 0.6rem;
+}
+
+.publisher-view__copy :deep(.topic-field input) {
+  width: 100%;
+  padding: 0.5rem 0 1rem;
+  border: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  border-radius: 0;
+  background: transparent;
+  font-family: var(--font-serif);
+  font-size: 1.35rem;
+  line-height: 1.6;
+}
+
+.publisher-view__copy :deep(.topic-field input:focus) {
+  border-bottom-color: var(--accent);
+}
+
+.publisher-view__copy :deep(input::placeholder),
+.publisher-view__copy textarea::placeholder {
+  color: var(--text-muted);
+  opacity: 0.7;
 }
 
 .publisher-view__field-heading {
   display: flex;
-  min-width: 0;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: 0.65rem;
+  margin-bottom: 0.5rem;
 }
 
 .publisher-view__ai-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.4rem;
 }
 
-.publisher-view__media {
-  min-height: 0;
-  grid-template-rows: auto minmax(8rem, 1fr);
+.publisher-view__form textarea {
+  width: 100%;
+  min-height: 18rem;
+  padding: 0.5rem 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: 0.95rem;
+  line-height: 1.9;
+  resize: vertical;
 }
 
-.publisher-view__sidebar {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  grid-column: 2;
-  grid-row: 1;
-  gap: 0.3rem;
-  min-width: 0;
-  min-height: 33.4rem;
+.publisher-view__media {
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.publisher-view__media :deep(.image-picker__drop-zone) {
+  min-height: 7rem;
+  border-color: var(--border-subtle);
+  border-radius: 8px;
+  background: var(--surface-page);
+}
+
+.publisher-view__media :deep(.image-picker__drop-zone:hover:not(:disabled)),
+.publisher-view__media :deep(.image-picker__drop-zone--over) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.publisher-view__media :deep(.image-picker__drop-title) {
+  font-weight: 500;
 }
 
 .publisher-view__previews {
-  grid-column: 1;
-  grid-row: 2;
-}
-
-.publisher-view__sidebar-title {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: 0.72rem;
-  font-weight: 650;
-}
-
-.publisher-view__settings {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  gap: 1rem;
-  padding: 1rem;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-card);
-  background: var(--surface-card);
-}
-
-.publisher-view__fields-row {
-  display: grid;
-  gap: 1rem;
   min-width: 0;
 }
 
-.publisher-view__form textarea {
-  width: 100%;
-  min-height: 14rem;
-  resize: none;
-  line-height: 1.7;
+.publisher-view__sidebar {
+  min-width: 0;
+  padding: 0.5rem 0 0.5rem 1.75rem;
+  border-left: 1px solid var(--border-subtle);
+}
+
+.publisher-view__sidebar-title {
+  margin: 0 0 1.75rem;
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.publisher-view__settings,
+.publisher-view__fields-row {
+  display: grid;
+  gap: 1.5rem;
+  min-width: 0;
+}
+
+.publisher-view__sidebar :deep(.channel-field),
+.publisher-view__sidebar :deep(.visibility-field) {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.25rem;
+}
+
+.publisher-view__sidebar :deep(.channel-field__label),
+.publisher-view__sidebar :deep(.visibility-field__label),
+.publisher-view__sidebar :deep(.published-time-field__label) {
+  margin-bottom: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+}
+
+.publisher-view__sidebar :deep(.channel-field__option),
+.publisher-view__sidebar :deep(.visibility-field__option),
+.publisher-view__sidebar :deep(.published-time-field__option) {
+  gap: 0.7rem;
+  padding: 0.65rem 0.5rem;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+}
+
+.publisher-view__sidebar :deep(.channel-field__option:has(input:checked)),
+.publisher-view__sidebar :deep(.visibility-field__option:has(input:checked)),
+.publisher-view__sidebar :deep(.published-time-field__option:has(input:checked)) {
+  background: var(--accent-soft);
+}
+
+.publisher-view__sidebar :deep(.channel-field__option:has(input:checked) strong),
+.publisher-view__sidebar :deep(.visibility-field__option:has(input:checked) strong) {
+  color: var(--accent-strong);
+}
+
+.publisher-view__sidebar :deep(.channel-field__option:has(input:focus-visible)),
+.publisher-view__sidebar :deep(.visibility-field__option:has(input:focus-visible)) {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.publisher-view__sidebar :deep(.visibility-field),
+.publisher-view__sidebar :deep(.published-time-field) {
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.publisher-view__sidebar :deep(.published-time-field__inputs) {
+  flex-wrap: wrap;
+  padding: 0.5rem 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.publisher-view__sidebar :deep(.published-time-field__input) {
+  flex-basis: 7rem;
+}
+
+.publisher-view__sidebar :deep(.visibility-field__password) {
+  margin-top: 0.5rem;
 }
 
 .publisher-view__actions {
   display: flex;
-  align-self: end;
+  flex-wrap: wrap;
   gap: 0.65rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border-subtle);
 }
 
 .publisher-view__actions .button {
-  flex: 1 1 0;
+  flex: 1 1 6rem;
+  min-height: 2.75rem;
 }
 
-@media (max-width: 1180px) {
+.publisher-view__actions .button--quiet {
+  background: transparent;
+}
+
+@media (max-width: 1000px) {
   .publisher-view {
-    width: min(calc(100% - (var(--page-gutter) * 2)), var(--editor-width));
+    max-width: var(--editor-width);
   }
 
   .publisher-view__form {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .publisher-view__manuscript,
-  .publisher-view__previews,
-  .publisher-view__sidebar {
-    grid-column: 1;
-    grid-row: auto;
-  }
-
-  .publisher-view__manuscript,
-  .publisher-view__sidebar {
-    height: auto;
+    gap: 2rem;
   }
 
   .publisher-view__sidebar {
-    min-height: 0;
+    padding: 0;
+    border-left: 0;
+  }
+
+  .publisher-view__fields-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 2rem;
+  }
+
+  .publisher-view__sidebar :deep(.visibility-field) {
+    padding-top: 0;
+    border-top: 0;
+  }
+
+  .publisher-view__actions {
+    justify-content: flex-end;
+  }
+
+  .publisher-view__actions .button {
+    flex: 0 1 10rem;
+  }
+}
+
+@media (max-width: 599px) {
+  .publisher-view {
+    padding-top: 1.25rem;
+  }
+
+  .publisher-view__heading {
+    padding-inline: 0.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .publisher-view__manuscript {
+    gap: 1.5rem;
+    padding: 1.25rem;
+  }
+
+  .publisher-view__copy :deep(.topic-field input) {
+    font-size: 1.15rem;
   }
 
   .publisher-view__form textarea {
-    resize: vertical;
+    min-height: 15rem;
   }
 
-}
+  .publisher-view__sidebar {
+    padding-inline: 0.5rem;
+  }
 
-@media (min-width: 600px) and (max-width: 1180px) {
   .publisher-view__fields-row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.5rem;
+  }
+
+  .publisher-view__sidebar :deep(.visibility-field) {
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .publisher-view__actions .button {
+    flex: 1 1 6rem;
   }
 }
 </style>
