@@ -48,11 +48,13 @@ import type {
 export type JournalTagSuggestionRequest =
   | {
       kind: 'entry';
+      channel: JournalPlainChannel;
       title: string | null;
       contentText: string;
     }
   | {
       kind: 'article';
+      channel: 'article';
       title: string;
       richBody: JournalRichDocument;
       existingTags: string[];

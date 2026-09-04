@@ -206,7 +206,7 @@ export async function createJournalServer(config: JournalServerConfig): Promise<
     webEntryService,
     webEntryUploads,
   );
-  await registerTagSuggestionRoutes(server, auth, aiSuggestions);
+  await registerTagSuggestionRoutes(server, auth, aiSuggestions, siteProfileService);
   await registerTopicSuggestionRoutes(server, auth, aiSuggestions);
   webEntryUploads.registerRoutes(server);
   await registerArticleRoutes(server, auth, articleService);

@@ -267,6 +267,7 @@ async function generateTags(): Promise<void> {
   try {
     const tags = await tagSuggestions.generate({
       kind: 'entry',
+      channel: channel.value,
       title: title.value.trim() || null,
       contentText: contentText.value,
     });

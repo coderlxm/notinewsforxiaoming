@@ -462,12 +462,14 @@ const journalSuggestedTagSchema = z.string().trim().min(1).max(32).refine(
 
 const journalEntryTagSuggestionRequestSchema = z.object({
   kind: z.literal('entry'),
+  channel: journalPlainChannelSchema,
   title: journalWebEntryTitleSchema,
   contentText: z.string(),
 }).strict();
 
 const journalArticleTagSuggestionRequestSchema = z.object({
   kind: z.literal('article'),
+  channel: z.literal('article'),
   title: z.string().trim().min(1).max(120),
   richBody: journalRichDocumentSchema,
   existingTags: journalArticleTagsSchema,
@@ -493,8 +495,16 @@ export type JournalTagSuggestionRequest = z.infer<
 >;
 
 export const journalTagSuggestionModelResponseSchema = z.object({
-  tags: z.array(journalSuggestedTagSchema).min(1).max(5),
-}).strict();
+  attributionTags: z.array(journalSuggestedTagSchema).max(5),
+  extraTags: z.array(journalSuggestedTagSchema).max(5),
+}).strict().superRefine((response, context) => {
+  if (response.attributionTags.length + response.extraTags.length === 0) {
+    context.addIssue({
+      code: 'custom',
+      message: 'Tag suggestions require at least one tag.',
+    });
+  }
+});
 
 export const journalTagSuggestionResponseSchema = z.object({
   tags: z.array(journalSuggestedTagSchema).max(5),
