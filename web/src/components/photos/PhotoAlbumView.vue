@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script setup lang="ts" name="PhotoAlbumView">
 import dayjs from 'dayjs';
 import { storeToRefs } from 'pinia';
 import { computed, nextTick, onBeforeUnmount, watch } from 'vue';
@@ -6,8 +6,6 @@ import { usePhotoLibraryStore } from '../../stores/photoLibrary';
 import JournalLoading from '../ui/JournalLoading.vue';
 import PhotoAlbumFloatingToolbar from './PhotoAlbumFloatingToolbar.vue';
 import PhotoJustifiedGallery from './PhotoJustifiedGallery.vue';
-
-defineOptions({ name: 'PhotoAlbumView' });
 
 const props = defineProps<{
   albumId: string;

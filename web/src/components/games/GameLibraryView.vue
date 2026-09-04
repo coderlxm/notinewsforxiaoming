@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script setup lang="ts" name="GameLibraryView">
 import { storeToRefs } from 'pinia';
 import { computed, nextTick, onBeforeUnmount, onMounted, shallowRef } from 'vue';
 import { useGameLibraryStore } from '../../stores/gameLibrary';
@@ -17,8 +17,6 @@ import type {
   GamePlatform,
   GamePlayStatus,
 } from './gameTypes';
-
-defineOptions({ name: 'GameLibraryView' });
 
 const emit = defineEmits<{
   layoutReady: [];

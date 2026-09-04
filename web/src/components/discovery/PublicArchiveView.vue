@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script setup lang="ts" name="PublicArchiveView">
 import { nextTick, onBeforeUnmount, onMounted, onUpdated, shallowRef } from 'vue';
 import { onBeforeRouteUpdate, useRoute, useRouter } from 'vue-router';
 import { fetchPublicDiscoveryArchive } from '../../api';
@@ -7,8 +7,6 @@ import type { JournalDiscoveryArchiveOverview } from '../../types';
 import JournalLoading from '../ui/JournalLoading.vue';
 import { discoveryErrorMessage, publicArchiveMonthPath } from './discoveryRoutes';
 import { usePublicDiscoveryHead } from './usePublicDiscoveryHead';
-
-defineOptions({ name: 'PublicArchiveView' });
 
 const props = defineProps<{
   accessScope: string;

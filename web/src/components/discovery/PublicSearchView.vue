@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script setup lang="ts" name="PublicSearchView">
 import {
   nextTick,
   onBeforeUnmount,
@@ -24,8 +24,6 @@ import {
   publicSearchPath,
 } from './discoveryRoutes';
 import { usePublicDiscoveryHead } from './usePublicDiscoveryHead';
-
-defineOptions({ name: 'PublicSearchView' });
 
 const props = defineProps<{
   accessScope: string;

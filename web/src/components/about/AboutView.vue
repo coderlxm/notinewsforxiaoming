@@ -1,11 +1,9 @@
-<script setup lang="ts">
+<script setup lang="ts" name="AboutView">
 import { storeToRefs } from 'pinia';
 import { computed } from 'vue';
 import { useSiteProfileStore } from '../../stores/siteProfile';
 import AboutContactList from './AboutContactList.vue';
 import AboutResumeCard from './AboutResumeCard.vue';
-
-defineOptions({ name: 'AboutView' });
 
 const siteProfile = useSiteProfileStore();
 const { profile, loadError } = storeToRefs(siteProfile);

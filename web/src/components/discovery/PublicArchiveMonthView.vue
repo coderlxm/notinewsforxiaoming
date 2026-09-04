@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script setup lang="ts" name="PublicArchiveMonthView">
 import {
   nextTick,
   onBeforeUnmount,
@@ -20,8 +20,6 @@ import {
   publicArchiveMonthPath,
 } from './discoveryRoutes';
 import { usePublicDiscoveryHead } from './usePublicDiscoveryHead';
-
-defineOptions({ name: 'PublicArchiveMonthView' });
 
 const props = defineProps<{
   accessScope: string;

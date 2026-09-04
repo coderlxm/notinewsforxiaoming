@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script setup lang="ts" name="PhotoLibraryView">
 import { storeToRefs } from 'pinia';
 import { computed, nextTick, onBeforeUnmount, onMounted } from 'vue';
 import type { PhotoLibraryPhoto } from '../../../../src/shared/photoLibraryProtocol';
@@ -8,8 +8,6 @@ import JournalLoading from '../ui/JournalLoading.vue';
 import FeaturedPhotoStrip from './FeaturedPhotoStrip.vue';
 import PhotoAlbumGrid from './PhotoAlbumGrid.vue';
 import PhotoHeroBillboard from './PhotoHeroBillboard.vue';
-
-defineOptions({ name: 'PhotoLibraryView' });
 
 const emit = defineEmits<{
   layoutReady: [];

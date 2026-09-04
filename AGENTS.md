@@ -189,6 +189,7 @@ NotiNewsForXiaoming 的现有发布路径是：
 
 ## 代码风格
 
+- Vue 组件需要显式命名时，使用 `<script setup lang="ts" name="组件名">`，不使用 `defineOptions({ name: '组件名' })`。该写法依赖 `vite-plugin-vue-setup-extend`，Journal 前端已在 `web/vite.config.ts` 中启用；其他 Vue 入口采用此写法前也必须接入插件。`defineOptions` 如有其他组件选项，应保留那些选项。
 - 保持实现短而直接。
 - 不为了极端情况添加防御代码。
 - 不引入与当前业务无关的抽象。
