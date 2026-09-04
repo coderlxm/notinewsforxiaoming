@@ -62,6 +62,10 @@ const renderedLoading = computed(() =>
 const total = computed(() =>
   renderedMessages.value === null ? null : renderedMessages.value.length,
 );
+const repliedTotal = computed(() => {
+  if (renderedMessages.value === null) return 0;
+  return renderedMessages.value.filter(m => m.replies && m.replies.length > 0).length;
+});
 const hiddenTotal = computed(() => {
   if (!ownerMode.value || renderedMessages.value === null) return null;
   return renderedMessages.value.filter(
@@ -161,13 +165,16 @@ async function handleRemove(id: number): Promise<void> {
 
 <template>
   <main class="guestbook-view">
+    <!-- 顶部看板 -->
     <GuestbookHeader
       :total="total"
+      :replied-total="repliedTotal"
       :hidden-total="hiddenTotal"
       :owner-mode="ownerMode"
     />
 
-    <div v-if="!ownerMode" class="guestbook-view__composer">
+    <!-- 访客留言输入框 -->
+    <section v-if="!ownerMode" class="guestbook-view__composer" aria-label="写留言">
       <JournalCommentForm
         v-if="authenticationChecked"
         ref="visitorForm"
@@ -178,43 +185,51 @@ async function handleRemove(id: number): Promise<void> {
         :initial-author-name="rememberedVisitorName"
         @submit="handleVisitorSubmit"
       />
-    </div>
+    </section>
 
-    <GuestbookList
-      :messages="renderedMessages"
-      :loading="renderedLoading"
-      :load-error="renderedLoadError"
-      :owner-mode="ownerMode"
-      :mutating-id="mutatingId"
-      :submitting-reply="submittingReply"
-      :reply-target-id="replyTargetId"
-      @open-reply="openReply"
-      @close-reply="closeReply"
-      @reply="handleReplySubmit"
-      @set-status="handleSetStatus"
-      @set-pinned="handleSetPinned"
-      @remove="handleRemove"
-    />
+    <!-- 下方多列自适应留言列表 -->
+    <section class="guestbook-view__list" aria-label="留言列表">
+      <GuestbookList
+        :messages="renderedMessages"
+        :loading="renderedLoading"
+        :load-error="renderedLoadError"
+        :owner-mode="ownerMode"
+        :mutating-id="mutatingId"
+        :submitting-reply="submittingReply"
+        :reply-target-id="replyTargetId"
+        @open-reply="openReply"
+        @close-reply="closeReply"
+        @reply="handleReplySubmit"
+        @set-status="handleSetStatus"
+        @set-pinned="handleSetPinned"
+        @remove="handleRemove"
+      />
+    </section>
   </main>
 </template>
 
 <style scoped>
 .guestbook-view {
   display: grid;
-  width: min(calc(100% - (var(--page-gutter) * 2)), var(--reading-width));
+  width: min(calc(100% - (var(--page-gutter) * 2)), 1360px);
   margin: 0 auto;
-  padding: clamp(2rem, 5vw, 4.2rem) 0 5rem;
-  gap: clamp(1.4rem, 3vw, 2rem);
+  padding: clamp(2.2rem, 4.5vw, 3.8rem) 0 5.5rem;
+  gap: clamp(1.4rem, 2.5vw, 2rem);
   align-content: start;
 }
 
-.guestbook-view__composer:empty {
-  min-height: 3.4rem;
+.guestbook-view__composer {
+  width: 100%;
 }
 
-@media (max-width: 799px) {
+.guestbook-view__list {
+  width: 100%;
+}
+
+@media (max-width: 599px) {
   .guestbook-view {
     padding: 1.6rem 0 calc(2.4rem + env(safe-area-inset-bottom));
+    gap: 1.2rem;
   }
 }
 </style>

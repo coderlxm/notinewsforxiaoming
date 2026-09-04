@@ -6,7 +6,7 @@ const gradientId = `guestbook-nav-grad-${rawId.replace(/[^a-zA-Z0-9-_]/g, '')}`;
 </script>
 
 <template>
-  <!-- 对话气泡 + 留言横线，琥珀-玫红-紫渐变 -->
+  <!-- 雅致信笺与书信折角，玫瑰红至典雅紫渐变 -->
   <svg
     viewBox="0 0 24 24"
     fill="none"
@@ -19,30 +19,38 @@ const gradientId = `guestbook-nav-grad-${rawId.replace(/[^a-zA-Z0-9-_]/g, '')}`;
         x1="3"
         y1="4"
         x2="21"
-        y2="21"
+        y2="20"
         gradientUnits="userSpaceOnUse"
       >
-        <stop offset="0%" stop-color="#F59E0B" />
-        <stop offset="52%" stop-color="#F472B6" />
-        <stop offset="100%" stop-color="#A855F7" />
+        <stop offset="0%" stop-color="#E11D48" />
+        <stop offset="50%" stop-color="#BE185D" />
+        <stop offset="100%" stop-color="#831843" />
       </linearGradient>
     </defs>
 
-    <!-- 气泡机身（左下角带纸条式折尾） -->
+    <!-- 信封主体轮廓 -->
     <path
       fill-rule="evenodd"
       clip-rule="evenodd"
-      d="M5.5 3h13A2.5 2.5 0 0 1 21 5.5v10a2.5 2.5 0 0 1-2.5 2.5H7.4L4 21V5.5A2.5 2.5 0 0 1 5.5 3Z"
+      d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v13a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 18.5v-13Z"
       :fill="`url(#${gradientId})`"
     />
 
-    <!-- 留言横线 -->
+    <!-- 信封折翼与信笺横线 -->
     <path
-      d="M8 8.2h8M8 11.8h5.2"
-      stroke="#0c0d12"
-      stroke-width="1.7"
+      d="M5 6.5L12 12.2L19 6.5"
+      stroke="#ffffff"
+      stroke-width="1.6"
       stroke-linecap="round"
       stroke-linejoin="round"
+      stroke-opacity="0.92"
+    />
+    <path
+      d="M8.5 15.5H15.5"
+      stroke="#ffffff"
+      stroke-width="1.5"
+      stroke-linecap="round"
+      stroke-opacity="0.85"
     />
   </svg>
 </template>

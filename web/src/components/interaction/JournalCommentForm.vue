@@ -80,7 +80,10 @@ defineExpose({ clearContent, markFailed });
 <template>
   <form
     class="comment-form"
-    :class="{ 'comment-form--expanded': expanded }"
+    :class="{
+      'comment-form--expanded': expanded,
+      'comment-form--guestbook': isGuestbook,
+    }"
     @focusin="focused = true"
     @focusout="handleFocusOut"
     @submit.prevent="submit"
@@ -93,8 +96,8 @@ defineExpose({ clearContent, markFailed });
       class="comment-form__content"
       :aria-label="mode === 'owner' ? '回复内容' : isGuestbook ? '留言内容' : '评论内容'"
       :name="mode === 'owner' ? 'reply-content' : isGuestbook ? 'guestbook-content' : 'comment-content'"
-      :rows="mode === 'owner' ? 3 : 2"
-      :placeholder="mode === 'owner' ? '写下你的回复……' : isGuestbook ? '写下你想对小明说的话……' : '留下你的想法……'"
+      :rows="mode === 'owner' ? 3 : isGuestbook ? 3 : 2"
+      :placeholder="mode === 'owner' ? '写下你的回复……' : isGuestbook ? '留下你的想法与留言……' : '留下你的想法……'"
       maxlength="1000"
       :disabled="busy || disabled"
       @input="handleInput"
@@ -154,40 +157,55 @@ defineExpose({ clearContent, markFailed });
 .comment-form {
   position: relative;
   display: grid;
-  gap: 0.5rem;
-  padding: 0.7rem 0.8rem 0.55rem;
+  gap: 0.55rem;
+  padding: 0.8rem 0.95rem 0.65rem;
   border: 1px solid var(--border-subtle);
-  border-radius: 0.85rem;
+  border-radius: var(--radius-card);
   background: var(--surface-card);
-  transition: border-color 180ms ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.comment-form--guestbook {
+  padding: clamp(0.9rem, 2.5vw, 1.15rem) clamp(1rem, 3vw, 1.35rem) 0.85rem;
 }
 
 .comment-form:focus-within {
   border-color: var(--focus);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 20%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 18%, transparent);
 }
 
 .comment-form__reply-context {
   margin: 0;
-  color: var(--text-muted);
+  color: var(--accent-strong);
   font-size: 0.78rem;
+  font-weight: 600;
 }
 
 .comment-form__content {
   width: 100%;
-  min-height: 2.6rem;
+  min-height: 2.8rem;
   padding: 0;
   border: 0;
   background: transparent;
   color: var(--text-primary);
   font: inherit;
-  font-size: 0.9rem;
-  line-height: 1.6;
+  font-size: 0.92rem;
+  line-height: 1.7;
   resize: vertical;
+}
+
+.comment-form--guestbook .comment-form__content {
+  min-height: 3.2rem;
 }
 
 .comment-form__content:focus {
   outline: none;
+}
+
+.comment-form__content::placeholder {
+  color: var(--text-muted);
+  opacity: 0.75;
 }
 
 .comment-form__honeypot {
@@ -207,8 +225,8 @@ defineExpose({ clearContent, markFailed });
 .comment-form__auxiliary {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding-top: 0.5rem;
+  gap: 0.6rem;
+  padding-top: 0.6rem;
   border-top: 1px solid var(--border-subtle);
   animation: comment-form-reveal 180ms var(--ease-card);
 }
@@ -216,19 +234,20 @@ defineExpose({ clearContent, markFailed });
 .comment-form__name-label {
   flex: none;
   color: var(--text-muted);
-  font-size: 0.78rem;
+  font-size: 0.8rem;
+  font-weight: 550;
 }
 
 .comment-form__name {
-  width: 10rem;
+  width: 10.5rem;
   min-height: 2.2rem;
-  padding: 0.2rem 0.55rem;
+  padding: 0.25rem 0.65rem;
   border: 1px solid var(--border-subtle);
-  border-radius: 0.55rem;
+  border-radius: 6px;
   background: var(--surface-muted);
   color: var(--text-primary);
   font: inherit;
-  font-size: 0.84rem;
+  font-size: 0.86rem;
 }
 
 .comment-form__name:focus {
@@ -238,7 +257,7 @@ defineExpose({ clearContent, markFailed });
 
 .comment-form__hint-toggle {
   margin-left: auto;
-  padding: 0.3rem 0.2rem;
+  padding: 0.3rem 0.4rem;
   border: 0;
   background: transparent;
   color: var(--text-muted);
@@ -246,6 +265,7 @@ defineExpose({ clearContent, markFailed });
   font: inherit;
   font-size: 0.74rem;
   white-space: nowrap;
+  border-radius: 4px;
 }
 
 .comment-form__hint-toggle:hover {
@@ -260,34 +280,36 @@ defineExpose({ clearContent, markFailed });
 
 .comment-form__submit {
   flex: none;
-  min-height: 2.2rem;
-  padding: 0.25rem 0.85rem;
+  min-height: 2.25rem;
+  padding: 0.28rem 1rem;
   border: 1px solid var(--border-strong);
   border-radius: 999px;
   background: var(--surface-muted);
   color: var(--text-primary);
   cursor: pointer;
   font: inherit;
-  font-size: 0.8rem;
-  transition: background 160ms ease, color 160ms ease;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
 }
 
 .comment-form__submit:not(:disabled):hover {
   border-color: var(--accent);
-  background: var(--accent-soft);
-  color: var(--accent-strong);
+  background: var(--accent);
+  color: #ffffff;
 }
 
 .comment-form__submit:disabled {
-  opacity: 0.55;
+  opacity: 0.5;
   cursor: default;
 }
 
 .comment-form__hint {
   margin: 0;
-  padding: 0.35rem 0.2rem 0.1rem;
+  padding: 0.4rem 0.2rem 0.1rem;
   color: var(--text-muted);
-  font-size: 0.74rem;
+  font-size: 0.75rem;
   line-height: 1.7;
 }
 
@@ -321,13 +343,13 @@ defineExpose({ clearContent, markFailed });
   .comment-form__hint-toggle {
     order: 1;
     margin-left: 0;
-    min-height: 40px;
+    min-height: 36px;
   }
 
   .comment-form__submit {
     order: 2;
     margin-left: auto;
-    min-height: 40px;
+    min-height: 36px;
   }
 }
 
