@@ -14,14 +14,19 @@ const props = defineProps<{
   contacts?: SiteContactItem[];
 }>();
 
+type PageDirection = 'next' | 'prev';
+
 const currentPage = shallowRef(1);
 const navigating = shallowRef(false);
+const pageDirection = shallowRef<PageDirection>('next');
 const previewImages = new Map<string, HTMLImageElement>();
 const totalPages = computed(() => props.pages.length);
 
 const activePage = computed(() =>
   props.pages.find((p) => p.pageNumber === currentPage.value) ?? props.pages[0],
 );
+
+const pageTransitionName = computed(() => `pdf-page-${pageDirection.value}`);
 
 const visibleContacts = computed(() =>
   props.contacts?.filter((item) => item.enabled && item.value.trim()) ?? [],
@@ -61,14 +66,24 @@ async function goToPage(pageNumber: number): Promise<void> {
     || pageNumber < 1
     || pageNumber > totalPages.value
   ) return;
-  const page = props.pages.find(item => item.pageNumber === pageNumber)!;
+
+  const targetPage = props.pages.find(item => item.pageNumber === pageNumber);
+  if (!targetPage) return;
+
   navigating.value = true;
+
   try {
-    await ensurePageDecoded(page);
+    await ensurePageDecoded(targetPage);
+    pageDirection.value = pageNumber > currentPage.value ? 'next' : 'prev';
     currentPage.value = pageNumber;
-  } finally {
+  } catch (error) {
     navigating.value = false;
+    throw error;
   }
+}
+
+function finishPageTurn(): void {
+  navigating.value = false;
 }
 
 function prevPage(): void {
@@ -117,7 +132,7 @@ onUnmounted(() => {
 
 <template>
   <div class="pdf-viewer-root">
-    <!-- 桌面端视图：画廊级单页聚焦翻页器 -->
+    <!-- 桌面端视图：单页纸张翻页器 -->
     <section class="pdf-book" aria-label="PDF 简历单页阅读器">
       <div class="pdf-book__stage" :aria-busy="navigating">
         <!-- 左侧翻页浮动按钮 -->
@@ -135,32 +150,43 @@ onUnmounted(() => {
           </svg>
         </button>
 
-        <!-- 当前页单张精工纸张 -->
-        <div v-if="activePage" class="pdf-paper">
-          <div class="pdf-paper__badge">
-            {{ String(activePage.pageNumber).padStart(2, '0') }} / {{ String(totalPages).padStart(2, '0') }}
-          </div>
+        <!-- 单页纸张舞台 -->
+        <div class="pdf-book__viewport">
+          <Transition :name="pageTransitionName" @after-enter="finishPageTurn">
+            <div
+              v-if="activePage"
+              :key="activePage.pageNumber"
+              class="pdf-paper"
+            >
+              <div class="pdf-paper__badge">
+                {{ String(activePage.pageNumber).padStart(2, '0') }} / {{ String(totalPages).padStart(2, '0') }}
+              </div>
 
-          <div class="pdf-paper__images">
-            <img
-              class="pdf-paper__image pdf-paper__image--light"
-              :src="activePage.lightUrl"
-              :width="activePage.width"
-              :height="activePage.height"
-              :alt="`简历第 ${activePage.pageNumber} 页，共 ${totalPages} 页`"
-              fetchpriority="high"
-              decoding="async"
-            >
-            <img
-              class="pdf-paper__image pdf-paper__image--dark"
-              :src="activePage.darkUrl"
-              :width="activePage.width"
-              :height="activePage.height"
-              alt=""
-              aria-hidden="true"
-              decoding="async"
-            >
-          </div>
+              <div class="pdf-paper__images">
+                <img
+                  class="pdf-paper__image pdf-paper__image--light"
+                  :src="activePage.lightUrl"
+                  :width="activePage.width"
+                  :height="activePage.height"
+                  :alt="`简历第 ${activePage.pageNumber} 页，共 ${totalPages} 页`"
+                  fetchpriority="high"
+                  decoding="async"
+                >
+                <img
+                  class="pdf-paper__image pdf-paper__image--dark"
+                  :src="activePage.darkUrl"
+                  :width="activePage.width"
+                  :height="activePage.height"
+                  alt=""
+                  aria-hidden="true"
+                  decoding="async"
+                >
+              </div>
+
+              <div class="pdf-paper__turn-shadow" aria-hidden="true" />
+              <div class="pdf-paper__spine-shadow" aria-hidden="true" />
+            </div>
+          </Transition>
         </div>
 
         <!-- 右侧翻页浮动按钮 -->
@@ -323,7 +349,7 @@ onUnmounted(() => {
   width: 100%;
 }
 
-/* 桌面端画廊单页 */
+/* 桌面端画廊 */
 .pdf-book {
   display: grid;
   gap: 1.25rem;
@@ -338,24 +364,38 @@ onUnmounted(() => {
   width: 100%;
 }
 
+/* 页面始终叠在同一舞台，切换时由 Vue 同时保留新旧两页。 */
+.pdf-book__viewport {
+  position: relative;
+  display: grid;
+  width: min(100%, 860px);
+  perspective: 1800px;
+  perspective-origin: center center;
+  isolation: isolate;
+}
+
 .pdf-paper {
   position: relative;
-  width: min(100%, 860px);
+  grid-area: 1 / 1;
+  width: 100%;
   border-radius: 8px;
   background: var(--surface-card);
   box-shadow:
-    0 16px 36px color-mix(in srgb, var(--ink) 12%, transparent),
-    0 2px 6px color-mix(in srgb, var(--ink) 4%, transparent),
+    0 2px 5px color-mix(in srgb, var(--ink) 4%, transparent),
+    0 12px 28px color-mix(in srgb, var(--ink) 10%, transparent),
+    0 24px 48px color-mix(in srgb, var(--ink) 6%, transparent),
     0 0 0 1px var(--border-subtle);
   overflow: hidden;
-  transition: transform 180ms ease, box-shadow 180ms ease;
+  user-select: none;
+  backface-visibility: hidden;
+  transform-origin: left center;
 }
 
 .pdf-paper__badge {
   position: absolute;
   top: 1rem;
   right: 1.1rem;
-  z-index: 2;
+  z-index: 5;
   padding: 0.2rem 0.55rem;
   border-radius: 999px;
   background: color-mix(in srgb, var(--ink) 70%, transparent);
@@ -400,12 +440,89 @@ onUnmounted(() => {
   opacity: 1;
 }
 
+/* 左侧保持轻微装订压痕，右侧光影只在翻动期间出现。 */
+.pdf-paper__spine-shadow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 20px;
+  background: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--ink) 11%, transparent) 0%,
+    color-mix(in srgb, var(--ink) 4%, transparent) 42%,
+    transparent 100%
+  );
+  pointer-events: none;
+  z-index: 4;
+}
+
+.pdf-paper__turn-shadow {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  background: linear-gradient(
+    to left,
+    color-mix(in srgb, var(--ink) 28%, transparent) 0%,
+    color-mix(in srgb, var(--ink) 9%, transparent) 8%,
+    transparent 24%
+  );
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 前进：当前页轻抬后退场，下一页在下层显露。 */
+.pdf-page-next-enter-active,
+.pdf-page-next-leave-active,
+.pdf-page-prev-enter-active,
+.pdf-page-prev-leave-active {
+  will-change: transform, opacity;
+}
+
+.pdf-page-next-enter-active,
+.pdf-page-prev-leave-active {
+  z-index: 1;
+  transition:
+    transform 430ms cubic-bezier(0.22, 0.68, 0.2, 1),
+    opacity 300ms ease;
+}
+
+.pdf-page-next-leave-active,
+.pdf-page-prev-enter-active {
+  z-index: 2;
+  transition:
+    transform 430ms cubic-bezier(0.22, 0.68, 0.2, 1),
+    opacity 260ms ease 70ms;
+}
+
+.pdf-page-next-enter-from,
+.pdf-page-prev-leave-to {
+  opacity: 0.82;
+  transform: translate3d(1.25%, 0, -18px) scale(0.994);
+}
+
+.pdf-page-next-leave-to,
+.pdf-page-prev-enter-from {
+  opacity: 0;
+  transform: translate3d(-4.5%, 0, 24px) rotateY(-9deg) scale(0.992);
+}
+
+.pdf-page-next-leave-active .pdf-paper__turn-shadow,
+.pdf-page-prev-enter-active .pdf-paper__turn-shadow {
+  transition: opacity 430ms cubic-bezier(0.22, 0.68, 0.2, 1);
+}
+
+.pdf-page-next-leave-to .pdf-paper__turn-shadow,
+.pdf-page-prev-enter-from .pdf-paper__turn-shadow {
+  opacity: 0.9;
+}
+
 /* 左右浮动翻页大箭头 */
 .pdf-book__nav {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  z-index: 5;
+  z-index: 10;
   display: flex;
   align-items: center;
   justify-content: center;
