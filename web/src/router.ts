@@ -110,16 +110,15 @@ export const router = createRouter({
   ],
 });
 
+const routeTitles = new Map([
+  ['about', '关于我 · 小明同学'],
+  ['resume', '个人简历 · 小明同学'],
+  ['photos', '照片墙 · 小明同学'],
+  ['photo-album', '照片墙 · 小明同学'],
+  ['games', '游戏墙 · 小明同学'],
+  ['guestbook', '留言板 · 小明同学'],
+]);
+
 router.afterEach((to) => {
-  document.title = to.name === 'about'
-    ? '关于我 · 小明同学'
-    : to.name === 'resume'
-      ? '个人简历 · 小明同学'
-      : to.name === 'photos' || to.name === 'photo-album'
-        ? '照片墙 · 小明同学'
-        : to.name === 'games'
-          ? '游戏墙 · 小明同学'
-          : to.name === 'guestbook'
-            ? '留言板 · 小明同学'
-            : '小明同学';
+  document.title = routeTitles.get(String(to.name)) ?? '小明同学';
 });
