@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onClickOutside, useMediaQuery } from '@vueuse/core';
 import { computed, onUnmounted, shallowRef, useTemplateRef } from 'vue';
+import { useNavIconStyle } from '../../composables/useNavIconStyle';
 import type { JournalChannel } from '../../types';
 import AboutNavigationIcon from '../about/AboutNavigationIcon.vue';
 import AINavigationIcon from '../ai/AINavigationIcon.vue';
@@ -10,6 +11,10 @@ import PhotoNavigationIcon from '../photos/PhotoNavigationIcon.vue';
 import ArticleNavigationIcon from './ArticleNavigationIcon.vue';
 import InterestNavigationIcon from './InterestNavigationIcon.vue';
 import LifeNavigationIcon from './LifeNavigationIcon.vue';
+
+const { navIconStyle, toggleNavIconStyle } = useNavIconStyle();
+// 图标风格切换入口展示控制（保持萌系线条为默认风格，切换组件隐藏但保留代码）
+const showStyleToggle = false;
 
 const props = withDefaults(
   defineProps<{
@@ -264,7 +269,7 @@ onClickOutside(sidebar, () => {
           </button>
         </div>
 
-        <!-- 桌面端专属底部项 (AI、关于我) -->
+        <!-- 桌面端专属底部项 (AI、关于我、风格切换) -->
         <div class="channel-sidebar__footer channel-sidebar__footer--desktop">
           <button
             class="channel-sidebar__item channel-sidebar__item--ai"
@@ -286,6 +291,41 @@ onClickOutside(sidebar, () => {
             <AboutNavigationIcon class="channel-sidebar__about-icon" />
             <span>关于我</span>
           </button>
+
+          <!-- 图标风格切换开关（默认隐藏，代码保留供随时启用） -->
+          <button
+            v-if="showStyleToggle"
+            class="channel-sidebar__style-toggle"
+            type="button"
+            :title="navIconStyle === 'playful-line' ? '当前：萌系线条风格，点击切换为质感渐变' : '当前：质感渐变风格，点击切换为萌系线条'"
+            aria-label="切换侧栏图标风格"
+            @click="toggleNavIconStyle"
+          >
+            <span class="channel-sidebar__style-badge">
+              <svg v-if="navIconStyle === 'playful-line'" class="channel-sidebar__style-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 3C6.5 3 2 7.1 2 12.2C2 17.3 6.8 21.2 12 21.2C17.5 21.2 22 17.1 22 12.2C22 7.1 17.5 3 12 3Z" />
+                <path d="M8 12.5C8 14 9.8 15 12 15C14.2 15 16 14 16 12.5" />
+              </svg>
+              <svg v-else class="channel-sidebar__style-svg" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <defs>
+                  <linearGradient id="nav-toggle-grad" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stop-color="#38BDF8" />
+                    <stop offset="50%" stop-color="#A855F7" />
+                    <stop offset="100%" stop-color="#F43F5E" />
+                  </linearGradient>
+                </defs>
+                <circle cx="12" cy="12" r="9" fill="url(#nav-toggle-grad)" />
+                <circle cx="12" cy="12" r="5" fill="#141720" fill-opacity="0.8" />
+                <circle cx="13.5" cy="10.5" r="1.2" fill="#FFFFFF" />
+              </svg>
+            </span>
+            <span class="channel-sidebar__style-text">
+              {{ navIconStyle === 'playful-line' ? '萌系线条' : '质感渐变' }}
+            </span>
+            <span class="channel-sidebar__style-pill" :class="{ 'channel-sidebar__style-pill--gradient': navIconStyle === 'gradient' }">
+              <span class="channel-sidebar__style-thumb" />
+            </span>
+          </button>
         </div>
       </nav>
     </div>
@@ -306,6 +346,15 @@ onClickOutside(sidebar, () => {
           <div class="mobile-more-sheet">
             <div class="mobile-more-sheet__header">
               <span class="mobile-more-sheet__title">更多频道与模块</span>
+              <button
+                v-if="showStyleToggle"
+                class="mobile-more-sheet__style-toggle"
+                type="button"
+                :title="navIconStyle === 'playful-line' ? '切换为质感渐变风格' : '切换为萌系线条风格'"
+                @click="toggleNavIconStyle"
+              >
+                <span>{{ navIconStyle === 'playful-line' ? '萌系线条' : '质感渐变' }}</span>
+              </button>
               <button
                 type="button"
                 class="mobile-more-sheet__close"
@@ -491,6 +540,111 @@ onClickOutside(sidebar, () => {
 
 .channel-sidebar__item--mobile-more {
   display: none;
+}
+
+.channel-sidebar__style-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  min-height: 2.35rem;
+  margin-top: 0.35rem;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-muted) 40%, transparent);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-align: left;
+  transition: all 150ms ease;
+}
+
+.channel-sidebar__style-toggle:hover {
+  background: var(--surface-muted);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+.channel-sidebar__style-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  flex: none;
+}
+
+.channel-sidebar__style-svg {
+  width: 100%;
+  height: 100%;
+}
+
+.channel-sidebar__style-text {
+  flex: 1;
+  white-space: nowrap;
+}
+
+.channel-sidebar__style-pill {
+  position: relative;
+  width: 2rem;
+  height: 1.15rem;
+  border-radius: 999px;
+  background: var(--border-strong);
+  transition: background-color 200ms ease;
+  flex: none;
+}
+
+.channel-sidebar__style-pill--gradient {
+  background: var(--accent);
+}
+
+.channel-sidebar__style-thumb {
+  position: absolute;
+  top: 0.1rem;
+  left: 0.1rem;
+  width: 0.95rem;
+  height: 0.95rem;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.channel-sidebar__style-pill--gradient .channel-sidebar__style-thumb {
+  transform: translateX(0.85rem);
+}
+
+.channel-sidebar--immersive .channel-sidebar__style-toggle {
+  border-color: var(--photo-border);
+  background: var(--photo-surface-hover);
+  color: var(--photo-text-secondary);
+}
+
+.channel-sidebar--immersive .channel-sidebar__style-toggle:hover {
+  color: var(--photo-text-primary);
+}
+
+.mobile-more-sheet__style-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.65rem;
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.15));
+  border-radius: 999px;
+  background: var(--surface-muted, rgba(255, 255, 255, 0.08));
+  color: var(--text-muted, rgba(255, 255, 255, 0.7));
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-left: auto;
+  margin-right: 0.5rem;
+  transition: all 150ms ease;
+}
+
+.mobile-more-sheet__style-toggle:active {
+  transform: scale(0.95);
 }
 
 /* 桌面端沉浸式抽屉交互 */

@@ -1,20 +1,62 @@
 <script setup lang="ts">
-import { useId } from 'vue';
+import { computed, useId } from 'vue';
+import { type NavIconStyle, useNavIconStyle } from '../../composables/useNavIconStyle';
+
+const props = defineProps<{
+  variant?: NavIconStyle;
+}>();
+
+const { navIconStyle } = useNavIconStyle();
+const activeStyle = computed(() => props.variant ?? navIconStyle.value);
 
 const rawId = useId();
 const gradientId = `about-nav-grad-${rawId.replace(/[^a-zA-Z0-9-_]/g, '')}`;
 </script>
 
 <template>
-  <!-- Personal Profile, Bio & Growth Color Theme -->
+  <!-- Plan B: 粗线圆角萌系风 (Cute Rounded Smiley Avatar / 个人与介绍) -->
   <svg
+    v-if="activeStyle === 'playful-line'"
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden="true"
+  >
+    <!-- 萌系头部圆轮廓 -->
+    <circle
+      cx="12"
+      cy="7.5"
+      r="4"
+      stroke="currentColor"
+      stroke-width="2.3"
+      stroke-linecap="round"
+    />
+    <!-- 头部可爱微笑弧线 -->
+    <path
+      d="M10.2 8C10.2 9.1 11 9.8 12 9.8C13 9.8 13.8 9.1 13.8 8"
+      stroke="currentColor"
+      stroke-width="1.8"
+      stroke-linecap="round"
+    />
+    <!-- 萌系身体与肩膀圆弧 -->
+    <path
+      d="M4.5 20.2C4.5 16.2 8 13.5 12 13.5C16 13.5 19.5 16.2 19.5 20.2"
+      stroke="currentColor"
+      stroke-width="2.3"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  </svg>
+
+  <!-- Plan A: 多色渐变微质感风 (Mint to Cyan Avatar Badge) -->
+  <svg
+    v-else
     viewBox="0 0 24 24"
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
     aria-hidden="true"
   >
     <defs>
-      <!-- 主渐变：生机薄荷绿 -> 翡翠绿 -> 碧青 -> 蔚蓝 (个人身份与成长色彩) -->
       <linearGradient
         :id="gradientId"
         x1="2"
@@ -30,21 +72,16 @@ const gradientId = `about-nav-grad-${rawId.replace(/[^a-zA-Z0-9-_]/g, '')}`;
       </linearGradient>
     </defs>
 
-    <!-- 头部肖像 -->
     <circle
       cx="12"
       cy="7.5"
       r="3.8"
       :fill="`url(#${gradientId})`"
     />
-
-    <!-- 身体与肩膀轮廓 -->
     <path
       d="M4.5 19.5C4.5 15.634 7.85786 13.25 12 13.25C16.1421 13.25 19.5 15.634 19.5 19.5C19.5 20.3284 18.8284 21 18 21H6C5.17157 21 4.5 20.3284 4.5 19.5Z"
       :fill="`url(#${gradientId})`"
     />
-
-    <!-- 头部柔和高光弧点 -->
     <circle
       cx="13.2"
       cy="6.3"
@@ -52,8 +89,6 @@ const gradientId = `about-nav-grad-${rawId.replace(/[^a-zA-Z0-9-_]/g, '')}`;
       fill="#FFFFFF"
       fill-opacity="0.9"
     />
-
-    <!-- 衣领/胸前身份标识线条 -->
     <path
       d="M10 16.8L12 18.8L14 16.8"
       stroke="#FFFFFF"

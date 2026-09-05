@@ -65,9 +65,10 @@ function finishCelebration(event: AnimationEvent): void {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  min-height: 40px;
-  padding: 0 0.35rem;
+  min-height: 28px;
+  padding: 0.2rem 0.35rem;
   border: 0;
+  border-radius: 6px;
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
@@ -78,6 +79,7 @@ function finishCelebration(event: AnimationEvent): void {
 }
 
 .reaction-button--detail {
+  min-height: 40px;
   gap: 0.45rem;
   font-size: 0.86rem;
 }

@@ -223,29 +223,34 @@ function handleCardClick(event: MouseEvent): void {
       class="article-card__body"
     />
 
-    <div v-if="entry.tags.length" class="article-card__tags" aria-label="标签">
-      <button
-        v-for="tag in entry.tags"
-        :key="tag"
-        class="article-card__tag"
-        type="button"
-        @click="emit('selectTag', tag)"
-      >
-        #{{ tag }}
-      </button>
-    </div>
-
     <footer
-      v-if="display === 'summary' && showInteractions && !editable"
-      class="article-card__interaction-footer"
+      v-if="entry.tags.length || (display === 'summary' && showInteractions && !editable)"
+      class="article-card__footer"
     >
-      <EntryInteractionSummary
-        :summary="entry.interactions"
-        :interactive="!editable"
-        :reaction-pending="reactionPending"
-        @toggle-reaction="emit('toggleReaction', entry)"
-        @open-comments="emit('openComments', entry)"
-      />
+      <div v-if="entry.tags.length" class="article-card__tags" aria-label="标签">
+        <button
+          v-for="tag in entry.tags"
+          :key="tag"
+          class="article-card__tag"
+          type="button"
+          @click="emit('selectTag', tag)"
+        >
+          #{{ tag }}
+        </button>
+      </div>
+
+      <div
+        v-if="display === 'summary' && showInteractions && !editable"
+        class="article-card__interactions"
+      >
+        <EntryInteractionSummary
+          :summary="entry.interactions"
+          :interactive="!editable"
+          :reaction-pending="reactionPending"
+          @toggle-reaction="emit('toggleReaction', entry)"
+          @open-comments="emit('openComments', entry)"
+        />
+      </div>
     </footer>
 
     <footer v-if="editable && confirmingDeletion" class="article-card__delete-confirmation" role="alert">
@@ -328,7 +333,6 @@ function handleCardClick(event: MouseEvent): void {
 }
 
 .article-card__header,
-.article-card__tags,
 .article-card__delete-actions {
   display: flex;
   align-items: center;
@@ -490,33 +494,47 @@ function handleCardClick(event: MouseEvent): void {
   outline-offset: 2px;
 }
 
-.article-card__body {
-  margin: 0.35rem 0;
+.article-card__footer {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.65rem;
+  margin-top: 0.15rem;
 }
 
 .article-card__tags {
-  gap: 0.15rem;
+  display: flex;
   flex-wrap: wrap;
+  align-items: center;
+  gap: 0.2rem 0.35rem;
+  flex: 1;
+  min-width: 0;
 }
 
-.article-card__interaction-footer {
+.article-card__interactions {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  flex: none;
+  margin-left: auto;
 }
 
 .article-card__tag {
-  min-height: 2.5rem;
-  padding: 0.45rem 0.35rem;
+  min-height: auto;
+  padding: 0.12rem 0.35rem;
   border: 0;
+  border-radius: 4px;
   background: transparent;
   color: var(--accent-strong);
   cursor: pointer;
   font: inherit;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  transition: color 150ms ease, background-color 150ms ease;
 }
 
 .article-card__tag:hover {
-  text-decoration: underline;
+  background: var(--accent-soft);
+  text-decoration: none;
 }
 
 .article-card__delete-confirmation {
@@ -563,7 +581,7 @@ function handleCardClick(event: MouseEvent): void {
   }
 
   .article-card__tags {
-    gap: 0;
+    gap: 0.15rem 0.25rem;
   }
 }
 
