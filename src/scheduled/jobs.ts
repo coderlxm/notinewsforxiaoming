@@ -24,6 +24,11 @@ import {
   sendWorkCheckinFollowUpIfPending,
 } from '../services/workCheckinReminder.js';
 import { triggerBusReminder } from '../services/busReminder.js';
+import { checkBackupHealth, getNewBackupFailures, saveBackupAlertState } from '../services/backupHealth.js';
+import {
+  formatBackupHealthAlert,
+} from '../formatters/index.js';
+import { sendTelegramMessage } from '../publishers/telegram.js';
 
 const VITAMIN_WORKDAY_RANDOM_WINDOW_MS = 15 * 60 * 1000;
 const PHOTO_WORKDAY_RANDOM_WINDOW_MS = 65 * 60 * 1000;
@@ -166,6 +171,16 @@ export function registerFixedJobs(bot: Telegraf): void {
   // sleep: 00:10 Beijing time
   schedule.scheduleJob({ hour: 0, minute: 10, tz: 'Asia/Shanghai' }, async () => {
     await runMode('sleep', getChinaDayOfWeek(), bot);
+  });
+
+  // backup health: 05:10
+  schedule.scheduleJob({ hour: 5, minute: 10, tz: 'Asia/Shanghai' }, async () => {
+    const results = checkBackupHealth();
+    const newFailures = getNewBackupFailures(results);
+    if (newFailures.length > 0) {
+      await sendTelegramMessage(formatBackupHealthAlert(newFailures), bot);
+    }
+    saveBackupAlertState(results);
   });
 
   // wakeup: 08:30

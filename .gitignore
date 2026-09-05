@@ -15,6 +15,7 @@ node_modules/
 data/fitness_status.json
 data/notinews.sqlite
 data/notinews.sqlite-*
+data/backup-health-alert-state.json
 
 # Mac OS
 .DS_Store

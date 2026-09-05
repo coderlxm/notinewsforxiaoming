@@ -1,6 +1,7 @@
 import type { WeatherData } from '../fetchers/weather.js';
 import type { GameNews } from '../fetchers/games.js';
 import type { ServerHealthResult } from '../services/serverHealth.js';
+import type { BackupHealthResult } from '../services/backupHealth.js';
 import { isChinaWorkday } from '../calendar/chinaWorkday.js';
 import { getCountdownInfo } from '../calendar/countdown.js';
 import { escapeHtml, escapeHtmlAttr } from '../utils/html.js';
@@ -237,5 +238,23 @@ export function formatServerHealthMessage(results: ServerHealthResult[]): string
   });
 
   message += '#服务器巡检 #健康检查';
+  return message;
+}
+
+export function formatBackupHealthAlert(results: BackupHealthResult[]): string {
+  const abnormalResults = results.filter(result => !result.healthy);
+  let message = `⚠️ <b>备份异常告警</b> (${chinaDateLabel()} ${chinaWeekdayLabel()})\n\n`;
+
+  abnormalResults.forEach(result => {
+    const title = `${result.target.alias} - ${result.target.name}`;
+    message += `❌ <b>${escapeHtml(title)}</b>\n`;
+    message += `状态: ${escapeHtml(result.error ?? '备份状态异常')}\n`;
+    if (result.exitAt) {
+      message += `最近执行: ${escapeHtml(result.exitAt)}\n`;
+    }
+    message += '\n';
+  });
+
+  message += '#备份告警';
   return message;
 }
