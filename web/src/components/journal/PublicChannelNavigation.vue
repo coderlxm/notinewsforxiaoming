@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { onClickOutside, useMediaQuery } from '@vueuse/core';
 import { computed, onUnmounted, shallowRef, useTemplateRef } from 'vue';
-import { journalChannels } from '../../journalChannels';
 import type { JournalChannel } from '../../types';
 import AboutNavigationIcon from '../about/AboutNavigationIcon.vue';
 import AINavigationIcon from '../ai/AINavigationIcon.vue';
 import GameNavigationIcon from '../games/GameNavigationIcon.vue';
 import GuestbookNavigationIcon from '../guestbook/GuestbookNavigationIcon.vue';
 import PhotoNavigationIcon from '../photos/PhotoNavigationIcon.vue';
+import ArticleNavigationIcon from './ArticleNavigationIcon.vue';
+import InterestNavigationIcon from './InterestNavigationIcon.vue';
+import LifeNavigationIcon from './LifeNavigationIcon.vue';
 
 const props = withDefaults(
   defineProps<{
@@ -179,16 +181,36 @@ onClickOutside(sidebar, () => {
         <div class="channel-sidebar__channels">
           <!-- 基础频道 (生活、文章、兴趣) -->
           <button
-            v-for="item in journalChannels"
-            :key="item.value"
-            class="channel-sidebar__item"
-            :class="{ 'channel-sidebar__item--active': channel === item.value && !isMoreActive }"
+            class="channel-sidebar__item channel-sidebar__life"
+            :class="{ 'channel-sidebar__item--active': channel === 'life' && !isMoreActive }"
             type="button"
-            :aria-current="channel === item.value && !isMoreActive ? 'page' : undefined"
-            @click="selectChannel(item.value)"
+            :aria-current="channel === 'life' && !isMoreActive ? 'page' : undefined"
+            @click="selectChannel('life')"
           >
-            <span class="channel-sidebar__marker" aria-hidden="true" />
-            <span>{{ item.label }}</span>
+            <LifeNavigationIcon class="channel-sidebar__life-icon" />
+            <span>生活</span>
+          </button>
+
+          <button
+            class="channel-sidebar__item channel-sidebar__article"
+            :class="{ 'channel-sidebar__item--active': channel === 'article' && !isMoreActive }"
+            type="button"
+            :aria-current="channel === 'article' && !isMoreActive ? 'page' : undefined"
+            @click="selectChannel('article')"
+          >
+            <ArticleNavigationIcon class="channel-sidebar__article-icon" />
+            <span>文章</span>
+          </button>
+
+          <button
+            class="channel-sidebar__item channel-sidebar__interest"
+            :class="{ 'channel-sidebar__item--active': channel === 'interest' && !isMoreActive }"
+            type="button"
+            :aria-current="channel === 'interest' && !isMoreActive ? 'page' : undefined"
+            @click="selectChannel('interest')"
+          >
+            <InterestNavigationIcon class="channel-sidebar__interest-icon" />
+            <span>兴趣</span>
           </button>
 
           <!-- 桌面端专属频道项 (照片墙、游戏墙) -->
@@ -442,52 +464,29 @@ onClickOutside(sidebar, () => {
   color: var(--text-primary);
 }
 
-.channel-sidebar__marker {
-  width: 0.35rem;
-  height: 1.4rem;
-  border-radius: 999px;
-  background: var(--border-strong);
-}
-
-.channel-sidebar__item--active .channel-sidebar__marker {
-  background: var(--accent);
-}
-
-.channel-sidebar__about-icon {
-  width: 1.4rem;
-  height: 1.4rem;
-  flex: none;
-  color: var(--border-strong);
-}
-
-.channel-sidebar__item--active .channel-sidebar__about-icon {
-  color: var(--accent);
-}
-
-.channel-sidebar__ai-icon {
-  width: 1.35rem;
-  height: 1.35rem;
-  flex: none;
-  color: var(--border-strong);
-}
-
+.channel-sidebar__life-icon,
+.channel-sidebar__article-icon,
+.channel-sidebar__interest-icon,
 .channel-sidebar__photo-icon,
 .channel-sidebar__game-icon,
-.channel-sidebar__guestbook-icon {
+.channel-sidebar__guestbook-icon,
+.channel-sidebar__ai-icon,
+.channel-sidebar__about-icon {
   width: 1.35rem;
   height: 1.35rem;
   flex: none;
   transition: transform 160ms var(--ease-card);
 }
 
+.channel-sidebar__item:hover .channel-sidebar__life-icon,
+.channel-sidebar__item:hover .channel-sidebar__article-icon,
+.channel-sidebar__item:hover .channel-sidebar__interest-icon,
 .channel-sidebar__item:hover .channel-sidebar__photo-icon,
 .channel-sidebar__item:hover .channel-sidebar__game-icon,
-.channel-sidebar__item:hover .channel-sidebar__guestbook-icon {
+.channel-sidebar__item:hover .channel-sidebar__guestbook-icon,
+.channel-sidebar__item:hover .channel-sidebar__ai-icon,
+.channel-sidebar__item:hover .channel-sidebar__about-icon {
   transform: scale(1.08);
-}
-
-.channel-sidebar__item--active .channel-sidebar__ai-icon {
-  color: var(--accent);
 }
 
 .channel-sidebar__item--mobile-more {
@@ -588,14 +587,6 @@ onClickOutside(sidebar, () => {
     background: var(--photo-surface-hover);
     color: var(--photo-text-primary);
   }
-
-  .channel-sidebar--immersive .channel-sidebar__marker {
-    background: rgb(255 255 255 / 22%);
-  }
-
-  .channel-sidebar--immersive .channel-sidebar__item--active .channel-sidebar__marker {
-    background: var(--accent);
-  }
 }
 
 /* 移动端底部 Tab 栏 */
@@ -653,10 +644,9 @@ onClickOutside(sidebar, () => {
     border-radius: 8px;
   }
 
-  .channel-sidebar__marker {
-    display: none;
-  }
-
+  .channel-sidebar__life-icon,
+  .channel-sidebar__article-icon,
+  .channel-sidebar__interest-icon,
   .channel-sidebar__about-icon,
   .channel-sidebar__ai-icon,
   .channel-sidebar__photo-icon,
