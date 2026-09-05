@@ -20,6 +20,7 @@ type StageAsset = JournalAsset & {
 const currentIndex = shallowRef(0);
 const videoReady = shallowRef(false);
 const videoPlaying = shallowRef(false);
+const videoMuted = shallowRef(true);
 const videoControlsActivated = shallowRef(false);
 const videoCurrentTime = shallowRef(0);
 const videoDuration = shallowRef(0);
@@ -102,6 +103,7 @@ function handleVideoHostMount(container: HTMLElement | null): void {
   if (!container || !asset || asset.mediaType !== 'video') {
     videoReady.value = asset?.mediaType !== 'video';
     videoPlaying.value = false;
+    videoMuted.value = true;
     videoControlsActivated.value = false;
     videoCurrentTime.value = 0;
     videoDuration.value = 0;
@@ -115,6 +117,7 @@ function handleVideoHostMount(container: HTMLElement | null): void {
   video.controls = false;
   video.autoplay = true;
   video.muted = true;
+  videoMuted.value = video.muted;
   video.playsInline = true;
   if (asset.previewUrl && !video.poster) {
     video.poster = asset.previewUrl;
@@ -152,6 +155,12 @@ function toggleVideoPlayback(): void {
   }
   videoControlsActivated.value = true;
   currentMountedVideo.pause();
+}
+
+function toggleVideoMuted(): void {
+  if (!currentMountedVideo || !videoReady.value) return;
+  currentMountedVideo.muted = !currentMountedVideo.muted;
+  videoMuted.value = currentMountedVideo.muted;
 }
 
 function handleVideoSurfaceClick(): void {
@@ -252,6 +261,26 @@ onBeforeUnmount(() => {
             <path d="m9 6 9 6-9 6Z" />
           </svg>
         </button>
+        <button
+          v-if="currentAsset.mediaType === 'video'"
+          class="media-stage__mute-toggle"
+          type="button"
+          :aria-label="videoMuted ? '打开声音' : '静音'"
+          :aria-pressed="!videoMuted"
+          :disabled="!videoReady"
+          @click.stop="toggleVideoMuted"
+        >
+          <svg class="media-stage__mute-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 9v6h4l5 4V5L8 9H4Z" />
+            <template v-if="videoMuted">
+              <path d="m17 9 4 4m0-4-4 4" />
+            </template>
+            <template v-else>
+              <path d="M16 9.5a4 4 0 0 1 0 5" />
+              <path d="M18.5 7a7 7 0 0 1 0 10" />
+            </template>
+          </svg>
+        </button>
         <input
           v-if="currentAsset.mediaType === 'video'"
           class="media-stage__progress"
@@ -343,6 +372,7 @@ onBeforeUnmount(() => {
 }
 
 .media-stage__item {
+  position: relative;
   display: grid;
   min-width: 0;
   min-height: 0;
@@ -404,6 +434,50 @@ onBeforeUnmount(() => {
   opacity: 1;
   place-items: center;
   transition: opacity 220ms ease, transform 220ms ease;
+}
+
+.media-stage__mute-toggle {
+  position: absolute;
+  z-index: 2;
+  top: 16px;
+  right: 16px;
+  display: grid;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 36%);
+  border-radius: 50%;
+  background: rgb(20 20 20 / 58%);
+  color: #fff;
+  cursor: pointer;
+  place-items: center;
+  transition: background 160ms ease, transform 160ms ease;
+}
+
+.media-stage__mute-toggle:hover:not(:disabled) {
+  background: rgb(20 20 20 / 76%);
+  transform: scale(1.04);
+}
+
+.media-stage__mute-toggle:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.media-stage__mute-toggle:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.media-stage__mute-icon {
+  display: block;
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
 }
 
 .media-stage__playback-toggle--playing,
@@ -703,6 +777,7 @@ onBeforeUnmount(() => {
 @media (prefers-reduced-motion: reduce) {
   .media-stage__media,
   .media-stage__playback-toggle,
+  .media-stage__mute-toggle,
   .media-stage__progress {
     animation: none;
     transition: none;
