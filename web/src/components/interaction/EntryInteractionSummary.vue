@@ -131,4 +131,10 @@ const emit = defineEmits<{
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+
+@media (max-width: 599px) {
+  .entry-interactions {
+    display: none;
+  }
+}
 </style>
