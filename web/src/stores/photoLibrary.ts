@@ -1,13 +1,16 @@
 import { shallowRef } from 'vue';
 import { defineStore } from 'pinia';
+import { shuffle } from 'radash';
 import { fetchPhotoAlbum, fetchPhotoLibrary } from '../api';
 import type {
   PhotoAlbumDetail,
   PhotoLibraryOverview,
+  PhotoLibraryPhoto,
 } from '../../../src/shared/photoLibraryProtocol';
 
 export const usePhotoLibraryStore = defineStore('photoLibrary', () => {
   const overview = shallowRef<PhotoLibraryOverview | null>(null);
+  const stripPhotos = shallowRef<PhotoLibraryPhoto[]>([]);
   const overviewLoading = shallowRef(false);
   const overviewError = shallowRef<string | null>(null);
   const albumsById = shallowRef(new Map<string, PhotoAlbumDetail>());
@@ -25,7 +28,9 @@ export const usePhotoLibraryStore = defineStore('photoLibrary', () => {
     overviewLoading.value = true;
     overviewError.value = null;
     try {
-      overview.value = await fetchPhotoLibrary();
+      const data = await fetchPhotoLibrary();
+      stripPhotos.value = shuffle(data.featured.slice(1));
+      overview.value = data;
     }
     catch (reason) {
       overviewError.value = errorMessage(reason);
@@ -97,6 +102,7 @@ export const usePhotoLibraryStore = defineStore('photoLibrary', () => {
 
   return {
     overview,
+    stripPhotos,
     overviewLoading,
     overviewError,
     albumsById,

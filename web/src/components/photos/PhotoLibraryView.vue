@@ -24,7 +24,7 @@ function isHeroEligiblePhoto(photo: PhotoLibraryPhoto): boolean {
 }
 
 const store = usePhotoLibraryStore();
-const { overview, overviewLoading, overviewError } = storeToRefs(store);
+const { overview, overviewLoading, overviewError, stripPhotos } = storeToRefs(store);
 const featured = computed(() => overview.value?.featured ?? []);
 const heroPhotos = computed(() => {
   const cameraLandscapePhotos = featured.value.filter(isHeroEligiblePhoto);
@@ -32,7 +32,6 @@ const heroPhotos = computed(() => {
   const anyLandscapePhotos = featured.value.filter(p => p.view.width > p.view.height);
   return anyLandscapePhotos.length > 0 ? anyLandscapePhotos : featured.value;
 });
-const stripPhotos = computed(() => featured.value.slice(1));
 const lightbox = usePhotoLightbox(featured);
 let active = true;
 
@@ -47,7 +46,8 @@ function openHeroPhoto(index = 0): void {
 }
 
 function openStripPhoto(index: number): void {
-  lightbox.open(index + 1);
+  const photo = stripPhotos.value[index];
+  lightbox.open(featured.value.findIndex(p => p.id === photo.id));
 }
 
 onMounted(async () => {
